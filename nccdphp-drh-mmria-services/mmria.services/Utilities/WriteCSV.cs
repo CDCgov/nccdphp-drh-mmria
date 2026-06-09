@@ -3,6 +3,7 @@ using System.Data;
 using System.IO;
 using System.Text;
 using System.Collections.Generic;
+using mmria.common.SharedLibraries.Security.FileSystem;
 
 namespace mmria.services.Utilities;
 
@@ -22,7 +23,7 @@ public sealed class WriteCSV
     {
         p_folder_name = PathSanitizer.ValidatePathSegment(p_folder_name, nameof(p_folder_name));
         p_file_name = PathSanitizer.ValidatePathSegment(p_file_name, nameof(p_file_name));
-        this.folder_name = System.IO.Path.Combine(p_export_directory, p_folder_name);
+        this.folder_name = ContainedFileStore.EnsureContainedDirectoryExists(p_export_directory, p_folder_name);
         this.file_name = p_file_name;
 
         this.is_excel = p_is_excel;
@@ -31,7 +32,7 @@ public sealed class WriteCSV
 
         if(! is_excel)
         {
-            writer = new StreamWriter(System.IO.Path.Combine(folder_name, this.file_name));
+            writer = new StreamWriter(ContainedFileStore.OpenContainedWriteStream(folder_name, this.file_name));
         }
     }
 
@@ -128,16 +129,15 @@ public sealed class WriteCSV
     public void WriteToExcel()
     {
         var Template_xlsx = "database-scripts/Template.xlsx";
-        var Output_xlsx = System.IO.Path.Combine (folder_name, file_name.Replace(".csv",".xlsx"));
+        var outputFileName = PathSanitizer.ValidatePathSegment(file_name.Replace(".csv",".xlsx"), nameof(file_name));
+        ContainedFileStore.DeleteExistingFileByName(folder_name, outputFileName);
+        var Output_xlsx = ContainedFileStore.ResolveContainedFilePath(folder_name, outputFileName);
 
         if(Output_xlsx.StartsWith("/home/net_core_user/app/workdir/mmria-export"))
         {
             Template_xlsx = "/opt/app-root/src/source-code/mmria/mmria-server/database-scripts/Template.xlsx";
         }
         
-        if(System.IO.File.Exists(Output_xlsx))
-            System.IO.File.Delete(Output_xlsx);
-
         using (FastExcel.FastExcel fastExcel = new FastExcel.FastExcel(new System.IO.FileInfo(Template_xlsx), new System.IO.FileInfo(Output_xlsx)))
         {
             fastExcel.Write(table, "sheet1");

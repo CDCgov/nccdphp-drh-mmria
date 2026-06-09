@@ -237,7 +237,17 @@ public sealed class _configController : Controller
             
             foreach(var kvp in config_set.name_value)
             {
-                result.string_keys["shared"].Add(kvp.Key, kvp.Value);
+                result.string_keys["shared"][kvp.Key] = kvp.Value;
+            }
+
+            if (!result.string_keys["shared"].ContainsKey("app_version"))
+            {
+                result.string_keys["shared"]["app_version"] = GetModeAwareMmriaSetting("app_version") ?? Program.DefaultAppVersion;
+            }
+
+            if (!result.string_keys["shared"].ContainsKey("omb_date"))
+            {
+                result.string_keys["shared"]["omb_date"] = GetModeAwareMmriaSetting("omb_date") ?? Program.DefaultOmbDate;
             }
 
             result.string_keys["shared"].Add("sams:direct_login_url", configuration["sams:direct_login_url"]);

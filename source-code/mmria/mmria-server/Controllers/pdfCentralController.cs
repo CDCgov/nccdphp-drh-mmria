@@ -197,11 +197,24 @@ public sealed class pdfCentralController : Controller
     
 
     [HttpGet]
-    public  async Task<FileResult> GetFileResult(string FileName)
+    public  async Task<IActionResult> GetFileResult(string FileName)
     {
-        var queue_Result = new mmria.common.steve.QueueResult();
-        var safeFileName = ContainedPathHelper.ValidateContainedName(FileName, nameof(FileName));
-        byte[] fileBytes = await ContainedPathHelper.ReadContainedFileAsync(download_directory, safeFileName);
+        string safeFileName;
+        try
+        {
+            safeFileName = ContainedPathHelper.ValidateContainedName(FileName, nameof(FileName));
+        }
+        catch (ArgumentException)
+        {
+            return NotFound();
+        }
+
+        if (!ContainedPathHelper.TryFindExistingFile(download_directory, safeFileName, out var fileInfo))
+        {
+            return NotFound();
+        }
+
+        byte[] fileBytes = await ContainedPathHelper.ReadExistingFileAsync(fileInfo);
         return SafeFileDownloadResultFactory.Create(
             fileBytes,
             System.Net.Mime.MediaTypeNames.Application.Octet,
@@ -213,8 +226,14 @@ public sealed class pdfCentralController : Controller
     [HttpGet]
     public  async Task<JsonResult> DeleteFileResult(string FileName)
     {
-        var safeFileName = ContainedPathHelper.ValidateContainedName(FileName, nameof(FileName));
-        ContainedPathHelper.DeleteContainedFile(download_directory, safeFileName);
+        try
+        {
+            var safeFileName = ContainedPathHelper.ValidateContainedName(FileName, nameof(FileName));
+            ContainedPathHelper.DeleteExistingFileByName(download_directory, safeFileName);
+        }
+        catch (ArgumentException)
+        {
+        }
 
         return await GetQueueResult();
     }

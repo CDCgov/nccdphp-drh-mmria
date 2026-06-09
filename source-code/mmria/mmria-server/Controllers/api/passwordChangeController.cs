@@ -14,6 +14,7 @@ using Microsoft.Extensions.Configuration;
 using Akka.Actor;
 using mmria.common.SharedLibraries.Session.Model;
 using mmria.common.SharedLibraries.Session.Manager;
+using mmria.common.SharedLibraries.Account.Manager;
 
 using mmria.server.extension;
 
@@ -24,8 +25,8 @@ namespace mmria.server;
 [Route("api/[controller]")]
 public sealed class passwordChangeController: ControllerBase 
 { 
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     mmria.common.SharedLibraries.Session.Manager.SessionManager _sessionManager;
+    private readonly AccountManager _accountManager;
     IHttpContextAccessor accessor;
     
 
@@ -37,12 +38,11 @@ public sealed class passwordChangeController: ControllerBase
         mmria.common.SharedLibraries.Session.Manager.SessionManager sessionManager,
         IHttpContextAccessor _accessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        AccountManager accountManager
     )
     {
-        _couchDbHttpClient = couchDbHttpClient;
-
         _sessionManager = sessionManager;
+        _accountManager = accountManager;
         accessor = _accessor;
         host_prefix = tenantRuntime.EffectiveHostPrefix;
 
@@ -72,39 +72,10 @@ public sealed class passwordChangeController: ControllerBase
                     u => u.IsAuthenticated && 
                     u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
 
-                var session_event_request_url = db_config.Get_Prefix_DB_Url($"session/_design/session_event_sortable/_view/by_user_id?startkey=\"{userName}\"&endkey=\"{userName}\"");
-
-                string response_from_server = await _couchDbHttpClient.ExecuteAsync("GET", session_event_request_url, null, db_config.user_name, db_config.user_value);
-
-                //var session_event_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_object_key_header<mmria.common.model.couchdb.session_event>>(response_from_server);
-                var session_event_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.session_event>>(response_from_server);
-
-                DateTime first_item_date = DateTime.Now;
-                DateTime last_item_date = DateTime.Now;
-
-                session_event_response.rows.Sort(new mmria.common.model.couchdb.Compare_Session_Event_By_DateCreated<mmria.common.model.couchdb.session_event>());
-
-                var date_of_last_change = DateTime.MinValue;
-        
-                foreach(var session_event in session_event_response.rows)
-                {
-                    if(session_event.value.action_result == mmria.common.model.couchdb.session_event.session_event_action_enum.password_changed)
-                    {
-                        date_of_last_change = session_event.value.date_created;
-                        break;
-                    }
-                }
-
-                if(date_of_last_change != DateTime.MinValue)
-                {
-                    days_til_expires = days_before_expires - (int)(DateTime.Now - date_of_last_change).TotalDays;
-                }
-                else if(session_event_response.rows.Count > 0)
-                {
-                    days_til_expires = days_before_expires - (int)(DateTime.Now - session_event_response.rows[session_event_response.rows.Count-1].value.date_created).TotalDays;
-                }
-                    
-                
+                days_til_expires = await _sessionManager.GetDaysUntilPasswordExpirationAsync(
+                    userName,
+                    days_before_expires,
+                    db_config);
             }
             catch(Exception ex) 
             {
@@ -125,7 +96,6 @@ public sealed class passwordChangeController: ControllerBase
         var user = await mmria.server.util.JsonRequestBodyReader.ReadAsync<ApplicationUser>(Request);
 
         var safeRequest = CreateSanitizedPasswordChangeRequest(user);
-        string object_string = null;
         mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response ();
 
         var userName = User.Identities.First(
@@ -134,13 +104,8 @@ public sealed class passwordChangeController: ControllerBase
 
         try
         {
-            string user_db_url = db_config.url + "/_users/org.couchdb.user:" + userName;
-            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", user_db_url, object_string, db_config.user_name, db_config.user_value);
-            var user_object = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.user>(responseFromServer);
-
             if
             (
-                user_object == null ||
                 safeRequest == null ||
                 !safeRequest.UserName.Equals(userName, StringComparison.OrdinalIgnoreCase)
             )
@@ -148,16 +113,13 @@ public sealed class passwordChangeController: ControllerBase
                 return null;
             }
 
-            user_object.password = safeRequest.Value;
+            result = await _accountManager.ChangePasswordAsync(
+                safeRequest.UserName,
+                safeRequest.Value,
+                userName,
+                db_config);
 
-            Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-            settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-            object_string = Newtonsoft.Json.JsonConvert.SerializeObject(user_object, settings);
-
-            responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", user_db_url, object_string, db_config.user_name, db_config.user_value);
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
-
-            if (result.ok) 
+            if (result?.ok == true) 
             {
                 var Session_Event_Message = new mmria.common.SharedLibraries.Session.Model.Session_Event_Message
                 (

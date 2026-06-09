@@ -1,18 +1,13 @@
 
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
-using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Configuration;
-using Newtonsoft.Json;
 using Microsoft.AspNetCore.Authorization;
 
+using mmria.common.SharedLibraries.BackupAdmin.Model;
 using  mmria.server.extension; 
 using mmria.server.util;
 namespace mmria.server.Controllers;
@@ -27,11 +22,6 @@ public sealed class backupManagerController : Controller
     string host_prefix = null;
 
     mmria.common.couchdb.ConfigurationSet ConfigDB;
-
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
-
-
-
     private readonly ILogger<backupManagerController> _logger;
     private readonly mmria.common.SharedLibraries.BackupAdmin.Manager.BackupAdminManager _backupAdminManager;
 
@@ -39,24 +29,16 @@ public sealed class backupManagerController : Controller
     (
         ILogger<backupManagerController> logger, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
         mmria.common.SharedLibraries.BackupAdmin.Manager.BackupAdminManager backupAdminManager
     )
 	{
         _logger = logger;
         ConfigDB = tenantRuntime.RequireConfigurationSet();
-        _couchDbHttpClient = couchDbHttpClient;
         _backupAdminManager = backupAdminManager;
 
         configuration = tenantRuntime.RequireConfiguration();
         db_config = tenantRuntime.RequireDbConfig();
         host_prefix = tenantRuntime.EffectiveHostPrefix;
-    }
-
-    private static string BuildBackupServiceUrl(string configUrl, params string[] pathSegments)
-    {
-        var encodedSegments = string.Join("/", pathSegments.Select(Uri.EscapeDataString));
-        return new Uri(new Uri(configUrl.TrimEnd('/') + "/"), $"api/backup/{encodedSegments}").AbsoluteUri;
     }
 
     private string GetBackupServiceBaseUrl()
@@ -96,49 +78,28 @@ public sealed class backupManagerController : Controller
         return OutboundRequestSecurityHelper.ValidateHeaderValue(configuredValue, "vital_service_key");
     }
 
-    private Uri BuildBackupServiceUri(params string[] pathSegments)
+    private IActionResult CreateBackupDownloadResponse(BackupAdminDownloadResult downloadResult, string safeFileName)
     {
-        return new Uri(BuildBackupServiceUrl(GetBackupServiceBaseUrl(), pathSegments));
-    }
-
-    private HttpRequestMessage CreateBackupServiceRequest(Uri requestUri)
-    {
-        var request = new HttpRequestMessage(HttpMethod.Get, ValidateTrustedBackupRequestUri(requestUri));
-        request.Headers.Add("vital-service-key", GetVitalServiceKey());
-        return request;
-    }
-
-    private Uri ValidateTrustedBackupRequestUri(Uri requestUri)
-    {
-        if (requestUri == null || !requestUri.IsAbsoluteUri)
+        if (downloadResult.Status == BackupAdminDownloadStatus.NotFound)
         {
-            throw new ArgumentException("Backup service request URI must be absolute.", nameof(requestUri));
+            return NotFound();
         }
 
-        if (!string.IsNullOrWhiteSpace(requestUri.UserInfo) || !string.IsNullOrWhiteSpace(requestUri.Fragment))
+        if (downloadResult.Status == BackupAdminDownloadStatus.ServiceError)
         {
-            throw new ArgumentException("Backup service request URI must not contain user info or fragments.", nameof(requestUri));
+            return StatusCode(downloadResult.StatusCode);
         }
 
-        var trustedBaseUri = new Uri(GetBackupServiceBaseUrl().TrimEnd('/') + "/");
-        var trustedApiBaseUri = new Uri(trustedBaseUri, "api/backup/");
-
-        if (!Uri.Compare(
-                trustedApiBaseUri,
-                requestUri,
-                UriComponents.SchemeAndServer,
-                UriFormat.SafeUnescaped,
-                StringComparison.OrdinalIgnoreCase).Equals(0))
+        if (!downloadResult.IsSuccess)
         {
-            throw new ArgumentException("Backup service request URI escaped the configured host.", nameof(requestUri));
+            return StatusCode(502);
         }
 
-        if (!requestUri.AbsolutePath.StartsWith(trustedApiBaseUri.AbsolutePath, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new ArgumentException("Backup service request URI escaped the configured backup API path.", nameof(requestUri));
-        }
-
-        return requestUri;
+        return SafeFileDownloadResultFactory.Create(
+            downloadResult.Content,
+            System.Net.Mime.MediaTypeNames.Application.Octet,
+            safeFileName,
+            "backup-download.bin");
     }
 
    
@@ -213,127 +174,47 @@ public sealed class backupManagerController : Controller
     public async Task<IActionResult>  GetFile(string id)
     {
 
-        var export_directory = configuration.GetString("export_directory", host_prefix);
-        var safeFileName = ContainedPathHelper.ValidateContainedName(id, nameof(id));
-        var requestUri = BuildBackupServiceUri("GetFile", safeFileName);
-
-        using (var client = OutboundRequestSecurityHelper.CreateNoRedirectClient())
+        string safeFileName;
+        try
         {
-            using (var request = CreateBackupServiceRequest(requestUri))
-            using (var response = await client.SendAsync(request))
-            {
-                if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
-                {
-                    return NotFound();
-                }
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    return StatusCode((int)response.StatusCode);
-                }
-
-                using (var content = response.Content)
-                {
-                    await using (System.IO.Stream contentStream = await response.Content.ReadAsStreamAsync())
-                    await using (var fs = ContainedPathHelper.OpenContainedWriteStream(export_directory, safeFileName))
-                    {
-                        await contentStream.CopyToAsync(fs);
-                    }
-                            
-                    if (ContainedPathHelper.ContainedFileExists(export_directory, safeFileName))
-                    {
-                        byte[] fileBytes = await ContainedPathHelper.ReadContainedFileAsync(export_directory, safeFileName);
-
-                        ContainedPathHelper.DeleteContainedFile(export_directory, safeFileName);
-                        return SafeFileDownloadResultFactory.Create(
-                            fileBytes,
-                            System.Net.Mime.MediaTypeNames.Application.Octet,
-                            safeFileName,
-                            "backup-download.bin");
-                    }
-                    else
-                    {
-                        return NotFound();
-                    }
-
-                }
-            }
+            safeFileName = ContainedPathHelper.ValidateContainedName(id, nameof(id));
+        }
+        catch (ArgumentException)
+        {
+            return NotFound();
         }
 
+        var downloadResult = await _backupAdminManager.DownloadFileAsync(
+            GetBackupServiceBaseUrl(),
+            GetVitalServiceKey(),
+            safeFileName);
+
+        return CreateBackupDownloadResponse(downloadResult, safeFileName);
     }
 
 
     [Route("backupManager/GetSubFolderFile/{folder}/{file_name}")]
     public async Task<IActionResult> GetSubFolderFile(string folder, string file_name)
     {
-        var export_directory = configuration.GetString("export_directory", host_prefix);
-        var safeFolderName = ContainedPathHelper.ValidateContainedName(folder, nameof(folder));
-        var safeFileName = ContainedPathHelper.ValidateContainedName(file_name, nameof(file_name));
-        var requestUri = BuildBackupServiceUri("GetSubFolderFile", safeFolderName, safeFileName);
-
-        using (var client = OutboundRequestSecurityHelper.CreateNoRedirectClient())
+        string safeFolderName;
+        string safeFileName;
+        try
         {
-            using (var request = CreateBackupServiceRequest(requestUri))
-            using (var response = await client.SendAsync(request))
-            {
-                if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
-                {
-                    return NotFound();
-                }
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    return StatusCode((int)response.StatusCode);
-                }
-
-                using (var content = response.Content)
-                {
-                    var directory_path = ContainedPathHelper.EnsureContainedDirectoryExists(export_directory, safeFolderName);
-
-
-                    await using (System.IO.Stream contentStream = await response.Content.ReadAsStreamAsync())
-                    await using (var fileStream = ContainedPathHelper.OpenContainedWriteStream(directory_path, safeFileName))
-                    {
-                        const int number_of_bytes = 8192;
-
-                        var buffer = new byte[number_of_bytes];
-                        var isMoreToRead = true;
-
-                        do
-                        {
-                            var read = await contentStream.ReadAsync(buffer, 0, buffer.Length);
-                            if (read == 0)
-                            {
-                                isMoreToRead = false;
-                            }
-                            else
-                            {
-                                await fileStream.WriteAsync(buffer, 0, read);
-                            }
-                        }
-                        while (isMoreToRead);
-                    }
-                            
-                    if (ContainedPathHelper.ContainedFileExists(directory_path, safeFileName))
-                    {
-                        byte[] fileBytes = await ContainedPathHelper.ReadContainedFileAsync(directory_path, safeFileName);
-                        ContainedPathHelper.DeleteContainedFile(directory_path, safeFileName);
-                        ContainedPathHelper.DeleteContainedDirectoryIfEmpty(export_directory, safeFolderName);
-                        return SafeFileDownloadResultFactory.Create(
-                            fileBytes,
-                            "application/octet-stream",
-                            safeFileName,
-                            "backup-download.bin");
-                    }
-                    else
-                    {
-                        return NotFound();
-                    }
-
-                }
-            }
+            safeFolderName = ContainedPathHelper.ValidateContainedName(folder, nameof(folder));
+            safeFileName = ContainedPathHelper.ValidateContainedName(file_name, nameof(file_name));
+        }
+        catch (ArgumentException)
+        {
+            return NotFound();
         }
 
+        var downloadResult = await _backupAdminManager.DownloadSubFolderFileAsync(
+            GetBackupServiceBaseUrl(),
+            GetVitalServiceKey(),
+            safeFolderName,
+            safeFileName);
+
+        return CreateBackupDownloadResponse(downloadResult, safeFileName);
     }
 
 }

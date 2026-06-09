@@ -82,6 +82,7 @@ public sealed class export_queueController: ControllerBase
     {
         //bool valid_login = false;
         //mmria.common.data.api.Set_Queue_Request queue_request = null;
+        var request_id = Guid.NewGuid().ToString("N");
         var queue_item = await mmria.server.util.JsonRequestBodyReader.ReadAsync<export_queue_item>(Request);
 
         mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response ();
@@ -97,10 +98,11 @@ public sealed class export_queueController: ControllerBase
         var safeQueueItem = await CreateSanitizedQueueItemAsync(queue_item, userName);
         if (safeQueueItem == null)
         {
+            System.Console.WriteLine($"[EXPORT-QUEUE] request rejected request_id='{request_id}' tenant='{host_prefix}' queue_id='' requested_queue_id='' terminal_status='invalid_request'");
             return result;
         }
 
-        System.Console.WriteLine($"[EXPORT-QUEUE] request received host_prefix='{host_prefix}' id='{safeQueueItem._id}' export_type='{safeQueueItem.export_type}'");
+        System.Console.WriteLine($"[EXPORT-QUEUE] request received request_id='{request_id}' tenant='{host_prefix}' queue_id='{safeQueueItem._id}' requested_queue_id='{safeQueueItem._id}' export_type='{safeQueueItem.export_type}'");
 
         var is_match = System.Text.RegularExpressions.Regex.IsMatch
         (
@@ -116,6 +118,7 @@ public sealed class export_queueController: ControllerBase
         )
         {
 
+            System.Console.WriteLine($"[EXPORT-QUEUE] request rejected request_id='{request_id}' tenant='{host_prefix}' queue_id='{safeQueueItem?._id}' requested_queue_id='{safeQueueItem?._id}' terminal_status='invalid_queue_id'");
             return result;
         }
 
@@ -128,6 +131,9 @@ public sealed class export_queueController: ControllerBase
             if(_exportQueueManager.ShouldTriggerService(sharedItem, result))
             {
                 var juris_user_name = User.Claims.Where(c => c.Type == ClaimTypes.Name).FirstOrDefault().Value; 
+                var vitalsUrl = configuration.GetString("vitals_url", host_prefix);
+                var vitalServiceKey = configuration.GetString("vital_service_key", host_prefix);
+                var serviceUrl = vitalsUrl?.Replace("Message/IJESet", "ExportQueue");
 
                 // Call mmria.services to process export queue
                 try
@@ -136,27 +142,38 @@ public sealed class export_queueController: ControllerBase
                         sharedItem,
                         juris_user_name,
                         host_prefix,
-                        configuration.GetString("vitals_url", host_prefix),
-                        configuration.GetString("vital_service_key", host_prefix)
+                        vitalsUrl,
+                        vitalServiceKey,
+                        request_id
                     );
-                    System.Console.WriteLine($"[EXPORT-QUEUE] delegated to mmria.services host_prefix='{host_prefix}' id='{safeQueueItem._id}'");
+                    System.Console.WriteLine($"[EXPORT-QUEUE] delegated to mmria.services request_id='{request_id}' tenant='{host_prefix}' queue_id='{safeQueueItem._id}' requested_queue_id='{safeQueueItem._id}' service_url='{serviceUrl}' terminal_status='delegated'");
                 }
                 catch (Exception ex)
                 {
-                    System.Console.WriteLine($"[EXPORT-QUEUE] delegate failed host_prefix='{host_prefix}' id='{safeQueueItem._id}' error='{ex.Message}'");
-                    // Don't fail the request - export will remain in queue and can be retried
+                    System.Console.WriteLine($"[EXPORT-QUEUE] delegate failed request_id='{request_id}' tenant='{host_prefix}' queue_id='{safeQueueItem._id}' requested_queue_id='{safeQueueItem._id}' service_url='{serviceUrl}' error='{ex.Message}' terminal_status='handoff_failed'");
+
+                    try
+                    {
+                        result = await _exportQueueManager.MarkServiceTriggerRetryAsync(sharedItem, userName, db_config);
+                        System.Console.WriteLine($"[EXPORT-QUEUE] retryable status preserved request_id='{request_id}' tenant='{host_prefix}' queue_id='{safeQueueItem._id}' requested_queue_id='{safeQueueItem._id}' status='{sharedItem.status}' terminal_status='retryable_in_queue'");
+                    }
+                    catch (Exception statusException)
+                    {
+                        System.Console.WriteLine($"[EXPORT-QUEUE] retryable status update failed request_id='{request_id}' tenant='{host_prefix}' queue_id='{safeQueueItem._id}' requested_queue_id='{safeQueueItem._id}' service_url='{serviceUrl}' error='{statusException.Message}' terminal_status='retryable_status_update_failed'");
+                    }
                 }
             }
             else // if (!result.ok) 
             {
-
+                System.Console.WriteLine($"[EXPORT-QUEUE] service trigger skipped request_id='{request_id}' tenant='{host_prefix}' queue_id='{safeQueueItem._id}' requested_queue_id='{safeQueueItem._id}' status='{sharedItem.status}' save_ok='{result.ok}' terminal_status='not_triggered'");
             }
 
         }
-        catch(Exception) 
+        catch(Exception ex)
         {
             //Console.Write("auth_session_token: {0}", auth_session_token);
             //Console.WriteLine (ex);
+            System.Console.WriteLine($"[EXPORT-QUEUE] request failed request_id='{request_id}' tenant='{host_prefix}' queue_id='{safeQueueItem?._id}' requested_queue_id='{safeQueueItem?._id}' error='{ex.Message}' terminal_status='request_error'");
         }
 
         return result;

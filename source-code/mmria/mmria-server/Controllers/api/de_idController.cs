@@ -10,6 +10,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Http;
 
 using  mmria.server.extension; 
+using mmria.common.SharedLibraries.DeIdentified.Manager;
 namespace mmria.server;
 
 [Authorize(Roles  = "committee_member")]
@@ -19,16 +20,16 @@ public sealed class de_idController: ControllerBase
     mmria.common.couchdb.OverridableConfiguration configuration;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly DeIdentifiedManager _deIdentifiedManager;
 
     public de_idController
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        DeIdentifiedManager deIdentifiedManager
     )
     {
-        _couchDbHttpClient = couchDbHttpClient;
+        _deIdentifiedManager = deIdentifiedManager;
         host_prefix = tenantRuntime.EffectiveHostPrefix;
 
         configuration = tenantRuntime.RequireConfiguration();
@@ -40,24 +41,7 @@ public sealed class de_idController: ControllerBase
     { 
         try
         {
-            string request_string = db_config.Get_Prefix_DB_Url($"de_id/_all_docs?include_docs=true");
-
-            if (!string.IsNullOrWhiteSpace (case_id)) 
-            {
-                request_string = db_config.Get_Prefix_DB_Url($"de_id/{case_id}");
-            } 
-
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                "GET",
-                request_string,
-                null,
-                db_config.user_name,
-                db_config.user_value
-            );
-
-            var result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (responseFromServer);
-
-            return result;
+            return await _deIdentifiedManager.GetDeIdentifiedCaseAsync(case_id, db_config);
         }
         catch(Exception ex)
         {

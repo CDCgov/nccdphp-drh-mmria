@@ -7,6 +7,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using mmria.common.SharedLibraries.MMRIARebuild.Model;
 using mmria.server.util;
 using Newtonsoft.Json.Linq;
 
@@ -25,6 +26,10 @@ public sealed class c_document_sync_all
         public string couchdb_url { get; set; }
         public string status { get; set; }
         public string metadata_version { get; set; }
+        public string document_write_status { get; set; }
+        public string index_restore_mode { get; set; }
+        public string index_warmup_status { get; set; }
+        public List<StartupRebuildIndexSurfaceSummary> index_surfaces { get; set; } = new();
         public string last_processed_id { get; set; }
         public int completed_batch_count { get; set; }
         public int processed_case_count { get; set; }
@@ -57,6 +62,7 @@ public sealed class c_document_sync_all
         public Dictionary<string, startup_rebuild_tenant_summary> tenant_statuses { get; set; } = new Dictionary<string, startup_rebuild_tenant_summary>(StringComparer.OrdinalIgnoreCase);
         public int total_tenant_count { get; set; }
         public int completed_tenant_count { get; set; }
+        public int indexing_pending_tenant_count { get; set; }
         public int paused_tenant_count { get; set; }
         public int running_tenant_count { get; set; }
         public int pending_tenant_count { get; set; }
@@ -258,6 +264,24 @@ public sealed class c_document_sync_all
         }
 
         return "shared";
+    }
+
+    private static List<StartupRebuildIndexSurfaceSummary> clone_index_surfaces(IEnumerable<StartupRebuildIndexSurfaceSummary> index_surfaces)
+    {
+        return (index_surfaces ?? Enumerable.Empty<StartupRebuildIndexSurfaceSummary>())
+            .Where(item => item != null)
+            .Select(item => new StartupRebuildIndexSurfaceSummary
+            {
+                query_surface = item.query_surface,
+                status = item.status,
+                attempt_count = item.attempt_count,
+                elapsed_ms = item.elapsed_ms,
+                started_utc = item.started_utc,
+                last_updated_utc = item.last_updated_utc,
+                completed_utc = item.completed_utc,
+                last_error = item.last_error
+            })
+            .ToList();
     }
 
     private int get_rebuild_setting(string key, int default_value, int minimum_value, int? maximum_value = null)
@@ -529,6 +553,7 @@ public sealed class c_document_sync_all
         summary.configured_tenants = configured_tenants.ToList();
         summary.total_tenant_count = configured_tenants.Count;
         summary.completed_tenant_count = 0;
+        summary.indexing_pending_tenant_count = 0;
         summary.paused_tenant_count = 0;
         summary.running_tenant_count = 0;
         summary.pending_tenant_count = 0;
@@ -561,6 +586,10 @@ public sealed class c_document_sync_all
                 case "completed":
                     summary.completed_tenant_count++;
                     break;
+                case "indexing_pending":
+                    summary.completed_tenant_count++;
+                    summary.indexing_pending_tenant_count++;
+                    break;
                 case "paused":
                     summary.paused_tenant_count++;
                     break;
@@ -581,8 +610,16 @@ public sealed class c_document_sync_all
 
         if(summary.total_tenant_count > 0 && summary.completed_tenant_count == summary.total_tenant_count)
         {
-            summary.status = "completed";
-            summary.completed_utc ??= DateTime.UtcNow.ToString("o");
+            if(summary.indexing_pending_tenant_count > 0)
+            {
+                summary.status = "indexing_pending";
+                summary.completed_utc = null;
+            }
+            else
+            {
+                summary.status = "completed";
+                summary.completed_utc ??= DateTime.UtcNow.ToString("o");
+            }
         }
         else if(summary.running_tenant_count > 0)
         {
@@ -743,6 +780,10 @@ public sealed class c_document_sync_all
         tenant_summary.couchdb_url = this.couchdb_url;
         tenant_summary.status = tenant_state.status;
         tenant_summary.metadata_version = tenant_state.metadata_version;
+        tenant_summary.document_write_status = tenant_state.document_write_status;
+        tenant_summary.index_restore_mode = tenant_state.index_restore_mode;
+        tenant_summary.index_warmup_status = tenant_state.index_warmup_status;
+        tenant_summary.index_surfaces = clone_index_surfaces(tenant_state.index_surfaces);
         tenant_summary.last_processed_id = tenant_state.last_processed_id;
         tenant_summary.completed_batch_count = tenant_state.completed_batch_count;
         tenant_summary.processed_case_count = tenant_state.processed_case_count;
@@ -1430,6 +1471,12 @@ public sealed class c_document_sync_all
         int bulk_write_retry_delay_ms = get_rebuild_setting("startup_rebuild_bulk_write_retry_delay_ms", 1000, 0);
         int progress_persist_every_batches = get_rebuild_setting("startup_rebuild_progress_persist_every_batches", 10, 1);
         int max_concurrent_tenants = DbRebuildSettings.ResolveMaxConcurrentTenants(_configuration, get_effective_host_prefix());
+        bool startup_rebuild_index_add_beginning = DbRebuildSettings.ResolveStartupRebuildIndexAddBeginning(_configuration, get_effective_host_prefix());
+        string index_restore_mode = DbRebuildSettings.ResolveStartupRebuildIndexRestoreMode(_configuration, get_effective_host_prefix(), startup_rebuild_index_add_beginning);
+        if(DbRebuildSettings.WaitsForIndexWarmup(index_restore_mode))
+        {
+            index_restore_mode = DbRebuildSettings.IndexRestoreModeEndNoWait;
+        }
         int processed_case_count = 0;
         int skipped_case_count = 0;
         int document_error_count = 0;
@@ -1439,6 +1486,9 @@ public sealed class c_document_sync_all
         int total_report_doc_count = 0;
         int completed_batch_count = 0;
         string start_after_id = null;
+        string document_write_status = "not_started";
+        string index_warmup_status = "not_started";
+        List<StartupRebuildIndexSurfaceSummary> index_surfaces = new();
         bool rebuild_completed_successfully = false;
         var tenant_rebuild_state = new startup_rebuild_tenant_summary
         {
@@ -1465,12 +1515,17 @@ public sealed class c_document_sync_all
         System.Console.WriteLine($"Bulk write retries: {bulk_write_retry_count}");
         System.Console.WriteLine($"Bulk write retry delay: {bulk_write_retry_delay_ms} ms");
         System.Console.WriteLine($"Progress persistence cadence: every {progress_persist_every_batches} batch(es)");
+        System.Console.WriteLine($"Design/index restore mode: {index_restore_mode}");
         System.Console.WriteLine("=======================================================");
         System.Console.WriteLine();
 
         void update_rebuild_state(string status, string last_error, bool is_completed)
         {
             tenant_rebuild_state.status = status;
+            tenant_rebuild_state.document_write_status = document_write_status;
+            tenant_rebuild_state.index_restore_mode = index_restore_mode;
+            tenant_rebuild_state.index_warmup_status = index_warmup_status;
+            tenant_rebuild_state.index_surfaces = clone_index_surfaces(index_surfaces);
             tenant_rebuild_state.last_processed_id = start_after_id;
             tenant_rebuild_state.completed_batch_count = completed_batch_count;
             tenant_rebuild_state.processed_case_count = processed_case_count;
@@ -1522,6 +1577,7 @@ public sealed class c_document_sync_all
                 System.Console.WriteLine($"Unable to delete legacy startup rebuild checkpoint before rebuild execution: {ex.Message}");
             }
 
+            document_write_status = "running";
             update_rebuild_state("running", null, false);
             await persist_startup_run_summary_async(reset_startup_run_summary, "initial", persist_to_database: true);
 
@@ -1540,6 +1596,17 @@ public sealed class c_document_sync_all
                 bulk_write_retry_delay_ms,
                 async progress =>
                 {
+                    document_write_status = string.IsNullOrWhiteSpace(progress.document_write_status)
+                        ? document_write_status
+                        : progress.document_write_status;
+                    index_warmup_status = string.IsNullOrWhiteSpace(progress.index_warmup_status)
+                        ? index_warmup_status
+                        : progress.index_warmup_status;
+                    if(!string.IsNullOrWhiteSpace(progress.index_restore_mode))
+                    {
+                        index_restore_mode = progress.index_restore_mode;
+                    }
+                    index_surfaces = clone_index_surfaces(progress.index_surfaces);
                     processed_case_count = progress.processed_case_count;
                     skipped_case_count = progress.skipped_case_count;
                     document_error_count = progress.document_error_count;
@@ -1557,9 +1624,21 @@ public sealed class c_document_sync_all
                         force_reset: false,
                         context: should_persist_progress ? $"legacy post-batch {progress.batch_number}" : $"legacy cached post-batch {progress.batch_number}",
                         persist_to_database: should_persist_progress);
-                });
+                },
+                index_restore_mode: index_restore_mode);
 
             var legacy_result = await legacy_sync_all.executeAsync();
+            document_write_status = string.IsNullOrWhiteSpace(legacy_result.document_write_status)
+                ? document_write_status
+                : legacy_result.document_write_status;
+            index_warmup_status = string.IsNullOrWhiteSpace(legacy_result.index_warmup_status)
+                ? index_warmup_status
+                : legacy_result.index_warmup_status;
+            if(!string.IsNullOrWhiteSpace(legacy_result.index_restore_mode))
+            {
+                index_restore_mode = legacy_result.index_restore_mode;
+            }
+            index_surfaces = clone_index_surfaces(legacy_result.index_surfaces);
             processed_case_count = legacy_result.processed_case_count;
             skipped_case_count = legacy_result.skipped_case_count;
             document_error_count = legacy_result.document_error_count;
@@ -1571,10 +1650,15 @@ public sealed class c_document_sync_all
             start_after_id = legacy_result.last_processed_id;
             rebuild_completed_successfully = legacy_result.rebuild_completed_successfully;
             tenant_rebuild_state.last_error = legacy_result.last_error;
+            string final_status = rebuild_completed_successfully && string.Equals(index_warmup_status, "pending", StringComparison.OrdinalIgnoreCase)
+                ? "indexing_pending"
+                : rebuild_completed_successfully
+                    ? "completed"
+                    : "paused";
 
             active_rebuild_stopwatch.Stop();
             update_rebuild_state(
-                rebuild_completed_successfully ? "completed" : "paused",
+                final_status,
                 rebuild_completed_successfully ? null : tenant_rebuild_state.last_error,
                 rebuild_completed_successfully);
 
@@ -1582,8 +1666,9 @@ public sealed class c_document_sync_all
 
             System.Console.WriteLine();
             System.Console.WriteLine(
-                $"Startup rebuild {(rebuild_completed_successfully ? "complete" : "paused")} in {active_rebuild_stopwatch.Elapsed.TotalSeconds:F1} seconds " +
+                $"Startup rebuild {(rebuild_completed_successfully ? "document writes complete" : "paused")} in {active_rebuild_stopwatch.Elapsed.TotalSeconds:F1} seconds " +
                 $"after waiting {slot_wait_stopwatch.Elapsed.TotalSeconds:F1} seconds for the startup rebuild slot. " +
+                $"Index warm-up status: {index_warmup_status}. " +
                 $"Processed {processed_case_count} cases, generated {total_de_id_doc_count} de_id docs and {total_report_doc_count} report docs. " +
                 $"Document build errors: {document_error_count}. de_id bulk errors: {de_id_bulk_error_count}. report bulk errors: {report_bulk_error_count}. Skipped cases: {skipped_case_count}.");
             System.Console.WriteLine();

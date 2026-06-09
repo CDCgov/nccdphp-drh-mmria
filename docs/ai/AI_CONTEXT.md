@@ -155,6 +155,3 @@ External dependencies
 - Historical investigation timelines now live under [`docs/ai/local/archive/`](./local/archive/).
 - Use archived docs when you need implementation history, incident context, or rationale from earlier debugging work.
 - Do not treat archived notes as canonical guidance when current code or active docs say otherwise.
-
-
-

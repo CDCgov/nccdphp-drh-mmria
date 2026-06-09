@@ -1,19 +1,26 @@
 using System.Collections.Generic;
 using System.Dynamic;
+using System;
+using System.Net;
+using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using mmria.common.couchdb;
 using mmria.common.getset;
 using mmria.common.model.couchdb;
+using mmria.common.SharedLibraries.ExportQueue.Model;
 
 namespace mmria.common.SharedLibraries.ExportQueue.DAL;
 
 public sealed class ExportQueueDAL
 {
     private readonly CouchDbHttpClient _httpClient;
+    private readonly IHttpClientFactory _httpClientFactory;
 
-    public ExportQueueDAL(CouchDbHttpClient httpClient)
+    public ExportQueueDAL(CouchDbHttpClient httpClient, IHttpClientFactory httpClientFactory)
     {
         _httpClient = httpClient;
+        _httpClientFactory = httpClientFactory;
     }
 
     public async Task<ExpandoObject> GetAllQueueDocumentsAsync(DBConfigurationDetail db_config)
@@ -42,7 +49,7 @@ public sealed class ExportQueueDAL
         string request_json,
         string vitalServiceKey)
     {
-        return await _httpClient.ExecuteAsync(
+        var response = await _httpClient.ExecuteForResponseAsync(
             "POST",
             service_url,
             request_json,
@@ -51,5 +58,105 @@ public sealed class ExportQueueDAL
             {
                 VitalServiceKey = vitalServiceKey
             });
+
+        if (response.StatusCode < 200 || response.StatusCode >= 300)
+        {
+            throw new InvalidOperationException(
+                $"mmria.services ExportQueue handoff failed with HTTP {response.StatusCode}: {TruncateResponse(response.Body)}");
+        }
+
+        ValidateServiceResponse(response.Body);
+        return response.Body;
+    }
+
+    public async Task<ExportQueueDownloadResult> DownloadExportFileAsync(
+        Uri requestUri,
+        string vitalServiceKey,
+        CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
+        var sanitizedVitalServiceKey = CouchDbHttpClient.SanitizeHeader(vitalServiceKey)?.Trim();
+        if (!string.IsNullOrWhiteSpace(sanitizedVitalServiceKey))
+        {
+            request.Headers.Add("vital-service-key", sanitizedVitalServiceKey);
+        }
+
+        HttpResponseMessage serviceResponse = null;
+        try
+        {
+            var client = _httpClientFactory.CreateClient(string.Empty);
+            serviceResponse = await client.SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken);
+
+            if (serviceResponse.StatusCode == HttpStatusCode.NotFound)
+            {
+                serviceResponse.Dispose();
+                return ExportQueueDownloadResult.NotFound();
+            }
+
+            if (!serviceResponse.IsSuccessStatusCode)
+            {
+                serviceResponse.Dispose();
+                return ExportQueueDownloadResult.ServiceError();
+            }
+
+            try
+            {
+                var stream = await serviceResponse.Content.ReadAsStreamAsync(cancellationToken);
+                var contentType = serviceResponse.Content.Headers.ContentType?.ToString();
+                return ExportQueueDownloadResult.Success(stream, contentType, serviceResponse);
+            }
+            catch
+            {
+                serviceResponse.Dispose();
+                return ExportQueueDownloadResult.Unreadable();
+            }
+        }
+        catch
+        {
+            serviceResponse?.Dispose();
+            throw;
+        }
+    }
+
+    private static void ValidateServiceResponse(string responseBody)
+    {
+        if (string.IsNullOrWhiteSpace(responseBody))
+        {
+            throw new InvalidOperationException("mmria.services ExportQueue handoff returned an empty response.");
+        }
+
+        try
+        {
+            var responseJson = Newtonsoft.Json.Linq.JObject.Parse(responseBody);
+            var successToken = responseJson["success"];
+            if (successToken == null || successToken.Type != Newtonsoft.Json.Linq.JTokenType.Boolean)
+            {
+                throw new InvalidOperationException("mmria.services ExportQueue handoff returned an invalid success response.");
+            }
+
+            if (!successToken.ToObject<bool>())
+            {
+                var message = responseJson["message"]?.ToString();
+                throw new InvalidOperationException(
+                    $"mmria.services ExportQueue handoff returned success=false: {TruncateResponse(message)}");
+            }
+        }
+        catch (Newtonsoft.Json.JsonException ex)
+        {
+            throw new InvalidOperationException("mmria.services ExportQueue handoff returned invalid JSON.", ex);
+        }
+    }
+
+    private static string TruncateResponse(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return value.Length <= 200 ? value : value.Substring(0, 200);
     }
 }

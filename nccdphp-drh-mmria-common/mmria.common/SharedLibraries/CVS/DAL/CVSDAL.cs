@@ -9,6 +9,7 @@ using mmria.common.couchdb;
 using mmria.common.cvs;
 using mmria.common.getset;
 using mmria.common.model.couchdb;
+using mmria.common.SharedLibraries.CVS.Model;
 
 namespace mmria.common.SharedLibraries.CVS.DAL;
 
@@ -26,14 +27,51 @@ public sealed class CVSDAL
 
     public async Task<string> PostExternalAsync(string base_url, object body)
     {
+        var response = await PostExternalWithStatusAsync(base_url, body);
+        if (response.is_transport_failure)
+        {
+            throw new HttpRequestException(response.body ?? "The CVS service did not respond.");
+        }
+
+        return response.body;
+    }
+
+    public async Task<CVSExternalPostResponse> PostExternalWithStatusAsync(string base_url, object body)
+    {
         var requestUri = ValidateCvsServiceUri(base_url);
         var body_text = JsonSerializer.Serialize(body);
         using var request = new HttpRequestMessage(HttpMethod.Post, requestUri);
         request.Headers.Accept.Clear();
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         request.Content = new StringContent(body_text, Encoding.UTF8, "application/json");
-        var response = await _externalHttpClient.SendAsync(request);
-        return await response.Content.ReadAsStringAsync();
+        try
+        {
+            using var response = await _externalHttpClient.SendAsync(request);
+            var response_body = response.Content == null
+                ? string.Empty
+                : await response.Content.ReadAsStringAsync();
+
+            return new CVSExternalPostResponse
+            {
+                is_success_status_code = response.IsSuccessStatusCode,
+                status_code = (int)response.StatusCode,
+                reason_phrase = response.ReasonPhrase,
+                content_type = response.Content?.Headers.ContentType?.MediaType,
+                body = response_body
+            };
+        }
+        catch (TaskCanceledException)
+        {
+            return CreateTransportFailureResponse(
+                "timeout",
+                "The CVS service request timed out.");
+        }
+        catch (HttpRequestException)
+        {
+            return CreateTransportFailureResponse(
+                "http_request",
+                "The CVS service did not respond.");
+        }
     }
 
     public async Task<string> PostInternalAsync(string base_url, object body, DBConfigurationDetail db_config)
@@ -87,5 +125,19 @@ public sealed class CVSDAL
         {
             Fragment = string.Empty
         }.Uri;
+    }
+
+    private static CVSExternalPostResponse CreateTransportFailureResponse(string kind, string message)
+    {
+        return new CVSExternalPostResponse
+        {
+            is_success_status_code = false,
+            status_code = 0,
+            reason_phrase = "Transport Failure",
+            content_type = "text/plain",
+            body = message,
+            is_transport_failure = true,
+            transport_error_kind = kind
+        };
     }
 }

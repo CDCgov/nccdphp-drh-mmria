@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using mmria.common.SharedLibraries.MMRIARebuild.DAL;
 using mmria.common.SharedLibraries.MMRIARebuild.Model;
 using Newtonsoft.Json.Linq;
 
@@ -26,6 +27,11 @@ internal sealed class MMRIARebuildWorker
     private readonly string _rebuildSource;
     private readonly List<string> _configuredTenants;
     private readonly string _summaryHostPrefix;
+    private readonly MMRIARebuildDAL _mmriaRebuildDal;
+    private readonly DurableTenantRebuildState _durableState;
+    private readonly string _durableOwnerId;
+    private readonly string _durableDecision;
+    private readonly bool _resumeExistingRun;
 
     public MMRIARebuildWorker(
         string couchdbUrl,
@@ -39,7 +45,12 @@ internal sealed class MMRIARebuildWorker
         TenantRebuildCoordinator.TenantRebuildLease tenantRebuildLease,
         string rebuildSource,
         List<string> configuredTenants,
-        string summaryHostPrefix)
+        string summaryHostPrefix,
+        MMRIARebuildDAL mmriaRebuildDal = null,
+        DurableTenantRebuildState durableState = null,
+        string durableOwnerId = null,
+        string durableDecision = null,
+        bool resumeExistingRun = false)
     {
         _couchdbUrl = couchdbUrl;
         _userName = userName;
@@ -55,6 +66,11 @@ internal sealed class MMRIARebuildWorker
         _summaryHostPrefix = string.IsNullOrWhiteSpace(summaryHostPrefix)
             ? null
             : summaryHostPrefix.Trim();
+        _mmriaRebuildDal = mmriaRebuildDal;
+        _durableState = durableState;
+        _durableOwnerId = durableOwnerId;
+        _durableDecision = durableDecision;
+        _resumeExistingRun = resumeExistingRun;
     }
 
     public async Task PersistQueuedSummaryAsync()
@@ -64,6 +80,12 @@ internal sealed class MMRIARebuildWorker
             host_prefix = GetEffectiveHostPrefix(),
             couchdb_url = _couchdbUrl,
             status = "queued",
+            run_id = _durableState?.run_id,
+            owner_id = _durableState?.owner_id,
+            heartbeat_utc = _durableState?.heartbeat_utc,
+            lease_expires_utc = _durableState?.lease_expires_utc,
+            target_generation = _durableState?.target_generation,
+            resume_available = _resumeExistingRun,
             metadata_version = _metadataVersion,
             started_utc = DateTime.UtcNow.ToString("o"),
             last_updated_utc = DateTime.UtcNow.ToString("o")
@@ -86,6 +108,11 @@ internal sealed class MMRIARebuildWorker
             host_prefix = GetEffectiveHostPrefix(),
             couchdb_url = _couchdbUrl,
             status = "excluded",
+            run_id = _durableState?.run_id,
+            owner_id = _durableState?.owner_id,
+            heartbeat_utc = _durableState?.heartbeat_utc,
+            lease_expires_utc = _durableState?.lease_expires_utc,
+            target_generation = _durableState?.target_generation,
             metadata_version = _metadataVersion,
             started_utc = currentUtc,
             last_updated_utc = currentUtc,
@@ -108,16 +135,30 @@ internal sealed class MMRIARebuildWorker
         int progressPersistEveryBatches = GetRebuildSetting("startup_rebuild_progress_persist_every_batches", 10, 1);
         int maxConcurrentTenants = DbRebuildSettings.ResolveMaxConcurrentTenants(_configuration, GetEffectiveHostPrefix());
         bool startupRebuildIndexAddBeginning = DbRebuildSettings.ResolveStartupRebuildIndexAddBeginning(_configuration, GetEffectiveHostPrefix());
+        string indexRestoreMode = DbRebuildSettings.ResolveStartupRebuildIndexRestoreMode(_configuration, GetEffectiveHostPrefix(), startupRebuildIndexAddBeginning);
+        int indexWarmDelayMs = GetRebuildSetting(DbRebuildSettings.StartupRebuildIndexWarmDelayMsKey, 60000, 0);
+        int indexWarmPollDelayMs = GetRebuildSetting(DbRebuildSettings.StartupRebuildIndexWarmPollDelayMsKey, 10000, 1000);
+        int indexWarmTimeoutMs = GetRebuildSetting(DbRebuildSettings.StartupRebuildIndexWarmTimeoutMsKey, 15 * 60 * 1000, 1000);
+        int indexWarmMaxSurfacesPerRun = GetRebuildSetting(DbRebuildSettings.StartupRebuildIndexWarmMaxSurfacesPerRunKey, 0, 0);
 
-        int processedCaseCount = 0;
-        int skippedCaseCount = 0;
-        int documentErrorCount = 0;
-        int deIdBulkErrorCount = 0;
-        int reportBulkErrorCount = 0;
-        int totalDeIdDocCount = 0;
-        int totalReportDocCount = 0;
-        int completedBatchCount = 0;
-        string lastProcessedId = null;
+        int processedCaseCount = _resumeExistingRun ? _durableState?.processed_case_count ?? 0 : 0;
+        int skippedCaseCount = _resumeExistingRun ? _durableState?.skipped_case_count ?? 0 : 0;
+        int documentErrorCount = _resumeExistingRun ? _durableState?.document_error_count ?? 0 : 0;
+        int deIdBulkErrorCount = _resumeExistingRun ? _durableState?.de_id_bulk_error_count ?? 0 : 0;
+        int reportBulkErrorCount = _resumeExistingRun ? _durableState?.report_bulk_error_count ?? 0 : 0;
+        int totalDeIdDocCount = _resumeExistingRun ? _durableState?.total_de_id_doc_count ?? 0 : 0;
+        int totalReportDocCount = _resumeExistingRun ? _durableState?.total_report_doc_count ?? 0 : 0;
+        int completedBatchCount = _resumeExistingRun ? _durableState?.completed_batch_count ?? 0 : 0;
+        string lastProcessedId = _resumeExistingRun ? _durableState?.last_completed_source_id : null;
+        string documentWriteStatus = _resumeExistingRun && !string.IsNullOrWhiteSpace(_durableState?.document_write_status)
+            ? _durableState.document_write_status
+            : "not_started";
+        string indexWarmupStatus = _resumeExistingRun && !string.IsNullOrWhiteSpace(_durableState?.index_warmup_status)
+            ? _durableState.index_warmup_status
+            : "not_started";
+        List<StartupRebuildIndexSurfaceSummary> indexSurfaces = _resumeExistingRun
+            ? CloneIndexSurfaces(_durableState?.index_surfaces)
+            : new();
         bool rebuildCompletedSuccessfully = false;
 
         var tenantRebuildState = new StartupRebuildTenantSummary
@@ -125,8 +166,16 @@ internal sealed class MMRIARebuildWorker
             host_prefix = GetEffectiveHostPrefix(),
             couchdb_url = _couchdbUrl,
             status = "running",
+            run_id = _durableState?.run_id,
+            owner_id = _durableState?.owner_id,
+            heartbeat_utc = _durableState?.heartbeat_utc,
+            lease_expires_utc = _durableState?.lease_expires_utc,
+            target_generation = _durableState?.target_generation,
+            resume_available = _resumeExistingRun,
             metadata_version = _metadataVersion,
-            started_utc = DateTime.UtcNow.ToString("o"),
+            started_utc = _resumeExistingRun && !string.IsNullOrWhiteSpace(_durableState?.started_utc)
+                ? _durableState.started_utc
+                : DateTime.UtcNow.ToString("o"),
             completed_utc = null,
             last_error = null
         };
@@ -134,6 +183,14 @@ internal sealed class MMRIARebuildWorker
         void UpdateRebuildState(string status, string lastError, bool isCompleted)
         {
             tenantRebuildState.status = status;
+            tenantRebuildState.run_id = _durableState?.run_id;
+            tenantRebuildState.owner_id = _durableOwnerId ?? _durableState?.owner_id;
+            tenantRebuildState.target_generation = _durableState?.target_generation;
+            tenantRebuildState.resume_available = _resumeExistingRun || !string.Equals(status, "completed", StringComparison.OrdinalIgnoreCase);
+            tenantRebuildState.document_write_status = documentWriteStatus;
+            tenantRebuildState.index_restore_mode = indexRestoreMode;
+            tenantRebuildState.index_warmup_status = indexWarmupStatus;
+            tenantRebuildState.index_surfaces = CloneIndexSurfaces(indexSurfaces);
             tenantRebuildState.last_processed_id = lastProcessedId;
             tenantRebuildState.completed_batch_count = completedBatchCount;
             tenantRebuildState.processed_case_count = processedCaseCount;
@@ -146,6 +203,32 @@ internal sealed class MMRIARebuildWorker
             tenantRebuildState.last_updated_utc = DateTime.UtcNow.ToString("o");
             tenantRebuildState.completed_utc = isCompleted ? DateTime.UtcNow.ToString("o") : null;
             tenantRebuildState.last_error = lastError;
+        }
+
+        async Task PersistDurableCheckpointAsync(string state, string lastError, bool isCompleted)
+        {
+            await UpdateDurableStateAsync(
+                state,
+                documentWriteStatus,
+                indexRestoreMode,
+                indexWarmupStatus,
+                indexSurfaces,
+                lastProcessedId,
+                completedBatchCount,
+                processedCaseCount,
+                skippedCaseCount,
+                documentErrorCount,
+                deIdBulkErrorCount,
+                reportBulkErrorCount,
+                totalDeIdDocCount,
+                totalReportDocCount,
+                lastError,
+                isCompleted);
+
+            tenantRebuildState.heartbeat_utc = DateTime.UtcNow.ToString("o");
+            tenantRebuildState.lease_expires_utc = DateTime.UtcNow
+                .AddSeconds(Math.Max(60, _durableState?.lease_seconds ?? GetRebuildSetting(DbRebuildSettings.StartupRebuildLeaseSecondsKey, 300, 60)))
+                .ToString("o");
         }
 
         async Task PersistStartupRunSummaryAsync(bool forceReset, string context, bool persistToDatabase)
@@ -175,6 +258,15 @@ internal sealed class MMRIARebuildWorker
         System.Console.WriteLine($"Bulk write retry delay: {writeRetryDelayMs} ms");
         System.Console.WriteLine($"Progress persistence cadence: every {progressPersistEveryBatches} batch(es)");
         System.Console.WriteLine($"Add designs/indexes at rebuild beginning: {startupRebuildIndexAddBeginning}");
+        System.Console.WriteLine($"Design/index restore mode: {indexRestoreMode}");
+        System.Console.WriteLine($"Durable rebuild run id: {_durableState?.run_id ?? "<none>"}");
+        System.Console.WriteLine($"Durable rebuild decision: {_durableDecision ?? "<none>"}");
+        System.Console.WriteLine($"Resume existing run: {_resumeExistingRun}");
+        System.Console.WriteLine($"Resume after source id: {lastProcessedId ?? "<none>"}");
+        System.Console.WriteLine($"Index warm delay: {indexWarmDelayMs} ms");
+        System.Console.WriteLine($"Index warm poll delay: {indexWarmPollDelayMs} ms");
+        System.Console.WriteLine($"Index warm timeout: {indexWarmTimeoutMs} ms");
+        System.Console.WriteLine($"Index warm max surfaces per cycle: {(indexWarmMaxSurfacesPerRun <= 0 ? "all" : indexWarmMaxSurfacesPerRun.ToString())}");
         System.Console.WriteLine("=======================================================");
         System.Console.WriteLine();
 
@@ -185,14 +277,21 @@ internal sealed class MMRIARebuildWorker
         {
             try
             {
-                await DeleteLegacyStartupRebuildCheckpointAsync();
+                if (!_resumeExistingRun)
+                {
+                    await DeleteLegacyStartupRebuildCheckpointAsync();
+                }
             }
             catch (Exception ex)
             {
                 System.Console.WriteLine($"Unable to delete legacy startup rebuild checkpoint before rebuild execution: {ex.Message}");
             }
 
+            bool resumeAtIndexPhase = _resumeExistingRun &&
+                string.Equals(documentWriteStatus, "completed", StringComparison.OrdinalIgnoreCase);
+            documentWriteStatus = resumeAtIndexPhase ? "completed" : "running";
             UpdateRebuildState("running", null, false);
+            await PersistDurableCheckpointAsync(resumeAtIndexPhase ? "indexing" : _resumeExistingRun ? "writing" : "running", null, false);
             await PersistStartupRunSummaryAsync(resetStartupRunSummary, "initial", persistToDatabase: true);
 
             var legacySyncAll = new c_document_sync_all_legacy(
@@ -211,6 +310,17 @@ internal sealed class MMRIARebuildWorker
                 startupRebuildIndexAddBeginning,
                 async progress =>
                 {
+                    documentWriteStatus = string.IsNullOrWhiteSpace(progress.document_write_status)
+                        ? documentWriteStatus
+                        : progress.document_write_status;
+                    indexWarmupStatus = string.IsNullOrWhiteSpace(progress.index_warmup_status)
+                        ? indexWarmupStatus
+                        : progress.index_warmup_status;
+                    if (!string.IsNullOrWhiteSpace(progress.index_restore_mode))
+                    {
+                        indexRestoreMode = progress.index_restore_mode;
+                    }
+                    indexSurfaces = CloneIndexSurfaces(progress.index_surfaces);
                     processedCaseCount = progress.processed_case_count;
                     skippedCaseCount = progress.skipped_case_count;
                     documentErrorCount = progress.document_error_count;
@@ -221,16 +331,43 @@ internal sealed class MMRIARebuildWorker
                     completedBatchCount = progress.completed_batch_count;
                     lastProcessedId = progress.last_processed_id;
 
-                    UpdateRebuildState("running", null, false);
+                    string progressState = string.Equals(documentWriteStatus, "completed", StringComparison.OrdinalIgnoreCase)
+                        ? "indexing"
+                        : "writing";
+                    UpdateRebuildState(string.Equals(progressState, "indexing", StringComparison.OrdinalIgnoreCase)
+                        ? "indexing"
+                        : "running", null, false);
+                    await PersistDurableCheckpointAsync(progressState, null, false);
 
                     bool shouldPersistProgress = completedBatchCount % progressPersistEveryBatches == 0;
                     await PersistStartupRunSummaryAsync(
                         forceReset: false,
                         context: shouldPersistProgress ? $"legacy post-batch {progress.batch_number}" : $"legacy cached post-batch {progress.batch_number}",
                         persistToDatabase: shouldPersistProgress);
-                });
+                },
+                index_restore_mode: indexRestoreMode,
+                index_warm_delay_ms: indexWarmDelayMs,
+                index_warm_poll_delay_ms: indexWarmPollDelayMs,
+                index_warm_timeout_ms: indexWarmTimeoutMs,
+                index_warm_max_surfaces_per_run: indexWarmMaxSurfacesPerRun,
+                resume_existing_run: _resumeExistingRun,
+                resume_after_source_id: lastProcessedId,
+                target_generation: _durableState?.target_generation,
+                run_id: _durableState?.run_id,
+                resume_state: _durableState);
 
             var legacyResult = await legacySyncAll.executeAsync();
+            documentWriteStatus = string.IsNullOrWhiteSpace(legacyResult.document_write_status)
+                ? documentWriteStatus
+                : legacyResult.document_write_status;
+            indexWarmupStatus = string.IsNullOrWhiteSpace(legacyResult.index_warmup_status)
+                ? indexWarmupStatus
+                : legacyResult.index_warmup_status;
+            if (!string.IsNullOrWhiteSpace(legacyResult.index_restore_mode))
+            {
+                indexRestoreMode = legacyResult.index_restore_mode;
+            }
+            indexSurfaces = CloneIndexSurfaces(legacyResult.index_surfaces);
             processedCaseCount = legacyResult.processed_case_count;
             skippedCaseCount = legacyResult.skipped_case_count;
             documentErrorCount = legacyResult.document_error_count;
@@ -242,17 +379,28 @@ internal sealed class MMRIARebuildWorker
             lastProcessedId = legacyResult.last_processed_id;
             rebuildCompletedSuccessfully = legacyResult.rebuild_completed_successfully;
             tenantRebuildState.last_error = legacyResult.last_error;
+            bool documentWritesCompleted = string.Equals(documentWriteStatus, "completed", StringComparison.OrdinalIgnoreCase);
+            bool indexWarmupCompleted = string.Equals(indexWarmupStatus, "completed", StringComparison.OrdinalIgnoreCase);
+            bool indexWarmupPending = string.Equals(indexWarmupStatus, "pending", StringComparison.OrdinalIgnoreCase);
+            string finalStatus = documentWritesCompleted && indexWarmupCompleted
+                ? "completed"
+                : documentWritesCompleted && indexWarmupPending
+                    ? "indexing_pending"
+                    : "paused";
+            bool finalStatusCompleted = string.Equals(finalStatus, "completed", StringComparison.OrdinalIgnoreCase);
 
             UpdateRebuildState(
-                rebuildCompletedSuccessfully ? "completed" : "paused",
-                rebuildCompletedSuccessfully ? null : tenantRebuildState.last_error,
-                rebuildCompletedSuccessfully);
+                finalStatus,
+                finalStatusCompleted ? null : tenantRebuildState.last_error,
+                finalStatusCompleted);
 
+            await PersistDurableCheckpointAsync(finalStatus, tenantRebuildState.last_error, finalStatusCompleted);
             await PersistStartupRunSummaryAsync(forceReset: false, context: "final", persistToDatabase: true);
 
             System.Console.WriteLine();
             System.Console.WriteLine(
-                $"Startup rebuild {(rebuildCompletedSuccessfully ? "complete" : "paused")}. " +
+                $"Startup rebuild {(rebuildCompletedSuccessfully ? "document writes complete" : "paused")}. " +
+                $"Index warm-up status: {indexWarmupStatus}. " +
                 $"Processed {processedCaseCount} cases, generated {totalDeIdDocCount} de_id docs and {totalReportDocCount} report docs. " +
                 $"Document build errors: {documentErrorCount}. de_id bulk errors: {deIdBulkErrorCount}. report bulk errors: {reportBulkErrorCount}. Skipped cases: {skippedCaseCount}.");
             System.Console.WriteLine();
@@ -276,6 +424,112 @@ internal sealed class MMRIARebuildWorker
         }
 
         return "shared";
+    }
+
+    private static List<StartupRebuildIndexSurfaceSummary> CloneIndexSurfaces(IEnumerable<StartupRebuildIndexSurfaceSummary> indexSurfaces)
+    {
+        return (indexSurfaces ?? Enumerable.Empty<StartupRebuildIndexSurfaceSummary>())
+            .Where(item => item != null)
+            .Select(item => new StartupRebuildIndexSurfaceSummary
+            {
+                query_surface = item.query_surface,
+                status = item.status,
+                attempt_count = item.attempt_count,
+                elapsed_ms = item.elapsed_ms,
+                started_utc = item.started_utc,
+                last_updated_utc = item.last_updated_utc,
+                completed_utc = item.completed_utc,
+                last_error = item.last_error
+            })
+            .ToList();
+    }
+
+    private async Task UpdateDurableStateAsync(
+        string state,
+        string documentWriteStatus,
+        string indexRestoreMode,
+        string indexWarmupStatus,
+        List<StartupRebuildIndexSurfaceSummary> indexSurfaces,
+        string lastCompletedSourceId,
+        int completedBatchCount,
+        int processedCaseCount,
+        int skippedCaseCount,
+        int documentErrorCount,
+        int deIdBulkErrorCount,
+        int reportBulkErrorCount,
+        int totalDeIdDocCount,
+        int totalReportDocCount,
+        string lastError,
+        bool isCompleted)
+    {
+        if (_mmriaRebuildDal == null ||
+            _durableState == null ||
+            string.IsNullOrWhiteSpace(_durableOwnerId))
+        {
+            return;
+        }
+
+        DateTime now = DateTime.UtcNow;
+        int leaseSeconds = Math.Max(
+            60,
+            _durableState.lease_seconds > 0
+                ? _durableState.lease_seconds
+                : GetRebuildSetting(DbRebuildSettings.StartupRebuildLeaseSecondsKey, 300, 60));
+
+        bool updated = await _mmriaRebuildDal.MutateActiveRebuildAsync(
+            _dbConfig,
+            GetEffectiveHostPrefix(),
+            _durableOwnerId,
+            requireCurrentOwner: true,
+            active =>
+            {
+                active.state = state;
+                active.decision = _durableDecision;
+                active.heartbeat_utc = now.ToString("o");
+                active.lease_expires_utc = isCompleted ? now.ToString("o") : now.AddSeconds(leaseSeconds).ToString("o");
+                active.lease_seconds = leaseSeconds;
+                active.document_write_status = documentWriteStatus;
+                active.index_restore_mode = indexRestoreMode;
+                active.index_warmup_status = indexWarmupStatus;
+                active.index_surfaces = CloneIndexSurfaces(indexSurfaces);
+                active.last_completed_source_id = lastCompletedSourceId;
+                active.completed_batch_count = completedBatchCount;
+                active.processed_case_count = processedCaseCount;
+                active.skipped_case_count = skippedCaseCount;
+                active.document_error_count = documentErrorCount;
+                active.de_id_bulk_error_count = deIdBulkErrorCount;
+                active.report_bulk_error_count = reportBulkErrorCount;
+                active.total_de_id_doc_count = totalDeIdDocCount;
+                active.total_report_doc_count = totalReportDocCount;
+                active.completed_utc = isCompleted ? now.ToString("o") : null;
+                active.last_error = lastError;
+            });
+
+        if (updated)
+        {
+            var active = await _mmriaRebuildDal.GetActiveRebuildAsync(_dbConfig, GetEffectiveHostPrefix());
+            if (active != null)
+            {
+                await _mmriaRebuildDal.SaveRunHistoryAsync(
+                    _dbConfig,
+                    new DurableTenantRebuildRunHistory
+                    {
+                        _id = MMRIARebuildDAL.GetRunHistoryDocumentId(active.run_id),
+                        tenant = active.tenant,
+                        run_id = active.run_id,
+                        source = active.source,
+                        request_id = active.request_id,
+                        request_fingerprint = active.request_fingerprint,
+                        final_state = active.state,
+                        current_owner_id = active.owner_id,
+                        resume_count = active.resume_count,
+                        started_utc = active.started_utc,
+                        completed_utc = active.completed_utc,
+                        last_updated_utc = now.ToString("o"),
+                        last_error = active.last_error
+                    });
+            }
+        }
     }
 
     private int GetRebuildSetting(string key, int defaultValue, int minimumValue, int? maximumValue = null)
@@ -516,6 +770,7 @@ internal sealed class MMRIARebuildWorker
         summary.configured_tenants = configuredTenants.ToList();
         summary.total_tenant_count = configuredTenants.Count;
         summary.completed_tenant_count = 0;
+        summary.indexing_pending_tenant_count = 0;
         summary.paused_tenant_count = 0;
         summary.running_tenant_count = 0;
         summary.pending_tenant_count = 0;
@@ -536,6 +791,8 @@ internal sealed class MMRIARebuildWorker
                 continue;
             }
 
+            tenantSummary.is_stale = IsStaleActiveTenantSummary(tenantSummary);
+
             summary.total_processed_case_count += tenantSummary.processed_case_count;
             summary.total_skipped_case_count += tenantSummary.skipped_case_count;
             summary.total_document_error_count += tenantSummary.document_error_count;
@@ -544,18 +801,24 @@ internal sealed class MMRIARebuildWorker
             summary.total_de_id_doc_count += tenantSummary.total_de_id_doc_count;
             summary.total_report_doc_count += tenantSummary.total_report_doc_count;
 
-            switch (tenantSummary.status?.ToLowerInvariant())
+            switch (tenantSummary.is_stale ? "stale" : tenantSummary.status?.ToLowerInvariant())
             {
                 case "completed":
                     summary.completed_tenant_count++;
                     break;
+                case "indexing_pending":
+                    summary.completed_tenant_count++;
+                    summary.indexing_pending_tenant_count++;
+                    break;
                 case "paused":
+                case "stale":
                     summary.paused_tenant_count++;
                     break;
                 case "excluded":
                     excludedTenantCount++;
                     break;
                 case "running":
+                case "indexing":
                 case "queued":
                     summary.running_tenant_count++;
                     break;
@@ -574,8 +837,16 @@ internal sealed class MMRIARebuildWorker
         if (summary.total_tenant_count > 0 &&
             summary.completed_tenant_count + excludedTenantCount == summary.total_tenant_count)
         {
-            summary.status = "completed";
-            summary.completed_utc ??= DateTime.UtcNow.ToString("o");
+            if (summary.indexing_pending_tenant_count > 0)
+            {
+                summary.status = "indexing_pending";
+                summary.completed_utc = null;
+            }
+            else
+            {
+                summary.status = "completed";
+                summary.completed_utc ??= DateTime.UtcNow.ToString("o");
+            }
         }
         else if (summary.running_tenant_count > 0)
         {
@@ -592,6 +863,23 @@ internal sealed class MMRIARebuildWorker
             summary.status = "running";
             summary.completed_utc = null;
         }
+    }
+
+    private static bool IsStaleActiveTenantSummary(StartupRebuildTenantSummary tenantSummary)
+    {
+        if (tenantSummary == null)
+        {
+            return false;
+        }
+
+        string status = tenantSummary.status?.ToLowerInvariant();
+        if (status != "running" && status != "queued")
+        {
+            return false;
+        }
+
+        return DateTime.TryParse(tenantSummary.lease_expires_utc, out DateTime leaseExpiresUtc) &&
+            leaseExpiresUtc.ToUniversalTime() <= DateTime.UtcNow;
     }
 
     private static List<string> BuildEffectiveSummaryTenants(
@@ -662,7 +950,18 @@ internal sealed class MMRIARebuildWorker
         tenantSummary.host_prefix = currentHostPrefix;
         tenantSummary.couchdb_url = _couchdbUrl;
         tenantSummary.status = tenantState.status;
+        tenantSummary.run_id = tenantState.run_id;
+        tenantSummary.owner_id = tenantState.owner_id;
+        tenantSummary.heartbeat_utc = tenantState.heartbeat_utc;
+        tenantSummary.lease_expires_utc = tenantState.lease_expires_utc;
+        tenantSummary.is_stale = tenantState.is_stale;
+        tenantSummary.resume_available = tenantState.resume_available;
+        tenantSummary.target_generation = tenantState.target_generation;
         tenantSummary.metadata_version = tenantState.metadata_version;
+        tenantSummary.document_write_status = tenantState.document_write_status;
+        tenantSummary.index_restore_mode = tenantState.index_restore_mode;
+        tenantSummary.index_warmup_status = tenantState.index_warmup_status;
+        tenantSummary.index_surfaces = CloneIndexSurfaces(tenantState.index_surfaces);
         tenantSummary.last_processed_id = tenantState.last_processed_id;
         tenantSummary.completed_batch_count = tenantState.completed_batch_count;
         tenantSummary.processed_case_count = tenantState.processed_case_count;

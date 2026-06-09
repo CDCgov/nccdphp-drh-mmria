@@ -47,4 +47,30 @@ public sealed class VitalImportDAL
         string response = await _httpClient.ExecuteAsync("GET", url, null, db_config.user_name, db_config.user_value);
         return Newtonsoft.Json.JsonConvert.DeserializeObject<alldocs_response<mmria.common.ije.Batch>>(response);
     }
+
+    public async Task<string> DeleteVitalNotificationAsync(string service_url, string vital_service_key)
+    {
+        return await _httpClient.ExecuteAsync(
+            "DELETE",
+            service_url,
+            null,
+            "application/json",
+            new CouchDbRequestOptions
+            {
+                VitalServiceKey = vital_service_key
+            });
+    }
+
+    public async Task<string> SubmitIjeSetAsync(string service_url, string document_content, string vital_service_key)
+    {
+        return await _httpClient.ExecuteAsync(
+            "PUT",
+            service_url,
+            document_content,
+            "application/json",
+            new CouchDbRequestOptions
+            {
+                VitalServiceKey = vital_service_key
+            });
+    }
 }

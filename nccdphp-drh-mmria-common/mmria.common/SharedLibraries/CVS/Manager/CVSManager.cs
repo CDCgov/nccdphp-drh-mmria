@@ -235,31 +235,11 @@ public sealed class CVSManager
         file_status_result.updated_lon = get_dashboard_body.payload.lon;
         file_status_result.updated_year = get_dashboard_body.payload.year;
 
-        var response_string = await _dal.PostExternalAsync(cvs.cvs_api_url, get_dashboard_body);
-        var responseDictionary = JsonSerializer.Deserialize<ExpandoObject>(response_string) as IDictionary<string, object>;
-
-        if (responseDictionary != null)
-        {
-            if (responseDictionary.ContainsKey("isBase64Encoded") &&
-                responseDictionary["isBase64Encoded"] != null &&
-                responseDictionary["isBase64Encoded"].ToString() == "True")
-            {
-                file_status_result.PdfBytes = Convert.FromBase64String(responseDictionary["body"].ToString());
-                file_status_result.file_status = "file ready";
-            }
-            else if (responseDictionary.ContainsKey("body") && responseDictionary["body"].ToString().StartsWith("PDF "))
-            {
-                file_status_result.file_status = "generating";
-            }
-            else
-            {
-                file_status_result.file_status = "error";
-            }
-        }
-        else
-        {
-            file_status_result.file_status = "error";
-        }
+        var external_response = await _dal.PostExternalWithStatusAsync(cvs.cvs_api_url, get_dashboard_body);
+        file_status_result = CVSDashboardResponseInterpreter.Interpret(external_response);
+        file_status_result.updated_lat = get_dashboard_body.payload.lat;
+        file_status_result.updated_lon = get_dashboard_body.payload.lon;
+        file_status_result.updated_year = get_dashboard_body.payload.year;
 
         return file_status_result;
     }

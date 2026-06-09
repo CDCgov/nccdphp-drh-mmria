@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 
 using  mmria.server.extension; 
+using mmria.common.SharedLibraries.MetadataVersion.Manager;
 namespace mmria.server.Controllers;
 
 [Route("api/[controller]")]
@@ -17,16 +18,16 @@ public sealed class substance_mappingController : ControllerBase
         mmria.common.couchdb.OverridableConfiguration configuration;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly MetadataVersionManager _metadataVersionManager;
 
     public substance_mappingController
 	(
         IHttpContextAccessor httpContextAccessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        MetadataVersionManager metadataVersionManager
     )
     {
-        _couchDbHttpClient = couchDbHttpClient;
+        _metadataVersionManager = metadataVersionManager;
         host_prefix = tenantRuntime.EffectiveHostPrefix;
 
         configuration = tenantRuntime.RequireConfiguration();
@@ -42,9 +43,7 @@ public sealed class substance_mappingController : ControllerBase
         mmria.common.metadata.Substance_Mapping result = null;
         try
         {
-        string request_string = $"{db_config.url}/metadata/substance-mapping";
-        string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
-        result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.Substance_Mapping>(responseFromServer);
+        result = await _metadataVersionManager.GetSubstanceMappingAsync(db_config);
         }
         catch (Exception ex)
         {
@@ -78,18 +77,9 @@ public sealed class substance_mappingController : ControllerBase
 
         if(substance_mapping._id == "substance-mapping")
         {
-            string url = $"{db_config.url}/metadata/substance-mapping";
-            //System.Console.WriteLine ("json\n{0}", object_string);
-
-            //bool save_document = false;
-
-
             try
             {
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", url, document_content, db_config.user_name, db_config.user_value);
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
-
-
+            result = await _metadataVersionManager.SaveSubstanceMappingAsync(document_content, db_config);
             }
             catch (Exception ex)
             {

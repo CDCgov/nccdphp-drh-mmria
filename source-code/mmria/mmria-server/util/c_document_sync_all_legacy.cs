@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
+using mmria.common.SharedLibraries.MMRIARebuild.Model;
 using Newtonsoft.Json.Linq;
 
 namespace mmria.server.utils;
@@ -15,6 +16,10 @@ public sealed class c_document_sync_all_legacy
 
     public class legacy_progress
     {
+        public string document_write_status { get; set; }
+        public string index_restore_mode { get; set; }
+        public string index_warmup_status { get; set; }
+        public List<StartupRebuildIndexSurfaceSummary> index_surfaces { get; set; } = new();
         public int batch_number { get; set; }
         public string last_processed_id { get; set; }
         public int completed_batch_count { get; set; }
@@ -87,6 +92,8 @@ public sealed class c_document_sync_all_legacy
     private readonly int _write_retry_count;
     private readonly int _write_retry_delay_ms;
     private readonly Func<legacy_progress, Task> _progress_callback;
+    private readonly string _index_restore_mode;
+    private readonly List<StartupRebuildIndexSurfaceSummary> _index_surface_statuses = new();
 
     public c_document_sync_all_legacy
     (
@@ -102,7 +109,8 @@ public sealed class c_document_sync_all_legacy
         int batch_delay_ms = 0,
         int write_retry_count = 0,
         int write_retry_delay_ms = 0,
-        Func<legacy_progress, Task> progress_callback = null
+        Func<legacy_progress, Task> progress_callback = null,
+        string index_restore_mode = null
     )
     {
         couchdb_url = p_couchdb_url;
@@ -118,6 +126,10 @@ public sealed class c_document_sync_all_legacy
         _write_retry_count = Math.Max(0, write_retry_count);
         _write_retry_delay_ms = Math.Max(0, write_retry_delay_ms);
         _progress_callback = progress_callback;
+        string resolved_index_restore_mode = mmria.server.util.DbRebuildSettings.ResolveStartupRebuildIndexRestoreMode(index_restore_mode, startupRebuildIndexAddBeginning: false);
+        _index_restore_mode = mmria.server.util.DbRebuildSettings.WaitsForIndexWarmup(resolved_index_restore_mode)
+            ? mmria.server.util.DbRebuildSettings.IndexRestoreModeEndNoWait
+            : resolved_index_restore_mode;
     }
 
     private string get_database_scripts_directory()
@@ -210,7 +222,61 @@ public sealed class c_document_sync_all_legacy
     private async Task restore_target_designs_async()
     {
         await restore_de_id_sortable_design_async();
+        mark_index_surface_status("de_id/_design/sortable", "pending");
         await restore_report_indexes_and_views_async();
+        mark_index_surface_status("report/_design/powerbi-report-index", "pending");
+        mark_index_surface_status("report/_design/opioid-report-index", "pending");
+        mark_index_surface_status("report/_design/interactive_aggregate_report", "pending");
+        mark_index_surface_status("report/_design/data_summary_view_report", "pending");
+        System.Console.WriteLine(
+            $">>> INDEXING PENDING for {db_config.prefix}de_id/report query surfaces. " +
+            $"Mode '{_index_restore_mode}' restored surfaces without forcing barrier queries. <<<");
+    }
+
+    private StartupRebuildIndexSurfaceSummary get_or_create_index_surface_status(string query_surface_label)
+    {
+        var status = _index_surface_statuses.FirstOrDefault(
+            item => string.Equals(item.query_surface, query_surface_label, StringComparison.OrdinalIgnoreCase));
+
+        if(status != null)
+        {
+            return status;
+        }
+
+        status = new StartupRebuildIndexSurfaceSummary
+        {
+            query_surface = query_surface_label,
+            status = "not_started",
+            started_utc = DateTime.UtcNow.ToString("o"),
+            last_updated_utc = DateTime.UtcNow.ToString("o")
+        };
+        _index_surface_statuses.Add(status);
+        return status;
+    }
+
+    private void mark_index_surface_status(string query_surface_label, string status)
+    {
+        var surface_status = get_or_create_index_surface_status(query_surface_label);
+        surface_status.status = status;
+        surface_status.last_updated_utc = DateTime.UtcNow.ToString("o");
+        surface_status.last_error = null;
+    }
+
+    private List<StartupRebuildIndexSurfaceSummary> clone_index_surface_statuses()
+    {
+        return _index_surface_statuses
+            .Select(item => new StartupRebuildIndexSurfaceSummary
+            {
+                query_surface = item.query_surface,
+                status = item.status,
+                attempt_count = item.attempt_count,
+                elapsed_ms = item.elapsed_ms,
+                started_utc = item.started_utc,
+                last_updated_utc = item.last_updated_utc,
+                completed_utc = item.completed_utc,
+                last_error = item.last_error
+            })
+            .ToList();
     }
 
     private async Task reset_database_async(string database_name)
@@ -416,7 +482,13 @@ public sealed class c_document_sync_all_legacy
 
     public async Task<legacy_result> executeAsync()
     {
-        var result = new legacy_result();
+        var result = new legacy_result
+        {
+            document_write_status = "running",
+            index_restore_mode = _index_restore_mode,
+            index_warmup_status = "not_started",
+            index_surfaces = clone_index_surface_statuses()
+        };
         string tenant_log_label = get_tenant_log_label();
 
         System.Console.WriteLine();
@@ -428,6 +500,7 @@ public sealed class c_document_sync_all_legacy
         System.Console.WriteLine($"{tenant_log_label} batch delay: {_batch_delay_ms} ms");
         System.Console.WriteLine($"Legacy write retries: {_write_retry_count}");
         System.Console.WriteLine($"Legacy write retry delay: {_write_retry_delay_ms} ms");
+        System.Console.WriteLine($"Legacy design/index restore mode: {_index_restore_mode}");
         System.Console.WriteLine("==============================================================");
         System.Console.WriteLine();
 
@@ -528,6 +601,10 @@ public sealed class c_document_sync_all_legacy
 
                 await report_progress_async(new legacy_progress
                 {
+                    document_write_status = result.document_write_status,
+                    index_restore_mode = result.index_restore_mode,
+                    index_warmup_status = result.index_warmup_status,
+                    index_surfaces = clone_index_surface_statuses(),
                     batch_number = batch_number,
                     last_processed_id = result.last_processed_id,
                     completed_batch_count = result.completed_batch_count,
@@ -557,6 +634,10 @@ public sealed class c_document_sync_all_legacy
         catch (Exception ex)
         {
             result.last_error = ex.ToString();
+            if(!string.Equals(result.document_write_status, "completed", StringComparison.OrdinalIgnoreCase))
+            {
+                result.document_write_status = "failed";
+            }
             System.Console.WriteLine($"error running c_docment_sync_all_legacy\n{ex}");
         }
         finally
@@ -565,9 +646,18 @@ public sealed class c_document_sync_all_legacy
             {
                 System.Console.WriteLine("Restoring legacy de_id/report designs and indexes after rebuild writes finished.");
                 await restore_target_designs_async();
+                if(result.rebuild_completed_successfully)
+                {
+                    result.document_write_status = "completed";
+                }
+
+                result.index_warmup_status = "pending";
+                result.index_surfaces = clone_index_surface_statuses();
             }
         }
 
+        result.index_restore_mode = _index_restore_mode;
+        result.index_surfaces = clone_index_surface_statuses();
         return result;
     }
 }

@@ -39,6 +39,33 @@ public sealed class AuditRecoveryDAL
         return JsonConvert.DeserializeObject<Change_Stack>(response);
     }
 
+    public async Task<get_sortable_view_reponse_header<Audit_Detail_View>> GetDeletedAuditDetailViewAsync(DBConfigurationDetail db_config)
+    {
+        string request = $"{db_config.url}/{db_config.prefix}audit/_design/sortable/_view/by_deleted?skip=0&limit=25000&descending=true";
+        string response = await _couchDbHttpClient.ExecuteAsync("GET", request, null, db_config.user_name, db_config.user_value);
+        return JsonConvert.DeserializeObject<get_sortable_view_reponse_header<Audit_Detail_View>>(response);
+    }
+
+    public async Task<string> GetOpenRevisionsJsonAsync(string caseId, DBConfigurationDetail db_config)
+    {
+        string request = $"{db_config.url}/{db_config.prefix}mmrds/{caseId}?revs=true&open_revs=all";
+        return await _couchDbHttpClient.ExecuteAsync("GET", request, null, db_config.user_name, db_config.user_value);
+    }
+
+    public async Task<document_put_response> RestoreCaseDocumentJsonAsync(string caseId, string caseDocumentJson, DBConfigurationDetail db_config)
+    {
+        string request = $"{db_config.url}/{db_config.prefix}mmrds/{caseId}";
+        string response = await _couchDbHttpClient.ExecuteAsync("PUT", request, caseDocumentJson, db_config.user_name, db_config.user_value);
+        return JsonConvert.DeserializeObject<document_put_response>(response);
+    }
+
+    public async Task<document_put_response> DeleteAuditDocumentAsync(string auditId, string rev, DBConfigurationDetail db_config)
+    {
+        string request = $"{db_config.url}/{db_config.prefix}audit/{auditId}?rev={rev}";
+        string response = await _couchDbHttpClient.ExecuteAsync("DELETE", request, null, db_config.user_name, db_config.user_value);
+        return JsonConvert.DeserializeObject<document_put_response>(response);
+    }
+
     public async Task<app> GetMetadataAsync(string metadataVersion, DBConfigurationDetail db_config)
     {
         string request = $"{db_config.url}/metadata/version_specification-{metadataVersion}/metadata";

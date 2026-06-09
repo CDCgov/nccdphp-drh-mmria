@@ -44,7 +44,7 @@ public class AccountDAL
             }
 
             var userDocId = $"org.couchdb.user:{userName}";
-            var url = $"{dbConfig.url}/_users/{System.Web.HttpUtility.HtmlEncode(userDocId)}";
+            var url = $"{dbConfig.url}/_users/{Uri.EscapeDataString(userDocId)}";
 
             var response = await _httpClient.ExecuteAsync(
                 "GET",
@@ -54,13 +54,56 @@ public class AccountDAL
                 dbConfig.user_value);
 
             var couchUser = JsonConvert.DeserializeObject<user>(response);
-            return couchUser;
+            return couchUser == null || string.IsNullOrWhiteSpace(couchUser.name)
+                ? null
+                : couchUser;
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Failed to get CouchDB user {userName}: {ex.Message}");
             return null;
         }
+    }
+
+    public async Task<document_put_response?> SaveCouchDbUserAsync(
+        user couchUser,
+        DBConfigurationDetail dbConfig)
+    {
+        if (couchUser == null || string.IsNullOrWhiteSpace(couchUser._id))
+        {
+            return null;
+        }
+
+        var url = $"{dbConfig.url}/_users/{Uri.EscapeDataString(couchUser._id)}";
+        var json = JsonConvert.SerializeObject(couchUser, new JsonSerializerSettings
+        {
+            NullValueHandling = NullValueHandling.Ignore
+        });
+
+        var response = await _httpClient.ExecuteAsync(
+            "PUT",
+            url,
+            json,
+            dbConfig.user_name,
+            dbConfig.user_value,
+            "application/json");
+
+        return JsonConvert.DeserializeObject<document_put_response>(response);
+    }
+
+    public async Task<document_put_response?> ChangePasswordAsync(
+        string userName,
+        string newPassword,
+        DBConfigurationDetail dbConfig)
+    {
+        var couchUser = await GetCouchDbUserAsync(userName, dbConfig);
+        if (couchUser == null)
+        {
+            return null;
+        }
+
+        couchUser.password = newPassword;
+        return await SaveCouchDbUserAsync(couchUser, dbConfig);
     }
 
     /// <summary>

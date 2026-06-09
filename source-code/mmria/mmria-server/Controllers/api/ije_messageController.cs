@@ -17,6 +17,7 @@ using Akka.Streams.Implementation.Fusing;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
 using System.Reflection.Metadata;
+using mmria.common.SharedLibraries.VitalImport.Manager;
 namespace mmria.server;
 
 public sealed class VitalImportPanelItem
@@ -41,20 +42,20 @@ public sealed class ije_messageController: ControllerBase
     mmria.common.couchdb.OverridableConfiguration configuration;
     mmria.common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly VitalImportManager _vitalImportManager;
 
     public ije_messageController
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        VitalImportManager vitalImportManager
     )
     {
         host_prefix = tenantRuntime.EffectiveHostPrefix;
         configuration = tenantRuntime.RequireConfiguration();
 
         db_config = tenantRuntime.RequireDbConfig();
-        _couchDbHttpClient = couchDbHttpClient;
+        _vitalImportManager = vitalImportManager;
     }
     
     [Authorize(Roles  = "abstractor,jurisdiction_admin,data_analyst,vital_importer,vital_importer_state")]
@@ -69,11 +70,7 @@ public sealed class ije_messageController: ControllerBase
             mmria.common.couchdb.DBConfigurationDetail config = configuration.GetDBConfig("vital_import");
 
             //mmria.common.couchdb.DBConfigurationDetail config =  config_id_configuration.detail_list["vital_import"];
-            
-            string url = $"{config.url}/vital_import/_all_docs?include_docs=true";
-
-            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", url, null, config.user_name, config.user_value);
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.alldocs_response<mmria.common.ije.Batch>>(responseFromServer);
+            result = await _vitalImportManager.GetBatchSetAsync(config);
 
         }
         catch(Exception ex) 
@@ -104,15 +101,9 @@ public sealed class ije_messageController: ControllerBase
 
             string user_db_url = configuration.GetString("vitals_url",host_prefix).Replace("Message/IJESet", "VitalNotification");
 
-            var responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                "DELETE",
+            await _vitalImportManager.DeleteVitalNotificationAsync(
                 user_db_url,
-                null,
-                "application/json",
-                new mmria.common.getset.CouchDbRequestOptions
-                {
-                    VitalServiceKey = configuration.GetString("vital_service_key",host_prefix)
-                });
+                configuration.GetString("vital_service_key",host_prefix));
 
         }
         catch(Exception ex) 
@@ -147,15 +138,10 @@ public sealed class ije_messageController: ControllerBase
 
             string user_db_url = configuration.GetString("vitals_url",host_prefix);
 
-            var responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                "PUT",
+            var responseFromServer = await _vitalImportManager.SubmitIjeSetAsync(
                 user_db_url,
                 object_string,
-                "application/json",
-                new mmria.common.getset.CouchDbRequestOptions
-                {
-                    VitalServiceKey = configuration.GetString("vital_service_key",host_prefix)
-                });
+                configuration.GetString("vital_service_key",host_prefix));
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.server.model.NewIJESet_MessageResponse>(responseFromServer);
 
             if (!result.ok) 

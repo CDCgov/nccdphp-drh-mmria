@@ -107,6 +107,14 @@ public sealed class UpdateMaidenNameResult
     public string MaidenName { get; set; }
 }
 
+public sealed class ClearCaseStatusResult
+{
+    public bool IsSuccessful { get; set; }
+    public string StatusText { get; set; }
+    public string LastUpdatedBy { get; set; }
+    public DateTime? DateLastUpdated { get; set; }
+}
+
 public class CaseManager
 {
     private readonly CouchDbHttpClient _couchDbHttpClient;
@@ -542,6 +550,109 @@ public class CaseManager
             {
                 Console.WriteLine(ex);
             }
+        }
+
+        return result;
+    }
+
+    public async Task<List<case_view_item>> FindCaseStatusRecordsAsync(
+        string recordId,
+        DBConfigurationDetail dbConfig)
+    {
+        var result = new List<case_view_item>();
+        var dal = new CaseDAL(_couchDbHttpClient);
+        string responseFromServer = await dal.GetCasesByDateLastUpdatedViewJsonAsync(dbConfig);
+
+        case_view_response case_view_response = JsonConvert.DeserializeObject<case_view_response>(responseFromServer);
+
+        foreach (var item in case_view_response.rows)
+        {
+            try
+            {
+                if
+                (
+                    item.value.record_id != null &&
+                    !string.IsNullOrWhiteSpace(recordId) &&
+                    (
+                        item.value.record_id.IndexOf(recordId, System.StringComparison.OrdinalIgnoreCase) > -1 ||
+                        recordId.IndexOf(item.value.record_id, System.StringComparison.OrdinalIgnoreCase) > -1
+                    )
+                )
+                {
+                    result.Add(item);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+            }
+        }
+
+        return result;
+    }
+
+    public async Task<ClearCaseStatusResult> ClearCaseStatusAsync(
+        string caseId,
+        string userName,
+        DBConfigurationDetail dbConfig)
+    {
+        var result = new ClearCaseStatusResult
+        {
+            IsSuccessful = false,
+            StatusText = "Problem Setting Status to (blank)"
+        };
+
+        try
+        {
+            var dal = new CaseDAL(_couchDbHttpClient);
+            string responseFromServer = await dal.GetCaseDocumentJsonAsync(caseId, dbConfig);
+            var case_response = JsonConvert.DeserializeObject<ExpandoObject>(responseFromServer);
+
+            var dictionary = case_response as IDictionary<string, object>;
+            if (dictionary != null)
+            {
+                var home_record = dictionary["home_record"] as IDictionary<string, object>;
+                if (home_record != null)
+                {
+                    var case_status = home_record["case_status"] as IDictionary<string, object>;
+                    if (case_status != null)
+                    {
+                        case_status["overall_case_status"] = 9999;
+                        case_status["case_locked_date"] = "";
+
+                        dictionary["last_updated_by"] = userName;
+                        dictionary["date_last_updated"] = DateTime.Now;
+
+                        result.LastUpdatedBy = userName;
+                        result.DateLastUpdated = (DateTime)dictionary["date_last_updated"];
+
+                        JsonSerializerSettings settings = new JsonSerializerSettings();
+                        settings.NullValueHandling = NullValueHandling.Ignore;
+                        var object_string = JsonConvert.SerializeObject(case_response, settings);
+
+                        var document_put_response = new document_put_response();
+                        try
+                        {
+                            responseFromServer = await dal.PutCaseDocumentJsonAsync(caseId, object_string, dbConfig);
+                            document_put_response = JsonConvert.DeserializeObject<document_put_response>(responseFromServer);
+                        }
+                        catch(Exception ex)
+                        {
+                            Console.WriteLine(ex);
+                        }
+
+                        if (document_put_response.ok)
+                        {
+                            result.StatusText = "(blank)";
+                            result.IsSuccessful = true;
+                        }
+                    }
+                }
+            }
+        }
+        catch(Exception ex)
+        {
+            result.StatusText = ex.ToString();
         }
 
         return result;

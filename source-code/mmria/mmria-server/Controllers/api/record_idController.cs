@@ -8,13 +8,14 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 
 using  mmria.server.extension;
+using mmria.common.SharedLibraries.CaseView.Manager;
 
 namespace mmria.server;
 
 [Route("api/[controller]")]
 public sealed class record_idController: ControllerBase
 { 
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly CaseRecordIdManager _caseRecordIdManager;
 
     public record Record_Id_Response
     {
@@ -28,10 +29,10 @@ public sealed class record_idController: ControllerBase
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        CaseRecordIdManager caseRecordIdManager
     )
     {
-        _couchDbHttpClient = couchDbHttpClient;
+        _caseRecordIdManager = caseRecordIdManager;
         host_prefix = tenantRuntime.EffectiveHostPrefix;
 
         configuration = tenantRuntime.RequireConfiguration();
@@ -44,32 +45,9 @@ public sealed class record_idController: ControllerBase
     {
         var result = new Record_Id_Response(){ ok = true, is_unique = false };
         try
-        {        
-            //"2016-06-12T13:49:24.759Z"
-            //string request_string = configuration["mmria_settings:couchdb_url + $"/metadata/version_specification-{Configuration["mmria_settings:metadata_version"]}/validator";
-            string request_string = db_config.Get_Prefix_DB_Url("mmrds/_design/sortable/_view/by_date_created?skip=0&take=25000");
-
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
-
-            mmria.common.model.couchdb.case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(responseFromServer);
-
-            var temp = new List<mmria.common.model.couchdb.case_view_item>();
-
-            var is_found = false;
-            foreach(mmria.common.model.couchdb.case_view_item cvi in case_view_response.rows)
-            {
-                if(!string.IsNullOrWhiteSpace(cvi.value.record_id))
-                {
-                    if(cvi.value.record_id.Trim().Equals(record_id.Trim(), StringComparison.OrdinalIgnoreCase))
-                    {
-                        is_found = true;
-                        break;
-                    }
-                }
-            }
-
-            result = new Record_Id_Response(){ ok = true, is_unique = !is_found };
-
+        {
+            var isUnique = await _caseRecordIdManager.IsRecordIdUniqueAsync(record_id, db_config);
+            result = new Record_Id_Response(){ ok = true, is_unique = isUnique };
         }
         catch(Exception ex) 
         {

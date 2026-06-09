@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using Microsoft.AspNetCore.Http;
 
 using  mmria.server.extension; 
+using mmria.common.SharedLibraries.SummaryReport.Manager;
 
 namespace mmria.server.Controllers;
 
@@ -17,13 +18,13 @@ public sealed class sessionSummaryController : Controller
     string host_prefix = null;
 
     mmria.common.couchdb.ConfigurationSet ConfigDB;
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly SummaryReportManager _summaryReportManager;
 
     public sessionSummaryController
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        SummaryReportManager summaryReportManager
     )
     {
         host_prefix = tenantRuntime.EffectiveHostPrefix;
@@ -32,13 +33,13 @@ public sealed class sessionSummaryController : Controller
         db_config = tenantRuntime.RequireDbConfig();
         
         ConfigDB = tenantRuntime.RequireConfigurationSet();
-        _couchDbHttpClient = couchDbHttpClient;
+        _summaryReportManager = summaryReportManager;
     }
 
     public async Task<IActionResult> Index(System.Threading.CancellationToken cancellationToken)
     {
 
-        var result = new mmria.server.utils.SessionSummary(ConfigDB, _couchDbHttpClient);
+        var result = new mmria.server.utils.SessionSummary(ConfigDB, _summaryReportManager);
 
         return View(await result.execute(cancellationToken));
     }
@@ -47,7 +48,7 @@ public sealed class sessionSummaryController : Controller
     public async Task<IActionResult> GenerateReport(System.Threading.CancellationToken cancellationToken)
     {
 
-        var summary_list = new mmria.server.utils.SessionSummary(ConfigDB, _couchDbHttpClient);
+        var summary_list = new mmria.server.utils.SessionSummary(ConfigDB, _summaryReportManager);
 
         var summary_row_list = await summary_list.execute(cancellationToken);
 

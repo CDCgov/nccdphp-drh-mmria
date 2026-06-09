@@ -363,7 +363,9 @@ public sealed class c_db_setup
                                 tenant = host_prefix,
                                 source = "startup",
                                 configured_tenants = startupRequestTenants,
-                                summary_host_prefix = startupRequestSummaryHostPrefix
+                                summary_host_prefix = startupRequestSummaryHostPrefix,
+                                requested_behavior = "ensure",
+                                allow_resume = true
                             },
                             rebuildServiceUrl,
                             configuration.GetString("vital_service_key", host_prefix));

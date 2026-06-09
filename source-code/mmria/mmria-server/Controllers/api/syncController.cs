@@ -51,7 +51,8 @@ public sealed class syncController: ControllerBase
                     new mmria.common.SharedLibraries.MMRIARebuild.Model.MMRIARebuildRequest
                     {
                         tenant = host_prefix,
-                        source = "manual"
+                        source = "manual",
+                        requested_behavior = "resume"
                     },
                     rebuildServiceUrl,
                     configuration.GetString("vital_service_key", host_prefix));

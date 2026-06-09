@@ -346,6 +346,7 @@ public sealed class MultiTenantSetupService
                 {
                     tenant = normalizedTenant,
                     source = "manual",
+                    requested_behavior = "resume",
                     configured_tenants = summaryContext?.ConfiguredTenants?.ToList() ?? new List<string>(),
                     summary_host_prefix = summaryContext?.SummaryHostPrefix
                 },
@@ -1051,6 +1052,7 @@ public sealed class MultiTenantSetupService
         }
 
         int completedTenantCount = 0;
+        int indexingPendingTenantCount = 0;
         int pausedTenantCount = 0;
         int runningTenantCount = 0;
         int pendingTenantCount = 0;
@@ -1086,6 +1088,10 @@ public sealed class MultiTenantSetupService
                 case "completed":
                     completedTenantCount++;
                     break;
+                case "indexing_pending":
+                    completedTenantCount++;
+                    indexingPendingTenantCount++;
+                    break;
                 case "paused":
                     pausedTenantCount++;
                     break;
@@ -1093,6 +1099,7 @@ public sealed class MultiTenantSetupService
                     excludedTenantCount++;
                     break;
                 case "queued":
+                case "indexing":
                 case "running":
                     runningTenantCount++;
                     break;
@@ -1105,6 +1112,7 @@ public sealed class MultiTenantSetupService
         int totalTenantCount = configuredTenants.Count;
         summary["total_tenant_count"] = totalTenantCount;
         summary["completed_tenant_count"] = completedTenantCount;
+        summary["indexing_pending_tenant_count"] = indexingPendingTenantCount;
         summary["paused_tenant_count"] = pausedTenantCount;
         summary["running_tenant_count"] = runningTenantCount;
         summary["pending_tenant_count"] = pendingTenantCount;
@@ -1116,14 +1124,22 @@ public sealed class MultiTenantSetupService
         summary["total_de_id_doc_count"] = totalDeIdDocCount;
         summary["total_report_doc_count"] = totalReportDocCount;
         summary["last_error"] = firstError;
-        summary["last_updated_utc"] = DateTime.UtcNow.ToString("o");
+        summary["summary_generated_utc"] = DateTime.UtcNow.ToString("o");
 
         if (totalTenantCount > 0 && completedTenantCount + excludedTenantCount == totalTenantCount)
         {
-            summary["status"] = "completed";
-            if (summary["completed_utc"] == null)
+            if (indexingPendingTenantCount > 0)
             {
-                summary["completed_utc"] = DateTime.UtcNow.ToString("o");
+                summary["status"] = "indexing_pending";
+                summary.Remove("completed_utc");
+            }
+            else
+            {
+                summary["status"] = "completed";
+                if (summary["completed_utc"] == null)
+                {
+                    summary["completed_utc"] = DateTime.UtcNow.ToString("o");
+                }
             }
         }
         else if (runningTenantCount > 0)
@@ -1157,7 +1173,9 @@ public sealed class MultiTenantSetupService
 
             string status = tenantStatus.Value<string>("status");
             if (!string.Equals(status, "queued", StringComparison.OrdinalIgnoreCase) &&
-                !string.Equals(status, "running", StringComparison.OrdinalIgnoreCase))
+                !string.Equals(status, "running", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(status, "indexing", StringComparison.OrdinalIgnoreCase) &&
+                !(string.Equals(status, "indexing_pending", StringComparison.OrdinalIgnoreCase) && HasFreshLease(tenantStatus)))
             {
                 continue;
             }
@@ -1173,6 +1191,12 @@ public sealed class MultiTenantSetupService
         }
 
         return result;
+    }
+
+    private static bool HasFreshLease(JObject tenantStatus)
+    {
+        return DateTime.TryParse(tenantStatus?.Value<string>("lease_expires_utc"), out DateTime leaseExpiresUtc) &&
+            leaseExpiresUtc.ToUniversalTime() > DateTime.UtcNow;
     }
 
     private async Task<(string effectiveHostPrefix, JObject summary)> GetNormalizedStartupRunSummarySnapshotAsync(string currentHostPrefix)

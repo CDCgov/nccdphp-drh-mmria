@@ -195,6 +195,16 @@ public sealed class SessionManager
         return await _dal.GetSessionDocumentAsync(id, db_config);
     }
 
+    public async Task<Session_MessageDTO> GetSessionMessageAsync(string id, DBConfigurationDetail db_config)
+    {
+        return await _dal.GetSessionMessageAsync(id, db_config);
+    }
+
+    public async Task<document_put_response> SaveSessionMessageAsync(Session_Message sessionMessage, DBConfigurationDetail db_config)
+    {
+        return await _dal.SaveSessionMessageAsync(sessionMessage, db_config);
+    }
+
     public async Task<document_put_response> PostSessionDocumentAsync(session post_request, ClaimsPrincipal user, DBConfigurationDetail db_config)
     {
         document_put_response result = new document_put_response();
@@ -281,6 +291,10 @@ public sealed class SessionManager
         if (date_of_last_password_change != DateTime.MinValue)
         {
             days_til_expiration = password_days_before_expires.Value - (int)(DateTime.Now - date_of_last_password_change).TotalDays;
+        }
+        else if (session_event_response.rows.Count > 0)
+        {
+            days_til_expiration = password_days_before_expires.Value - (int)(DateTime.Now - session_event_response.rows[session_event_response.rows.Count - 1].value.date_created).TotalDays;
         }
 
         return days_til_expiration;
