@@ -266,7 +266,7 @@ internal sealed class MMRIARebuildWorker
         System.Console.WriteLine($"Index warm delay: {indexWarmDelayMs} ms");
         System.Console.WriteLine($"Index warm poll delay: {indexWarmPollDelayMs} ms");
         System.Console.WriteLine($"Index warm timeout: {indexWarmTimeoutMs} ms");
-        System.Console.WriteLine($"Index warm max surfaces per run: {(indexWarmMaxSurfacesPerRun <= 0 ? "all" : indexWarmMaxSurfacesPerRun.ToString())}");
+        System.Console.WriteLine($"Index warm max surfaces per cycle: {(indexWarmMaxSurfacesPerRun <= 0 ? "all" : indexWarmMaxSurfacesPerRun.ToString())}");
         System.Console.WriteLine("=======================================================");
         System.Console.WriteLine();
 
@@ -331,10 +331,12 @@ internal sealed class MMRIARebuildWorker
                     completedBatchCount = progress.completed_batch_count;
                     lastProcessedId = progress.last_processed_id;
 
-                    UpdateRebuildState("running", null, false);
                     string progressState = string.Equals(documentWriteStatus, "completed", StringComparison.OrdinalIgnoreCase)
                         ? "indexing"
                         : "writing";
+                    UpdateRebuildState(string.Equals(progressState, "indexing", StringComparison.OrdinalIgnoreCase)
+                        ? "indexing"
+                        : "running", null, false);
                     await PersistDurableCheckpointAsync(progressState, null, false);
 
                     bool shouldPersistProgress = completedBatchCount % progressPersistEveryBatches == 0;
@@ -816,6 +818,7 @@ internal sealed class MMRIARebuildWorker
                     excludedTenantCount++;
                     break;
                 case "running":
+                case "indexing":
                 case "queued":
                     summary.running_tenant_count++;
                     break;

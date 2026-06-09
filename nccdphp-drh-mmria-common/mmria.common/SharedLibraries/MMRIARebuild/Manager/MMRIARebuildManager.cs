@@ -624,7 +624,9 @@ public sealed class MMRIARebuildManager
             }
         }
 
-        return "ensure";
+        return string.Equals(normalizedSource, "startup", StringComparison.OrdinalIgnoreCase)
+            ? "ensure"
+            : "resume";
     }
 
     private static string BuildRequestFingerprint(

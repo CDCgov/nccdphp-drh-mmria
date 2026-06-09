@@ -346,6 +346,7 @@ public sealed class MultiTenantSetupService
                 {
                     tenant = normalizedTenant,
                     source = "manual",
+                    requested_behavior = "resume",
                     configured_tenants = summaryContext?.ConfiguredTenants?.ToList() ?? new List<string>(),
                     summary_host_prefix = summaryContext?.SummaryHostPrefix
                 },
@@ -1098,6 +1099,7 @@ public sealed class MultiTenantSetupService
                     excludedTenantCount++;
                     break;
                 case "queued":
+                case "indexing":
                 case "running":
                     runningTenantCount++;
                     break;
@@ -1172,6 +1174,7 @@ public sealed class MultiTenantSetupService
             string status = tenantStatus.Value<string>("status");
             if (!string.Equals(status, "queued", StringComparison.OrdinalIgnoreCase) &&
                 !string.Equals(status, "running", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(status, "indexing", StringComparison.OrdinalIgnoreCase) &&
                 !(string.Equals(status, "indexing_pending", StringComparison.OrdinalIgnoreCase) && HasFreshLease(tenantStatus)))
             {
                 continue;

@@ -407,9 +407,36 @@ public sealed class c_document_sync_all_legacy
     private async Task<string> warm_target_indexes_async(Func<Task> index_progress_callback = null)
     {
         System.Console.WriteLine("Warming legacy de_id/report designs and indexes after rebuild writes complete.");
-        return await restore_target_designs_async(
-            wait_for_index_completion: true,
-            index_progress_callback);
+        int warm_cycle_count = 0;
+
+        while(true)
+        {
+            warm_cycle_count++;
+            string warm_status = await restore_target_designs_async(
+                wait_for_index_completion: true,
+                index_progress_callback);
+
+            if(string.Equals(warm_status, "completed", StringComparison.OrdinalIgnoreCase))
+            {
+                return "completed";
+            }
+
+            var pending_surfaces = _index_surface_statuses
+                .Where(item => !string.Equals(item.status, "completed", StringComparison.OrdinalIgnoreCase))
+                .Select(item => item.query_surface)
+                .ToList();
+
+            if(pending_surfaces.Count == 0)
+            {
+                return "completed";
+            }
+
+            System.Console.WriteLine(
+                $">>> INDEX WARM-UP cycle {warm_cycle_count} completed for {db_config.prefix}. " +
+                $"{pending_surfaces.Count} surface(s) still pending: {string.Join(", ", pending_surfaces)}. " +
+                "Continuing with the next warm-up cycle. <<<");
+            await report_index_progress_async(index_progress_callback);
+        }
     }
 
     private async Task<string> restore_target_designs_async(
@@ -425,10 +452,9 @@ public sealed class c_document_sync_all_legacy
             Func<Task> barrier_query_action)
         {
             var existing_status = get_or_create_index_surface_status(query_surface_label);
-            if(_resume_existing_run &&
-                string.Equals(existing_status.status, "completed", StringComparison.OrdinalIgnoreCase))
+            if(string.Equals(existing_status.status, "completed", StringComparison.OrdinalIgnoreCase))
             {
-                System.Console.WriteLine($">>> SKIPPING completed {db_config.prefix}{query_surface_label} during rebuild resume. <<<");
+                System.Console.WriteLine($">>> SKIPPING completed {db_config.prefix}{query_surface_label} during index warm-up. <<<");
                 await report_index_progress_async(index_progress_callback);
                 return;
             }
@@ -463,7 +489,7 @@ public sealed class c_document_sync_all_legacy
                 mark_index_surface_status(query_surface_label, "pending");
                 System.Console.WriteLine(
                     $">>> INDEXING PENDING for {db_config.prefix}{query_surface_label}. " +
-                    $"Configured max warm surfaces per run is {_index_warm_max_surfaces_per_run}. <<<");
+                    $"Configured max warm surfaces per cycle is {_index_warm_max_surfaces_per_run}. <<<");
                 await report_index_progress_async(index_progress_callback);
                 return;
             }
@@ -1034,7 +1060,7 @@ public sealed class c_document_sync_all_legacy
         System.Console.WriteLine($"Legacy index warm delay: {_index_warm_delay_ms} ms");
         System.Console.WriteLine($"Legacy index warm poll delay: {_index_warm_poll_delay_ms} ms");
         System.Console.WriteLine($"Legacy index warm timeout: {_index_warm_timeout_ms} ms");
-        System.Console.WriteLine($"Legacy index warm max surfaces per run: {(_index_warm_max_surfaces_per_run <= 0 ? "all" : _index_warm_max_surfaces_per_run.ToString())}");
+        System.Console.WriteLine($"Legacy index warm max surfaces per cycle: {(_index_warm_max_surfaces_per_run <= 0 ? "all" : _index_warm_max_surfaces_per_run.ToString())}");
         System.Console.WriteLine("==============================================================");
         System.Console.WriteLine();
 
