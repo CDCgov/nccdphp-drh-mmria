@@ -16,7 +16,10 @@ public sealed class ScheduleInfoMessage
         string p_export_directory,
         string p_jurisdiction_user_name,
         string p_version_number,
-        string p_cdc_instance_pull_list
+        string p_cdc_instance_pull_list,
+        string p_request_id = null,
+        string p_requested_queue_item_id = null,
+        string p_tenant = null
         )
     {
         cron_schedule = p_cron_schedule;
@@ -28,6 +31,9 @@ public sealed class ScheduleInfoMessage
         jurisdiction_user_name = p_jurisdiction_user_name;
         version_number = p_version_number;
         cdc_instance_pull_list  = p_cdc_instance_pull_list;
+        request_id = p_request_id;
+        requested_queue_item_id = p_requested_queue_item_id;
+        tenant = p_tenant;
     }
 
     public string cron_schedule { get; private set; }
@@ -43,4 +49,7 @@ public sealed class ScheduleInfoMessage
     public string export_directory { get; private set; }
 
     public string cdc_instance_pull_list { get; private set; }
+    public string request_id { get; private set; }
+    public string requested_queue_item_id { get; private set; }
+    public string tenant { get; private set; }
 }

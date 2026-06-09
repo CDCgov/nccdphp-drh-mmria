@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
+using mmria.common.SharedLibraries.MMRIARebuild.Model;
 using Newtonsoft.Json.Linq;
 
 namespace mmria.common.SharedLibraries.MMRIARebuild.Manager;
@@ -12,11 +13,13 @@ namespace mmria.common.SharedLibraries.MMRIARebuild.Manager;
 public sealed class c_document_sync_all_legacy
 {
     private const string RebuildClientName = "CouchDbRebuild";
-    private const int BarrierQueryPollDelayMs = 2000;
-    private const int BarrierQueryTimeoutMs = 15 * 60 * 1000;
 
     public class legacy_progress
     {
+        public string document_write_status { get; set; }
+        public string index_restore_mode { get; set; }
+        public string index_warmup_status { get; set; }
+        public List<StartupRebuildIndexSurfaceSummary> index_surfaces { get; set; } = new();
         public int batch_number { get; set; }
         public string last_processed_id { get; set; }
         public int completed_batch_count { get; set; }
@@ -90,6 +93,17 @@ public sealed class c_document_sync_all_legacy
     private readonly int _write_retry_delay_ms;
     private readonly bool _add_indexes_at_beginning;
     private readonly Func<legacy_progress, Task> _progress_callback;
+    private readonly string _index_restore_mode;
+    private readonly int _index_warm_delay_ms;
+    private readonly int _index_warm_poll_delay_ms;
+    private readonly int _index_warm_timeout_ms;
+    private readonly int _index_warm_max_surfaces_per_run;
+    private readonly List<StartupRebuildIndexSurfaceSummary> _index_surface_statuses = new();
+    private readonly bool _resume_existing_run;
+    private readonly string _resume_after_source_id;
+    private readonly string _target_generation;
+    private readonly string _run_id;
+    private readonly DurableTenantRebuildState _resume_state;
 
     public c_document_sync_all_legacy
     (
@@ -106,7 +120,17 @@ public sealed class c_document_sync_all_legacy
         int write_retry_count = 0,
         int write_retry_delay_ms = 0,
         bool add_indexes_at_beginning = true,
-        Func<legacy_progress, Task> progress_callback = null
+        Func<legacy_progress, Task> progress_callback = null,
+        string index_restore_mode = null,
+        int index_warm_delay_ms = 60000,
+        int index_warm_poll_delay_ms = 10000,
+        int index_warm_timeout_ms = 15 * 60 * 1000,
+        int index_warm_max_surfaces_per_run = 0,
+        bool resume_existing_run = false,
+        string resume_after_source_id = null,
+        string target_generation = null,
+        string run_id = null,
+        DurableTenantRebuildState resume_state = null
     )
     {
         couchdb_url = p_couchdb_url;
@@ -121,8 +145,33 @@ public sealed class c_document_sync_all_legacy
         _batch_delay_ms = Math.Max(0, batch_delay_ms);
         _write_retry_count = Math.Max(0, write_retry_count);
         _write_retry_delay_ms = Math.Max(0, write_retry_delay_ms);
-        _add_indexes_at_beginning = add_indexes_at_beginning;
         _progress_callback = progress_callback;
+        _index_restore_mode = DbRebuildSettings.ResolveStartupRebuildIndexRestoreMode(index_restore_mode, add_indexes_at_beginning);
+        _add_indexes_at_beginning = DbRebuildSettings.RestoresIndexesAtBeginning(_index_restore_mode);
+        _index_warm_delay_ms = Math.Max(0, index_warm_delay_ms);
+        _index_warm_poll_delay_ms = Math.Max(1000, index_warm_poll_delay_ms);
+        _index_warm_timeout_ms = Math.Max(1000, index_warm_timeout_ms);
+        _index_warm_max_surfaces_per_run = Math.Max(0, index_warm_max_surfaces_per_run);
+        _resume_existing_run = resume_existing_run;
+        _resume_after_source_id = string.IsNullOrWhiteSpace(resume_after_source_id) ? null : resume_after_source_id.Trim();
+        _target_generation = string.IsNullOrWhiteSpace(target_generation) ? run_id : target_generation.Trim();
+        _run_id = string.IsNullOrWhiteSpace(run_id) ? _target_generation : run_id.Trim();
+        _resume_state = resume_state;
+
+        foreach (var surface in resume_state?.index_surfaces ?? Enumerable.Empty<StartupRebuildIndexSurfaceSummary>())
+        {
+            _index_surface_statuses.Add(new StartupRebuildIndexSurfaceSummary
+            {
+                query_surface = surface.query_surface,
+                status = surface.status,
+                attempt_count = surface.attempt_count,
+                elapsed_ms = surface.elapsed_ms,
+                started_utc = surface.started_utc,
+                last_updated_utc = surface.last_updated_utc,
+                completed_utc = surface.completed_utc,
+                last_error = surface.last_error
+            });
+        }
     }
 
     private string get_database_scripts_directory()
@@ -154,7 +203,8 @@ public sealed class c_document_sync_all_legacy
         string method,
         string url,
         string payload = null,
-        string contentType = "application/json")
+        string contentType = "application/json",
+        bool throwOnError = false)
     {
         return _couchDbHttpClient.ExecuteAsync(
             method,
@@ -163,7 +213,32 @@ public sealed class c_document_sync_all_legacy
             user_name,
             user_value,
             contentType,
+            throwOnError: throwOnError,
             clientName: RebuildClientName);
+    }
+
+    private async Task execute_barrier_request_async(
+        string method,
+        string url,
+        string payload = null)
+    {
+        string response = await execute_rebuild_request_async(
+            method,
+            url,
+            payload,
+            throwOnError: true);
+
+        if (string.IsNullOrWhiteSpace(response))
+        {
+            return;
+        }
+
+        var payloadObject = JObject.Parse(response);
+        if (!string.IsNullOrWhiteSpace(payloadObject.Value<string>("error")))
+        {
+            throw new HttpRequestException(
+                $"CouchDB barrier query returned error '{payloadObject.Value<string>("error")}', reason '{payloadObject.Value<string>("reason")}'.");
+        }
     }
 
     private async Task<c_document_sync_rebuild_context> load_rebuild_context_async()
@@ -193,9 +268,16 @@ public sealed class c_document_sync_all_legacy
         };
     }
 
-    private async Task<List<string>> get_case_id_batch_async(int skip, int take)
+    private async Task<List<string>> get_case_id_batch_async(string start_after_id, int take)
     {
-        string url = couchdb_url + $"/{db_config.prefix}mmrds/_all_docs?skip={skip}&limit={take}";
+        string url = couchdb_url + $"/{db_config.prefix}mmrds/_all_docs?limit={take}";
+        if(!string.IsNullOrWhiteSpace(start_after_id))
+        {
+            string encoded_start_key = Uri.EscapeDataString(
+                Newtonsoft.Json.JsonConvert.SerializeObject(start_after_id));
+            url += $"&startkey={encoded_start_key}&skip=1";
+        }
+
         string response = await execute_rebuild_request_async("GET", url);
         var result = new List<string>();
 
@@ -242,6 +324,7 @@ public sealed class c_document_sync_all_legacy
     {
         System.Console.WriteLine("Preparing legacy de_id/report databases before rebuild writes start.");
         await reset_target_databases_async();
+        await write_target_generation_markers_async();
 
         if(_add_indexes_at_beginning)
         {
@@ -250,43 +333,268 @@ public sealed class c_document_sync_all_legacy
         }
     }
 
-    private async Task finalize_target_databases_async()
+    private async Task write_target_generation_markers_async()
     {
-        System.Console.WriteLine("Restoring legacy de_id/report designs and indexes after rebuild writes complete.");
-        await restore_target_designs_async(wait_for_index_completion: true);
+        await write_target_generation_marker_async("de_id");
+        await write_target_generation_marker_async("report");
     }
 
-    private async Task restore_target_designs_async(bool wait_for_index_completion)
+    private async Task write_target_generation_marker_async(string database_name)
     {
-        await restore_de_id_sortable_design_async();
-        await wait_for_query_surface_restore_async(
+        if(string.IsNullOrWhiteSpace(_target_generation) || string.IsNullOrWhiteSpace(_run_id))
+        {
+            return;
+        }
+
+        var marker = new JObject
+        {
+            ["_id"] = "_local/mmria-rebuild-generation",
+            ["run_id"] = _run_id,
+            ["target_generation"] = _target_generation,
+            ["tenant"] = _host_prefix ?? db_config?.prefix,
+            ["metadata_version"] = metadata_version,
+            ["created_utc"] = DateTime.UtcNow.ToString("o")
+        };
+
+        await execute_rebuild_request_async(
+            "PUT",
+            couchdb_url + $"/{db_config.prefix}{database_name}/_local/mmria-rebuild-generation",
+            marker.ToString(Newtonsoft.Json.Formatting.None));
+    }
+
+    private async Task verify_target_generation_markers_async()
+    {
+        await verify_target_generation_marker_async("de_id");
+        await verify_target_generation_marker_async("report");
+    }
+
+    private async Task verify_target_generation_marker_async(string database_name)
+    {
+        if(string.IsNullOrWhiteSpace(_target_generation) || string.IsNullOrWhiteSpace(_run_id))
+        {
+            throw new InvalidOperationException(
+                $"Resume for {db_config.prefix}{database_name} requires a durable run_id and target_generation. requires_force_fresh");
+        }
+
+        string response = await execute_rebuild_request_async(
+            "GET",
+            couchdb_url + $"/{db_config.prefix}{database_name}/_local/mmria-rebuild-generation");
+
+        if(string.IsNullOrWhiteSpace(response))
+        {
+            throw new InvalidOperationException(
+                $"Resume marker missing for {db_config.prefix}{database_name}. requires_force_fresh");
+        }
+
+        var marker = JObject.Parse(response);
+        if(string.Equals(marker.Value<string>("error"), "not_found", StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(marker.Value<string>("run_id"), _run_id, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(marker.Value<string>("target_generation"), _target_generation, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"Resume marker mismatch for {db_config.prefix}{database_name}. requires_force_fresh");
+        }
+    }
+
+    private async Task<string> finalize_target_databases_async(Func<Task> index_progress_callback = null)
+    {
+        System.Console.WriteLine("Restoring legacy de_id/report designs and indexes after rebuild writes complete.");
+        return await restore_target_designs_async(
+            wait_for_index_completion: DbRebuildSettings.WaitsForIndexWarmup(_index_restore_mode),
+            index_progress_callback);
+    }
+
+    private async Task<string> warm_target_indexes_async(Func<Task> index_progress_callback = null)
+    {
+        System.Console.WriteLine("Warming legacy de_id/report designs and indexes after rebuild writes complete.");
+        return await restore_target_designs_async(
+            wait_for_index_completion: true,
+            index_progress_callback);
+    }
+
+    private async Task<string> restore_target_designs_async(
+        bool wait_for_index_completion,
+        Func<Task> index_progress_callback = null)
+    {
+        int warmed_surface_count = 0;
+        bool stagger_warmup = DbRebuildSettings.StaggersIndexWarmup(_index_restore_mode);
+
+        async Task restore_surface_async(
+            string query_surface_label,
+            Func<Task> restore_action,
+            Func<Task> barrier_query_action)
+        {
+            var existing_status = get_or_create_index_surface_status(query_surface_label);
+            if(_resume_existing_run &&
+                string.Equals(existing_status.status, "completed", StringComparison.OrdinalIgnoreCase))
+            {
+                System.Console.WriteLine($">>> SKIPPING completed {db_config.prefix}{query_surface_label} during rebuild resume. <<<");
+                await report_index_progress_async(index_progress_callback);
+                return;
+            }
+
+            if(is_index_surface_restored_enough(existing_status.status))
+            {
+                System.Console.WriteLine(
+                    $">>> REUSING restored {db_config.prefix}{query_surface_label} during index warm-up. " +
+                    $"Current status: {existing_status.status}. <<<");
+            }
+            else
+            {
+                await restore_action();
+            }
+
+            if(!wait_for_index_completion)
+            {
+                mark_index_surface_status(query_surface_label, "pending");
+                System.Console.WriteLine(
+                    $">>> INDEXING PENDING for {db_config.prefix}{query_surface_label}. " +
+                    $"Mode '{_index_restore_mode}' restored the query surface without forcing a barrier query. <<<");
+                await report_index_progress_async(index_progress_callback);
+                return;
+            }
+
+            mark_index_surface_status(query_surface_label, "restored");
+            await report_index_progress_async(index_progress_callback);
+
+            if(_index_warm_max_surfaces_per_run > 0 &&
+                warmed_surface_count >= _index_warm_max_surfaces_per_run)
+            {
+                mark_index_surface_status(query_surface_label, "pending");
+                System.Console.WriteLine(
+                    $">>> INDEXING PENDING for {db_config.prefix}{query_surface_label}. " +
+                    $"Configured max warm surfaces per run is {_index_warm_max_surfaces_per_run}. <<<");
+                await report_index_progress_async(index_progress_callback);
+                return;
+            }
+
+            if((stagger_warmup || DbRebuildSettings.DelaysIndexWarmup(_index_restore_mode)) && _index_warm_delay_ms > 0)
+            {
+                System.Console.WriteLine(
+                    $">>> DELAYING {_index_warm_delay_ms} ms before warming {db_config.prefix}{query_surface_label}. " +
+                    $"Mode: {_index_restore_mode}. <<<");
+                await Task.Delay(_index_warm_delay_ms);
+            }
+
+            warmed_surface_count++;
+            await wait_for_query_surface_restore_async(
+                query_surface_label,
+                barrier_query_action,
+                index_progress_callback);
+        }
+
+        await restore_surface_async(
             "de_id/_design/sortable",
-            wait_for_index_completion,
+            restore_de_id_sortable_design_async,
             ensure_de_id_sortable_ready_async);
 
-        await restore_report_powerbi_index_async();
-        await wait_for_query_surface_restore_async(
+        await restore_surface_async(
             "report/_design/powerbi-report-index",
-            wait_for_index_completion,
+            restore_report_powerbi_index_async,
             ensure_report_powerbi_index_ready_async);
 
-        await restore_report_opioid_index_async();
-        await wait_for_query_surface_restore_async(
+        await restore_surface_async(
             "report/_design/opioid-report-index",
-            wait_for_index_completion,
+            restore_report_opioid_index_async,
             ensure_report_opioid_index_ready_async);
 
-        await restore_interactive_report_view_async();
-        await wait_for_query_surface_restore_async(
+        await restore_surface_async(
             "report/_design/interactive_aggregate_report",
-            wait_for_index_completion,
+            restore_interactive_report_view_async,
             ensure_interactive_report_view_ready_async);
 
-        await restore_data_summary_view_async();
-        await wait_for_query_surface_restore_async(
+        await restore_surface_async(
             "report/_design/data_summary_view_report",
-            wait_for_index_completion,
+            restore_data_summary_view_async,
             ensure_data_summary_view_ready_async);
+
+        return wait_for_index_completion &&
+            _index_surface_statuses.All(item => string.Equals(item.status, "completed", StringComparison.OrdinalIgnoreCase))
+            ? "completed"
+            : "pending";
+    }
+
+    private static bool is_index_surface_restored_enough(string status)
+    {
+        return string.Equals(status, "pending", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(status, "restored", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(status, "warming", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(status, "failed", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private StartupRebuildIndexSurfaceSummary get_or_create_index_surface_status(string query_surface_label)
+    {
+        var status = _index_surface_statuses.FirstOrDefault(
+            item => string.Equals(item.query_surface, query_surface_label, StringComparison.OrdinalIgnoreCase));
+
+        if(status != null)
+        {
+            return status;
+        }
+
+        status = new StartupRebuildIndexSurfaceSummary
+        {
+            query_surface = query_surface_label,
+            status = "not_started",
+            started_utc = DateTime.UtcNow.ToString("o"),
+            last_updated_utc = DateTime.UtcNow.ToString("o")
+        };
+        _index_surface_statuses.Add(status);
+        return status;
+    }
+
+    private void mark_index_surface_status(
+        string query_surface_label,
+        string status,
+        int attempt_count = -1,
+        long elapsed_ms = -1,
+        string last_error = null)
+    {
+        var surface_status = get_or_create_index_surface_status(query_surface_label);
+        surface_status.status = status;
+        surface_status.last_updated_utc = DateTime.UtcNow.ToString("o");
+
+        if(attempt_count >= 0)
+        {
+            surface_status.attempt_count = attempt_count;
+        }
+
+        if(elapsed_ms >= 0)
+        {
+            surface_status.elapsed_ms = elapsed_ms;
+        }
+
+        surface_status.last_error = last_error;
+
+        if(string.Equals(status, "completed", StringComparison.OrdinalIgnoreCase))
+        {
+            surface_status.completed_utc = DateTime.UtcNow.ToString("o");
+        }
+    }
+
+    private List<StartupRebuildIndexSurfaceSummary> clone_index_surface_statuses()
+    {
+        return _index_surface_statuses
+            .Select(item => new StartupRebuildIndexSurfaceSummary
+            {
+                query_surface = item.query_surface,
+                status = item.status,
+                attempt_count = item.attempt_count,
+                elapsed_ms = item.elapsed_ms,
+                started_utc = item.started_utc,
+                last_updated_utc = item.last_updated_utc,
+                completed_utc = item.completed_utc,
+                last_error = item.last_error
+            })
+            .ToList();
+    }
+
+    private async Task report_index_progress_async(Func<Task> index_progress_callback)
+    {
+        if(index_progress_callback != null)
+        {
+            await index_progress_callback();
+        }
     }
 
     private async Task reset_database_async(string database_name)
@@ -413,56 +721,81 @@ public sealed class c_document_sync_all_legacy
 
     private async Task wait_for_query_surface_restore_async(
         string query_surface_label,
-        bool wait_for_index_completion,
-        Func<Task> barrier_query_action)
+        Func<Task> barrier_query_action,
+        Func<Task> index_progress_callback = null)
     {
-        if(!wait_for_index_completion)
-        {
-            return;
-        }
-
         Stopwatch wait_stopwatch = Stopwatch.StartNew();
-        bool logged_wait_message = false;
         Exception last_exception = null;
+        int attempt_count = 0;
 
         while(true)
         {
+            attempt_count++;
+
             try
             {
+                mark_index_surface_status(
+                    query_surface_label,
+                    "warming",
+                    attempt_count,
+                    wait_stopwatch.ElapsedMilliseconds);
+                await report_index_progress_async(index_progress_callback);
+
                 await barrier_query_action();
+                mark_index_surface_status(
+                    query_surface_label,
+                    "completed",
+                    attempt_count,
+                    wait_stopwatch.ElapsedMilliseconds);
+                await report_index_progress_async(index_progress_callback);
                 System.Console.WriteLine(
                     $">>> COMPLETED {db_config.prefix}{query_surface_label} barrier query at {DateTime.Now:HH:mm:ss.fff} " +
-                    $"after waiting {wait_stopwatch.ElapsedMilliseconds} ms <<<");
+                    $"after attempt {attempt_count} and {wait_stopwatch.ElapsedMilliseconds} ms <<<");
                 return;
             }
             catch (Exception ex)
             {
                 last_exception = ex;
+                mark_index_surface_status(
+                    query_surface_label,
+                    "warming",
+                    attempt_count,
+                    wait_stopwatch.ElapsedMilliseconds,
+                    ex.Message);
+                await report_index_progress_async(index_progress_callback);
 
-                if(!logged_wait_message)
+                if(attempt_count == 1 || attempt_count % 5 == 0)
                 {
                     System.Console.WriteLine(
                         $">>> WAITING FOR {db_config.prefix}{query_surface_label} barrier query to succeed. " +
-                        $"Initial response: {ex.Message} <<<");
-                    logged_wait_message = true;
+                        $"Attempt {attempt_count}, elapsed {wait_stopwatch.ElapsedMilliseconds} ms, " +
+                        $"next retry in {_index_warm_poll_delay_ms} ms, timeout {_index_warm_timeout_ms} ms. " +
+                        $"Last response: {ex.Message} <<<");
                 }
             }
 
-            if(wait_stopwatch.ElapsedMilliseconds >= BarrierQueryTimeoutMs)
+            if(wait_stopwatch.ElapsedMilliseconds >= _index_warm_timeout_ms)
             {
+                mark_index_surface_status(
+                    query_surface_label,
+                    "failed",
+                    attempt_count,
+                    wait_stopwatch.ElapsedMilliseconds,
+                    last_exception?.Message);
+                await report_index_progress_async(index_progress_callback);
                 throw new TimeoutException(
                     $"Timed out waiting for barrier query for {db_config.prefix}{query_surface_label} " +
-                    $"after {wait_stopwatch.ElapsedMilliseconds} ms.",
+                    $"after {wait_stopwatch.ElapsedMilliseconds} ms and {attempt_count} attempt(s).",
                     last_exception);
             }
 
-            await Task.Delay(BarrierQueryPollDelayMs);
+            await Task.Delay(_index_warm_poll_delay_ms);
         }
     }
 
     private Task ensure_de_id_sortable_ready_async()
     {
-        return execute_rebuild_request_async(
+        return execute_barrier_request_async(
             "GET",
             couchdb_url + $"/{db_config.prefix}de_id/_design/sortable/_view/by_date_created?limit=1&update=true");
     }
@@ -492,7 +825,7 @@ public sealed class c_document_sync_all_legacy
             ["limit"] = 1
         };
 
-        await execute_rebuild_request_async(
+        await execute_barrier_request_async(
             "POST",
             couchdb_url + $"/{db_config.prefix}report/_find",
             payload.ToString(Newtonsoft.Json.Formatting.None));
@@ -500,14 +833,14 @@ public sealed class c_document_sync_all_legacy
 
     private Task ensure_interactive_report_view_ready_async()
     {
-        return execute_rebuild_request_async(
+        return execute_barrier_request_async(
             "GET",
             couchdb_url + $"/{db_config.prefix}report/_design/interactive_aggregate_report/_view/indicator_id?limit=1&update=true");
     }
 
     private Task ensure_data_summary_view_ready_async()
     {
-        return execute_rebuild_request_async(
+        return execute_barrier_request_async(
             "GET",
             couchdb_url + $"/{db_config.prefix}report/_design/data_summary_view_report/_view/year_of_death?limit=1&update=true");
     }
@@ -540,6 +873,7 @@ public sealed class c_document_sync_all_legacy
         document.Remove("_rev");
         string payload = document.ToString(Newtonsoft.Json.Formatting.None);
         string url = couchdb_url + $"/{db_config.prefix}{database_name}/{Uri.EscapeDataString(document_id)}";
+        int conflict_count = 0;
 
         for(int attempt = 0; ; attempt++)
         {
@@ -556,6 +890,28 @@ public sealed class c_document_sync_all_legacy
                 if(result?.ok == true)
                 {
                     return true;
+                }
+
+                var response_payload = JObject.Parse(response);
+                if(string.Equals(response_payload.Value<string>("error"), "conflict", StringComparison.OrdinalIgnoreCase))
+                {
+                    conflict_count++;
+                    if(conflict_count > _write_retry_count + 1)
+                    {
+                        System.Console.WriteLine($"Legacy {database_name} write conflict retry limit reached for '{document_id}'.");
+                        return false;
+                    }
+
+                    string current_revision = await try_get_document_revision_async(database_name, document_id);
+                    if(string.IsNullOrWhiteSpace(current_revision))
+                    {
+                        System.Console.WriteLine($"Legacy {database_name} write conflict for '{document_id}' but no current _rev was found.");
+                        return false;
+                    }
+
+                    document["_rev"] = current_revision;
+                    payload = document.ToString(Newtonsoft.Json.Formatting.None);
+                    continue;
                 }
 
                 System.Console.WriteLine($"Legacy {database_name} write received unexpected response: {response}");
@@ -581,12 +937,44 @@ public sealed class c_document_sync_all_legacy
         }
     }
 
+    private async Task<string> try_get_document_revision_async(string database_name, string document_id)
+    {
+        string response = await execute_rebuild_request_async(
+            "GET",
+            couchdb_url + $"/{db_config.prefix}{database_name}/{Uri.EscapeDataString(document_id)}");
+
+        if(string.IsNullOrWhiteSpace(response))
+        {
+            return null;
+        }
+
+        var payload = JObject.Parse(response);
+        if(string.Equals(payload.Value<string>("error"), "not_found", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return payload.Value<string>("_rev");
+    }
+
     private async Task report_progress_async(legacy_progress progress)
     {
         if(_progress_callback != null)
         {
             await _progress_callback(progress);
         }
+    }
+
+    private async Task report_result_progress_async(legacy_result result)
+    {
+        if(result == null)
+        {
+            return;
+        }
+
+        result.index_restore_mode = _index_restore_mode;
+        result.index_surfaces = clone_index_surface_statuses();
+        await report_progress_async(result);
     }
 
     private string get_tenant_log_label()
@@ -615,7 +1003,22 @@ public sealed class c_document_sync_all_legacy
 
     public async Task<legacy_result> executeAsync()
     {
-        var result = new legacy_result();
+        var result = new legacy_result
+        {
+            document_write_status = "running",
+            index_restore_mode = _index_restore_mode,
+            index_warmup_status = "not_started",
+            index_surfaces = clone_index_surface_statuses(),
+            last_processed_id = _resume_existing_run ? _resume_state?.last_completed_source_id ?? _resume_after_source_id : null,
+            completed_batch_count = _resume_existing_run ? _resume_state?.completed_batch_count ?? 0 : 0,
+            processed_case_count = _resume_existing_run ? _resume_state?.processed_case_count ?? 0 : 0,
+            skipped_case_count = _resume_existing_run ? _resume_state?.skipped_case_count ?? 0 : 0,
+            document_error_count = _resume_existing_run ? _resume_state?.document_error_count ?? 0 : 0,
+            de_id_bulk_error_count = _resume_existing_run ? _resume_state?.de_id_bulk_error_count ?? 0 : 0,
+            report_bulk_error_count = _resume_existing_run ? _resume_state?.report_bulk_error_count ?? 0 : 0,
+            total_de_id_doc_count = _resume_existing_run ? _resume_state?.total_de_id_doc_count ?? 0 : 0,
+            total_report_doc_count = _resume_existing_run ? _resume_state?.total_report_doc_count ?? 0 : 0
+        };
         string tenant_log_label = get_tenant_log_label();
 
         System.Console.WriteLine();
@@ -627,131 +1030,165 @@ public sealed class c_document_sync_all_legacy
         System.Console.WriteLine($"{tenant_log_label} batch delay: {_batch_delay_ms} ms");
         System.Console.WriteLine($"Legacy write retries: {_write_retry_count}");
         System.Console.WriteLine($"Legacy write retry delay: {_write_retry_delay_ms} ms");
-        System.Console.WriteLine($"Legacy design/index restore mode: {(_add_indexes_at_beginning ? "beginning" : "end")}");
+        System.Console.WriteLine($"Legacy design/index restore mode: {_index_restore_mode}");
+        System.Console.WriteLine($"Legacy index warm delay: {_index_warm_delay_ms} ms");
+        System.Console.WriteLine($"Legacy index warm poll delay: {_index_warm_poll_delay_ms} ms");
+        System.Console.WriteLine($"Legacy index warm timeout: {_index_warm_timeout_ms} ms");
+        System.Console.WriteLine($"Legacy index warm max surfaces per run: {(_index_warm_max_surfaces_per_run <= 0 ? "all" : _index_warm_max_surfaces_per_run.ToString())}");
         System.Console.WriteLine("==============================================================");
         System.Console.WriteLine();
 
         try
         {
-            await prepare_target_databases_async();
-            var rebuild_context = await load_rebuild_context_async();
+            if(_resume_existing_run)
+            {
+                System.Console.WriteLine($"Resuming existing rebuild generation '{_target_generation}' after source id '{result.last_processed_id ?? "<none>"}'.");
+                await verify_target_generation_markers_async();
+            }
+            else
+            {
+                await prepare_target_databases_async();
+            }
 
             bool has_more_documents = false;
-            for(int page = 0; ; page++)
+            bool document_writes_already_completed = _resume_existing_run &&
+                string.Equals(_resume_state?.document_write_status, "completed", StringComparison.OrdinalIgnoreCase);
+
+            if(!document_writes_already_completed)
             {
-                int batch_number = page + 1;
-                var fetch_stopwatch = Stopwatch.StartNew();
-                List<string> document_ids = await get_case_id_batch_async(page * _page_size, _page_size);
-                fetch_stopwatch.Stop();
+                var rebuild_context = await load_rebuild_context_async();
+                string start_after_id = result.last_processed_id;
 
-                if(document_ids.Count == 0)
+                for(;;)
                 {
-                    System.Console.WriteLine($"No more source cases after {tenant_log_label} Batch {batch_number}. Fetch time: {fetch_stopwatch.ElapsedMilliseconds} ms.");
-                    break;
-                }
+                    int batch_number = result.completed_batch_count + 1;
+                    var fetch_stopwatch = Stopwatch.StartNew();
+                    List<string> document_ids = await get_case_id_batch_async(start_after_id, _page_size);
+                    fetch_stopwatch.Stop();
 
-                has_more_documents = true;
-                System.Console.WriteLine($"Starting {tenant_log_label} Batch {batch_number} with {document_ids.Count} source cases.");
-
-                long build_elapsed_ms = 0;
-                long write_elapsed_ms = 0;
-                int batch_de_id_doc_count = 0;
-                int batch_report_doc_count = 0;
-
-                foreach(string document_id in document_ids)
-                {
-                    result.processed_case_count++;
-                    result.last_processed_id = document_id;
-
-                    try
+                    if(document_ids.Count == 0)
                     {
-                        var build_stopwatch = Stopwatch.StartNew();
-                        string document_json = await get_case_document_async(document_id);
-                        var sync_document = new c_sync_document(
-                            document_id,
-                            document_json,
-                            "PUT",
-                            metadata_version,
-                            db_config,
-                            _couchDbHttpClient,
-                            _configuration,
-                            _host_prefix,
-                            rebuild_context: rebuild_context,
-                            skip_revision_lookup: true);
-                        var build_result = await sync_document.build_documents_async();
-                        build_stopwatch.Stop();
-                        build_elapsed_ms += build_stopwatch.ElapsedMilliseconds;
-
-                        var write_stopwatch = Stopwatch.StartNew();
-
-                        if(!string.IsNullOrWhiteSpace(build_result.de_identified_json))
-                        {
-                            result.total_de_id_doc_count++;
-                            batch_de_id_doc_count++;
-                            if(!await put_document_async("de_id", build_result.de_identified_json))
-                            {
-                                result.de_id_bulk_error_count++;
-                            }
-                        }
-
-                        foreach(string report_document_json in build_result.report_document_json_list ?? Enumerable.Empty<string>())
-                        {
-                            if(string.IsNullOrWhiteSpace(report_document_json))
-                            {
-                                continue;
-                            }
-
-                            result.total_report_doc_count++;
-                            batch_report_doc_count++;
-                            if(!await put_document_async("report", report_document_json))
-                            {
-                                result.report_bulk_error_count++;
-                            }
-                        }
-
-                        write_stopwatch.Stop();
-                        write_elapsed_ms += write_stopwatch.ElapsedMilliseconds;
+                        System.Console.WriteLine($"No more source cases after {tenant_log_label} Batch {batch_number}. Fetch time: {fetch_stopwatch.ElapsedMilliseconds} ms.");
+                        break;
                     }
-                    catch (Exception document_ex)
+
+                    has_more_documents = true;
+                    System.Console.WriteLine($"Starting {tenant_log_label} Batch {batch_number} with {document_ids.Count} source cases.");
+
+                    long build_elapsed_ms = 0;
+                    long write_elapsed_ms = 0;
+                    int batch_de_id_doc_count = 0;
+                    int batch_report_doc_count = 0;
+
+                    foreach(string document_id in document_ids)
                     {
-                        result.document_error_count++;
-                        System.Console.WriteLine($"error running c_docment_sync_all_legacy.document {document_id}\n{document_ex}");
+                        result.processed_case_count++;
+
+                        try
+                        {
+                            var build_stopwatch = Stopwatch.StartNew();
+                            string document_json = await get_case_document_async(document_id);
+                            var sync_document = new c_sync_document(
+                                document_id,
+                                document_json,
+                                "PUT",
+                                metadata_version,
+                                db_config,
+                                _couchDbHttpClient,
+                                _configuration,
+                                _host_prefix,
+                                rebuild_context: rebuild_context,
+                                skip_revision_lookup: true);
+                            var build_result = await sync_document.build_documents_async();
+                            build_stopwatch.Stop();
+                            build_elapsed_ms += build_stopwatch.ElapsedMilliseconds;
+
+                            var write_stopwatch = Stopwatch.StartNew();
+
+                            if(!string.IsNullOrWhiteSpace(build_result.de_identified_json))
+                            {
+                                result.total_de_id_doc_count++;
+                                batch_de_id_doc_count++;
+                                if(!await put_document_async("de_id", build_result.de_identified_json))
+                                {
+                                    result.de_id_bulk_error_count++;
+                                }
+                            }
+
+                            foreach(string report_document_json in build_result.report_document_json_list ?? Enumerable.Empty<string>())
+                            {
+                                if(string.IsNullOrWhiteSpace(report_document_json))
+                                {
+                                    continue;
+                                }
+
+                                result.total_report_doc_count++;
+                                batch_report_doc_count++;
+                                if(!await put_document_async("report", report_document_json))
+                                {
+                                    result.report_bulk_error_count++;
+                                }
+                            }
+
+                            write_stopwatch.Stop();
+                            write_elapsed_ms += write_stopwatch.ElapsedMilliseconds;
+                            result.last_processed_id = document_id;
+                            start_after_id = document_id;
+                        }
+                        catch (Exception document_ex)
+                        {
+                            result.document_error_count++;
+                            System.Console.WriteLine($"error running c_docment_sync_all_legacy.document {document_id}\n{document_ex}");
+                        }
                     }
-                }
 
-                result.completed_batch_count = batch_number;
-                result.batch_number = batch_number;
-                result.fetch_elapsed_ms = fetch_stopwatch.ElapsedMilliseconds;
-                result.build_elapsed_ms = build_elapsed_ms;
-                result.write_elapsed_ms = write_elapsed_ms;
+                    result.completed_batch_count = batch_number;
+                    result.batch_number = batch_number;
+                    result.fetch_elapsed_ms = fetch_stopwatch.ElapsedMilliseconds;
+                    result.build_elapsed_ms = build_elapsed_ms;
+                    result.write_elapsed_ms = write_elapsed_ms;
 
-                await report_progress_async(new legacy_progress
-                {
-                    batch_number = batch_number,
-                    last_processed_id = result.last_processed_id,
-                    completed_batch_count = result.completed_batch_count,
-                    processed_case_count = result.processed_case_count,
-                    skipped_case_count = result.skipped_case_count,
-                    document_error_count = result.document_error_count,
-                    de_id_bulk_error_count = result.de_id_bulk_error_count,
-                    report_bulk_error_count = result.report_bulk_error_count,
-                    total_de_id_doc_count = result.total_de_id_doc_count,
-                    total_report_doc_count = result.total_report_doc_count,
-                    fetch_elapsed_ms = result.fetch_elapsed_ms,
-                    build_elapsed_ms = result.build_elapsed_ms,
-                    write_elapsed_ms = result.write_elapsed_ms
-                });
+                    await report_progress_async(new legacy_progress
+                    {
+                        document_write_status = result.document_write_status,
+                        index_restore_mode = result.index_restore_mode,
+                        index_warmup_status = result.index_warmup_status,
+                        index_surfaces = clone_index_surface_statuses(),
+                        batch_number = batch_number,
+                        last_processed_id = result.last_processed_id,
+                        completed_batch_count = result.completed_batch_count,
+                        processed_case_count = result.processed_case_count,
+                        skipped_case_count = result.skipped_case_count,
+                        document_error_count = result.document_error_count,
+                        de_id_bulk_error_count = result.de_id_bulk_error_count,
+                        report_bulk_error_count = result.report_bulk_error_count,
+                        total_de_id_doc_count = result.total_de_id_doc_count,
+                        total_report_doc_count = result.total_report_doc_count,
+                        fetch_elapsed_ms = result.fetch_elapsed_ms,
+                        build_elapsed_ms = result.build_elapsed_ms,
+                        write_elapsed_ms = result.write_elapsed_ms
+                    });
 
-                System.Console.WriteLine(
-                    $"{tenant_log_label} Batch {batch_number}: fetched {document_ids.Count} case ids in {fetch_stopwatch.ElapsedMilliseconds} ms, " +
-                    $"built {batch_de_id_doc_count} de_id docs and {batch_report_doc_count} report docs in {build_elapsed_ms} ms, " +
-                    $"wrote docs in {write_elapsed_ms} ms.");
+                    System.Console.WriteLine(
+                        $"{tenant_log_label} Batch {batch_number}: fetched {document_ids.Count} case ids in {fetch_stopwatch.ElapsedMilliseconds} ms, " +
+                        $"built {batch_de_id_doc_count} de_id docs and {batch_report_doc_count} report docs in {build_elapsed_ms} ms, " +
+                        $"wrote docs in {write_elapsed_ms} ms.");
 
-                if(_batch_delay_ms > 0)
-                {
-                    await Task.Delay(_batch_delay_ms);
+                    if(_batch_delay_ms > 0)
+                    {
+                        await Task.Delay(_batch_delay_ms);
+                    }
                 }
             }
+            else
+            {
+                result.document_write_status = "completed";
+                System.Console.WriteLine($"{tenant_log_label} document writes were already completed; resuming design/index work only.");
+            }
+
+            result.document_write_status = "completed";
+            result.index_surfaces = clone_index_surface_statuses();
+            await report_result_progress_async(result);
 
             if((has_more_documents || result.completed_batch_count == 0) && !_add_indexes_at_beginning)
             {
@@ -760,13 +1197,53 @@ public sealed class c_document_sync_all_legacy
 
             if(!_add_indexes_at_beginning)
             {
-                await finalize_target_databases_async();
+                result.index_warmup_status = DbRebuildSettings.WaitsForIndexWarmup(_index_restore_mode)
+                    ? "running"
+                    : "pending";
+                await report_result_progress_async(result);
+                result.index_warmup_status = await finalize_target_databases_async(
+                    async () =>
+                    {
+                        result.index_surfaces = clone_index_surface_statuses();
+                        await report_result_progress_async(result);
+                    });
             }
+            else
+            {
+                result.index_warmup_status = "pending";
+                await report_result_progress_async(result);
+            }
+
+            if(DbRebuildSettings.DefersIndexWarmup(_index_restore_mode) &&
+                !string.Equals(result.index_warmup_status, "completed", StringComparison.OrdinalIgnoreCase))
+            {
+                result.index_warmup_status = "running";
+                await report_result_progress_async(result);
+                result.index_warmup_status = await warm_target_indexes_async(
+                    async () =>
+                    {
+                        result.index_surfaces = clone_index_surface_statuses();
+                        await report_result_progress_async(result);
+                    });
+            }
+
+            result.index_surfaces = clone_index_surface_statuses();
             result.rebuild_completed_successfully = true;
         }
         catch (Exception ex)
         {
             result.last_error = ex.ToString();
+            if(!string.Equals(result.document_write_status, "completed", StringComparison.OrdinalIgnoreCase))
+            {
+                result.document_write_status = "failed";
+            }
+
+            result.index_surfaces = clone_index_surface_statuses();
+            if(result.index_surfaces.Any(item => string.Equals(item.status, "failed", StringComparison.OrdinalIgnoreCase)))
+            {
+                result.index_warmup_status = "failed";
+            }
+
             System.Console.WriteLine($"error running c_docment_sync_all_legacy\n{ex}");
         }
 

@@ -11,6 +11,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using mmria.common.utils;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 using  mmria.server.extension; 
 using mmria.server.util;
@@ -161,6 +163,10 @@ public sealed class versionController: ControllerBase
         try
         {
             string responseString = await _metadataVersionManager.GetVersionDocumentAsync(version_specification_id, document_name, db_config);
+            if (string.Equals(document_name, "metadata", StringComparison.OrdinalIgnoreCase))
+            {
+                responseString = RewriteOmbExpirationLabelPrompt(responseString);
+            }
 
             string type="javascript";
             if(!string.IsNullOrWhiteSpace(document_name))
@@ -199,6 +205,61 @@ public sealed class versionController: ControllerBase
             }
             return ms.ToArray();
         }
+    }
+
+    private static string RewriteOmbExpirationLabelPrompt(string metadataJson)
+    {
+        if (string.IsNullOrWhiteSpace(metadataJson))
+        {
+            return metadataJson;
+        }
+
+        try
+        {
+            var root = JToken.Parse(metadataJson);
+            return RewriteOmbExpirationLabels(root, Program.OmbExpirationLabel) > 0
+                ? root.ToString(Formatting.None)
+                : metadataJson;
+        }
+        catch(Exception ex)
+        {
+            Console.WriteLine(ex);
+            return metadataJson;
+        }
+    }
+
+    private static int RewriteOmbExpirationLabels(JToken token, string prompt)
+    {
+        if (token is JObject obj)
+        {
+            int result = 0;
+            if (obj.TryGetValue("name", StringComparison.OrdinalIgnoreCase, out var nameToken) &&
+                string.Equals(nameToken?.ToString(), "omb_expiration_label", StringComparison.OrdinalIgnoreCase))
+            {
+                obj["prompt"] = prompt;
+                result++;
+            }
+
+            foreach (var child in obj.Properties().Select(property => property.Value).ToList())
+            {
+                result += RewriteOmbExpirationLabels(child, prompt);
+            }
+
+            return result;
+        }
+
+        if (token is JArray array)
+        {
+            int result = 0;
+            foreach (var child in array.ToList())
+            {
+                result += RewriteOmbExpirationLabels(child, prompt);
+            }
+
+            return result;
+        }
+
+        return 0;
     }
     // POST api/values 
     [Authorize(Roles  = "form_designer")]

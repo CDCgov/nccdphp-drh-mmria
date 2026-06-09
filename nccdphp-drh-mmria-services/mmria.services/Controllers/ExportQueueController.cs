@@ -39,14 +39,19 @@ public sealed class ExportQueueController : ControllerBase
         {
             mmria.common.couchdb.DBConfigurationDetail item_db_info;
 
-            string host_prefix = request.host_prefix;
-            string jurisdiction_user_name = request.jurisdiction_user_name;
-            string queue_item_id = request.queue_item_id;
+            string host_prefix = request?.host_prefix;
+            string jurisdiction_user_name = request?.jurisdiction_user_name;
+            string queue_item_id = request?.queue_item_id;
+            string request_id = request?.request_id;
 
-            System.Console.WriteLine($"[EXPORT-QUEUE] services received host_prefix='{host_prefix}' id='{queue_item_id}'");
+            System.Console.WriteLine($"[EXPORT-QUEUE] services received request_id='{request_id}' tenant='{host_prefix}' queue_id='{queue_item_id}' requested_queue_id='{queue_item_id}' terminal_status='received'");
 
             mmria.common.couchdb.ConfigurationSet db_config_set = mmria.services.vitalsimport.Program.DbConfigSet;
-            item_db_info = db_config_set.detail_list[host_prefix];
+            if (string.IsNullOrWhiteSpace(host_prefix) ||
+                !db_config_set.detail_list.TryGetValue(host_prefix, out item_db_info))
+            {
+                throw new InvalidOperationException($"Tenant '{host_prefix}' was not found.");
+            }
 
             // Get configuration values
             var db_config = new mmria.common.couchdb.DBConfigurationDetail
@@ -66,20 +71,24 @@ public sealed class ExportQueueController : ControllerBase
                 item_db_info.user_name,
                 item_db_info.user_value,
                 _configurationSet.name_value.ContainsKey("export_directory") ? _configurationSet.name_value["export_directory"] : "/workspace/export",
-                request.jurisdiction_user_name,
+                jurisdiction_user_name,
                 _configurationSet.name_value.ContainsKey("metadata_version") ? _configurationSet.name_value["metadata_version"] : "",
-                _configurationSet.name_value.ContainsKey("cdc_instance_pull_list") ? _configurationSet.name_value["cdc_instance_pull_list"] : ""
+                _configurationSet.name_value.ContainsKey("cdc_instance_pull_list") ? _configurationSet.name_value["cdc_instance_pull_list"] : "",
+                request_id,
+                queue_item_id,
+                host_prefix
             );
 
             // Create and tell the actor to process
             var actor = _actorSystem.ActorOf(Akka.Actor.Props.Create<mmria.services.ExportQueue.Process_Export_Queue>(db_config, _serviceScopeFactory));
             actor.Tell(scheduleInfo);
 
+            System.Console.WriteLine($"[EXPORT-QUEUE] services actor triggered request_id='{request_id}' tenant='{host_prefix}' queue_id='{queue_item_id}' requested_queue_id='{queue_item_id}' terminal_status='actor_triggered'");
             return Ok(new { success = true, message = "Export queue processing initiated" });
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"ExportQueueController error: {ex}");
+            Console.WriteLine($"[EXPORT-QUEUE] services error request_id='{request?.request_id}' tenant='{request?.host_prefix}' queue_id='{request?.queue_item_id}' requested_queue_id='{request?.queue_item_id}' error='{ex.Message}' terminal_status='service_error'");
             return StatusCode(500, new { success = false, message = ex.Message });
         }
     }
@@ -159,6 +168,7 @@ public sealed class ExportQueueController : ControllerBase
 public sealed class ExportQueueRequest
 {
     public string queue_item_id { get; set; }
+    public string request_id { get; set; }
     public string jurisdiction_user_name { get; set; }
     public string host_prefix { get; set; }
 }

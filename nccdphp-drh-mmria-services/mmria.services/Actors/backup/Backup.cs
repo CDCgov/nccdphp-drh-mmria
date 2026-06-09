@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Text.Json;
 using System.Threading.Tasks;
 using mmria.common.SharedLibraries.Security.FileSystem;
 using mmria.services.Utilities;
@@ -19,6 +20,7 @@ public sealed class Backup
 		public int Doc_ID_Count { get; set;}
 		public int SuccessCount { get; set;}
 		public int ErrorCount { get; set; }
+		public bool IsMissingDatabase { get; set; }
 	}
 
 	private HashSet<string> id_list = null;
@@ -107,6 +109,7 @@ id_list = await GetIdList();
 
 		result.Doc_ID_Count = id_list.Count;
 
+		EnsureBackupFolderExists();
 
 		var (SuccessCount, ErrorCount) = await GetDocumentList ();
 
@@ -125,10 +128,20 @@ id_list = await GetIdList();
 			return result;
 
 		}
+		catch (CouchDbMissingDatabaseException ex)
+		{
+			result.Status = "Error";
+			result.Detail = ex.Message;
+			result.IsMissingDatabase = true;
+			result.ErrorCount = 1;
+
+			return result;
+		}
 		catch (Exception ex) 
 		{
 			result.Status = $"Error";
 			result.Detail = $"{ex}";
+			result.ErrorCount = 1;
 
 			return result;
 		}
@@ -145,7 +158,19 @@ id_list = await GetIdList();
 		var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
 		string URL = string.Format("{0}/_all_docs", this.database_url);
-		var curl_result = await _couchDbHttpClient.ExecuteAsync("GET", URL, null, this.user_name, this.password);
+		var response = await _couchDbHttpClient.ExecuteForResponseAsync("GET", URL, null, this.user_name, this.password);
+		var curl_result = response.Body;
+
+		if(IsMissingDatabaseResponse(response))
+		{
+			throw new CouchDbMissingDatabaseException($"CouchDB database does not exist. Response: {GetResponsePreview(curl_result)}");
+		}
+
+		if(response.StatusCode < 200 || response.StatusCode >= 300)
+		{
+			throw new InvalidOperationException($"Unable to enumerate documents for {this.database_url}. HTTP {response.StatusCode}. Response: {GetResponsePreview(curl_result)}");
+		}
+
 		var all_cases = System.Text.Json.JsonSerializer.Deserialize<mmria.common.model.couchdb.alldocs_response<System.Dynamic.ExpandoObject>> (curl_result);
 		var all_cases_rows = all_cases?.rows;
 
@@ -161,6 +186,17 @@ id_list = await GetIdList();
 		return result;
 	}
 
+	private void EnsureBackupFolderExists()
+	{
+		if(string.IsNullOrWhiteSpace(this.backup_file_path))
+		{
+			throw new InvalidOperationException("missing backup_file_path");
+		}
+
+		System.IO.Directory.CreateDirectory(this.backup_file_path);
+		System.IO.Directory.CreateDirectory(System.IO.Path.Combine(this.backup_file_path, "_design"));
+	}
+
 	
 
 
@@ -173,7 +209,7 @@ id_list = await GetIdList();
 		{
 			try
 			{
-				string URL = $"{this.database_url}/{id}";
+				string URL = $"{this.database_url}/{Uri.EscapeDataString(id)}";
 				string curl_result = await _couchDbHttpClient.ExecuteAsync("GET", URL, null, this.user_name, this.password);
 
 				dynamic case_row = System.Text.Json.JsonSerializer.Deserialize<System.Dynamic.ExpandoObject> (curl_result);
@@ -227,7 +263,7 @@ id_list = await GetIdList();
 
 							foreach(var kvp in attachment_set)
 							{
-								var attachment_url = $"{URL}/{kvp.Key}";
+								var attachment_url = $"{URL}/{Uri.EscapeDataString(kvp.Key)}";
 						string attachment_doc_json = await _couchDbHttpClient.ExecuteAsync("GET", attachment_url, null, this.user_name, this.password);
 
                         var attachment_file_name = PathSanitizer.ValidatePathSegment(System.IO.Path.GetFileName(kvp.Key), nameof(kvp.Key));
@@ -275,5 +311,47 @@ id_list = await GetIdList();
 		return normalized.Substring(0, 512);
 	}
 
-}
+	private static bool IsMissingDatabaseResponse(mmria.common.getset.CouchDbHttpResponse response)
+	{
+		if(response?.StatusCode != 404 || string.IsNullOrWhiteSpace(response.Body))
+		{
+			return false;
+		}
 
+		try
+		{
+			using var document = JsonDocument.Parse(response.Body);
+			var root = document.RootElement;
+
+			if(!root.TryGetProperty("error", out JsonElement errorElement) ||
+				!root.TryGetProperty("reason", out JsonElement reasonElement))
+			{
+				return false;
+			}
+
+			string error = errorElement.ValueKind == JsonValueKind.String
+				? errorElement.GetString()
+				: errorElement.ToString();
+			string reason = reasonElement.ValueKind == JsonValueKind.String
+				? reasonElement.GetString()
+				: reasonElement.ToString();
+
+			return string.Equals(error, "not_found", StringComparison.OrdinalIgnoreCase) &&
+				!string.IsNullOrWhiteSpace(reason) &&
+				reason.Contains("Database does not exist", StringComparison.OrdinalIgnoreCase);
+		}
+		catch(JsonException)
+		{
+			return false;
+		}
+	}
+
+	private sealed class CouchDbMissingDatabaseException : Exception
+	{
+		public CouchDbMissingDatabaseException(string message)
+			: base(message)
+		{
+		}
+	}
+
+}

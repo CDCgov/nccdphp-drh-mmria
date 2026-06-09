@@ -8,6 +8,31 @@ namespace mmria.services.backup;
 
 public sealed class BackupColdProcessor : ReceiveActor
 {
+    private static readonly string[] RequiredTenantDatabaseNames =
+    {
+        "configuration",
+        "audit",
+        "mmrds",
+        "_users",
+        "metadata",
+        "jurisdiction",
+        "session"
+    };
+
+    private static readonly string[] OptionalTenantDatabaseNames =
+    {
+        "offline_cases",
+        "backups",
+        "logging"
+    };
+
+    private static readonly string[] TenantDatabaseNames = RequiredTenantDatabaseNames
+        .Concat(OptionalTenantDatabaseNames)
+        .ToArray();
+
+    private static readonly HashSet<string> OptionalTenantDatabaseNameSet =
+        new(OptionalTenantDatabaseNames, StringComparer.OrdinalIgnoreCase);
+
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public BackupColdProcessor(mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
@@ -36,6 +61,7 @@ public sealed class BackupColdProcessor : ReceiveActor
     async Task Process_Message(mmria.services.backup.BackupSupervisor.PerformBackupMessage message)
     {
         string runId = "pending";
+        string targetFolder = null;
         int processedSegmentCount = 0;
         int readySegmentCount = 0;
         bool compressionQueued = false;
@@ -45,20 +71,8 @@ public sealed class BackupColdProcessor : ReceiveActor
             mmria.common.couchdb.ConfigurationSet db_config_set = mmria.services.vitalsimport.Program.DbConfigSet;
             string root_folder = db_config_set.name_value["backup_storage_root_folder"];
 
-            var databaseNames = new[]
-            {
-                "configuration",
-                "audit",
-                "mmrds",
-                "_users",
-                "metadata",
-                "jurisdiction",
-                "session",
-                "offline_cases"
-            };
-
             runId = DateTime.UtcNow.ToString("yyyy-MM-dd-HH-mm-ss-ddd");
-            string targetFolder = System.IO.Path.Combine(root_folder, runId);
+            targetFolder = System.IO.Path.Combine(root_folder, runId);
             System.IO.Directory.CreateDirectory(targetFolder);
 
             var excludeFromBackupSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -73,6 +87,9 @@ public sealed class BackupColdProcessor : ReceiveActor
             string vitalImportFolder = System.IO.Path.Combine(targetFolder, "vital_import");
             System.IO.Directory.CreateDirectory(System.IO.Path.Combine(vitalImportFolder, "_design"));
 
+            WriteSegmentInProgressMarker(targetFolder, "vital_import", "vital_import", "Started", Enumerable.Empty<DatabaseBackupSummary>());
+            LogDatabaseStart(runId, "vital_import", "vital_import");
+
             var vitalImportResult = await backup.Execute(
                 new[]
                 {
@@ -83,12 +100,15 @@ public sealed class BackupColdProcessor : ReceiveActor
                     $"backup_file_path:{vitalImportFolder}"
                 });
 
+            var vitalImportDatabaseSummary = CreateDatabaseSummary("vital_import", "vital_import", vitalImportResult);
             var vitalImportDatabaseSummaries = new List<DatabaseBackupSummary>
             {
-                CreateDatabaseSummary("vital_import", "vital_import", vitalImportResult)
+                vitalImportDatabaseSummary
             };
 
             databaseSummaries.AddRange(vitalImportDatabaseSummaries);
+            LogDatabaseFinish(runId, vitalImportDatabaseSummary);
+            WriteSegmentInProgressMarker(targetFolder, "vital_import", "vital_import", vitalImportDatabaseSummary.Status, vitalImportDatabaseSummaries);
             LogDatabaseIssues(runId, vitalImportDatabaseSummaries);
 
             var vitalImportSegmentSummary = FinalizeSegment(targetFolder, runId, "vital_import", vitalImportDatabaseSummaries);
@@ -114,13 +134,15 @@ public sealed class BackupColdProcessor : ReceiveActor
                 System.IO.Directory.CreateDirectory(prefixFolder);
 
                 var prefixDatabaseSummaries = new List<DatabaseBackupSummary>();
+                WriteSegmentInProgressMarker(targetFolder, prefix, null, "Started", prefixDatabaseSummaries);
 
-                foreach(string databaseName in databaseNames)
+                foreach(string databaseName in TenantDatabaseNames)
                 {
                     string dbFolder = System.IO.Path.Combine(prefixFolder, databaseName);
-                    System.IO.Directory.CreateDirectory(System.IO.Path.Combine(dbFolder, "_design"));
 
                     Backup.BackupResultMessage backupResultMessage;
+                    LogDatabaseStart(runId, prefix, databaseName);
+                    WriteSegmentInProgressMarker(targetFolder, prefix, databaseName, "Started", prefixDatabaseSummaries);
 
                     try
                     {
@@ -146,7 +168,10 @@ public sealed class BackupColdProcessor : ReceiveActor
                         };
                     }
 
-                    prefixDatabaseSummaries.Add(CreateDatabaseSummary(prefix, databaseName, backupResultMessage));
+                    var databaseSummary = CreateDatabaseSummary(prefix, databaseName, backupResultMessage, IsOptionalTenantDatabase(databaseName));
+                    prefixDatabaseSummaries.Add(databaseSummary);
+                    LogDatabaseFinish(runId, databaseSummary);
+                    WriteSegmentInProgressMarker(targetFolder, prefix, databaseName, databaseSummary.Status, prefixDatabaseSummaries);
                 }
 
                 databaseSummaries.AddRange(prefixDatabaseSummaries);
@@ -183,6 +208,7 @@ public sealed class BackupColdProcessor : ReceiveActor
         catch(Exception ex)
         {
             Console.WriteLine($"{GetRunPrefix(runId)} Run failed. Detail='{NormalizeDetail(ex.ToString())}'");
+            WriteRunErrorMarker(targetFolder, runId, ex);
         }
 
         if(message.ReturnToSender)
@@ -203,8 +229,21 @@ public sealed class BackupColdProcessor : ReceiveActor
     private static DatabaseBackupSummary CreateDatabaseSummary(
         string segmentName,
         string databaseName,
-        Backup.BackupResultMessage backupResultMessage)
+        Backup.BackupResultMessage backupResultMessage,
+        bool isOptionalDatabase = false)
     {
+        if(isOptionalDatabase && backupResultMessage?.IsMissingDatabase == true)
+        {
+            return new DatabaseBackupSummary(
+                segmentName,
+                databaseName,
+                "Skipped",
+                0,
+                0,
+                0,
+                CreateSkippedOptionalDatabaseDetail(backupResultMessage));
+        }
+
         return new DatabaseBackupSummary(
             segmentName,
             databaseName,
@@ -213,6 +252,19 @@ public sealed class BackupColdProcessor : ReceiveActor
             backupResultMessage?.SuccessCount ?? 0,
             backupResultMessage?.ErrorCount ?? 0,
             NormalizeDetail(backupResultMessage?.Detail));
+    }
+
+    private static bool IsOptionalTenantDatabase(string databaseName)
+    {
+        return OptionalTenantDatabaseNameSet.Contains(databaseName);
+    }
+
+    private static string CreateSkippedOptionalDatabaseDetail(Backup.BackupResultMessage backupResultMessage)
+    {
+        string detail = NormalizeDetail(backupResultMessage?.Detail);
+        return string.IsNullOrWhiteSpace(detail)
+            ? "Optional database is missing; backup skipped."
+            : $"Optional database is missing; backup skipped. {detail}";
     }
 
     private static void LogRunStart(string runId, string targetFolder, IReadOnlyCollection<string> excludedTenants)
@@ -261,6 +313,17 @@ public sealed class BackupColdProcessor : ReceiveActor
         return !summary.Status.Equals("Success", StringComparison.OrdinalIgnoreCase);
     }
 
+    private static void LogDatabaseStart(string runId, string segmentName, string databaseName)
+    {
+        Console.WriteLine($"{GetRunPrefix(runId)} Segment='{segmentName}' Db='{databaseName}' Status=Started");
+    }
+
+    private static void LogDatabaseFinish(string runId, DatabaseBackupSummary summary)
+    {
+        Console.WriteLine(
+            $"{GetRunPrefix(runId)} Segment='{summary.SegmentName}' Db='{summary.DatabaseName}' Status={summary.Status} DocumentCount={summary.DocumentCount} SuccessCount={summary.SuccessCount} ErrorCount={summary.ErrorCount}");
+    }
+
     private static SegmentBackupSummary FinalizeSegment(
         string targetFolder,
         string runId,
@@ -270,12 +333,15 @@ public sealed class BackupColdProcessor : ReceiveActor
         string segmentStatus = GetSegmentStatus(databaseSummaries);
         int dbAttemptedCount = databaseSummaries.Count;
         int dbSucceededCount = databaseSummaries.Count(summary => summary.Status.Equals("Success", StringComparison.OrdinalIgnoreCase));
-        int dbFailedCount = dbAttemptedCount - dbSucceededCount;
+        int dbSkippedCount = databaseSummaries.Count(summary => summary.Status.Equals("Skipped", StringComparison.OrdinalIgnoreCase));
+        int dbFailedCount = databaseSummaries.Count(summary =>
+            !summary.Status.Equals("Success", StringComparison.OrdinalIgnoreCase) &&
+            !summary.Status.Equals("Skipped", StringComparison.OrdinalIgnoreCase));
         int totalDocumentCount = databaseSummaries.Sum(summary => summary.DocumentCount);
         bool readyForCompression = segmentStatus.Equals("Success", StringComparison.OrdinalIgnoreCase);
 
         string segmentSummaryFileLine =
-            $"Segment {segmentName} Status: {segmentStatus} DbAttempted: {dbAttemptedCount} DbSucceeded: {dbSucceededCount} DbFailed: {dbFailedCount} DocumentCount: {totalDocumentCount}";
+            $"Segment {segmentName} Status: {segmentStatus} DbAttempted: {dbAttemptedCount} DbSucceeded: {dbSucceededCount} DbSkipped: {dbSkippedCount} DbFailed: {dbFailedCount} DocumentCount: {totalDocumentCount}";
 
         var markerResult = WriteSegmentMarker(
             targetFolder,
@@ -288,6 +354,7 @@ public sealed class BackupColdProcessor : ReceiveActor
             segmentStatus,
             dbAttemptedCount,
             dbSucceededCount,
+            dbSkippedCount,
             dbFailedCount,
             totalDocumentCount,
             markerResult.ReadyForCompression,
@@ -295,7 +362,7 @@ public sealed class BackupColdProcessor : ReceiveActor
             markerResult.MarkerPath);
 
         Console.WriteLine(
-            $"{GetRunPrefix(runId)} Segment='{segmentSummary.SegmentName}' Status={segmentSummary.Status} DbAttempted={segmentSummary.DbAttemptedCount} DbSucceeded={segmentSummary.DbSucceededCount} DbFailed={segmentSummary.DbFailedCount} DocumentCount={segmentSummary.TotalDocumentCount} Marker={segmentSummary.MarkerType} Path='{segmentSummary.MarkerPath}'");
+            $"{GetRunPrefix(runId)} Segment='{segmentSummary.SegmentName}' Status={segmentSummary.Status} DbAttempted={segmentSummary.DbAttemptedCount} DbSucceeded={segmentSummary.DbSucceededCount} DbSkipped={segmentSummary.DbSkippedCount} DbFailed={segmentSummary.DbFailedCount} DocumentCount={segmentSummary.TotalDocumentCount} Marker={segmentSummary.MarkerType} Path='{segmentSummary.MarkerPath}'");
 
         return segmentSummary;
     }
@@ -338,6 +405,33 @@ public sealed class BackupColdProcessor : ReceiveActor
         return $"{backupSummary.SegmentName} {backupSummary.DatabaseName} BackupStatus: {backupSummary.Status} DocCount: {backupSummary.DocumentCount} SuccessCount: {backupSummary.SuccessCount} ErrorCount: {backupSummary.ErrorCount} Detail: {backupSummary.Detail}";
     }
 
+    private static void WriteSegmentInProgressMarker(
+        string targetFolder,
+        string segmentName,
+        string currentDatabaseName,
+        string currentStatus,
+        IEnumerable<DatabaseBackupSummary> completedDatabaseSummaries)
+    {
+        if(string.IsNullOrWhiteSpace(targetFolder))
+        {
+            return;
+        }
+
+        var currentDatabaseText = string.IsNullOrWhiteSpace(currentDatabaseName)
+            ? "<none>"
+            : currentDatabaseName;
+
+        var documentText = new List<string>
+        {
+            $"Segment {segmentName} Status: InProgress CurrentDb: {currentDatabaseText} CurrentStatus: {currentStatus} LastUpdatedUtc: {DateTime.UtcNow:O}"
+        };
+
+        documentText.AddRange((completedDatabaseSummaries ?? Enumerable.Empty<DatabaseBackupSummary>()).Select(FormatBackupSummary));
+
+        string inProgressFilePath = GetSegmentInProgressMarkerPath(targetFolder, segmentName);
+        System.IO.File.WriteAllText(inProgressFilePath, string.Join(Environment.NewLine, documentText));
+    }
+
     private static void WriteCountFiles(
         string rootFolder,
         string targetFolder,
@@ -350,7 +444,7 @@ public sealed class BackupColdProcessor : ReceiveActor
         foreach(SegmentBackupSummary summary in segmentSummaries.OrderBy(summary => summary.SegmentName, StringComparer.OrdinalIgnoreCase))
         {
             documentText.Add(
-                $"Segment {summary.SegmentName} Status: {summary.Status} DbAttempted: {summary.DbAttemptedCount} DbSucceeded: {summary.DbSucceededCount} DbFailed: {summary.DbFailedCount} DocumentCount: {summary.TotalDocumentCount} Marker: {summary.MarkerType} Path: {summary.MarkerPath}");
+                $"Segment {summary.SegmentName} Status: {summary.Status} DbAttempted: {summary.DbAttemptedCount} DbSucceeded: {summary.DbSucceededCount} DbSkipped: {summary.DbSkippedCount} DbFailed: {summary.DbFailedCount} DocumentCount: {summary.TotalDocumentCount} Marker: {summary.MarkerType} Path: {summary.MarkerPath}");
         }
 
         foreach(DatabaseBackupSummary summary in databaseSummaries
@@ -396,7 +490,13 @@ public sealed class BackupColdProcessor : ReceiveActor
     {
         var ready_file_path = System.IO.Path.Combine(targetFolder, $"{segmentName}-ready-for-compression.txt");
         var error_file_path = System.IO.Path.Combine(targetFolder, $"{segmentName}-backup-error.txt");
+        var in_progress_file_path = GetSegmentInProgressMarkerPath(targetFolder, segmentName);
         var file_contents = string.Join(Environment.NewLine, summaryLines ?? Enumerable.Empty<string>());
+
+        if(System.IO.File.Exists(in_progress_file_path))
+        {
+            System.IO.File.Delete(in_progress_file_path);
+        }
 
         if(System.IO.File.Exists(ready_file_path))
         {
@@ -418,6 +518,35 @@ public sealed class BackupColdProcessor : ReceiveActor
         return new SegmentMarkerWriteResult(false, "error", error_file_path);
     }
 
+    private static string GetSegmentInProgressMarkerPath(string targetFolder, string segmentName)
+    {
+        return System.IO.Path.Combine(targetFolder, $"{segmentName}-in-progress.txt");
+    }
+
+    private static void WriteRunErrorMarker(string targetFolder, string runId, Exception exception)
+    {
+        if(string.IsNullOrWhiteSpace(targetFolder))
+        {
+            return;
+        }
+
+        try
+        {
+            System.IO.Directory.CreateDirectory(targetFolder);
+
+            string fileContents = string.Join(
+                Environment.NewLine,
+                $"Run {runId} Status: Error LastUpdatedUtc: {DateTime.UtcNow:O}",
+                $"Detail: {NormalizeDetail(exception?.ToString())}");
+
+            System.IO.File.WriteAllText(System.IO.Path.Combine(targetFolder, "run-backup-error.txt"), fileContents);
+        }
+        catch(Exception markerException)
+        {
+            Console.WriteLine($"{GetRunPrefix(runId)} Failed to write run error marker. Detail='{NormalizeDetail(markerException.ToString())}'");
+        }
+    }
+
     private static string GetRunPrefix(string runId)
     {
         return $"[ColdBackup][{runId}]";
@@ -437,6 +566,7 @@ public sealed class BackupColdProcessor : ReceiveActor
         string Status,
         int DbAttemptedCount,
         int DbSucceededCount,
+        int DbSkippedCount,
         int DbFailedCount,
         int TotalDocumentCount,
         bool ReadyForCompression,

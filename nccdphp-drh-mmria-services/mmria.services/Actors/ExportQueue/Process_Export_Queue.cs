@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using Akka.Actor;
 using mmria.common.getset;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,6 +14,7 @@ namespace mmria.services.ExportQueue;
 
 public sealed class Process_Export_Queue : ReceiveActor
 {
+    private static readonly TimeSpan ExportHeartbeatInterval = TimeSpan.FromSeconds(60);
     //protected override void PreStart() => Console.WriteLine("Process_Export_Queue started");
     //protected override void PostStop() => Console.WriteLine("Process_Export_Queue stopped");
 
@@ -32,8 +35,10 @@ public sealed class Process_Export_Queue : ReceiveActor
             //Console.WriteLine($"Process_Export_Queue {System.DateTime.Now}");
 
             //System.Console.WriteLine ("{0} Beginning Export Queue Item Processing", System.DateTime.Now);
-            System.Console.WriteLine($"[EXPORT-QUEUE] actor start url='{db_config.url}' prefix='{db_config.prefix}'");
+            System.Console.WriteLine($"[EXPORT-QUEUE] actor start request_id='{scheduleInfoMessage.request_id}' tenant='{scheduleInfoMessage.tenant}' queue_id='' requested_queue_id='{scheduleInfoMessage.requested_queue_item_id}' url='{db_config.url}' prefix='{db_config.prefix}' terminal_status='started'");
             var __export_queue_sw = System.Diagnostics.Stopwatch.StartNew();
+            var itemTerminalStatus = "not_started";
+            var deleteTerminalStatus = "not_started";
 
             try
             {
@@ -41,12 +46,13 @@ public sealed class Process_Export_Queue : ReceiveActor
                 var exportQueueManager = serviceScope.ServiceProvider.GetRequiredService<ExportQueueManager>();
                 var couchDbHttpClient = serviceScope.ServiceProvider.GetRequiredService<CouchDbHttpClient>();
 
-                await Process_Export_Queue_Item (scheduleInfoMessage, exportQueueManager, couchDbHttpClient);
+                itemTerminalStatus = await Process_Export_Queue_Item (scheduleInfoMessage, exportQueueManager, couchDbHttpClient);
             }
             catch(Exception ex)
             {
                 // to nothing for now
-                System.Console.WriteLine ("[EXPORT-QUEUE] error url='{0}' prefix='{1}' Process_Export_Queue_Item: {2}", db_config.url, db_config.prefix, ex);
+                itemTerminalStatus = "item_error";
+                System.Console.WriteLine ("[EXPORT-QUEUE] error request_id='{0}' tenant='{1}' queue_id='' requested_queue_id='{2}' url='{3}' prefix='{4}' terminal_status='item_error' Process_Export_Queue_Item: {5}", scheduleInfoMessage.request_id, scheduleInfoMessage.tenant, scheduleInfoMessage.requested_queue_item_id, db_config.url, db_config.prefix, ex);
 
             }
 
@@ -55,16 +61,17 @@ public sealed class Process_Export_Queue : ReceiveActor
                 using var serviceScope = _serviceScopeFactory.CreateScope();
                 var exportQueueManager = serviceScope.ServiceProvider.GetRequiredService<ExportQueueManager>();
 
-                await Process_Export_Queue_Delete (scheduleInfoMessage, exportQueueManager);
+                deleteTerminalStatus = await Process_Export_Queue_Delete (scheduleInfoMessage, exportQueueManager);
             }
             catch(Exception ex)
             {
                 // to nothing for now
-                System.Console.WriteLine ("[EXPORT-QUEUE] error url='{0}' prefix='{1}' Process_Export_Queue_Delete: {2}", db_config.url, db_config.prefix, ex);
+                deleteTerminalStatus = "delete_error";
+                System.Console.WriteLine ("[EXPORT-QUEUE] error request_id='{0}' tenant='{1}' queue_id='' requested_queue_id='{2}' url='{3}' prefix='{4}' terminal_status='delete_error' Process_Export_Queue_Delete: {5}", scheduleInfoMessage.request_id, scheduleInfoMessage.tenant, scheduleInfoMessage.requested_queue_item_id, db_config.url, db_config.prefix, ex);
 
             }
 
-            System.Console.WriteLine($"[EXPORT-QUEUE] tick complete url='{db_config.url}' prefix='{db_config.prefix}' elapsed_ms={__export_queue_sw.ElapsedMilliseconds}");
+            System.Console.WriteLine($"[EXPORT-QUEUE] tick complete request_id='{scheduleInfoMessage.request_id}' tenant='{scheduleInfoMessage.tenant}' queue_id='' requested_queue_id='{scheduleInfoMessage.requested_queue_item_id}' item_terminal_status='{itemTerminalStatus}' delete_terminal_status='{deleteTerminalStatus}' url='{db_config.url}' prefix='{db_config.prefix}' elapsed_ms={__export_queue_sw.ElapsedMilliseconds} terminal_status='tick_complete'");
 
             Context.Stop(this.Self);
         });
@@ -101,8 +108,86 @@ public sealed class Process_Export_Queue : ReceiveActor
         }
     }
 
+    private async Task RunWithHeartbeatAsync(
+        ScheduleInfoMessage scheduleInfoMessage,
+        ExportQueueItem item,
+        ExportQueueManager exportQueueManager,
+        Func<Task> exportWork)
+    {
+        using var heartbeatCancellation = new CancellationTokenSource();
+        var heartbeatTask = RunHeartbeatAsync(
+            scheduleInfoMessage,
+            item._id,
+            exportQueueManager,
+            heartbeatCancellation.Token);
 
-    public async System.Threading.Tasks.Task Process_Export_Queue_Item (
+        try
+        {
+            await exportWork();
+        }
+        finally
+        {
+            heartbeatCancellation.Cancel();
+            try
+            {
+                await heartbeatTask;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+    }
+
+    private async Task RunHeartbeatAsync(
+        ScheduleInfoMessage scheduleInfoMessage,
+        string queueItemId,
+        ExportQueueManager exportQueueManager,
+        CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            await Task.Delay(ExportHeartbeatInterval, cancellationToken);
+
+            try
+            {
+                var touched = await exportQueueManager.TouchCreatingHeartbeatAsync(queueItemId, db_config);
+                if (!touched)
+                {
+                    return;
+                }
+
+                System.Console.WriteLine($"[EXPORT-QUEUE] heartbeat request_id='{scheduleInfoMessage.request_id}' tenant='{scheduleInfoMessage.tenant}' queue_id='{queueItemId}' requested_queue_id='{scheduleInfoMessage.requested_queue_item_id}' terminal_status='heartbeat'");
+            }
+            catch (Exception ex)
+            {
+                System.Console.WriteLine($"[EXPORT-QUEUE] heartbeat failed request_id='{scheduleInfoMessage.request_id}' tenant='{scheduleInfoMessage.tenant}' queue_id='{queueItemId}' requested_queue_id='{scheduleInfoMessage.requested_queue_item_id}' error='{ex.Message}' terminal_status='heartbeat_failed'");
+            }
+        }
+    }
+
+    private async Task<string> EnsureTerminalStatusAsync(
+        ExportQueueItem item,
+        ExportQueueManager exportQueueManager)
+    {
+        var latestItem = await exportQueueManager.GetQueueItemAsync(item._id, db_config);
+        var latestStatus = latestItem?.status;
+
+        if (!string.IsNullOrWhiteSpace(latestStatus) &&
+            latestStatus.StartsWith("Creating Export...", StringComparison.OrdinalIgnoreCase))
+        {
+            await exportQueueManager.MarkExportErrorAsync(
+                item._id,
+                new InvalidOperationException("exporter finished without completing queue item"),
+                db_config);
+
+            return "Export error... exporter finished without completing queue item";
+        }
+
+        return string.IsNullOrWhiteSpace(latestStatus) ? "unknown" : latestStatus;
+    }
+
+
+    public async Task<string> Process_Export_Queue_Item (
         ScheduleInfoMessage scheduleInfoMessage,
         ExportQueueManager exportQueueManager,
         CouchDbHttpClient couchDbHttpClient)
@@ -111,143 +196,131 @@ public sealed class Process_Export_Queue : ReceiveActor
 
         ExportQueueItem item_to_process = await exportQueueManager.GetNextQueuedServiceItemAsync(db_config);
 
-        if (item_to_process != null)
+        if (item_to_process == null)
         {
-            System.Console.WriteLine($"[EXPORT-QUEUE] processing item url='{db_config.url}' prefix='{db_config.prefix}' id='{item_to_process._id}'");
-            EnsureQueueItemStorageNames(item_to_process);
+            System.Console.WriteLine($"[EXPORT-QUEUE] no queued item request_id='{scheduleInfoMessage.request_id}' tenant='{scheduleInfoMessage.tenant}' queue_id='' requested_queue_id='{scheduleInfoMessage.requested_queue_item_id}' terminal_status='no_queued_item'");
+            return "no_queued_item";
+        }
 
-            async System.Threading.Tasks.Task write_error(ExportQueueItem i, Exception e)
+        System.Console.WriteLine($"[EXPORT-QUEUE] processing item request_id='{scheduleInfoMessage.request_id}' tenant='{scheduleInfoMessage.tenant}' queue_id='{item_to_process._id}' requested_queue_id='{scheduleInfoMessage.requested_queue_item_id}' url='{db_config.url}' prefix='{db_config.prefix}' terminal_status='processing'");
+        EnsureQueueItemStorageNames(item_to_process);
+
+        async Task write_error(ExportQueueItem i, Exception e)
+        {
+            try
             {
-                try
-                {
-                    await exportQueueManager.MarkExportErrorAsync(i._id, e, db_config);
-                }
-                catch(Exception ex)
-                {
-                    System.Console.WriteLine (ex);
-                }
+                await exportQueueManager.MarkExportErrorAsync(i._id, e, db_config);
             }
+            catch(Exception ex)
+            {
+                System.Console.WriteLine($"[EXPORT-QUEUE] export error status write failed request_id='{scheduleInfoMessage.request_id}' tenant='{scheduleInfoMessage.tenant}' queue_id='{i?._id}' requested_queue_id='{scheduleInfoMessage.requested_queue_item_id}' error='{ex.Message}' terminal_status='error_status_write_failed'");
+            }
+        }
 
-            item_to_process.date_last_updated = new DateTime?();
-            //item_to_process.last_updated_by = g_uid;
+        var exportType = item_to_process.export_type ?? string.Empty;
 
-
-            List<string> args = new List<string>();
-            args.Add("exporter:exporter");
-            args.Add("user_name:" + scheduleInfoMessage.user_name);
-            args.Add("password:" + scheduleInfoMessage.user_value);
-            args.Add("database_url:" + scheduleInfoMessage.couch_db_url);
-            args.Add ("item_file_name:" + item_to_process.file_name);
-            args.Add ("item_id:" + item_to_process._id);
-            args.Add ("juris_user_name:" + scheduleInfoMessage.jurisdiction_user_name);
-
+        try
+        {
+            await exportQueueManager.MarkCreatingAsync(item_to_process, db_config);
 
             if 
             (
-                item_to_process.export_type.StartsWith ("core csv", StringComparison.OrdinalIgnoreCase) ||
-                item_to_process.export_type.StartsWith ("core xlsx", StringComparison.OrdinalIgnoreCase)
+                exportType.StartsWith ("core csv", StringComparison.OrdinalIgnoreCase) ||
+                exportType.StartsWith ("core xlsx", StringComparison.OrdinalIgnoreCase)
             )
             {
-                await exportQueueManager.MarkCreatingAsync(item_to_process, db_config);
-
-                try
-                {
-                
-                    mmria.services.Utilities.CoreElementExport.core_element_exporter core_element_exporter = new mmria.services.Utilities.CoreElementExport.core_element_exporter(scheduleInfoMessage, couchDbHttpClient, exportQueueManager);
-                    await core_element_exporter.Execute(item_to_process);
-                }
-                catch(Exception ex)
-                {
-
-                    await write_error(item_to_process, ex);
-                    System.Console.WriteLine (ex);
-                }
-
-            
+                await RunWithHeartbeatAsync(
+                    scheduleInfoMessage,
+                    item_to_process,
+                    exportQueueManager,
+                    async () =>
+                    {
+                        var core_element_exporter = new mmria.services.Utilities.CoreElementExport.core_element_exporter(scheduleInfoMessage, couchDbHttpClient, exportQueueManager);
+                        await core_element_exporter.Execute(item_to_process);
+                    });
             }
             else if
             (
-                item_to_process.export_type.StartsWith ("all csv", StringComparison.OrdinalIgnoreCase) ||
-                item_to_process.export_type.StartsWith ("all xlsx", StringComparison.OrdinalIgnoreCase)
+                exportType.StartsWith ("all csv", StringComparison.OrdinalIgnoreCase) ||
+                exportType.StartsWith ("all xlsx", StringComparison.OrdinalIgnoreCase)
             )
             {
-                await exportQueueManager.MarkCreatingAsync(item_to_process, db_config);
-
-                try
-                {
-                    mmria.services.Utilities.Exporter.mmrds_exporter mmrds_exporter = new mmria.services.Utilities.Exporter.mmrds_exporter(scheduleInfoMessage, couchDbHttpClient, exportQueueManager);
-                    if(!await mmrds_exporter.Execute(item_to_process))
+                await RunWithHeartbeatAsync(
+                    scheduleInfoMessage,
+                    item_to_process,
+                    exportQueueManager,
+                    async () =>
                     {
-                        System.Console.WriteLine ("exporter failed to finish");
-                    }
-                }
-                catch(Exception ex)
-                {
-                    await write_error(item_to_process, ex);
-                    System.Console.WriteLine (ex);
-                }
-
+                        var mmrds_exporter = new mmria.services.Utilities.Exporter.mmrds_exporter(scheduleInfoMessage, couchDbHttpClient, exportQueueManager);
+                        if(!await mmrds_exporter.Execute(item_to_process))
+                        {
+                            throw new InvalidOperationException("exporter failed to finish");
+                        }
+                    });
             }
-            else if (item_to_process.export_type.StartsWith ("cdc csv", StringComparison.OrdinalIgnoreCase)) 
+            else if (exportType.StartsWith ("cdc csv", StringComparison.OrdinalIgnoreCase))
             {
-                await exportQueueManager.MarkCreatingAsync(item_to_process, db_config);
-                args.Add ("is_cdc_de_identified:true");
-
-                try
-                {
-                    mmria.services.Utilities.Exporter.mmrds_exporter mmrds_exporter = new mmria.services.Utilities.Exporter.mmrds_exporter (scheduleInfoMessage, couchDbHttpClient, exportQueueManager);
-                    //mmrds_exporter.Execute (item_to_process);
-                    if(!await mmrds_exporter.Execute(item_to_process))
+                await RunWithHeartbeatAsync(
+                    scheduleInfoMessage,
+                    item_to_process,
+                    exportQueueManager,
+                    async () =>
                     {
-                        System.Console.WriteLine ("exporter failed to finish");
-                    }
-                }
-                catch(Exception ex)
-                {
-                    await write_error(item_to_process, ex);
-                    System.Console.WriteLine (ex);
-                }
-
-
+                        var mmrds_exporter = new mmria.services.Utilities.Exporter.mmrds_exporter (scheduleInfoMessage, couchDbHttpClient, exportQueueManager);
+                        if(!await mmrds_exporter.Execute(item_to_process))
+                        {
+                            throw new InvalidOperationException("exporter failed to finish");
+                        }
+                    });
             }
             else 
             {
-                await exportQueueManager.MarkCreatingAsync(item_to_process, db_config);
-                args.Add ("is_cdc_de_identified:true");
-
-                try
-                {
-                    mmria.services.Utilities.Exporter.exporter custom_exporter = new mmria.services.Utilities.Exporter.exporter (scheduleInfoMessage, couchDbHttpClient, exportQueueManager);
-                    //mmrds_exporter.Execute (item_to_process);
-                    if(!await custom_exporter.Execute(item_to_process))
+                await RunWithHeartbeatAsync(
+                    scheduleInfoMessage,
+                    item_to_process,
+                    exportQueueManager,
+                    async () =>
                     {
-                        await write_error(item_to_process, new Exception("exporter failed to finish"));
-                        System.Console.WriteLine ("exporter failed to finish");
-                    }
-                }
-                catch(Exception ex)
-                {
-                    await write_error(item_to_process, ex);
-                    System.Console.WriteLine (ex);
-                }
+                        var custom_exporter = new mmria.services.Utilities.Exporter.exporter (scheduleInfoMessage, couchDbHttpClient, exportQueueManager);
+                        if(!await custom_exporter.Execute(item_to_process))
+                        {
+                            throw new InvalidOperationException("exporter failed to finish");
+                        }
+                    });
             }
 
+            var terminalStatus = await EnsureTerminalStatusAsync(item_to_process, exportQueueManager);
+            System.Console.WriteLine($"[EXPORT-QUEUE] processing complete request_id='{scheduleInfoMessage.request_id}' tenant='{scheduleInfoMessage.tenant}' queue_id='{item_to_process._id}' requested_queue_id='{scheduleInfoMessage.requested_queue_item_id}' status='{terminalStatus}' terminal_status='{terminalStatus}'");
+            return terminalStatus;
+        }
+        catch(Exception ex)
+        {
+            await write_error(item_to_process, ex);
+            System.Console.WriteLine($"[EXPORT-QUEUE] processing error request_id='{scheduleInfoMessage.request_id}' tenant='{scheduleInfoMessage.tenant}' queue_id='{item_to_process._id}' requested_queue_id='{scheduleInfoMessage.requested_queue_item_id}' error='{ex.Message}' terminal_status='export_error'");
+            return "export_error";
         }
 
     }
 
 
-    public async System.Threading.Tasks.Task Process_Export_Queue_Delete (
+    public async Task<string> Process_Export_Queue_Delete (
         ScheduleInfoMessage scheduleInfoMessage,
         ExportQueueManager exportQueueManager)
     {
         //System.Console.WriteLine ("{0} check_for_changes_job.Process_Export_Queue_Delete: started", System.DateTime.Now);
 
         ExportQueueItem item_to_process = await exportQueueManager.GetNextDeletedServiceItemAsync(db_config);
+        if (item_to_process == null)
+        {
+            return "no_deleted_item";
+        }
+
         if (item_to_process != null)
         {
             try
             {
+                System.Console.WriteLine($"[EXPORT-QUEUE] delete processing request_id='{scheduleInfoMessage.request_id}' tenant='{scheduleInfoMessage.tenant}' queue_id='{item_to_process._id}' requested_queue_id='{scheduleInfoMessage.requested_queue_item_id}' terminal_status='delete_processing'");
+
                 var item_directory_name = !string.IsNullOrWhiteSpace(item_to_process.storage_directory_name)
                     ? item_to_process.storage_directory_name
                     : ContainedFileStore.CreateSafeContainedName(
@@ -261,7 +334,7 @@ public sealed class Process_Export_Queue : ReceiveActor
                 catch(Exception)
                 {
                     // do nothing for now
-                    System.Console.WriteLine ("check_for_changes_job.Process_Export_Queue_Delete: Unable to Delete Directory {0}", item_directory_name);
+                    System.Console.WriteLine ("[EXPORT-QUEUE] delete directory failed request_id='{0}' tenant='{1}' queue_id='{2}' requested_queue_id='{3}' directory='{4}' terminal_status='delete_directory_failed'", scheduleInfoMessage.request_id, scheduleInfoMessage.tenant, item_to_process._id, scheduleInfoMessage.requested_queue_item_id, item_directory_name);
                 }
 
                 var storage_file_name = !string.IsNullOrWhiteSpace(item_to_process.storage_file_name)
@@ -279,18 +352,23 @@ public sealed class Process_Export_Queue : ReceiveActor
                 catch(Exception)
                 {
                     // do nothing for now
-                    System.Console.WriteLine ("Program.Process_Export_Queue_Delete: Unable to Delete File {0}", storage_file_name);
+                    System.Console.WriteLine ("[EXPORT-QUEUE] delete file failed request_id='{0}' tenant='{1}' queue_id='{2}' requested_queue_id='{3}' file='{4}' terminal_status='delete_file_failed'", scheduleInfoMessage.request_id, scheduleInfoMessage.tenant, item_to_process._id, scheduleInfoMessage.requested_queue_item_id, storage_file_name);
                 }
 
                 await exportQueueManager.MarkExpungedAsync(item_to_process, db_config);
+                System.Console.WriteLine($"[EXPORT-QUEUE] delete complete request_id='{scheduleInfoMessage.request_id}' tenant='{scheduleInfoMessage.tenant}' queue_id='{item_to_process._id}' requested_queue_id='{scheduleInfoMessage.requested_queue_item_id}' terminal_status='expunged'");
+                return "expunged";
             }
-            catch(Exception)
+            catch(Exception ex)
             {
                 // do nothing for now
+                System.Console.WriteLine($"[EXPORT-QUEUE] delete error request_id='{scheduleInfoMessage.request_id}' tenant='{scheduleInfoMessage.tenant}' queue_id='{item_to_process._id}' requested_queue_id='{scheduleInfoMessage.requested_queue_item_id}' error='{ex.Message}' terminal_status='delete_error'");
+                return "delete_error";
             }
 
         }
 
+        return "no_deleted_item";
     }
 
     /*

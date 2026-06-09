@@ -37,6 +37,14 @@ namespace mmria.server;
 
 public sealed partial class Program
 {
+    public const string DefaultAppVersion = "4.0.1";
+    public const string DefaultOmbDate = "05/31/2026";
+
+    public static string AppVersion { get; private set; } = DefaultAppVersion;
+    public static string OmbDate { get; private set; } = DefaultOmbDate;
+    public static string AppVersionLabel => $"MMRIA V{AppVersion}";
+    public static string OmbExpirationLabel => $"Exp. Date {OmbDate}";
+
     // Per-tenant change-sequence state. Replaces the previous globally-shared
     // Last_Change_Sequence / Change_Sequence_Call_Count / DateOfLastChange_Sequence_Call
     // statics, which were a multi-tenant correctness bug (one tenant's last_seq overwrote
@@ -121,6 +129,8 @@ public sealed partial class Program
             //2. Load all configuration values
             string web_site_url = GetConfig("web_site_url", "http://*:8080");//default is 8080, 12345 for local
             string app_instance_name = GetConfig("app_instance_name");
+            AppVersion = GetConfig("app_version", DefaultAppVersion);
+            OmbDate = GetConfig("omb_date", DefaultOmbDate);
             
             string[] multiTenantJurisdictions = [];
             var envMultiTenant = GetConfig("multi_tenant_jurisdictions");
@@ -197,6 +207,8 @@ public sealed partial class Program
             Log.Information($"multi_tenant_re_build_src: {startupSummaryHostPrefix}");
             Log.Information($"multi_tenant_jurisdictions_rebuild: {startupRebuildTenantsCsv}");
             Log.Information($"is_multi_tenant_mode: {isMultiTenantMode}");
+            Log.Information($"app_version: {AppVersion}");
+            Log.Information($"omb_date: {OmbDate}");
             Log.Information("***********************\n");
 
             // Load multi-tenant configuration using centralized loader
@@ -226,6 +238,8 @@ public sealed partial class Program
                 overridableConfiguration.SetString("shared", "multi_tenant_shared_config_id_template_couchdb_url", couchDbTemplateUrl);
                 overridableConfiguration.SetString("shared", "multi_tenant_re_build_src", startupSummaryHostPrefix);
                 overridableConfiguration.SetString("shared", "is_multi_tenant_mode", isMultiTenantMode ? "true" : "false");
+                overridableConfiguration.SetString("shared", "app_version", AppVersion);
+                overridableConfiguration.SetString("shared", "omb_date", OmbDate);
                 overridableConfiguration.SetBoolean("shared", "is_multi_tenant_mode", isMultiTenantMode);
                 if(int.TryParse(tenantDatabaseCountsWatchThreshold, out var parsedTenantDatabaseCountsWatchThreshold))
                 {

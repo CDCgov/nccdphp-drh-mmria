@@ -14,6 +14,9 @@ namespace mmria.common.SharedLibraries.ExportQueue.Manager;
 
 public sealed class ExportQueueManager
 {
+    private const string InQueueStatusPrefix = "In Queue...";
+    private const string CreatingExportStatusPrefix = "Creating Export...";
+    private const string DeletedStatusPrefix = "Deleted";
     private readonly ExportQueueDAL _dal;
 
     public ExportQueueManager(ExportQueueDAL dal)
@@ -81,9 +84,19 @@ public sealed class ExportQueueManager
     {
         document_put_response result = new document_put_response();
 
+        if (queue_item == null)
+        {
+            return result;
+        }
+
+        if (string.IsNullOrWhiteSpace(queue_item._id))
+        {
+            return result;
+        }
+
         var is_match = Regex.IsMatch(queue_item._id, @"^\d\d\d\d-\d\d-\d\dT\d\d-\d\d-\d\d.\d\d\dZ.zip$");
 
-        if (!is_match || queue_item == null)
+        if (!is_match)
         {
             return result;
         }
@@ -100,15 +113,19 @@ public sealed class ExportQueueManager
         string object_string = Newtonsoft.Json.JsonConvert.SerializeObject(queue_item, settings);
 
         result = await _dal.SaveQueueDocumentAsync(queue_item._id, object_string, db_config);
+        ApplySuccessfulSaveRevision(queue_item, result);
         return result;
     }
 
     public bool ShouldTriggerService(ExportQueueItem queue_item, document_put_response result)
     {
-        return result.ok &&
+        return queue_item != null &&
+               result != null &&
+               result.ok &&
+               !string.IsNullOrWhiteSpace(queue_item.status) &&
                (
-                   queue_item.status.StartsWith("In Queue...", StringComparison.OrdinalIgnoreCase) ||
-                   queue_item.status.StartsWith("Deleted", StringComparison.OrdinalIgnoreCase)
+                   queue_item.status.StartsWith(InQueueStatusPrefix, StringComparison.OrdinalIgnoreCase) ||
+                   queue_item.status.StartsWith(DeletedStatusPrefix, StringComparison.OrdinalIgnoreCase)
                );
     }
 
@@ -117,13 +134,15 @@ public sealed class ExportQueueManager
         string jurisdiction_user_name,
         string host_prefix,
         string vitals_url,
-        string vital_service_key)
+        string vital_service_key,
+        string request_id = null)
     {
         string user_db_url = vitals_url.Replace("Message/IJESet", "ExportQueue");
 
         var requestBody = new
         {
             queue_item_id = queue_item._id,
+            request_id,
             jurisdiction_user_name,
             host_prefix
         };
@@ -159,7 +178,23 @@ public sealed class ExportQueueManager
             item =>
                 string.Equals(item.data_type, "export", StringComparison.OrdinalIgnoreCase) &&
                 !string.IsNullOrWhiteSpace(item.status) &&
-                item.status.StartsWith("In Queue...", StringComparison.OrdinalIgnoreCase));
+                item.status.StartsWith(InQueueStatusPrefix, StringComparison.OrdinalIgnoreCase));
+
+        return GetOldestQueueItem(result);
+    }
+
+    public async Task<ExportQueueItem> GetNextQueuedServiceItemOlderThanAsync(
+        DBConfigurationDetail db_config,
+        DateTime olderThanUtc)
+    {
+        List<ExportQueueItem> result = await GetServiceQueueItemsAsync(
+            db_config,
+            requireExportType: true,
+            item =>
+                string.Equals(item.data_type, "export", StringComparison.OrdinalIgnoreCase) &&
+                !string.IsNullOrWhiteSpace(item.status) &&
+                item.status.StartsWith(InQueueStatusPrefix, StringComparison.OrdinalIgnoreCase) &&
+                IsQueueActivityOlderThan(item, olderThanUtc));
 
         return GetOldestQueueItem(result);
     }
@@ -171,18 +206,79 @@ public sealed class ExportQueueManager
             requireExportType: false,
             item =>
                 !string.IsNullOrWhiteSpace(item.status) &&
-                item.status.StartsWith("Deleted", StringComparison.OrdinalIgnoreCase));
+                item.status.StartsWith(DeletedStatusPrefix, StringComparison.OrdinalIgnoreCase));
+
+        return GetOldestQueueItem(result);
+    }
+
+    public async Task<ExportQueueItem> GetFreshCreatingExportAsync(
+        DBConfigurationDetail db_config,
+        DateTime freshAfterUtc)
+    {
+        List<ExportQueueItem> result = await GetServiceQueueItemsAsync(
+            db_config,
+            requireExportType: true,
+            item =>
+                string.Equals(item.data_type, "export", StringComparison.OrdinalIgnoreCase) &&
+                !string.IsNullOrWhiteSpace(item.status) &&
+                item.status.StartsWith(CreatingExportStatusPrefix, StringComparison.OrdinalIgnoreCase) &&
+                !IsQueueActivityOlderThan(item, freshAfterUtc));
+
+        return GetOldestQueueItem(result);
+    }
+
+    public async Task<ExportQueueItem> GetOldestStaleCreatingExportAsync(
+        DBConfigurationDetail db_config,
+        DateTime staleBeforeUtc)
+    {
+        List<ExportQueueItem> result = await GetServiceQueueItemsAsync(
+            db_config,
+            requireExportType: true,
+            item =>
+                string.Equals(item.data_type, "export", StringComparison.OrdinalIgnoreCase) &&
+                !string.IsNullOrWhiteSpace(item.status) &&
+                item.status.StartsWith(CreatingExportStatusPrefix, StringComparison.OrdinalIgnoreCase) &&
+                IsQueueActivityOlderThan(item, staleBeforeUtc));
 
         return GetOldestQueueItem(result);
     }
 
     public async Task MarkCreatingAsync(ExportQueueItem export_queue_item, DBConfigurationDetail db_config)
     {
-        export_queue_item.status = "Creating Export...";
+        export_queue_item.status = CreatingExportStatusPrefix;
         export_queue_item.last_updated_by = "mmria-services";
-        export_queue_item.date_last_updated = DateTime.Now;
+        export_queue_item.date_last_updated = DateTime.UtcNow;
 
         await SaveQueueItemDocumentAsync(export_queue_item, db_config);
+    }
+
+    public async Task<document_put_response> MarkServiceTriggerRetryAsync(
+        ExportQueueItem export_queue_item,
+        string userName,
+        DBConfigurationDetail db_config)
+    {
+        export_queue_item.status = "In Queue... service trigger failed; waiting for retry";
+        export_queue_item.last_updated_by = string.IsNullOrWhiteSpace(userName) ? "mmria-server" : userName;
+        export_queue_item.date_last_updated = DateTime.UtcNow;
+
+        return await SaveQueueItemDocumentAsync(export_queue_item, db_config);
+    }
+
+    public async Task<bool> TouchCreatingHeartbeatAsync(string id, DBConfigurationDetail db_config)
+    {
+        ExportQueueItem export_queue_item = await GetQueueItemAsync(id, db_config);
+        if (export_queue_item == null ||
+            string.IsNullOrWhiteSpace(export_queue_item.status) ||
+            !export_queue_item.status.StartsWith(CreatingExportStatusPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        export_queue_item.last_updated_by = "mmria-services";
+        export_queue_item.date_last_updated = DateTime.UtcNow;
+
+        await SaveQueueItemDocumentAsync(export_queue_item, db_config);
+        return true;
     }
 
     public async Task MarkExportErrorAsync(string id, Exception exception, DBConfigurationDetail db_config)
@@ -201,9 +297,19 @@ public sealed class ExportQueueManager
 
         export_queue_item.status = $"Export error... {message}";
         export_queue_item.last_updated_by = "mmria-services";
-        export_queue_item.date_last_updated = DateTime.Now;
+        export_queue_item.date_last_updated = DateTime.UtcNow;
 
         await SaveQueueItemDocumentAsync(export_queue_item, db_config);
+    }
+
+    public async Task MarkStaleCreatingExportErrorAsync(
+        string id,
+        DBConfigurationDetail db_config)
+    {
+        await MarkExportErrorAsync(
+            id,
+            new TimeoutException("Creating Export heartbeat expired"),
+            db_config);
     }
 
     public async Task MarkDownloadReadyAsync(
@@ -221,6 +327,8 @@ public sealed class ExportQueueManager
         export_queue_item.status = "Download";
         export_queue_item.storage_file_name = storageFileName;
         export_queue_item.storage_directory_name = storageDirectoryName;
+        export_queue_item.last_updated_by = "mmria-services";
+        export_queue_item.date_last_updated = DateTime.UtcNow;
 
         await SaveQueueItemDocumentAsync(export_queue_item, db_config);
     }
@@ -234,6 +342,8 @@ public sealed class ExportQueueManager
         }
 
         export_queue_item.status = "Queue Failed:" + error;
+        export_queue_item.last_updated_by = "mmria-services";
+        export_queue_item.date_last_updated = DateTime.UtcNow;
 
         await SaveQueueItemDocumentAsync(export_queue_item, db_config);
     }
@@ -242,6 +352,7 @@ public sealed class ExportQueueManager
     {
         export_queue_item.status = "expunged";
         export_queue_item.last_updated_by = "mmria-services";
+        export_queue_item.date_last_updated = DateTime.UtcNow;
 
         await SaveQueueItemDocumentAsync(export_queue_item, db_config);
     }
@@ -256,21 +367,22 @@ public sealed class ExportQueueManager
     public async Task MarkDownloadedAsync(ExportQueueItem export_queue_item, DBConfigurationDetail db_config)
     {
         export_queue_item.status = "Downloaded";
+        export_queue_item.date_last_updated = DateTime.UtcNow;
 
-        Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings();
-        settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-        string object_string = Newtonsoft.Json.JsonConvert.SerializeObject(export_queue_item, settings);
-
-        await _dal.SaveQueueDocumentAsync(export_queue_item._id, object_string, db_config);
+        await SaveQueueItemDocumentAsync(export_queue_item, db_config);
     }
 
-    private async Task SaveQueueItemDocumentAsync(ExportQueueItem export_queue_item, DBConfigurationDetail db_config)
+    private async Task<document_put_response> SaveQueueItemDocumentAsync(ExportQueueItem export_queue_item, DBConfigurationDetail db_config)
     {
         Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings();
         settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
         string object_string = Newtonsoft.Json.JsonConvert.SerializeObject(export_queue_item, settings);
 
-        await _dal.SaveQueueDocumentAsync(export_queue_item._id, object_string, db_config);
+        var result = await _dal.SaveQueueDocumentAsync(export_queue_item._id, object_string, db_config);
+        EnsureSuccessfulSave(export_queue_item._id, result);
+        ApplySuccessfulSaveRevision(export_queue_item, result);
+
+        return result;
     }
 
     private async Task<List<ExportQueueItem>> GetServiceQueueItemsAsync(
@@ -324,6 +436,50 @@ public sealed class ExportQueueManager
         }
 
         return items[0];
+    }
+
+    private static bool IsQueueActivityOlderThan(ExportQueueItem item, DateTime thresholdUtc)
+    {
+        var activityTime = GetQueueActivityTimeUtc(item);
+        return activityTime == null || activityTime.Value < thresholdUtc;
+    }
+
+    private static DateTime? GetQueueActivityTimeUtc(ExportQueueItem item)
+    {
+        var activityTime = item?.date_last_updated ?? item?.date_created;
+        if (activityTime == null)
+        {
+            return null;
+        }
+
+        return activityTime.Value.Kind == DateTimeKind.Utc
+            ? activityTime.Value
+            : activityTime.Value.ToUniversalTime();
+    }
+
+    private static void EnsureSuccessfulSave(string id, document_put_response result)
+    {
+        if (result?.ok == true)
+        {
+            return;
+        }
+
+        var errorDescription = result?.error_description;
+        throw new InvalidOperationException(
+            $"Export queue status write failed for '{id}': {errorDescription ?? "CouchDB did not return ok=true."}");
+    }
+
+    private static void ApplySuccessfulSaveRevision(ExportQueueItem item, document_put_response result)
+    {
+        if (item == null || result?.ok != true)
+        {
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(result.rev))
+        {
+            item._rev = result.rev;
+        }
     }
 
     private static ExportQueueItem CreateQueueItemFromDocument(IDictionary<string, object> document, bool requireExportType)

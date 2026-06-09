@@ -258,7 +258,7 @@
         summaryOverallStatus.textContent = summary && summary.status ? summary.status : "-";
         summaryLastUpdated.textContent = formatDateTime(summary && summary.last_updated_utc);
         summaryCounts.textContent = summary
-            ? `completed ${summary.completed_tenant_count || 0}, running ${summary.running_tenant_count || 0}, paused ${summary.paused_tenant_count || 0}, pending ${summary.pending_tenant_count || 0}`
+            ? `completed ${summary.completed_tenant_count || 0}, indexing pending ${summary.indexing_pending_tenant_count || 0}, running ${summary.running_tenant_count || 0}, paused ${summary.paused_tenant_count || 0}, pending ${summary.pending_tenant_count || 0}`
             : "-";
 
         if (tenantNames.length === 0) {
