@@ -1192,7 +1192,7 @@ function convert_html_to_pdf(p_value) {
 	let CommentRegex = /<!--\[[^>]+>/gi;
 
 	let node = document.createElement("body");
-	node.innerHTML = p_value.replace(CommentRegex, "");
+	node.innerHTML = pdf_version_normalize_html_input(p_value).replace(CommentRegex, "");
 
 	ConvertHTMLDOMWalker(result, node);
 
@@ -1277,6 +1277,103 @@ function convert_attribute_to_pdf(p_node, p_result)
 
 	return result;
 
+}
+
+function pdf_version_normalize_html_input(p_value)
+{
+	if(p_value == null)
+	{
+		return "";
+	}
+
+	let value = `${p_value}`;
+
+	if(!pdf_version_value_contains_html(value))
+	{
+		return pdf_version_escape_html(value).replace(/\r\n|\r|\n/g, "<br>");
+	}
+
+	return value.replace(/<br\s*\/?>/gi, "<br>");
+}
+
+function pdf_version_value_contains_html(p_value)
+{
+	return /<\/?[a-z][^>]*>/i.test(p_value);
+}
+
+function pdf_version_escape_html(p_value)
+{
+	return `${p_value}`
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;")
+		.replace(/'/g, "&#39;");
+}
+
+function pdf_version_normalize_text_node(p_node)
+{
+	let text = p_node.textContent.replace(/[\r\n\t\f]+/g, " ").replace(/ {2,}/g, " ");
+
+	if(text.trim() == "")
+	{
+		return "";
+	}
+
+	return text;
+}
+
+function pdf_version_trim_one_terminal_newline(p_array)
+{
+	for(let i = p_array.length - 1; i >= 0; i--)
+	{
+		let item = p_array[i];
+
+		if(item == null)
+		{
+			continue;
+		}
+
+		if(Array.isArray(item.text))
+		{
+			if(pdf_version_trim_one_terminal_newline(item.text))
+			{
+				if(item.text.length == 0)
+				{
+					p_array.splice(i, 1);
+				}
+
+				return true;
+			}
+
+			return false;
+		}
+
+		if(typeof item.text == "string")
+		{
+			if(item.text.length == 0)
+			{
+				p_array.splice(i, 1);
+				continue;
+			}
+
+			if(item.text.endsWith("\n"))
+			{
+				item.text = item.text.slice(0, -1);
+
+				if(item.text.length == 0)
+				{
+					p_array.splice(i, 1);
+				}
+
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	return false;
 }
 
 function rgb_to_hex(p_value) 
@@ -1447,7 +1544,13 @@ function ConvertHTMLDOMWalker(p_result, p_node)
 			return;
 			break;
 		case "#TEXT":
-			p_result.push({ text: p_node.textContent.trim().replace("<br>", "\n") });
+			let text = pdf_version_normalize_text_node(p_node);
+
+			if(text.length > 0)
+			{
+				p_result.push({ text: text });
+			}
+
 			return;
 			break;
 		case "P":
@@ -1457,6 +1560,7 @@ function ConvertHTMLDOMWalker(p_result, p_node)
 				let child = p_node.childNodes[i];
 				ConvertHTMLDOMWalker(text_array, child);
 			}
+			pdf_version_trim_one_terminal_newline(text_array);
 			text_array.push({ text: "\n" });
 			p_result.push({ text: text_array, style: convert_attribute_to_pdf(p_node)});
 			return;
@@ -1467,11 +1571,7 @@ function ConvertHTMLDOMWalker(p_result, p_node)
                 ConvertHTMLDOMWalker(span_text_array, child);
             }
 
-            if(span_text_array.length == 1)
-            {
-                p_result.push({ text: ' ' + span_text_array[0].text,  style: convert_attribute_to_pdf(p_node) });
-            }
-            else
+            if(span_text_array.length > 0)
             {
                 p_result.push({ text: span_text_array,  style: convert_attribute_to_pdf(p_node) });
             }
@@ -1480,7 +1580,17 @@ function ConvertHTMLDOMWalker(p_result, p_node)
 		case "STRONG":
         case "B":
 			let strong_attr = { bold: true };
-			p_result.push({ text: p_node.textContent.trim(), style: convert_attribute_to_pdf(p_node, strong_attr) });
+			let strong_text_array = [];
+			for (let i = 0; i < p_node.childNodes.length; i++) {
+				let child = p_node.childNodes[i];
+				ConvertHTMLDOMWalker(strong_text_array, child);
+			}
+
+			if(strong_text_array.length > 0)
+			{
+				p_result.push({ text: strong_text_array, style: convert_attribute_to_pdf(p_node, strong_attr) });
+			}
+
 			return;
 			break;
 		case "BR":
@@ -1489,7 +1599,17 @@ function ConvertHTMLDOMWalker(p_result, p_node)
 			break;
 		case "EM":
 			let em_attr = { italics: true };
-			p_result.push({ text: p_node.textContent.trim(), style: convert_attribute_to_pdf(p_node, em_attr) });
+			let em_text_array = [];
+			for (let i = 0; i < p_node.childNodes.length; i++) {
+				let child = p_node.childNodes[i];
+				ConvertHTMLDOMWalker(em_text_array, child);
+			}
+
+			if(em_text_array.length > 0)
+			{
+				p_result.push({ text: em_text_array, style: convert_attribute_to_pdf(p_node, em_attr) });
+			}
+
 			return;
 			break;
 		case "UL":
