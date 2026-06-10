@@ -1194,7 +1194,7 @@ function convert_html_to_pdf(p_value) {
 	let node = document.createElement("body");
 	node.innerHTML = pdf_version_normalize_html_input(p_value).replace(CommentRegex, "");
 
-	ConvertHTMLDOMWalker(result, node);
+	ConvertHTMLDOMWalker(result, node, {});
 
 	return result;
 
@@ -1208,7 +1208,7 @@ function convert_attribute_to_pdf(p_node, p_result)
 
 	if (p_result != null) 
     {
-		result = p_result;
+		result = Object.assign({}, p_result);
 	}
 
 	/*
@@ -1241,28 +1241,56 @@ function convert_attribute_to_pdf(p_node, p_result)
         {
 			let attr = p_node.attributes[i];
 
-			if (attr.name == "style") 
+			if (attr.name.toLowerCase() == "style")
             {
 				let style_array = attr.value.split(';');
 				for (let style_index = 0; style_index < style_array.length; style_index++) 
                 {
 					let kvp = style_array[style_index].split(":");
-					switch (kvp[0].trim()) 
+					let style_name = kvp[0].trim().toLowerCase();
+					let style_value = kvp.slice(1).join(":").replace(/\s*!important\s*$/i, "").trim();
+					let style_value_lower = style_value.toLowerCase();
+
+					if(style_value == "")
+					{
+						continue;
+					}
+
+					switch (style_name)
                     {
 						case "text-align":
-							result['alignment'] = kvp[1].trim();
+							result['alignment'] = style_value;
 							break;
 						case "font-size":
-							result['fontSize'] = kvp[1].trim().replace("px", "").replace("pt", "").replace("rem", "");
+							let font_size = parseFloat(style_value.replace("px", "").replace("pt", "").replace("rem", ""));
+
+							if(!isNaN(font_size))
+							{
+								result['fontSize'] = font_size;
+							}
 							break;
-							//case "bold": 
-							//    result['bold']  = kvp[1];
+						case "font-weight":
+							if(style_value_lower == "bold" || style_value_lower == "bolder" || parseInt(style_value_lower) >= 600)
+							{
+								result['bold'] = true;
+							}
+							break;
+						case "font-style":
+							if(style_value_lower == "italic" || style_value_lower == "oblique")
+							{
+								result['italics'] = true;
+							}
+							break;
+						case "text-decoration":
+						case "text-decoration-line":
+							convert_text_decoration_to_pdf(result, style_value_lower);
 							break;
 						case "color":
-							result['color'] = `${rgb_to_hex(kvp[1].trim())}`;
+							result['color'] = `${rgb_to_hex(style_value)}`;
 							break;
+						case "background":
 						case "background-color":
-							result['background'] = `${rgb_to_hex(kvp[1].trim())}`;
+							result['background'] = `${rgb_to_hex(style_value)}`;
 							break;
 						default:
 							// console.log(`missing style: ${attr.name} = ${attr.value}`);
@@ -1277,6 +1305,92 @@ function convert_attribute_to_pdf(p_node, p_result)
 
 	return result;
 
+}
+
+function convert_text_decoration_to_pdf(p_result, p_value)
+{
+	let value = `${p_value}`.toLowerCase();
+
+	if(value.indexOf("underline") > -1)
+	{
+		p_result['decoration'] = 'underline';
+	}
+	else if(value.indexOf("line-through") > -1)
+	{
+		p_result['decoration'] = 'lineThrough';
+	}
+}
+
+function pdf_version_get_node_format(p_node, p_format)
+{
+	let result = convert_attribute_to_pdf(p_node, p_format);
+
+	switch (p_node.nodeName.toUpperCase())
+    {
+		case "STRONG":
+		case "B":
+			result['bold'] = true;
+			break;
+		case "EM":
+		case "I":
+			result['italics'] = true;
+			break;
+		case "U":
+			result['decoration'] = 'underline';
+			break;
+		case "DEL":
+		case "S":
+		case "STRIKE":
+			result['decoration'] = 'lineThrough';
+			break;
+	}
+
+	return result;
+}
+
+function pdf_version_apply_text_format(p_result, p_format)
+{
+	if(p_format == null)
+	{
+		return p_result;
+	}
+
+	let supported_properties = [
+		'alignment',
+		'background',
+		'bold',
+		'color',
+		'decoration',
+		'fontSize',
+		'italics',
+	];
+
+	for(let i = 0; i < supported_properties.length; i++)
+	{
+		let property_name = supported_properties[i];
+
+		if(p_format[property_name] != null)
+		{
+			p_result[property_name] = p_format[property_name];
+		}
+	}
+
+	return p_result;
+}
+
+function pdf_version_apply_block_format(p_result, p_format)
+{
+	if(p_format != null && p_format.alignment != null)
+	{
+		p_result['alignment'] = p_format.alignment;
+	}
+
+	return p_result;
+}
+
+function pdf_version_text_with_format(p_text, p_format)
+{
+	return pdf_version_apply_text_format({ text: p_text }, p_format);
 }
 
 function pdf_version_normalize_html_input(p_value)
@@ -1376,6 +1490,21 @@ function pdf_version_trim_one_terminal_newline(p_array)
 	return false;
 }
 
+function pdf_version_add_col_span(p_value)
+{
+	if(p_value == null)
+	{
+		return { text: '', colSpan: '2' };
+	}
+
+	if(typeof p_value == "string")
+	{
+		return { text: p_value, colSpan: '2' };
+	}
+
+	return Object.assign({}, p_value, { colSpan: '2' });
+}
+
 function rgb_to_hex(p_value) 
 {
 	if (p_value.split("(").length < 2) 
@@ -1440,9 +1569,10 @@ function GetTableDetailRow(p_result, p_node)
 	}
 }
 
-function ConvertHTMLDOMWalker(p_result, p_node) 
+function ConvertHTMLDOMWalker(p_result, p_node, p_format)
 {
 	//let crlf_regex = /\n/g;
+	let node_format = pdf_version_get_node_format(p_node, p_format);
 
 	switch (p_node.nodeName.toUpperCase()) 
     {
@@ -1548,7 +1678,7 @@ function ConvertHTMLDOMWalker(p_result, p_node)
 
 			if(text.length > 0)
 			{
-				p_result.push({ text: text });
+				p_result.push(pdf_version_text_with_format(text, node_format));
 			}
 
 			return;
@@ -1558,56 +1688,55 @@ function ConvertHTMLDOMWalker(p_result, p_node)
 			let text_array = [];
 			for (let i = 0; i < p_node.childNodes.length; i++) {
 				let child = p_node.childNodes[i];
-				ConvertHTMLDOMWalker(text_array, child);
+				ConvertHTMLDOMWalker(text_array, child, node_format);
 			}
 			pdf_version_trim_one_terminal_newline(text_array);
 			text_array.push({ text: "\n" });
-			p_result.push({ text: text_array, style: convert_attribute_to_pdf(p_node)});
+			p_result.push(pdf_version_apply_block_format({ text: text_array }, node_format));
 			return;
         case "SPAN":
-            let span_text_array = [];
             for (let i = 0; i < p_node.childNodes.length; i++) {
                 let child = p_node.childNodes[i];
-                ConvertHTMLDOMWalker(span_text_array, child);
-            }
-
-            if(span_text_array.length > 0)
-            {
-                p_result.push({ text: span_text_array,  style: convert_attribute_to_pdf(p_node) });
+                ConvertHTMLDOMWalker(p_result, child, node_format);
             }
             return;
 			break;
 		case "STRONG":
         case "B":
-			let strong_attr = { bold: true };
-			let strong_text_array = [];
 			for (let i = 0; i < p_node.childNodes.length; i++) {
 				let child = p_node.childNodes[i];
-				ConvertHTMLDOMWalker(strong_text_array, child);
-			}
-
-			if(strong_text_array.length > 0)
-			{
-				p_result.push({ text: strong_text_array, style: convert_attribute_to_pdf(p_node, strong_attr) });
+				ConvertHTMLDOMWalker(p_result, child, node_format);
 			}
 
 			return;
 			break;
 		case "BR":
-			p_result.push({ text: "\n" });
+			p_result.push(pdf_version_text_with_format("\n", node_format));
 			return;
 			break;
 		case "EM":
-			let em_attr = { italics: true };
-			let em_text_array = [];
+		case "I":
 			for (let i = 0; i < p_node.childNodes.length; i++) {
 				let child = p_node.childNodes[i];
-				ConvertHTMLDOMWalker(em_text_array, child);
+				ConvertHTMLDOMWalker(p_result, child, node_format);
 			}
 
-			if(em_text_array.length > 0)
-			{
-				p_result.push({ text: em_text_array, style: convert_attribute_to_pdf(p_node, em_attr) });
+			return;
+			break;
+		case "U":
+			for (let i = 0; i < p_node.childNodes.length; i++) {
+				let child = p_node.childNodes[i];
+				ConvertHTMLDOMWalker(p_result, child, node_format);
+			}
+
+			return;
+			break;
+		case "DEL":
+		case "S":
+		case "STRIKE":
+			for (let i = 0; i < p_node.childNodes.length; i++) {
+				let child = p_node.childNodes[i];
+				ConvertHTMLDOMWalker(p_result, child, node_format);
 			}
 
 			return;
@@ -1617,9 +1746,9 @@ function ConvertHTMLDOMWalker(p_result, p_node)
 			for (let i = 0; i < p_node.childNodes.length; i++) {
 				let child = p_node.childNodes[i];
 
-				ConvertHTMLDOMWalker(ul_array, child);
+				ConvertHTMLDOMWalker(ul_array, child, node_format);
 			}
-			p_result.push({ ul: ul_array });
+			p_result.push(pdf_version_apply_block_format({ ul: ul_array }, node_format));
 			return;
 			break;
 
@@ -1628,31 +1757,25 @@ function ConvertHTMLDOMWalker(p_result, p_node)
 			for (let i = 0; i < p_node.childNodes.length; i++) {
 				let child = p_node.childNodes[i];
 
-				ConvertHTMLDOMWalker(ol_array, child);
+				ConvertHTMLDOMWalker(ol_array, child, node_format);
 			}
-			p_result.push({ ol: ol_array });
+			p_result.push(pdf_version_apply_block_format({ ol: ol_array }, node_format));
 			return;
 			break;
 		case "LI":
-			if (p_node.childNodes.length > 1) 
+			let li_array = [];
+			for (let i = 0; i < p_node.childNodes.length; i++)
             {
-				let li_array = [];
-				for (let i = 0; i < p_node.childNodes.length; i++) 
-                {
-					let child = p_node.childNodes[i];
+				let child = p_node.childNodes[i];
 
-					ConvertHTMLDOMWalker(li_array, child);
-				}
-				const text_only = [];
-                process_li_array(text_only, li_array);
+				ConvertHTMLDOMWalker(li_array, child, node_format);
+			}
 
-                p_result.push({ text: text_only });
+			pdf_version_trim_one_terminal_newline(li_array);
 
-			} 
-            else 
-            {
-				let li_node = { text: p_node.textContent.trim() }
-				p_result.push(convert_attribute_to_pdf(p_node, li_node));
+			if(li_array.length > 0)
+			{
+				p_result.push(pdf_version_apply_block_format({ text: li_array }, node_format));
 			}
 			return;
 			break;
@@ -1663,28 +1786,10 @@ function ConvertHTMLDOMWalker(p_result, p_node)
 	for (let i = 0; i < p_node.childNodes.length; i++) {
 		let child = p_node.childNodes[i];
 
-		ConvertHTMLDOMWalker(p_result, child);
+		ConvertHTMLDOMWalker(p_result, child, node_format);
 	}
 
 
-}
-
-function process_li_array(p_result, p_array)
-{
-    for (let i = 0; i < p_array.length; i++) 
-    {
-        const item = p_array[i];
-
-        if(Array.isArray(item.text))
-        {
-            process_li_array(p_result, item.text);
-        }
-        else
-        {
-            p_result.push(item.text);
-        }
-
-    }
 }
 
 // Core Summary - display all of the core summary fields
@@ -2679,65 +2784,11 @@ function print_pdf_render_content(ctx) {
 			// console.log('*************** type: ', ctx.metadata.type);
 			if (ctx.metadata.name == 'case_opening_overview') {
 				let narrative = convert_html_to_pdf(pdf_version_index_to_string(ctx));
-				// Loop thru and handle the ul (bullet list) & ol (ordered list) differently
 				for (let i = 0; i < narrative.length; i++) {
-					if (narrative[i].hasOwnProperty('ul') == true) {
-						// Found a record with the ul: key
-						narrative[i].ul.forEach((u) => {
-							let ulRet = '' + u.text;
-
-                            if(Array.isArray(u.text))
-                            {
-                                ulRet = '' + u.text.join("");
-                            }
-							// bullet list removed -  removed style: ['narrativeDetail'], 
-							ctx.content.push([
-								{ ul: [ulRet,], colSpan: '2', },
-								{},
-							]);
-						});
-					} else if (narrative[i].hasOwnProperty('ol') == true) {
-						// Found a record with the ol: key
-						narrative[i].ol.forEach((o) => {
-							let olRet = '' + o.text;
-
-                            if(Array.isArray(o.text))
-                            {
-                                ulRet = '' + o.text.join("");
-                            }
-							// ordered list -  removed style: ['narrativeDetail'], 
-							ctx.content.push([
-								{ ol: [olRet,], colSpan: '2', },
-								{},
-							]);
-						});
-					} else if (narrative[i].hasOwnProperty('table') == true) {
-						// Found a table record
-						let myHeaderRows = narrative[i].table.headerRows;
-						let myBody = [];
-						narrative[i].table.body.forEach((b) => {
-							myBody.push(b);
-						});
-						let myWidths = narrative[i].table.widths;
-
-						// table removed -  - removed style: ['narrativeDetail'], 
-						ctx.content.push([
-							{
-								layout: 'lightHorizontalLines',
-								table: {
-									headerRows: myHeaderRows,
-									widths: myWidths,
-									body: myBody,
-								}, colSpan: '2',
-							}, {},
-						]);
-					} else {
-						// Regular default - removed style: ['narrativeDetail'], 
-						ctx.content.push([
-							{ text: narrative[i], colSpan: '2' },
-							{},
-						]);
-					}
+					ctx.content.push([
+						pdf_version_add_col_span(narrative[i]),
+						{},
+					]);
 				}
 			} else {
 				ctx.content.push([
