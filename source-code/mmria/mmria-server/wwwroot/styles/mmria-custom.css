@@ -1746,6 +1746,23 @@ dialog::backdrop {
 .trumbowyg-box {
   margin-top: 0 !important;
 }
+
+.case-narrative-print-rich-text {
+  line-height: normal;
+  white-space: normal;
+}
+
+.case-narrative-print-rich-text blockquote,
+.case-narrative-print-rich-text div,
+.case-narrative-print-rich-text ol,
+.case-narrative-print-rich-text p,
+.case-narrative-print-rich-text ul {
+  margin: 0 !important;
+}
+
+.case-narrative-print-rich-text strong {
+  letter-spacing: normal;
+}
 /* ~~~~~~~ END VENDER OVERRIDES ~~~~~~~ */
 
 .logout-button {

@@ -921,48 +921,74 @@ public class CaseManager
             string existing_offline_by_tab_id = null;
             try
             {
-                var check_document_json = await _couchDbHttpClient.ExecuteAsync(
+                var check_document_response = await _couchDbHttpClient.ExecuteForResponseAsync(
                     "GET",
                     dbConfig.Get_Prefix_DB_Url($"mmrds/{id_val}"),
                     null,
                     dbConfig.user_name,
                     dbConfig.user_value
                 );
-                var check_document_expando_object = JsonConvert.DeserializeObject<ExpandoObject>(check_document_json);
-                IDictionary<string, object> result_dictionary = check_document_expando_object as IDictionary<string, object>;
 
-                // Read lock fields from the stored document json (source of truth).
-                // This avoids payload-based bypass and keeps UTC parsing consistent.
-                var check_document_jobject = JObject.Parse(check_document_json);
-                existingRevision = check_document_jobject.Value<string>("_rev");
-                existingCreatedBy = check_document_jobject.Value<string>("created_by");
-                existingDateCreated = ParseUtcDateTime(check_document_jobject["date_created"]);
-                existing_locked_by = check_document_jobject.Value<string>("last_checked_out_by");
-                existing_date_last_checked_out = ParseUtcDateTime(check_document_jobject["date_last_checked_out"]);
-                existing_checked_out_by_tab_id = check_document_jobject.Value<string>("checked_out_by_tab_id");
-                TryReadIsOffline(check_document_jobject, out existing_is_offline);
-                existing_offline_by = check_document_jobject.Value<string>("offline_by");
-                existing_offline_by_tab_id = check_document_jobject.Value<string>("offline_by_tab_id");
-
-                if (result_dictionary != null &&
-                    !authorization_case.is_authorized_to_handle_jurisdiction_id(dbConfig, user, ResourceRightEnum.WriteCase, check_document_expando_object, _couchDbHttpClient))
+                if (check_document_response.StatusCode == 404)
                 {
-                    result_dictionary.TryGetValue("jurisdiction_id", out var jurisdiction_id_obj);
-                    result_dictionary.TryGetValue("_id", out var id_obj);
-                    var jurisdiction_id = jurisdiction_id_obj?.ToString();
-                    var id = id_obj?.ToString();
+                    // New case: CouchDB returns not_found for the existence probe.
+                }
+                else if (check_document_response.StatusCode == 200)
+                {
+                    var check_document_json = check_document_response.Body;
+                    var check_document_jobject = JObject.Parse(check_document_json);
+                    var check_document_expando_object = JsonConvert.DeserializeObject<ExpandoObject>(check_document_json);
+                    IDictionary<string, object> result_dictionary = check_document_expando_object as IDictionary<string, object>;
 
-                    response.error_description = $"2nd unauthorized PUT {jurisdiction_id}: {id}";
-                    Console.Write($"2nd unauthorized PUT {jurisdiction_id}: {id}");
+                    // Read lock fields from the stored document json (source of truth).
+                    // This avoids payload-based bypass and keeps UTC parsing consistent.
+                    existingRevision = check_document_jobject.Value<string>("_rev");
+                    existingCreatedBy = check_document_jobject.Value<string>("created_by");
+                    existingDateCreated = ParseUtcDateTime(check_document_jobject["date_created"]);
+                    existing_locked_by = check_document_jobject.Value<string>("last_checked_out_by");
+                    existing_date_last_checked_out = ParseUtcDateTime(check_document_jobject["date_last_checked_out"]);
+                    existing_checked_out_by_tab_id = check_document_jobject.Value<string>("checked_out_by_tab_id");
+                    TryReadIsOffline(check_document_jobject, out existing_is_offline);
+                    existing_offline_by = check_document_jobject.Value<string>("offline_by");
+                    existing_offline_by_tab_id = check_document_jobject.Value<string>("offline_by_tab_id");
+
+                    if (result_dictionary != null &&
+                        !authorization_case.is_authorized_to_handle_jurisdiction_id(dbConfig, user, ResourceRightEnum.WriteCase, check_document_expando_object, _couchDbHttpClient))
+                    {
+                        var jurisdiction_id = check_document_jobject.SelectToken("home_record.jurisdiction_id")?.ToString();
+                        var id = check_document_jobject.Value<string>("_id");
+                        var existing_case_id = string.IsNullOrWhiteSpace(id) ? id_val : id;
+
+                        response.error_description = $"2nd unauthorized PUT {jurisdiction_id}: {existing_case_id}";
+                        Console.Write($"2nd unauthorized PUT {jurisdiction_id}: {existing_case_id}");
+                        result.Response = response;
+                        return result;
+                    }
+                }
+                else
+                {
+                    response.ok = false;
+                    response.error_description = $"Unable to verify existing case before save. CouchDB returned HTTP {check_document_response.StatusCode} for case {id_val}.";
                     result.Response = response;
                     return result;
                 }
 
             }
+            catch (JsonException ex)
+            {
+                response.ok = false;
+                response.error_description = $"Unable to parse existing case document before save for case {id_val}.";
+                Console.WriteLine($"err caseController.Post existing case parse\n{ex}");
+                result.Response = response;
+                return result;
+            }
             catch (Exception ex)
             {
-                // do nothing for now document doesn't exsist.
-                System.Console.WriteLine($"err caseController.Post\n{ex}");
+                response.ok = false;
+                response.error_description = $"Unable to verify existing case before save for case {id_val}.";
+                System.Console.WriteLine($"err caseController.Post existing case probe\n{ex}");
+                result.Response = response;
+                return result;
             }
             // end - check if doc exists
 

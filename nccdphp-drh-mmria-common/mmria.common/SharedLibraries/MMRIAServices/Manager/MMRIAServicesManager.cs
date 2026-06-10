@@ -69,19 +69,23 @@ public sealed class MMRIAServicesManager
 
     public async Task<TenantDatabaseCountsResponse> GetTenantDatabaseCountsAsync(
         mmria.common.couchdb.ConfigurationSet runtimeConfigSet,
-        string configId,
+        string configId = null,
         int maxConcurrentEntries = 4,
         int perDatabaseTimeoutSeconds = 20)
     {
-        var cdcConfigDb = ResolveCdcConfigurationDb(runtimeConfigSet);
+        var cdcConfigurationAccess = ResolveCdcConfigurationAccess(runtimeConfigSet);
+        string resolvedConfigId = string.IsNullOrWhiteSpace(configId)
+            ? cdcConfigurationAccess.configId
+            : configId;
+
         var configuration = await _mmriaServicesDal.GetConfigurationDocumentAsync(
-            cdcConfigDb,
-            configId,
+            cdcConfigurationAccess.dbConfig,
+            resolvedConfigId,
             timeoutSeconds: perDatabaseTimeoutSeconds);
 
         if (configuration == null)
         {
-            throw new InvalidOperationException($"Configuration document '{configId}' could not be loaded.");
+            throw new InvalidOperationException($"Configuration document '{resolvedConfigId}' could not be loaded.");
         }
 
         return await BuildTenantDatabaseCountsResponseAsync(
@@ -1382,7 +1386,7 @@ public sealed class MMRIAServicesManager
         }.Uri;
     }
 
-    private static mmria.common.couchdb.DBConfigurationDetail ResolveCdcConfigurationDb(
+    private static (string configId, mmria.common.couchdb.DBConfigurationDetail dbConfig) ResolveCdcConfigurationAccess(
         mmria.common.couchdb.ConfigurationSet runtimeConfigSet)
     {
         if (runtimeConfigSet?.detail_list == null || runtimeConfigSet.detail_list.Count == 0)
@@ -1390,14 +1394,17 @@ public sealed class MMRIAServicesManager
             throw new InvalidOperationException("Runtime ConfigurationSet is missing detail_list entries for CDC configuration access.");
         }
 
+        string cdcConfigId = null;
         mmria.common.couchdb.DBConfigurationDetail cdcConnection = null;
-        if (runtimeConfigSet.detail_list.ContainsKey("cdc"))
+        if (runtimeConfigSet.detail_list.TryGetValue("cdc", out var cdcDbConfig))
         {
-            cdcConnection = runtimeConfigSet.detail_list["cdc"];
+            cdcConfigId = "cdc";
+            cdcConnection = cdcDbConfig;
         }
-        else if (runtimeConfigSet.detail_list.ContainsKey("cdcqa"))
+        else if (runtimeConfigSet.detail_list.TryGetValue("cdcqa", out var cdcQaDbConfig))
         {
-            cdcConnection = runtimeConfigSet.detail_list["cdcqa"];
+            cdcConfigId = "cdcqa";
+            cdcConnection = cdcQaDbConfig;
         }
 
         if (cdcConnection == null)
@@ -1412,6 +1419,6 @@ public sealed class MMRIAServicesManager
             throw new InvalidOperationException("Resolved CDC configuration database connection is missing URL or credentials.");
         }
 
-        return cdcConnection;
+        return (cdcConfigId, cdcConnection);
     }
 }

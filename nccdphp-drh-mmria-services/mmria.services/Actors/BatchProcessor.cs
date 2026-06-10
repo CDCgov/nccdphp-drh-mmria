@@ -118,26 +118,6 @@ public sealed class BatchProcessor : ReceiveActor
             await Process_Message(message);
         });
 
-        ReceiveAsync<mmria.common.ije.BatchItemComplete>(async message =>
-        {
-            pending_items--;
-            _currentChunkPending--;
-            
-            Console.WriteLine($"BatchItem completed. Total pending: {pending_items}, Chunk pending: {_currentChunkPending}, Remaining: {_remainingItems.Count}");
-            
-            // When current chunk completes, dispatch next chunk
-            if (_currentChunkPending == 0 && _remainingItems.Count > 0)
-            {
-                DispatchNextChunk();
-            }
-            
-            // Finalize when all items complete
-            if (pending_items == 0 && batch != null)
-            {
-                await Finalize_Batch();
-            }
-        });
-        
         ReceiveAsync<mmria.common.ije.BatchRemoveDataMessage>(async message =>
         {
             await Process_Message(message);
@@ -309,6 +289,20 @@ public sealed class BatchProcessor : ReceiveActor
                 status = batch.Status
             };
             Context.ActorSelection("akka://mmria-actor-system/user/batch-supervisor").Tell(BatchStatusMessage);
+
+            var save_batch_result = await _mmriaServicesManager.save_batch(
+                batch,
+                batch,
+                mmria.services.vitalsimport.Program.couchdb_url,
+                mmria.services.vitalsimport.Program.timer_user_name,
+                mmria.services.vitalsimport.Program.timer_value
+            );
+            if(save_batch_result.result)
+            {
+                batch = save_batch_result.updated_batch;
+            }
+
+            Context.Stop(this.Self);
     
 
         }
@@ -419,28 +413,14 @@ public sealed class BatchProcessor : ReceiveActor
 
     private async System.Threading.Tasks.Task Process_Message(mmria.common.ije.BatchItem message)
     {
-        var new_item = (batch_item_set[message.CDCUniqueID].Item1, message);
-        batch_item_set[message.CDCUniqueID] = new_item;
-
-        var current_status = batch.Status;
-        int finished_count = 0;
-
-        foreach(var item in batch_item_set)
+        var item_key = message.CDCUniqueID?.Trim();
+        if(!string.IsNullOrWhiteSpace(item_key) && batch_item_set.TryGetValue(item_key, out var existing_item))
         {
-            if
-            (
-                item.Value.Item2.Status == mmria.common.ije.BatchItem.StatusEnum.NewCaseAdded ||
-                item.Value.Item2.Status == mmria.common.ije.BatchItem.StatusEnum.ExistingCaseSkipped ||
-                item.Value.Item2.Status == mmria.common.ije.BatchItem.StatusEnum.ImportFailed 
-            )
-            {
-                finished_count += 1;
-            }
-        }          
-
-        if(finished_count == batch_item_set.Count)
+            batch_item_set[item_key] = (existing_item.Item1, message);
+        }
+        else
         {
-            current_status = mmria.common.ije.Batch.StatusEnum.Finished;
+            Console.WriteLine($"BatchProcessor: completed item not found in batch {batch?.id}. CDCUniqueID was missing or unknown.");
         }
 
         var new_batch = new mmria.common.ije.Batch()
@@ -451,7 +431,7 @@ public sealed class BatchProcessor : ReceiveActor
             created_by = batch.created_by,
             date_last_updated  = DateTime.UtcNow,
             last_updated_by = batch.last_updated_by, 
-            Status = current_status,
+            Status = batch.Status,
             reporting_state = batch.reporting_state,
             ImportDate = batch.ImportDate,
             mor_file_name = batch.mor_file_name,
@@ -472,24 +452,19 @@ public sealed class BatchProcessor : ReceiveActor
         };
         Context.ActorSelection("akka://mmria-actor-system/user/batch-supervisor").Tell(BatchStatusMessage);
 
-        if
-        (
-            current_status == mmria.common.ije.Batch.StatusEnum.Finished ||
-            current_status == mmria.common.ije.Batch.StatusEnum.BatchRejected
-        )
+        pending_items--;
+        _currentChunkPending--;
+        
+        Console.WriteLine($"BatchItem completed. Total pending: {pending_items}, Chunk pending: {_currentChunkPending}, Remaining: {_remainingItems.Count}");
+        
+        if (_currentChunkPending == 0 && _remainingItems.Count > 0)
         {
-            var save_batch_result = await _mmriaServicesManager.save_batch(
-                batch,
-                batch,
-                mmria.services.vitalsimport.Program.couchdb_url,
-                mmria.services.vitalsimport.Program.timer_user_name,
-                mmria.services.vitalsimport.Program.timer_value
-            );
-            if(save_batch_result.result)
-            {
-                batch = save_batch_result.updated_batch;
-            }
-            Context.Stop(this.Self);
+            DispatchNextChunk();
+        }
+        
+        if (pending_items == 0 && batch != null)
+        {
+            await Finalize_Batch();
         }
 
         
