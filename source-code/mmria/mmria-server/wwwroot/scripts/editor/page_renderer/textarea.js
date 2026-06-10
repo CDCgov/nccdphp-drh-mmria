@@ -197,7 +197,7 @@ function textarea_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_
 
 function tbw_change_paste(p_object_path, p_metadata_path, p_dictionary_path)
 {
-    let data = $('.trumbowyg-editor').html();
+    let data = $('#case_narrative_editor').trumbowyg('html');
 
     //g_textarea_oninput(p_object_path, p_metadata_path,p_dictionary_path, data);
     //return;
@@ -227,7 +227,7 @@ function tbw_change_paste(p_object_path, p_metadata_path, p_dictionary_path)
 
 function tbw_onchange(p_object_path, p_metadata_path, p_dictionary_path)
 {
-    let data = $('.trumbowyg-editor').html();
+    let data = $('#case_narrative_editor').trumbowyg('html');
 
     //g_textarea_oninput(p_object_path, p_metadata_path,p_dictionary_path, data);
     //return;
@@ -266,13 +266,11 @@ function textarea_control_strip_html_attributes(p_value)
 {
 
     let CommentRegex = /<!--\[[^>]+>/gi;
+    const NormalizeBr = /<br\s*\/>/gi;
 
     let Strip5PlusBr = /<br\><br\><br\><br\>+/gi;
 
-    let StripTrailingBR = /<br><br>(<br>|<br>.?)+/gi;
-
-    const Replace1 = /<br><\/p>/gi;
-    const Replace2 = /<br><\/span>/gi;
+    // Replace3/Replace4 clean up empty spans that paste operations leave behind
     const Replace3 = /<p><span [^>]+><\/span><\/p>/gi;
     const Replace4 = /<span [^>]+><\/span>/gi;
 
@@ -282,12 +280,10 @@ function textarea_control_strip_html_attributes(p_value)
 
     let node = document.createElement("body");
     node.innerHTML = p_value.replace(CommentRegex,"")
+        .replace(NormalizeBr,"<br>")
         .replace(crlf_regex," ")
         .replace(Strip5PlusBr,"<br><br>")
-        .replace(StripTrailingBR,"")
         .replace(PseudoTagRegex,"")
-        .replace(Replace1, "</p>")
-        .replace(Replace2, "</span>")
         .replace(Replace3,"")
         .replace(Replace4,"").trim();
 
