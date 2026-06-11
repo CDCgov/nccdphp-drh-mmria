@@ -1490,6 +1490,31 @@ function pdf_version_trim_one_terminal_newline(p_array)
 	return false;
 }
 
+function pdf_version_has_meaningful_pdf_text(p_array)
+{
+	for(let i = 0; i < p_array.length; i++)
+	{
+		let item = p_array[i];
+
+		if(item == null)
+		{
+			continue;
+		}
+
+		if(Array.isArray(item.text) && pdf_version_has_meaningful_pdf_text(item.text))
+		{
+			return true;
+		}
+
+		if(typeof item.text == "string" && item.text.replace(/\n/g, "").trim() != "")
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
 function pdf_version_add_col_span(p_value)
 {
 	if(p_value == null)
@@ -1805,7 +1830,12 @@ function ConvertHTMLDOMWalker(p_result, p_node, p_format)
 				ConvertHTMLDOMWalker(text_array, child, node_format);
 			}
 			pdf_version_trim_one_terminal_newline(text_array);
+			let has_meaningful_text = pdf_version_has_meaningful_pdf_text(text_array);
 			text_array.push({ text: "\n" });
+			if(has_meaningful_text)
+			{
+				text_array.push({ text: " \n", fontSize: 4, lineHeight: 1, color: "#ffffff" });
+			}
 			p_result.push(pdf_version_apply_block_format({ text: text_array }, node_format));
 			return;
         case "SPAN":
