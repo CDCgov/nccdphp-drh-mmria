@@ -1748,7 +1748,7 @@ dialog::backdrop {
 }
 
 .case-narrative-print-rich-text {
-  line-height: normal;
+  line-height: 1.5;
   white-space: normal;
 }
 

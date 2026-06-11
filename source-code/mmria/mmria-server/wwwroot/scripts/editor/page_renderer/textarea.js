@@ -200,9 +200,47 @@ function textarea_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_
 
 
 
+function textarea_control_get_case_narrative_editor_html()
+{
+    let editor = $('#case_narrative_editor');
+
+    if(editor.length == 0)
+    {
+        return "";
+    }
+
+    let trumbowyg = editor.data('trumbowyg');
+
+    if(trumbowyg != null && typeof trumbowyg.syncCode == "function")
+    {
+        trumbowyg.syncCode();
+        return editor.val();
+    }
+
+    let editor_html = editor
+        .closest('.trumbowyg-box')
+        .find('.trumbowyg-editor')
+        .html();
+
+    if(editor_html != null)
+    {
+        editor.val(editor_html);
+        return editor_html;
+    }
+
+    let data = editor.trumbowyg('html');
+
+    if(data != null && data !== false)
+    {
+        return data;
+    }
+
+    return editor.val() || "";
+}
+
 function tbw_change_paste(p_object_path, p_metadata_path, p_dictionary_path)
 {
-    let data = $('#case_narrative_editor').trumbowyg('html');
+    let data = textarea_control_get_case_narrative_editor_html();
 
     //g_textarea_oninput(p_object_path, p_metadata_path,p_dictionary_path, data);
     //return;
@@ -232,7 +270,7 @@ function tbw_change_paste(p_object_path, p_metadata_path, p_dictionary_path)
 
 function tbw_onchange(p_object_path, p_metadata_path, p_dictionary_path)
 {
-    let data = $('#case_narrative_editor').trumbowyg('html');
+    let data = textarea_control_get_case_narrative_editor_html();
 
     //g_textarea_oninput(p_object_path, p_metadata_path,p_dictionary_path, data);
     //return;
@@ -378,14 +416,7 @@ function DOMWalker(p_node)
                     }
                     else if(att_value.trim().indexOf("font-size")== 0)
                     {
-                        if(name_value[1].trim().endsWith("rem"))
-                        {
-                            new_array.push(`font-size:12`);
-                        }
-                        else
-                        {
-                            new_array.push(att_value);
-                        }
+                        new_array.push(att_value);
                     }
                     else
                     {
