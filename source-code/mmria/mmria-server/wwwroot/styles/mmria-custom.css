@@ -1743,6 +1743,11 @@ dialog::backdrop {
   margin-bottom: 0 !important;
 }
 
+.case-narrative-trumbowyg .trumbowyg-editor p:empty,
+.case-narrative-trumbowyg .trumbowyg-editor div:empty {
+  min-height: 1.5em;
+}
+
 .trumbowyg-box {
   margin-top: 0 !important;
 }

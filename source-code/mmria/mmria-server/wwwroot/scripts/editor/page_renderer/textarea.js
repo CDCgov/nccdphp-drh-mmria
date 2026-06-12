@@ -488,9 +488,14 @@ function apply_case_narrative_editor_accessibility()
 
     narrativeEditor.attr("aria-labelledby", "case-narrative-heading");
 
-    const trumbowygEditor = narrativeEditor
-        .next(".trumbowyg-box")
-        .find(".trumbowyg-editor");
+    const trumbowygBox = narrativeEditor.closest(".trumbowyg-box");
+
+    if(trumbowygBox.length > 0)
+    {
+        trumbowygBox.addClass("case-narrative-trumbowyg");
+    }
+
+    const trumbowygEditor = trumbowygBox.find(".trumbowyg-editor");
 
     if(trumbowygEditor.length > 0)
     {
