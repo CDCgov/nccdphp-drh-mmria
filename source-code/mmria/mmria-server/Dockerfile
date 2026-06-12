@@ -30,6 +30,11 @@ FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-imag
 # Switch to root temporarily to create directories
 USER root
 
+# Apply available runtime security errata in the final image layer.
+RUN dnf -y update aspnetcore-runtime-9.0 dotnet-host dotnet-hostfxr-9.0 dotnet-runtime-9.0 openssl-libs && \
+    dnf clean all && \
+    rm -rf /var/cache/dnf
+
 WORKDIR /app
 COPY --from=publish /app/publish .
 RUN rm -f ./wwwroot/test*.html ./wwwroot/test.js ./wwwroot/pdf-version/test*.html ./wwwroot/print-version/test*.html || true
