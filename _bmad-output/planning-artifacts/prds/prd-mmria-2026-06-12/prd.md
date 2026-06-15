@@ -2,7 +2,7 @@
 title: "PRD: MMRIA V4.1"
 status: final
 created: 2026-06-12
-updated: 2026-06-12
+updated: 2026-06-15
 ---
 
 # PRD: MMRIA V4.1
@@ -38,19 +38,40 @@ Cut (Ctrl+X) and paste (Ctrl+V) operations insert content at the current cursor 
 
 ### FR-2 — Vitals Field Validation
 
-Vitals fields appear in repeating-record grids on four case forms: "ER Visits & Hospitalization," "Prenatal Care Record," "Other Medical Office Visits," and "Transport Vital Signs." Each form allows reviewers to enter as many vitals records as needed. The same validation rules and behavior apply to all four forms.
+Vitals fields appear in repeating-record grids on case forms. Validation and display-time exclusion apply to every vitals grid that includes the graph/table toggle control. Each grid allows reviewers to enter as many vitals records as needed. The same validation rules and display behavior apply consistently across all in-scope grids.
 
 **FR-2.1 — On-blur field-level hard block**
-When a reviewer leaves a vitals field (blur event) with a value outside the configured valid range, the value is cleared from the field. Validation fires at field level, not at form save. Auto-save at any trigger point (timed interval, Save & Continue, Save & Finish, form navigation, browser close) is not affected.
+When a reviewer leaves a vitals field (blur event, tab-out, or paste) with a value outside the configured valid range, the value is cleared from the field. Validation fires at field level only. Save & Continue, Save & Finish, and autosave have no special validation behavior — they save the current field state as-is.
 
-**FR-2.2 — Section 508-compliant modal on invalid entry**
-When a vitals field value is rejected per FR-2.1, a modal dialog is displayed showing the valid range for that field. The modal meets Section 508 accessibility requirements.
+**FR-2.2 — Modal on invalid entry**
+When a vitals field value is rejected per FR-2.1, a modal dialog is displayed with the message: "The value entered for the [field label] field falls outside of the permitted range. Please enter a valid input between {min}–{max}." On dismiss, focus returns to the cleared field. The modal uses the existing site modal pattern and meets Section 508 accessibility requirements.
 
 **FR-2.3 — Config-driven valid ranges**
 Valid ranges for all vitals fields are stored in a single CouchDB configuration document. Ranges are loaded once at server startup and held in memory. A developer can update ranges by editing the configuration document and running the production update script — no code deployment required.
 
-**FR-2.4 — Consistent behavior across all four forms**
-All four targeted forms apply identical range constraints from the shared configuration and identical validation behavior. Validation logic is not duplicated per form.
+Confirmed ranges:
+
+| Field | Min | Max |
+|---|---|---|
+| Temperature | 0 | 110 |
+| Heart Rate | 0 | 400 |
+| Respiration | 0 | 60 |
+| Systolic BP | 0 | 300 |
+| Diastolic BP | 0 | 300 |
+| Oxygen Saturation | 0 | 100 |
+
+**FR-2.4 — Display-time exclusion — print and PDF views**
+Out-of-range vitals values are displayed as empty string in print view and PDF view. The stored value in the database is not affected. The case form itself continues to display the stored value.
+
+**FR-2.5 — Display-time exclusion — graph and table views**
+Out-of-range vitals values are excluded from graph and table views within the case form. They are not plotted and not shown in the table. The case form input field continues to display the stored value.
+
+**FR-2.6 — Historical data detection**
+On two events — (1) entering edit mode for a case, and (2) navigating to a different form via the form selector while in edit mode — the system re-validates all vitals values in the case against the configured ranges. If any out-of-range values are found:
+- A modal is displayed with the message: "This case contains vital sign records with values outside the permitted range. These values are excluded from graphs, tables, print and pdf views."
+- A red text indicator is applied at the top of each affected vitals record in the form.
+
+Out-of-range values are saved to the database as-is. All exclusion is display-time only.
 
 ---
 
@@ -77,13 +98,35 @@ PMSS-related print dropdowns are not in scope and must not be modified.
 
 ---
 
-## Non-Functional Requirements
+### FR-5 — Case Narrative Instruction Text Replacement
+
+**FR-5.1 — Replace instruction text**
+On the Case Narrative form, remove both existing instruction lines:
+- `"Use the pre-fill text below, and copy and paste from Reviewer's Notes below to create a comprehensive case narrative. Whatever you type here is what will be printed in the Print Version."`
+- `"CTRL+B to bold, CTRL+I to italicize, CTRL+U to underline"`
+
+Replace with the following text, preserving line breaks as shown:
+
+```
+-You may use this template as a guide, deleting any portions that are not applicable.
+-Alternatively, you may copy the reviewer’s notes sections below into the final case narrative field or into an external document. You may also use your own template.
+-Ensure any narrative you want to copy and paste into the final case narrative field is in plain text without formatting (ctrl+shift+v).
+
+Remember to:
+-Focus on the most relative information to the cause of death (see Cause of Death Modules)
+-Humanize the story using a story-telling approach
+-Use inclusive and non-stigmatizing language
+-Spell out acronyms or explain in plain text clinical terminology
+-Incorporate interview(s) and CVS throughout (as applicable)
+```
+
+No behavior, configuration, or data changes are required. This is a static text replacement only.
 
 **NFR-1 — Browser support**
 All changes must function correctly in Microsoft Edge and Google Chrome. No other browsers are in scope.
 
 **NFR-2 — Section 508 compliance**
-The vitals validation modal (FR-2.2) must meet Section 508 accessibility requirements.
+The vitals validation modals (FR-2.2, FR-2.6) must meet Section 508 accessibility requirements.
 
 **NFR-3 — Validation performance**
 Vitals range configuration is loaded once at server startup and held in memory. Field-level blur validation is synchronous against the in-memory config. No per-event network requests are introduced by this feature.
@@ -105,6 +148,6 @@ Vitals range configuration is loaded once at server startup and held in memory. 
 
 | # | Item | Blocker? | Owner | Condition to Resolve |
 |---|---|---|---|---|
-| OI-1 | Vitals valid ranges not yet defined | **Yes — blocks FR-2 implementation** | Program team | Ranges must be defined and approved before FR-2 development begins |
+| OI-1 | Vitals valid ranges not yet defined | **Resolved** | Program team | Ranges confirmed — see FR-2.3. |
 | OI-2 | Three specific print dropdown render locations for `core-summary` need identification | No | Developer | Identify all client-side render sites before FR-4 implementation |
 | OI-3 | FR-1.1 prior fix status | No | Developer | Determine whether existing save-path fix fully resolves the line break defect via test coverage |

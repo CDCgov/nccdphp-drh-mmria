@@ -141,110 +141,136 @@ The PDF and HTML print generators are tightly coupled to the HTML structure stor
 
 ### FR-2 — Vitals Field Validation
 
-#### 2.1 Config document schema
+#### 2.1 Scope
 
-Add a new top-level key `vitals_ranges` to the existing CouchDB configuration document. Value is a JSON object mapping field names to `{min, max}` pairs. Specific range values are pending OI-1 (program team must define them before implementation).
+Apply to **every vitals grid that renders the graph/table toggle control**. The developer identifies all such grid instances in the codebase — do not hardcode a form list. Wherever the graph/table toggle renders, vitals validation and display-time exclusion apply.
 
-**Schema (structure only — values are placeholders until OI-1 is resolved):**
+#### 2.2 Config document schema — confirmed values
 
-```json
-{
-  "vitals_ranges": {
-    "temperature":   { "min": 0.0,  "max": 0.0,  "label": "Temperature (°F)" },
-    "pulse":         { "min": 0,    "max": 0,    "label": "Pulse (bpm)" },
-    "respiration":   { "min": 0,    "max": 0,    "label": "Respiration (breaths/min)" },
-    "bp_systolic":   { "min": 0,    "max": 0,    "label": "Systolic BP (mmHg)" },
-    "bp_diastolic":  { "min": 0,    "max": 0,    "label": "Diastolic BP (mmHg)" }
-  }
-}
-```
+The `vital_sign_range` nested object in `string_keys.shared` of the CouchDB config document holds the valid ranges. Update the document with the following confirmed values. The DB key names use the flat `{field}_min` / `{field}_max` pattern already established; the exact keys that map to HTML input `name` attributes are confirmed via OI-4.
 
-The `label` string is used in the Section 508 modal message (FR-2.2).
+| Logical field | Label | Min | Max |
+|---|---|---|---|
+| Temperature | "Temperature" | 0 | 110 |
+| Pulse / Heart Rate | "Heart Rate" | 0 | 400 |
+| Respiration | "Respiration" | 0 | 60 |
+| Systolic BP | "Systolic BP" | 0 | 300 |
+| Diastolic BP | "Diastolic BP" | 0 | 300 |
+| Oxygen Saturation _(new)_ | "Oxygen Saturation" | 0 | 100 |
 
-**Field name keys must match the HTML input `name` attributes as rendered by `chart.js`** — confirm exact attribute names during implementation.
+OI-1 is **resolved**. Values are finalized. Oxygen Saturation is a net-new field; developer confirms it exists in the vitals grids before wiring.
 
-#### 2.2 Server-side loading
+Each field in the config object also carries a `label` string and an `invalid_text_modal` template string (already present in the existing DB document). Update `invalid_text_modal` values to match the finalized message format in §2.5.
 
-Extend `OverridableConfiguration` (or the CouchDB config loader) to parse and hold `vitals_ranges` on startup. Options:
+#### 2.3 Server-side loading
 
-- **Option A (preferred — minimal change):** Deserialize `vitals_ranges` from the config document into `detail_list` as a `DBConfigurationDetail` entry with key `"vitals_ranges"`. Expose via `configuration.GetDetail("vitals_ranges")`.
-- **Option B (if `DBConfigurationDetail` shape doesn't fit):** Add a dedicated `VitalsRanges` dictionary property to `OverridableConfiguration`, loaded from the `vitals_ranges` key in the raw config JSON.
+`vital_sign_range` is a nested JSON object inside `string_keys.shared`. `OverridableConfiguration.string_keys` is typed as `Dictionary<string, Dictionary<string, string>>` — `System.Text.Json` cannot natively deserialize a nested object into a `string` dictionary value.
 
-Choose whichever option requires fewer schema changes to `OverridableConfiguration`. Do not introduce a new configuration class or service.
+**Resolution:** Add `NestedStringDictionaryConverter` — a custom `JsonConverter<Dictionary<string, Dictionary<string, string>>>` that, when it encounters a JSON object as a dictionary value, stores it as its raw JSON string. Apply via `[JsonConverter]` attribute on `string_keys` in `OverridableConfiguration`. After this, `configuration.GetString("vital_sign_range", host_prefix)` returns the raw JSON string of the entire nested object.
 
-#### 2.3 Client-side delivery
+A `VitalSignRangeHelper` static class (in `mmria-server/util/`) deserializes this raw JSON string into a typed `VitalSignRangeConfig` model and applies hardcoded defaults if the config key is absent or unparseable. The defaults match the confirmed values in §2.2.
+
+#### 2.4 Client-side delivery
 
 **Constraint (NFR-3):** No per-event network requests. Ranges must be available synchronously at blur time.
 
-**Mechanism: JavaScript global injected at page load via Razor.**
-
-In the appropriate Razor view or layout partial (the one that renders the case form pages), inject:
-
-```html
-<script>
-  window.mmria_vitals_ranges = @Html.Raw(Json.Serialize(Model.VitalsRanges));
-</script>
-```
-
-Where `Model.VitalsRanges` is the `vitals_ranges` object read from `OverridableConfiguration` at the controller level and passed to the view. If vitals ranges are not available (null or empty — pending OI-1), the script block should set `window.mmria_vitals_ranges = null;` so the client can safely skip validation.
-
-**Do not** add vitals ranges to the `get_case_set()` API response — this avoids changing the API contract.
-
-**Which Razor view:** Identify the layout or view that renders the case editor forms (the page that loads `case/index.js` and the form renderer). Add the script block there. This ensures ranges are available before any form interaction.
-
-#### 2.4 Validation logic — `chart.js`
-
-`chart.js` in `wwwroot/scripts/editor/page_renderer/` renders vitals grids and is the single implementation point for all four forms. This avoids per-form duplication (satisfying FR-2.4).
-
-**Add a blur handler to vitals input fields:**
+**Mechanism:** `window.mmria_vital_sign_range` JavaScript global injected via the Case/Index Razor view at page load, alongside existing config globals, in the existing `HeadScripts` block. Pattern:
 
 ```javascript
-// Attach on grid render, inside p_post_html_render or equivalent post-render callback
-function mmria_vitals_validate_on_blur(event) {
-    var fieldName = event.target.name;  // e.g., "temperature"
-    var value = parseFloat(event.target.value);
+window.mmria_vital_sign_range = @Html.Raw(TempData["vital_sign_range_config"]);
+```
 
-    if (!window.mmria_vitals_ranges || !window.mmria_vitals_ranges[fieldName]) {
-        return; // No config loaded — skip validation (OI-1 not yet resolved)
-    }
+Where `TempData["vital_sign_range_config"]` is set in `CaseController.Index()` by calling `VitalSignRangeHelper.GetVitalSignRangeConfig(configuration, host_prefix)` and serializing the result. Follows the same TempData/HeadScripts pattern as `window.case_edit_inactivity_config`. If the config is unavailable, the global is `null` and all validation silently skips.
 
-    var range = window.mmria_vitals_ranges[fieldName];
+#### 2.5 Field-level validation — triggers and behavior
 
-    if (!isNaN(value) && (value < range.min || value > range.max)) {
-        event.target.value = '';  // Clear invalid value (FR-2.1)
-        mmria_vitals_show_range_modal(range);  // Show 508-compliant modal (FR-2.2)
+**Triggers:** blur, tab-out, and paste only. These are the three events where an out-of-range value must be caught and cleared.
+
+**Save & Continue, Save & Finish, and autosave have no special validation behavior.** They save whatever is currently in the field to CouchDB as-is. Validation does not fire at save time. This is intentional — by the time a save fires, any in-progress field entry is either valid (allowed through) or already cleared by the blur/tab/paste handler.
+
+**On invalid entry (value outside `[min, max]`):**
+1. Clear the field value to empty string.
+2. Show the field-level modal (§2.7).
+3. On modal dismiss, return focus to the cleared field.
+
+**Validation function — single implementation in `chart.js`:**
+
+```javascript
+function mmria_vitals_validate_field(inputElement) {
+    if (!window.mmria_vital_sign_range) return;
+
+    var fieldName = inputElement.name; // must match config key — confirmed via OI-4
+    var range = window.mmria_vital_sign_range[fieldName];
+    if (!range) return;
+
+    var value = parseFloat(inputElement.value);
+    if (inputElement.value !== '' && !isNaN(value) &&
+        (value < parseFloat(range.min) || value > parseFloat(range.max))) {
+        inputElement.value = '';
+        mmria_vitals_show_field_modal(range);
     }
 }
 ```
 
-**Attach point:** In the post-render callback for vitals grid inputs in `chart.js`. Follow the existing `p_post_html_render.push(...)` pattern used elsewhere in the codebase.
+Attach to blur, keydown (Tab key), and paste events on each vitals input in `chart.js` post-render. Single attachment point covers all grids in scope (§2.1).
 
-**Grid coverage:** The same handler covers all four target grids because `chart.js` renders all of them. Verify the four paths are all routed through the same rendering code in `chart.js`:
-- `er_visit_and_hospital_medical_records/vital_signs`
-- `prenatal/routine_monitoring`
-- `other_medical_office_visits/vital_signs`
-- `medical_transport/transport_vital_signs`
+#### 2.6 Display-time exclusion — print, PDF, graph, and table views
 
-**Auto-save safety:** The blur validation fires at field-leave time and clears the value in the DOM input before any save trigger can read it. Since save reads from the DOM (or from a bound data model), an out-of-range value cleared by blur will not be present when a save trigger fires. This is the correct sequence and does not require changes to the auto-save mechanism.
+Out-of-range values are **excluded at render time** from the following surfaces. The case form input field itself continues to display the stored value — the red text indicator and historical data modal (§2.8) are the in-form signal.
 
-#### 2.5 Section 508 modal (FR-2.2)
+| Surface | Behavior for out-of-range value |
+|---|---|
+| **Print view** | Render as empty string |
+| **PDF view** | Render as empty string |
+| **Graph view** | Do not plot the point |
+| **Table view** | Render cell as empty |
+| **Case form input** | Display stored value as-is (no exclusion) |
 
-**Requirements:**
-- `role="dialog"` and `aria-modal="true"` on the dialog container
-- `aria-labelledby` pointing to the dialog's heading element
-- Focus moves to the dialog on open (call `.focus()` on the first focusable element)
-- Focus is trapped inside the dialog while open (Tab / Shift+Tab cycle only within the dialog)
-- Dialog is dismissible by keyboard: Enter or Space on the close button, Escape key
-- On close, focus returns to the vitals input field that triggered the modal
+All exclusion is display-time only via runtime re-validation against `window.mmria_vital_sign_range`. The database value is never modified by this feature.
 
-**Modal content:**
-```
-{field label} must be between {min} and {max}.
-For example: Temperature must be between 88 and 110.
-```
-(Values from `range.label`, `range.min`, `range.max`)
+Each render path (graph renderer, table renderer, print template, PDF generator) reads the vitals value, checks it against the config, and substitutes blank/empty if out of range before rendering. No stored data is altered.
 
-**Implementation:** Inject a single modal HTML fragment once into the case page DOM. Reuse for all vitals fields (populate dynamically). Follow any existing accessible modal pattern in the codebase. If none exists, implement from scratch per the requirements above. Do not introduce a third-party modal library.
+#### 2.7 PDF date fix
+
+The existing PDF view displays `/ /` for invalid or empty date values in vitals records. Replace this with an empty string. This is a targeted fix within the PDF rendering path for vitals date fields — scope it to that specific rendering location only.
+
+#### 2.8 Historical data detection
+
+On two events:
+1. **Entry into edit mode** for a case
+2. **Form navigation** — the user selects a different form from the "Select case form" dropdown while in edit mode
+
+Re-validate all vitals values across all vitals records in the case against `window.mmria_vital_sign_range`. This catches out-of-range values that were saved before validation was in place.
+
+**If any out-of-range values are found:**
+
+1. Show the historical data modal (§2.9 — distinct message from the field-level modal):
+   > "This case contains vital sign records with values outside the permitted range. These values are excluded from graphs, tables, print and pdf views."
+   Use the same existing site modal pattern (purple header, OK button).
+
+2. Apply a **red text indicator** at the top of each affected vitals record in the form. The indicator marks that record as containing excluded data.
+
+**Open items for developer (do not block architecture):**
+- **OI-dev-B:** Confirm the technical hook for edit-mode entry in the codebase — the event or function to attach the re-validation call to.
+- **OI-dev-C:** Confirm the DOM element target for the red text indicator per vitals record in `chart.js`. Confirm whether the indicator persists across page reloads (re-evaluated on each render) or is written once on edit-mode entry. Expected behavior: re-evaluated on each render, since exclusion is display-time only.
+
+#### 2.9 Section 508 modal — two uses
+
+Both uses share the **existing site modal pattern** (purple header, OK button, keyboard-friendly, follows existing 508 precedent). No new modal implementation required — reuse what exists.
+
+**Use 1 — Field-level (blur/tab/paste):**
+> "The value entered for the [field label] field falls outside of the permitted range. Please enter a valid input between {min}-{max}."
+
+On dismiss: focus returns to the cleared field.
+
+**Use 2 — Historical data detection (edit-mode entry / form change):**
+> "This case contains vital sign records with values outside the permitted range. These values are excluded from graphs, tables, print and pdf views."
+
+On dismiss: no focus change required.
+
+#### 2.10 DB storage
+
+Out-of-range values are **saved to CouchDB as-is.** No special handling on the save path. All exclusion is display-time only — the value is filtered at render time using runtime re-validation against the config. This means a corrected config range can retroactively include or exclude previously saved values without any data migration.
 
 ---
 
@@ -252,107 +278,56 @@ For example: Temperature must be between 88 and 110.
 
 #### 3.1 CouchDB config document additions
 
-Add the following two keys to the existing CouchDB configuration document:
+Add the following two flat string keys to the existing CouchDB configuration document under `string_keys.shared`:
 
-```json
-{
-  "omb_expiration_date": "05/31/2026",
-  "mmria_version": "4.1"
-}
+| Key | Default value |
+|---|---|
+| `omb_expiration_date` | `"05/31/2026"` |
+| `mmria_version` | `"MMRIA V 4.1"` |
+
+**Database-scripts artifact:** Update the config document source in `source-code/mmria/mmria-server/database-scripts/` to include these two keys. This is the source-of-truth for the production update script.
+
+#### 3.2 Controller pattern
+
+Both values follow the **same inline pattern** already used throughout the existing controllers:
+
+```csharp
+configuration.GetString("omb_expiration_date", host_prefix) ?? "05/31/2026"
+configuration.GetString("mmria_version",        host_prefix) ?? "MMRIA V 4.1"
 ```
 
-Both are string scalars. Load via `OverridableConfiguration.name_value` using `configuration.GetString("omb_expiration_date")` and `configuration.GetString("mmria_version")`.
+Set in the relevant controller(s) as TempData or ViewBag entries — same as `metadata_version`, `is_offline_mode_enabled`, and other config values. No helper class. No new service or filter. Hardcoded defaults live inline in the controller as shown above.
 
-**Database-scripts artifact:** Update `source-code/mmria/mmria-server/database-scripts/` (the config document source) to include these two keys. This is the source-of-truth artifact for the production update script.
+**Which controller(s):** Developer identifies during implementation which controller action(s) serve the pages where each render surface appears (OI-5). Do not introduce a new population mechanism before confirming one doesn't already exist.
 
-#### 3.2 OMB expiration date (FR-3.1)
+#### 3.3 OMB expiration date render surface — `_BurdenStatement.cshtml`
 
-Two render surfaces require changes.
-
-**Surface 1 — `_BurdenStatement.cshtml`**
-
-The Razor partial currently contains hardcoded HTML:
+The Razor partial currently contains:
 ```html
 <p class="m-0">Exp. Date 05/31/2026</p>
 ```
 
-**Change:** Read `omb_expiration_date` from `OverridableConfiguration` in the controller or filter that serves this partial, pass it to the view as `ViewData["OmbExpirationDate"]` (or a strongly-typed property on the shared layout model), and render it:
+Replace the hardcoded date with the TempData/ViewBag value set by the controller. The partial receives the value from whatever layout or controller context already provides data to it — follow that existing path.
 
-```html
-<p class="m-0">Exp. Date @ViewData["OmbExpirationDate"]</p>
-```
+**Note on the Committee Decisions form inline rendering:** The `omb_expiration_label` field in `metadata.json` (loaded into CouchDB) also carries `"Exp. Date 05/31/2026"` as its `prompt` value. When the OMB date changes, the developer updates the config doc value and the production script also patches this label's `prompt` in the metadata document. No client-side render-time substitution is required. This keeps both surfaces in sync via the same script run with no new front-end mechanism.
 
-Because `_BurdenStatement.cshtml` is a shared partial rendered on the Home page and potentially other pages, use the layout population mechanism already in place (look for what currently provides shared ViewData to the layout before adding a new pattern).
+#### 3.4 MMRIA version render surface — `_Footer.cshtml`
 
-**Surface 2 — Committee Decisions form (inline form renderer)**
-
-**Mechanism: `config_key` property on metadata label fields.**
-
-In `metadata.json`, change the `omb_expiration_label` field to add a `config_key` property:
-
-```json
-{
-  "prompt": "Exp. Date 05/31/2026",
-  "name": "omb_expiration_label",
-  "type": "label",
-  "config_key": "omb_expiration_date",
-  "tags": []
-}
-```
-
-The `prompt` field remains as a static fallback value (used if the config key is not found).
-
-**In the client-side form renderer** (`page_renderer.js` or the label rendering path), when rendering a `type: "label"` field:
-
-```javascript
-// When rendering a label field:
-if (field.config_key && window.mmria_system_config && window.mmria_system_config[field.config_key]) {
-    displayText = window.mmria_system_config[field.config_key];
-} else {
-    displayText = field.prompt;
-}
-```
-
-Where `window.mmria_system_config` is a JavaScript global injected at page load (see §3.4 below). This is a **non-breaking** change: label fields without `config_key` continue to render `prompt` unchanged.
-
-#### 3.3 MMRIA version number (FR-3.2)
-
-**One render surface only:** `Views/Shared/_Footer.cshtml`, currently line 7:
+Currently line 7:
 ```html
 <p aria-label="MMRIA V4.0.1">MMRIA V4.0.1</p>
 ```
 
-**Change:** Read `mmria_version` from `OverridableConfiguration` in the same mechanism used for `omb_expiration_date` (shared layout ViewData or filter). Render as:
-```html
-<p aria-label="MMRIA V@ViewData["MmriaVersion"]">MMRIA V@ViewData["MmriaVersion"]</p>
-```
-
-#### 3.4 JavaScript global for client-side config values
-
-Inject a `window.mmria_system_config` global at page load, alongside `window.mmria_vitals_ranges` (FR-2.3). In the same Razor script block:
-
-```html
-<script>
-  window.mmria_vitals_ranges  = @Html.Raw(Json.Serialize(Model.VitalsRanges));
-  window.mmria_system_config  = @Html.Raw(Json.Serialize(Model.SystemConfig));
-</script>
-```
-
-Where `Model.SystemConfig` includes at minimum `{ "omb_expiration_date": "..." }`. Both globals are set in a single script block to avoid multiple inline scripts.
-
-**If this Razor view is not a form page** (i.e., `_Footer.cshtml` and `_BurdenStatement.cshtml` are layout-level), then a common filter or action filter can populate `ViewData["OmbExpirationDate"]` and `ViewData["MmriaVersion"]` for every request. Investigate whether a `BaseController` or existing action filter is the right extension point. Do not duplicate controller logic across multiple controllers.
+Replace both occurrences of the hardcoded version string with the TempData/ViewBag value set by the controller.
 
 #### 3.5 Developer update workflow (FR-3.3)
 
 No admin UI. The workflow is:
 
-1. Developer edits the CouchDB config document (either directly or via the database-scripts source file).
+1. Developer updates `omb_expiration_date` and/or `mmria_version` in the CouchDB config document source.
 2. Developer runs the existing production update script.
-3. Script deploys the updated config document to CouchDB.
-4. Application server restarts (or a targeted config reload is triggered if the system supports hot reload of config docs).
-5. All render surfaces reflect the new values.
-
-**Architectural note:** If the application does not currently support hot-reload of the config document without restart, that is out of scope for V4.1. A restart is acceptable for developer-managed config changes.
+3. Script deploys the updated config document (and patches `omb_expiration_label.prompt` in the metadata document for OMB date changes).
+4. Application restarts and all render surfaces reflect the new values.
 
 ---
 
@@ -438,7 +413,7 @@ Complete list of files to change for V4.1. No other files should be modified.
 | File | FR | Nature of change |
 |---|---|---|
 | `wwwroot/scripts/case/index.js` | FR-1.1, FR-1.2, FR-1.3 | Save-path serialization fix; paste handler rewrite |
-| `wwwroot/scripts/editor/page_renderer/chart.js` | FR-2.4 | Blur handler attachment on vitals grid inputs |
+| `wwwroot/scripts/editor/page_renderer/chart.js` | FR-2 | Blur/tab/paste validation handler; display-time exclusion on all render paths; historical data re-validation on edit-mode entry and form change; red text indicator per affected record |
 | `wwwroot/scripts/editor/page_renderer/form.mmria.js` | FR-4.1 | Remove `core-summary` option |
 | `wwwroot/scripts/editor/page_renderer/form.committee_member.mmria.js` | FR-4.1 | Remove `core-summary` option |
 | `wwwroot/scripts/de-identified/index.js` | FR-4.1 | Remove `core-summary` option + redirect guard |
@@ -448,7 +423,7 @@ Complete list of files to change for V4.1. No other files should be modified.
 
 | File | FR | Nature of change |
 |---|---|---|
-| Case editor Razor view (identify during implementation) | FR-2.3, FR-3.4 | Add `window.mmria_vitals_ranges` + `window.mmria_system_config` script block |
+| Case editor Razor view (identify during implementation) | FR-2.3 | Add `window.mmria_vitals_ranges` script block |
 
 ### Server-side Razor views
 
@@ -461,21 +436,15 @@ Complete list of files to change for V4.1. No other files should be modified.
 
 | Layer | FR | Nature of change |
 |---|---|---|
-| Layout population mechanism (filter, base controller, or action) | FR-3.1, FR-3.2 | Populate `ViewData["OmbExpirationDate"]` and `ViewData["MmriaVersion"]` per request |
-| `OverridableConfiguration` or its loader | FR-2.2 | Parse and expose `vitals_ranges` JSON object from CouchDB config doc |
+| Relevant controller action(s) (identified during implementation) | FR-3.1, FR-3.2 | Add two `GetString ?? default` lines + TempData/ViewBag entries, same pattern as existing config values |
+| `OverridableConfiguration` or its loader | FR-2 | Parse and expose `vital_sign_range` JSON object from CouchDB config doc |
 
 ### Database scripts / config documents
 
 | File | FR | Nature of change |
 |---|---|---|
-| `database-scripts/` — CouchDB config document source | FR-2, FR-3.1, FR-3.2 | Add `vitals_ranges`, `omb_expiration_date`, `mmria_version` keys |
-| `database-scripts/metadata.json` | FR-3.1 | Add `"config_key": "omb_expiration_date"` to `omb_expiration_label` field definition |
-
-### Front-end form renderer
-
-| File | FR | Nature of change |
-|---|---|---|
-| `wwwroot/scripts/editor/page_renderer.js` or label rendering path | FR-3.1 | Add `config_key` substitution for `type: "label"` fields |
+| `database-scripts/` — CouchDB config document source | FR-2, FR-3.1, FR-3.2 | Add `vital_sign_range` object, `omb_expiration_date`, `mmria_version` keys |
+| `database-scripts/metadata.json` | FR-3.1 | Update `omb_expiration_label.prompt` value when OMB date changes (via production script, not at render time) |
 
 ---
 
@@ -485,11 +454,13 @@ These items from the PRD remain unresolved and must be closed before the affecte
 
 | OI | Item | Blocks | Resolution needed |
 |---|---|---|---|
-| OI-1 | Vitals valid ranges not defined by program team | FR-2 implementation | Program team defines and approves min/max values for all five vitals fields. No FR-2 work should proceed past config schema + wiring until values are confirmed. |
+| OI-1 | Vitals valid ranges not defined by program team | FR-2 implementation | **Resolved.** Values confirmed: Temperature 0–110, Heart Rate 0–400, Respiration 0–60, Systolic BP 0–300, Diastolic BP 0–300, Oxygen Saturation 0–100. |
 | OI-2 | Three print dropdown render locations need identification | FR-4 implementation | **Resolved by codebase exploration.** Locations confirmed: `form.mmria.js:~2047`, `form.committee_member.mmria.js:~1851`, `de-identified/index.js:~1131`. |
 | OI-3 | FR-1.1 prior fix status unconfirmed | FR-1.1 | Developer audits `textarea_control_strip_html_attributes()` call at `case/index.js:~4356`, confirms fix scope, and adds round-trip test. |
-| OI-4 (new) | Exact HTML `name` attributes for vitals input fields | FR-2.4 | Developer confirms the `name` attribute values on vitals inputs as rendered by `chart.js` at lines ~248–260. These must match `vitals_ranges` JSON keys exactly. |
-| OI-5 (new) | Layout/controller pattern for ViewData population | FR-3.1, FR-3.2 | Developer identifies whether a base controller, action filter, or per-controller injection is the existing pattern for shared layout data in this codebase before implementing config value injection. |
+| OI-4 | Exact HTML `name` attributes for vitals inputs | FR-2 | Developer confirms the `name` attribute values on vitals inputs as rendered by `chart.js`. Config keys in `vital_sign_range` must match these exactly. Also confirm whether Oxygen Saturation field exists in the vitals grids. |
+| OI-5 | Which controller action(s) serve `_Footer.cshtml` and `_BurdenStatement.cshtml` | FR-3.1, FR-3.2 | Developer identifies the controller action(s) that serve these layout surfaces and confirms whether a single location or multiple actions need the two new TempData/ViewBag entries. |
+| OI-dev-B | Technical hook for edit-mode entry | FR-2 historical data detection | Developer confirms the function or event in the codebase that signals transition into case edit mode — this is the attach point for historical vitals re-validation. |
+| OI-dev-C | DOM target for red text indicator per vitals record | FR-2 historical data detection | Developer confirms the DOM element target in `chart.js` for the per-record red text indicator. Confirm whether indicator is re-evaluated on each render (expected) or written once. |
 
 ---
 
@@ -512,3 +483,32 @@ These items were explicitly excluded in the PRD and are not architected here:
 - PMSS print dropdown changes
 - New services, infrastructure, or external dependencies
 - Any SharedLibraries migration or controller cleanup beyond what is strictly required to wire FR-3 config values
+
+---
+
+### FR-5 — Case Narrative Instruction Text Replacement
+
+This is a static text replacement. No behavior, configuration, data, or API changes.
+
+**Change surface:** Developer locates the Razor view or static resource that renders the Case Narrative form instruction text and replaces it in place. Likely a `.cshtml` partial or the metadata-driven form definition.
+
+**Remove both existing lines:**
+- `"Use the pre-fill text below, and copy and paste from Reviewer's Notes below to create a comprehensive case narrative. Whatever you type here is what will be printed in the Print Version."`
+- `"CTRL+B to bold, CTRL+I to italicize, CTRL+U to underline"`
+
+**Replace with (preserve line breaks exactly as shown):**
+
+```
+-You may use this template as a guide, deleting any portions that are not applicable.
+-Alternatively, you may copy the reviewer’s notes sections below into the final case narrative field or into an external document. You may also use your own template.
+-Ensure any narrative you want to copy and paste into the final case narrative field is in plain text without formatting (ctrl+shift+v).
+
+Remember to:
+-Focus on the most relative information to the cause of death (see Cause of Death Modules)
+-Humanize the story using a story-telling approach
+-Use inclusive and non-stigmatizing language
+-Spell out acronyms or explain in plain text clinical terminology
+-Incorporate interview(s) and CVS throughout (as applicable)
+```
+
+**Implementation note:** Search the codebase for the first distinctive phrase of the existing text to locate the render source. If the text originates from `metadata.json` or a CouchDB document (rather than a Razor view), update the source document via the database-scripts update path. Do not change surrounding markup or field structure.
