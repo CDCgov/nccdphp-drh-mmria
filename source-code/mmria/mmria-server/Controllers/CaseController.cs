@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
+using System.Text.Json;
 
 using  mmria.server.extension; 
 using mmria.server.util;
@@ -62,6 +63,10 @@ public sealed class CaseController : Controller
         TempData["case_edit_inactivity_lock_minutes"] = effectiveInactivityConfig.LockMinutes;
         TempData["case_edit_inactivity_warning_minutes_before_lock"] = effectiveInactivityConfig.WarningMinutes;
         TempData["case_edit_auto_save_freq"] = configuration.GetInteger("case_edit_auto_save_freq", host_prefix) ?? 2;
+
+        var vitalSignRangeConfig = VitalSignRangeHelper.GetVitalSignRangeConfig(configuration, host_prefix);
+        TempData["vital_sign_range_config"] = JsonSerializer.Serialize(vitalSignRangeConfig);
+
         ViewBag.is_offline_mode_enabled = configuration.GetBoolean("is_offline_mode_enabled", host_prefix) ?? false;
         ViewBag.is_offline_logging_enabled = configuration.GetBoolean("is_offline_logging_enabled", host_prefix) ?? false;
         ViewBag.offline_logging_max_logs = configuration.GetInteger("offline_logging_max_logs", host_prefix) ?? 10000;

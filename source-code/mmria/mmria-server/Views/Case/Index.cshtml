@@ -50,6 +50,7 @@
   var case_edit_inactivity_lock_minutes = TempData["case_edit_inactivity_lock_minutes"];
   var case_edit_inactivity_warning_minutes_before_lock = TempData["case_edit_inactivity_warning_minutes_before_lock"];
   var case_edit_auto_save_freq = TempData["case_edit_auto_save_freq"];
+  var vital_sign_range_config = TempData["vital_sign_range_config"];
 }
 
 @section HeadScripts
@@ -64,6 +65,7 @@
             warning_minutes_before_lock: @case_edit_inactivity_warning_minutes_before_lock,
             auto_save_freq_minutes: @case_edit_auto_save_freq
         };
+        window.mmria_vital_sign_range = @Html.Raw(vital_sign_range_config ?? "null");
     </script>
 
   <link href="./styles/jquery/jquery.timepicker.css" type="text/css" rel="stylesheet" />
