@@ -262,6 +262,92 @@ evahmrvs_b_dias Diastolic 40 20
 
 */
 
+function mmria_vitals_validate_field(inputEl)
+{
+    if (!window.mmria_vital_sign_range) { return; }
+    var fieldName = inputEl.name;
+    var range = window.mmria_vital_sign_range[fieldName];
+    if (!range) { return; }
+    if (inputEl.value === '' || inputEl.value === null) { return; }
+    var value = parseFloat(inputEl.value);
+    if (isNaN(value)) { return; }
+    if (value < parseFloat(range.min) || value > parseFloat(range.max))
+    {
+        inputEl.value = '';
+        mmria_vitals_show_field_modal(range, inputEl);
+    }
+}
+
+function mmria_vitals_show_field_modal(range, inputEl)
+{
+    var existingModal = document.getElementById('vitals-range-modal');
+    if (existingModal && existingModal.parentNode) { existingModal.parentNode.removeChild(existingModal); }
+    var existingBackdrop = document.getElementById('vitals-range-backdrop');
+    if (existingBackdrop && existingBackdrop.parentNode) { existingBackdrop.parentNode.removeChild(existingBackdrop); }
+
+    var modalHtml =
+        '<div id="vitals-range-modal" class="modal fade" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="vitals-range-modal-title" style="z-index: 1050;">'
+        + '<div class="modal-dialog" role="document">'
+        + '<div class="modal-content">'
+        + '<div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">'
+        + '<h4 id="vitals-range-modal-title" class="modal-title" style="margin: 0; font-weight: 600; font-size: 17px;">Out of Range</h4>'
+        + '</div>'
+        + '<div class="modal-body" style="padding: 20px;">'
+        + '<p id="vitals-range-modal-msg" style="font-size: 16px; color: #333; margin: 0;"></p>'
+        + '</div>'
+        + '<div class="modal-footer" style="padding: 15px 20px; text-align: right;">'
+        + '<button type="button" id="vitals-range-modal-ok" class="btn btn-primary" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">OK</button>'
+        + '</div>'
+        + '</div>'
+        + '</div>'
+        + '</div>'
+        + '<div id="vitals-range-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>';
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    var msgEl = document.getElementById('vitals-range-modal-msg');
+    if (msgEl)
+    {
+        msgEl.textContent = 'The value entered for the ' + range.label
+            + ' field falls outside of the permitted range.'
+            + ' Please enter a valid input between ' + range.min + '\u2013' + range.max + '.';
+    }
+
+    var modal = document.getElementById('vitals-range-modal');
+    var backdrop = document.getElementById('vitals-range-backdrop');
+
+    setTimeout(function()
+    {
+        if (modal) { modal.classList.add('show'); modal.style.display = 'block'; }
+        if (backdrop) { backdrop.classList.add('show'); }
+        var okBtn = document.getElementById('vitals-range-modal-ok');
+        if (okBtn) { okBtn.focus(); }
+    }, 10);
+
+    function closeVitalsModal()
+    {
+        if (modal) { modal.classList.remove('show'); }
+        if (backdrop) { backdrop.classList.remove('show'); }
+        setTimeout(function()
+        {
+            if (modal && modal.parentNode) { modal.parentNode.removeChild(modal); }
+            if (backdrop && backdrop.parentNode) { backdrop.parentNode.removeChild(backdrop); }
+        }, 150);
+        if (inputEl && typeof inputEl.focus === 'function') { inputEl.focus(); }
+    }
+
+    var okBtn = document.getElementById('vitals-range-modal-ok');
+    if (okBtn) { okBtn.onclick = closeVitalsModal; }
+
+    if (modal)
+    {
+        modal.addEventListener('keydown', function(e)
+        {
+            if (e.key === 'Escape') { e.preventDefault(); closeVitalsModal(); }
+        });
+    }
+}
+
 function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_object_path, p_dictionary_path, p_is_grid_context, p_post_html_render, p_search_ctx, p_ctx, p_is_de_identified = false)
 {
 	let style_object = g_default_ui_specification.form_design[p_dictionary_path.substring(1)];
@@ -592,6 +678,24 @@ function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obj
 	p_post_html_render.push("     connectNull: true");
 	p_post_html_render.push("  }");
     p_post_html_render.push("  }));");
+
+    p_post_html_render.push(
+        "(function() {" +
+        " var chartEl = document.getElementById('" + map_key + "');" +
+        " if (!chartEl) { return; }" +
+        " var parent = chartEl.parentElement;" +
+        " if (!parent) { return; }" +
+        " var inputs = parent.querySelectorAll('input.number');" +
+        " for (var i = 0; i < inputs.length; i++) {" +
+        "  var inp = inputs[i];" +
+        "  if (inp.dataset.vitalsValidationAttached) { continue; }" +
+        "  inp.dataset.vitalsValidationAttached = '1';" +
+        "  inp.addEventListener('blur', function(e) { mmria_vitals_validate_field(e.target); });" +
+        "  inp.addEventListener('keydown', function(e) { if (e.key === 'Tab') { mmria_vitals_validate_field(e.target); } });" +
+        "  inp.addEventListener('paste', (function(t) { return function() { setTimeout(function() { mmria_vitals_validate_field(t); }, 0); }; })(inp));" +
+        " }" +
+        "})();"
+    );
 
 	g_chart_data.set
     (

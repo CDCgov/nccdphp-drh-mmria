@@ -1,6 +1,10 @@
+---
+baseline_commit: 1ebbb6482c05fbb7a9f2aacf61e1e30cf98174fe
+---
+
 # Story 2.2: On-Blur Vitals Validation and Invalid Entry Modal
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -20,32 +24,32 @@ so that out-of-range values never silently enter the form and I can correct them
 
 ## Tasks / Subtasks
 
-- [ ] Resolve OI-4 before writing validation (AC: #7)
-  - [ ] Inspect the DOM rendered by `chart.js` for a vitals grid — identify the exact HTML `name` attribute values on vitals input fields
-  - [ ] Confirm whether an Oxygen Saturation field exists in the vitals grids
-  - [ ] Update `vital_sign_range` config doc keys (from Story 2.1) to match confirmed `name` attributes
-- [ ] Identify scope: grids with graph/table toggle (AC: #7)
-  - [ ] In `chart.js`, find the code that renders the graph/table toggle control
-  - [ ] Use the toggle's presence as the selector to identify which grids are in scope
-  - [ ] Do not hardcode a list of form names or field names
-- [ ] Implement `mmria_vitals_validate_field(inputElement)` in `chart.js` (AC: #1–#6)
-  - [ ] Null-check `window.mmria_vital_sign_range` → return if null
-  - [ ] Look up `window.mmria_vital_sign_range[inputElement.name]` → return if no range entry
-  - [ ] Parse `parseFloat(inputElement.value)` — skip if empty string or NaN
-  - [ ] If value < range.min or value > range.max: clear field, call modal function
-  - [ ] Modal function passes `range.label`, `range.min`, `range.max` to the existing site modal
-- [ ] Attach events using post-render pattern (AC: #7)
-  - [ ] Use `p_post_html_render.push(function() { ... })` pattern to attach after DOM insertion
-  - [ ] Attach to blur event on each in-scope vitals input
-  - [ ] Attach to keydown: check `event.key === 'Tab'` then call validate
-  - [ ] Attach to paste: call validate on `setTimeout` (after paste content lands)
-- [ ] Implement modal display (AC: #2, #3)
-  - [ ] Find the existing site modal invocation pattern (search for existing modal usage in `chart.js` or `case/index.js`)
-  - [ ] Reuse that pattern — do not create a new modal
-  - [ ] Message format: `"The value entered for the {range.label} field falls outside of the permitted range. Please enter a valid input between {range.min}–{range.max}."`
-  - [ ] On modal OK dismiss: `inputElement.focus()`
-- [ ] Verify save paths are unaffected (AC: #6)
-  - [ ] Confirm no validation call added to save, Save & Continue, Save & Finish, or autosave handlers
+- [x] Resolve OI-4 before writing validation (AC: #7)
+  - [x] Inspect the DOM rendered by `chart.js` for a vitals grid — identify the exact HTML `name` attribute values on vitals input fields
+  - [x] Confirm whether an Oxygen Saturation field exists in the vitals grids
+  - [x] Update `vital_sign_range` config doc keys (from Story 2.1) to match confirmed `name` attributes
+- [x] Identify scope: grids with graph/table toggle (AC: #7)
+  - [x] In `chart.js`, find the code that renders the graph/table toggle control
+  - [x] Use the toggle's presence as the selector to identify which grids are in scope
+  - [x] Do not hardcode a list of form names or field names
+- [x] Implement `mmria_vitals_validate_field(inputElement)` in `chart.js` (AC: #1–#6)
+  - [x] Null-check `window.mmria_vital_sign_range` → return if null
+  - [x] Look up `window.mmria_vital_sign_range[inputElement.name]` → return if no range entry
+  - [x] Parse `parseFloat(inputElement.value)` — skip if empty string or NaN
+  - [x] If value < range.min or value > range.max: clear field, call modal function
+  - [x] Modal function passes `range.label`, `range.min`, `range.max` to the existing site modal
+- [x] Attach events using post-render pattern (AC: #7)
+  - [x] Use `p_post_html_render.push(function() { ... })` pattern to attach after DOM insertion
+  - [x] Attach to blur event on each in-scope vitals input
+  - [x] Attach to keydown: check `event.key === 'Tab'` then call validate
+  - [x] Attach to paste: call validate on `setTimeout` (after paste content lands)
+- [x] Implement modal display (AC: #2, #3)
+  - [x] Find the existing site modal invocation pattern (search for existing modal usage in `chart.js` or `case/index.js`)
+  - [x] Reuse that pattern — do not create a new modal
+  - [x] Message format: `"The value entered for the {range.label} field falls outside of the permitted range. Please enter a valid input between {range.min}–{range.max}."`
+  - [x] On modal OK dismiss: `inputElement.focus()`
+- [x] Verify save paths are unaffected (AC: #6)
+  - [x] Confirm no validation call added to save, Save & Continue, Save & Finish, or autosave handlers
 
 ## Dev Notes
 
@@ -105,9 +109,25 @@ p_post_html_render.push(function() {
 ## Dev Agent Record
 
 ### Agent Model Used
+Claude Sonnet 4.6
 
 ### Debug Log References
+- Build succeeded with 0 errors (85 pre-existing warnings only; file-lock warning is due to running server process, not a code error)
 
 ### Completion Notes List
+- OI-4 resolved: confirmed field `name` attributes from `home_record.json` metadata — `temperature`, `pulse`, `respiration`, `bp_systolic`, `bp_diastolic`. No `oxygen_saturation` field exists in either vitals grid.
+- `VitalSignRangeHelper.cs` updated: return type changed from flat `Dictionary<string, string>` to `Dictionary<string, VitalSignRangeEntry>` (with `Min`, `Max`, `Label`). Supports both nested per-field JSON (new format) and flat key JSON (existing DB format) via `BuildFromFlatKeys`. Defaults keyed by confirmed `name` attributes.
+- `mmria_vitals_validate_field(inputEl)` added to `chart.js`: guards on null range, empty value, NaN; clears field and shows modal on out-of-range.
+- `mmria_vitals_show_field_modal(range, inputEl)` added to `chart.js`: follows `offline-modals.js` pattern exactly — `insertAdjacentHTML('beforeend', ...)`, `setTimeout` fade-in, DOM removal on close, Escape key support, focus return to cleared field via closure.
+- Event attachment IIFE pushed to `p_post_html_render` at end of `chart_render()`: finds all `input.number` elements in the chart div's parent container, guards against duplicate attachment via `dataset.vitalsValidationAttached`, attaches blur/keydown(Tab)/paste events.
+- Scope detection: uses `chartEl.parentElement` to find the containing form section — the vitals grid fieldset and chart divs are siblings in the same parent. No form names hardcoded.
+- Save paths confirmed unaffected: `mmria_vitals_validate_field` not present in `case/index.js` save handlers.
 
 ### File List
+- `source-code/mmria/mmria-server/util/VitalSignRangeHelper.cs` — updated (new `VitalSignRangeEntry` type, nested per-field return structure, flat-key fallback parser)
+- `source-code/mmria/mmria-server/wwwroot/scripts/editor/page_renderer/chart.js` — updated (`mmria_vitals_validate_field`, `mmria_vitals_show_field_modal` functions added; event-attachment IIFE pushed to `p_post_html_render` in `chart_render`)
+
+### Change Log
+| Date | Change |
+|---|---|
+| 2026-06-15 | Implemented Story 2.2: on-blur vitals validation, out-of-range modal with focus return, event attachment via post-render pattern; updated VitalSignRangeHelper to produce per-field nested structure |
