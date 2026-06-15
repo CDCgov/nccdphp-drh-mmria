@@ -4353,9 +4353,6 @@ function openTab(pageRoute, tabName, p_section, p_type_output, p_number, p_show_
 	// console.log('p_type_output: ', p_type_output);
 
 
-   // g_data.case_narrative.case_opening_overview = textarea_control_strip_html_attributes(g_data.case_narrative.case_opening_overview);
-
-
    let sorted_data = clone(g_data);
 
    g_apply_sort(g_metadata, sorted_data, "","", "");

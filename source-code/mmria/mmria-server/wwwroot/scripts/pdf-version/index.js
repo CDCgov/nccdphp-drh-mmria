@@ -1458,7 +1458,16 @@ function ConvertHTMLDOMWalker(p_result, p_node)
 				ConvertHTMLDOMWalker(text_array, child);
 			}
 			text_array.push({ text: "\n" });
-			p_result.push({ text: text_array, style: convert_attribute_to_pdf(p_node)});
+			{
+				// Canvas items (e.g. from <hr> inside <p>) cannot be inline text nodes;
+				// emit them as standalone blocks outside the paragraph text container.
+				const p_inlines = text_array.filter(item => !item.canvas);
+				const p_canvases = text_array.filter(item => !!item.canvas);
+				if (p_inlines.length > 0) {
+					p_result.push({ text: p_inlines, style: convert_attribute_to_pdf(p_node) });
+				}
+				p_canvases.forEach(c => p_result.push(c));
+			}
 			return;
         case "SPAN":
             let span_text_array = [];
@@ -1490,6 +1499,19 @@ function ConvertHTMLDOMWalker(p_result, p_node)
 		case "EM":
 			let em_attr = { italics: true };
 			p_result.push({ text: p_node.textContent.trim(), style: convert_attribute_to_pdf(p_node, em_attr) });
+			return;
+			break;
+		case "U":
+			let u_text = p_node.textContent.trim();
+			if (u_text.length > 0) {
+				p_result.push({ text: u_text, style: 'isUnderlined' });
+			}
+			return;
+			break;
+		case "HR":
+			// Page width 612pt minus left/right margins (20+20) = 572pt usable width
+			p_result.push({ canvas: [{ type: 'line', x1: 0, y1: 5, x2: 572, y2: 5, lineWidth: 1 }] });
+			p_result.push({ text: '\n' });
 			return;
 			break;
 		case "UL":
@@ -2610,6 +2632,12 @@ function print_pdf_render_content(ctx) {
 									body: myBody,
 								}, colSpan: '2',
 							}, {},
+						]);
+					} else if (narrative[i].hasOwnProperty('canvas') == true) {
+						// Canvas element (e.g. from <hr>) — cannot be wrapped in {text:}
+						ctx.content.push([
+							Object.assign({}, narrative[i], { colSpan: '2' }),
+							{},
 						]);
 					} else {
 						// Regular default - removed style: ['narrativeDetail'], 

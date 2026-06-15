@@ -339,14 +339,19 @@ function DOMWalker(p_node)
         for(let i = 0; i < p_node.attributes.length; i++)
         {
             let attr = p_node.attributes[i];
-           
-            if(attr.name != "style")
+            const lname = attr.name.toLowerCase();
+            const lvalue = attr.value.trim().toLowerCase();
+
+            // Remove only XSS-vector attributes: event handlers (on*) and javascript: scheme values.
+            // Structural attributes such as <font size="...">, <a href="...">, etc. are preserved.
+            if(lname.startsWith('on') || lvalue.startsWith('javascript:'))
             {
-                //console.log(`${attr.name} = ${attr.value}`);
                 remove_list.push(attr.name);
+                continue;
             }
 
-            if(attr.value.trim() != "")
+            // Normalize style attribute values (color names → hex, rem font-sizes → px equivalent)
+            if(lname === 'style' && attr.value.trim() !== '')
             {
                 let VarRegex =/var.*\(--([a-z ]+)\)/gi;
                 let array = attr.value.split(";")
