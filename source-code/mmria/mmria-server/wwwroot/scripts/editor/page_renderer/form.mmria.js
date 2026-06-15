@@ -1345,7 +1345,7 @@ function form_multi_render
                             (
                                 p_metadata, 
                                 "/case_narrative/case_opening_overview"
-                            )} </h2><p class="mb-0" style="line-height: normal">Use the pre-fill text below, and copy and paste from Reviewer's Notes below to create a comprehensive case narrative. Whatever you type here is what will be printed in the Print Version.</p>`;
+                            )} </h2>`;
                         // Stop the scanning
                         clearInterval(scan_for_narrative_label);
                     }
