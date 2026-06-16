@@ -4,7 +4,7 @@ baseline_commit: 3d907ee8d92473811ad909f4e6924e06106d7934
 
 # Story 2.5: Historical Data Detection and Record Indicators
 
-Status: review
+Status: done
 
 ## Story
 

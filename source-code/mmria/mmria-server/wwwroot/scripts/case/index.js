@@ -4246,16 +4246,6 @@ function pdf_case_onclick(event, type_output)
 
   if (section_name) 
   {
-    if (section_name == 'core-summary') 
-    {
-
-        window.setTimeout(function()
-        {
-            openTab('./pdf-version', unique_tab_name, section_name, type_output);
-        }, 1000);	
-    } 
-    else 
-    {
         // data-record of selected option
         const selectedOption = dropdown.options[dropdown.options.selectedIndex];
         const record_number = selectedOption.dataset.record;
@@ -4278,7 +4268,6 @@ function pdf_case_onclick(event, type_output)
             }, 1000);	
         }
       
-    }
   }
 
 }
@@ -4293,18 +4282,6 @@ function print_case_onclick(event)
   
 	if (section_name) 
 	{
-	  if (section_name == 'core-summary') 
-	  {
-  
-		  window.setTimeout(function()
-		  {
-			  openTab('./core-elements', unique_tab_name, 'all', 'print');
-		  }, 1000);	
-  
-		
-	  } 
-	  else 
-	  {
 		// data-record of selected option
 		const selectedOption = dropdown.options[dropdown.options.selectedIndex];
 		const record_number = selectedOption.dataset.record;
@@ -4326,8 +4303,6 @@ function print_case_onclick(event)
                 openTab('./print-version', unique_tab_name, section_name, 'print', record_number);
             }, 1000);	
         }
-		
-	  }
 	}
   
 }

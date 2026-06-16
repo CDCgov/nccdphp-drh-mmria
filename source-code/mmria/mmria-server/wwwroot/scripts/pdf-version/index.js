@@ -35,7 +35,6 @@ let TitleMap = {
 	"case_narrative": "Narrative",
 	"committee_review": "Decision",
 	"all": "ALL",
-	"core-summary": "Core",
     "tracking": "Tracking",
     "demographic": "Demographic",
     "outcome": "Outcome",
@@ -351,10 +350,6 @@ async function print_pdf(ctx) {
                     //debugger;
                 }
 			}
-			else if (g_section_name == 'core-summary') 
-            {
-				g_writeText = 'CORE SUMMARY';
-			} 
             else 
             {
 				g_writeText = getSectionTitle(ctx.section_name);
@@ -791,9 +786,6 @@ function getReportTabName(section) {
 		case 'committee_review':
 			nm = 'Committee Review';
 			break;
-		case 'core-summary':
-			nm = 'Core Elements Only';
-			break;
 		case 'all':
 			nm = 'All Case Forms';
 			break;
@@ -1162,11 +1154,6 @@ async function formatContent(p_ctx, arrMap) {
 					}
 				}
 			}
-			break;
-
-		// Core Summary
-		case 'core-summary':
-			retContent.push(await core_summary());
 			break;
 
 		// Show selected report
@@ -1610,37 +1597,6 @@ function process_li_array(p_result, p_array)
 }
 
 // Core Summary - display all of the core summary fields
-async function core_summary() {
-	let body = [];
-	// let arrMap = getArrayMap();
-
-	// Record Core Fields
-	let retPage = [];
-
-	// let arrIndex = arrMap.findIndex((s) => s.name == 'home_record');
-	body = core_pdf_summary(g_md, g_d, '/', false, '');
-
-	// Show the table
-	retPage.push([
-		{
-			layout: {
-				defaultBorder: false,
-				paddingLeft: function (i, node) { return 1; },
-				paddingRight: function (i, node) { return 1; },
-				paddingTop: function (i, node) { return 2; },
-				paddingBottom: function (i, node) { return 2; },
-			},
-			table: {
-				headerRows: 0,
-				widths: [250, '*'],
-				body: body,
-			},
-		},
-	]);
-
-	return retPage;
-}
-
 function core_pdf_summary(p_metadata, p_data, p_path, p_is_core_summary, p_metadata_path) {
 	let is_core_summary = false;
 
