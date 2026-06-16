@@ -75,9 +75,13 @@ async function create_print_version
     p_number,
     p_metadata_summary,
     p_show_hidden,
+    p_vital_sign_range,
     p_is_de_identified = false
 ) 
 {
+	if (p_vital_sign_range !== undefined) {
+		window.mmria_vital_sign_range = p_vital_sign_range;
+	}
 	// Validate input parameters
 	if (!p_metadata) {
 		console.error('PDF Generation Error: metadata is missing');
@@ -696,6 +700,22 @@ function fmtStrDate(dt) {
 	}
 	let dtParts = dt.split('-');
 	return `${fmt2Digits(dtParts[1])}/${fmt2Digits(dtParts[2])}/${fmtYear(dtParts[0])}`;
+}
+
+// Like fmtDateTime but returns empty string for blank/invalid vitals dates (AC #3)
+function fmtDateTimeVitals(dt) {
+	if (dt == null || dt.length == 0 || dt == '0001-01-01T00:00:00') return '';
+	return fmtDateTime(dt);
+}
+
+// Returns true if fieldName is in the vital sign range config and value is out of range (AC #1, #2, #5)
+function mmria_vitals_is_out_of_range(fieldName, value) {
+	if (!window.mmria_vital_sign_range) return false;
+	var range = window.mmria_vital_sign_range[fieldName];
+	if (!range) return false;
+	var v = parseFloat(value);
+	if (value === '' || value == null || isNaN(v)) return false;
+	return (v < parseFloat(range.min) || v > parseFloat(range.max));
 }
 
 // Get the header name
@@ -2273,7 +2293,7 @@ function print_pdf_render_content(ctx) {
 					ctx.data.forEach((dataChild, dataIndex) => {
 						row = new Array();
 						row.push({ text: `${dataIndex + 1}`, style: ['tableDetail', 'isItalics', 'isBold'], alignment: 'center', },);
-						row.push({ text: fmtDateTime(dataChild[metaChild[0].name]), style: ['tableDetail'], },);
+						row.push({ text: fmtDateTimeVitals(dataChild[metaChild[0].name]), style: ['tableDetail'], },);
 						// Create a two column table for the Medical Info column - exclude the first (datetime) and last (comments)  
 						let colPrompt = new Array();
 						let colData = new Array();
@@ -2288,7 +2308,7 @@ function print_pdf_render_content(ctx) {
 								case 'time':
 								case 'hidden':
 									colPrompt.push({ text: `${metaChild[i].prompt.replace(" - ", "-")}: `, style: ['tableLabel'], alignment: 'right', },);
-									colData.push({ text: dataChild[metaChild[i].name] || '-', style: ['tableDetail'], },);
+									colData.push({ text: mmria_vitals_is_out_of_range(metaChild[i].name, dataChild[metaChild[i].name]) ? '' : (dataChild[metaChild[i].name] || '-'), style: ['tableDetail'], },);
 									break;
 								default:
 									colPrompt.push({ text: `${metaChild[i].prompt}: `, style: ['tableLabel'], alignment: 'right', },);

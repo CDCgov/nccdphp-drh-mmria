@@ -1,6 +1,6 @@
 # Story 2.3: Display-Time Exclusion — Print, PDF, and Vitals Date Fix
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -18,22 +18,22 @@ so that printed output does not surface unreliable data.
 
 ## Tasks / Subtasks
 
-- [ ] Identify print view rendering path (AC: #1)
-  - [ ] Determine whether print view is rendered server-side (Razor) or client-side JS
-  - [ ] Find where vitals field values are written to print output
-  - [ ] Add out-of-range check before each vitals value is rendered: if `window.mmria_vital_sign_range` and value is out of range → render empty string
-- [ ] Identify PDF rendering path for vitals values (AC: #2)
-  - [ ] In `wwwroot/scripts/pdf-version/index.js`, find where vitals field values are rendered
-  - [ ] Add the same out-of-range check pattern: check against `window.mmria_vital_sign_range`, substitute empty string if out of range
-- [ ] Fix vitals date `/ /` display in PDF (AC: #3)
-  - [ ] In `wwwroot/scripts/pdf-version/index.js`, find where vitals date fields are formatted/rendered
-  - [ ] Identify the code path that produces `/ /` for empty or invalid dates
-  - [ ] Replace `/ /` output with empty string for vitals date fields — scope fix to vitals date rendering only
-- [ ] Confirm case form unaffected (AC: #4)
-  - [ ] Verify no change made to `chart.js` rendering of in-form input values
-  - [ ] Input fields continue to show stored value
-- [ ] Null-guard all exclusion checks (AC: #5)
-  - [ ] Every out-of-range check: `if (window.mmria_vital_sign_range) { /* check */ }` — if null, skip and render value as-is
+- [x] Identify print view rendering path (AC: #1)
+  - [x] Determine whether print view is rendered server-side (Razor) or client-side JS
+  - [x] Find where vitals field values are written to print output
+  - [x] Add out-of-range check before each vitals value is rendered: if `window.mmria_vital_sign_range` and value is out of range → render empty string
+- [x] Identify PDF rendering path for vitals values (AC: #2)
+  - [x] In `wwwroot/scripts/pdf-version/index.js`, find where vitals field values are rendered
+  - [x] Add the same out-of-range check pattern: check against `window.mmria_vital_sign_range`, substitute empty string if out of range
+- [x] Fix vitals date `/ /` display in PDF (AC: #3)
+  - [x] In `wwwroot/scripts/pdf-version/index.js`, find where vitals date fields are formatted/rendered
+  - [x] Identify the code path that produces `/ /` for empty or invalid dates
+  - [x] Replace `/ /` output with empty string for vitals date fields — scope fix to vitals date rendering only
+- [x] Confirm case form unaffected (AC: #4)
+  - [x] Verify no change made to `chart.js` rendering of in-form input values
+  - [x] Input fields continue to show stored value
+- [x] Null-guard all exclusion checks (AC: #5)
+  - [x] Every out-of-range check: `if (window.mmria_vital_sign_range) { /* check */ }` — if null, skip and render value as-is
 
 ## Dev Notes
 
@@ -80,9 +80,35 @@ Apply this pattern (or inline equivalent) at each render site.
 ## Dev Agent Record
 
 ### Agent Model Used
+Claude Sonnet 4.6
 
 ### Debug Log References
+- Print view is client-side JS rendered via `wwwroot/scripts/print-version/print_version_renderer.js` — `print_version_render()` function, `default:` case handles number/string/time fields.
+- PDF vitals rendering is in `wwwroot/scripts/pdf-version/index.js` in the `vital_signs` / `transport_vital_signs` grid branch (~line 2293).
+- `fmtDateTime()` at line 675 was the source of `  /  /    ` output for empty vitals dates.
+- **Root cause of suppression not working**: Both `/print-version/index.html` and `/pdf-version/index.html` are standalone static HTML pages opened via `window.open()` from the case editor. They do NOT receive `window.mmria_vital_sign_range` (which is only set in the Razor-served Case/Index.cshtml). Fix: pass the config as an additional `p_vital_sign_range` parameter through `openTab` → `create_print_version`, and set it on `window.mmria_vital_sign_range` in the child window before rendering.
+- Build failed with file-lock error (MSB3027/MSB3021) — pre-existing environment issue, running debug server holds `mmria.common.dll`. C# compilation itself succeeded. JS files unaffected by .NET build.
 
 ### Completion Notes List
+- Print view is client-side JS. No Razor involvement for vitals fields.
+- Added `mmria_vitals_is_out_of_range()` helper to both `pdf-version/index.js` and `print-version/print_version_renderer.js`.
+- Added `fmtDateTimeVitals()` to `pdf-version/index.js` — returns `''` for blank/invalid dates; delegates to `fmtDateTime()` otherwise. Used only for the vitals date column to scope the fix.
+- Out-of-range check applied to `string`/`number`/`time`/`hidden` fields in the PDF vitals grid loop. If out of range → `''`; otherwise existing `|| '-'` fallback preserved.
+- Out-of-range check applied in the `default:` case of `print_version_render()` — safe because `mmria_vitals_is_out_of_range` returns `false` for any field not in the range config.
+- No changes to `chart.js` or any case form input rendering.
 
 ### File List
+- `source-code/mmria/mmria-server/wwwroot/scripts/pdf-version/index.js`
+- `source-code/mmria/mmria-server/wwwroot/scripts/print-version/print_version_renderer.js`
+- `source-code/mmria/mmria-server/wwwroot/scripts/print-version/index.js`
+- `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js`
+
+### Change Log
+- `pdf-version/index.js`: Added `fmtDateTimeVitals()` and `mmria_vitals_is_out_of_range()` helper functions after `fmtStrDate`.
+- `pdf-version/index.js`: Changed vitals date column from `fmtDateTime()` to `fmtDateTimeVitals()`.
+- `pdf-version/index.js`: Applied `mmria_vitals_is_out_of_range` check in `string`/`number`/`time`/`hidden` case of vitals grid loop.
+- `pdf-version/index.js`: Added `p_vital_sign_range` parameter to `create_print_version`; sets `window.mmria_vital_sign_range` on the child window before rendering.
+- `print-version/print_version_renderer.js`: Added `mmria_vitals_is_out_of_range()` helper at end of file.
+- `print-version/print_version_renderer.js`: Applied check in `default:` case of `print_version_render()` for the non-`case_opening_overview` branch.
+- `print-version/index.js`: Added `p_vital_sign_range` parameter to `create_print_version`; sets `window.mmria_vital_sign_range` on the child window before rendering.
+- `case/index.js`: Both `openTab` `create_print_version` call sites now pass `window.mmria_vital_sign_range` as the 8th argument.

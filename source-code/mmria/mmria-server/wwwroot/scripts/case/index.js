@@ -4369,7 +4369,8 @@ function openTab(pageRoute, tabName, p_section, p_type_output, p_number, p_show_
 		p_type_output,
         p_number,
         g_metadata_summary,
-        p_show_hidden
+        p_show_hidden,
+        window.mmria_vital_sign_range
       );
     });
   } 
@@ -4383,7 +4384,8 @@ function openTab(pageRoute, tabName, p_section, p_type_output, p_number, p_show_
 	p_type_output,
       p_number,
       g_metadata_summary,
-      p_show_hidden
+      p_show_hidden,
+      window.mmria_vital_sign_range
     );
   }
 }
