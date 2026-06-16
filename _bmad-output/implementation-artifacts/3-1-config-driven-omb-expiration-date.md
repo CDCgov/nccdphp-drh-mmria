@@ -38,8 +38,8 @@ so that the next date change can be applied by running the update script — no 
   - [x] Follow the existing path that provides data to this partial — do not introduce a new data-passing mechanism
 - [x] Update `metadata.json` `omb_expiration_label.prompt` (AC: #4)
   - [x] Locate `omb_expiration_label` in `database-scripts/metadata.json` (or equivalent metadata source)
-  - [x] Update `prompt` value to match the config-driven value
-  - [x] Ensure this is deployable via the production update script
+  - [x] Change `prompt` to `"Exp. Date {{omb_expiration_date}}"` placeholder
+  - [x] In `metadataController.Get()` and `Get(string id)`: serialize ExpandoObject, replace `{{omb_expiration_date}}` with config value, return as `application/json`
 - [x] Build and verify (AC: #2, #3, #5)
   - [x] Run `build-server` task — zero errors
   - [ ] Load Home page — confirm OMB date renders from config

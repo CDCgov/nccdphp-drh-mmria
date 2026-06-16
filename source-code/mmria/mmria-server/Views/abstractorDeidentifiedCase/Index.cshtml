@@ -42,6 +42,7 @@
   }
 
   var metadata_version = TempData["metadata_version"];
+  var omb_expiration_date = TempData["omb_expiration_date"] ?? "05/31/2026";
   var ui_role_mode = TempData["ui_role_mode"];
   var case_edit_inactivity_lock_minutes = TempData["case_edit_inactivity_lock_minutes"];
   var case_edit_inactivity_warning_minutes_before_lock = TempData["case_edit_inactivity_warning_minutes_before_lock"];
@@ -60,6 +61,7 @@
             warning_minutes_before_lock: @case_edit_inactivity_warning_minutes_before_lock,
             auto_save_freq_minutes: @case_edit_auto_save_freq
         };
+        window.mmria_omb_expiration_date = "@omb_expiration_date";
     </script>
   <link href="./styles/jquery/jquery.timepicker.css" type="text/css" rel="stylesheet" />
   <link href="./styles/jquery/jquery.datetimepicker.css" type="text/css" rel="stylesheet" />
