@@ -1057,7 +1057,6 @@ function form_render(
 					// Insert new HTML/TEXT
 					caseNarrativeLabel.innerHTML = `
                         <h3 id="case-narrative-heading" class="h3 mb-2 mt-0 font-weight-bold">Case Narrative</h3>
-                        <p class="mb-0" style="line-height: normal">Use the pre-fill text below, and copy and paste from Reviewer's Notes below to create a comprehensive case narrative. Whatever you type here is what will be printed in the Print Version.</p>
                     `;
 					// Stop the scanning
 					clearInterval(scan_for_narrative_label);

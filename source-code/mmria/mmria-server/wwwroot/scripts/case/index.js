@@ -3077,6 +3077,10 @@ async function window_on_hash_change(e)
 
 
             g_render();
+            if (g_data_is_checked_out && mmria_vitals_revalidate_all())
+            {
+                mmria_vitals_show_historical_modal();
+            }
             
         }
       } 
@@ -4242,16 +4246,6 @@ function pdf_case_onclick(event, type_output)
 
   if (section_name) 
   {
-    if (section_name == 'core-summary') 
-    {
-
-        window.setTimeout(function()
-        {
-            openTab('./pdf-version', unique_tab_name, section_name, type_output);
-        }, 1000);	
-    } 
-    else 
-    {
         // data-record of selected option
         const selectedOption = dropdown.options[dropdown.options.selectedIndex];
         const record_number = selectedOption.dataset.record;
@@ -4274,7 +4268,6 @@ function pdf_case_onclick(event, type_output)
             }, 1000);	
         }
       
-    }
   }
 
 }
@@ -4289,18 +4282,6 @@ function print_case_onclick(event)
   
 	if (section_name) 
 	{
-	  if (section_name == 'core-summary') 
-	  {
-  
-		  window.setTimeout(function()
-		  {
-			  openTab('./core-elements', unique_tab_name, 'all', 'print');
-		  }, 1000);	
-  
-		
-	  } 
-	  else 
-	  {
 		// data-record of selected option
 		const selectedOption = dropdown.options[dropdown.options.selectedIndex];
 		const record_number = selectedOption.dataset.record;
@@ -4322,8 +4303,6 @@ function print_case_onclick(event)
                 openTab('./print-version', unique_tab_name, section_name, 'print', record_number);
             }, 1000);	
         }
-		
-	  }
 	}
   
 }
@@ -4353,9 +4332,6 @@ function openTab(pageRoute, tabName, p_section, p_type_output, p_number, p_show_
 	// console.log('p_type_output: ', p_type_output);
 
 
-   // g_data.case_narrative.case_opening_overview = textarea_control_strip_html_attributes(g_data.case_narrative.case_opening_overview);
-
-
    let sorted_data = clone(g_data);
 
    g_apply_sort(g_metadata, sorted_data, "","", "");
@@ -4372,7 +4348,8 @@ function openTab(pageRoute, tabName, p_section, p_type_output, p_number, p_show_
 		p_type_output,
         p_number,
         g_metadata_summary,
-        p_show_hidden
+        p_show_hidden,
+        window.mmria_vital_sign_range
       );
     });
   } 
@@ -4386,7 +4363,8 @@ function openTab(pageRoute, tabName, p_section, p_type_output, p_number, p_show_
 	p_type_output,
       p_number,
       g_metadata_summary,
-      p_show_hidden
+      p_show_hidden,
+      window.mmria_vital_sign_range
     );
   }
 }
@@ -4574,6 +4552,10 @@ async function enable_edit_click()
     if ($global.case_document_begin_edit != null) 
     {
         $global.case_document_begin_edit();
+    }
+    if (mmria_vitals_revalidate_all())
+    {
+        mmria_vitals_show_historical_modal();
     }
   }
 }

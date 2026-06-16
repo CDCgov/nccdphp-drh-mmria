@@ -766,7 +766,7 @@ d3.select('#chart svg').append('text')
         result.push('</p>');
         result.push('</h9>');
         result.push('<div>');
-        result.push(p_data);
+        result.push(mmria_vitals_is_out_of_range(p_metadata.name, p_data) ? '' : p_data);
         result.push('</div>');
       }
       else//if (p_metadata.name == 'case_opening_overview') 
@@ -884,7 +884,14 @@ function get_chart_y_range_from_path(p_metadata, p_metadata_path, p_multiform_in
 			const val = array[i][field];
 			if(val)
 			{
-				result.push(parseFloat(val).toFixed(2));
+                if (mmria_vitals_is_out_of_range(field, val))
+                {
+                    result.push('null');
+                }
+                else
+                {
+				    result.push(parseFloat(val).toFixed(2));
+                }
 			}
 			else
 			{
@@ -922,7 +929,10 @@ function get_chart_y_values_from_path(p_metadata, p_metadata_path, p_multiform_i
 			const val = array[i][field];
 			if(val)
 			{
-				result.push(parseFloat(val).toFixed(2));
+                if (!mmria_vitals_is_out_of_range(field, val))
+                {
+			        result.push(parseFloat(val).toFixed(2));
+                }
 			}		
 		}
 
@@ -1068,4 +1078,14 @@ function print_version_textarea_replace_return_with_br(p_value)
     }
 
     return result
+}
+
+// Returns true if fieldName is in the vital sign range config and value is out of range (AC #1, #5)
+function mmria_vitals_is_out_of_range(fieldName, value) {
+    if (!window.mmria_vital_sign_range) return false;
+    var range = window.mmria_vital_sign_range[fieldName];
+    if (!range) return false;
+    var v = parseFloat(value);
+    if (value === '' || value == null || isNaN(v)) return false;
+    return (v < parseFloat(range.min) || v > parseFloat(range.max));
 }

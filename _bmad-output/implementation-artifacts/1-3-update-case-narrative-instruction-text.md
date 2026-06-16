@@ -1,6 +1,6 @@
 # Story 1.3: Update Case Narrative Instruction Text
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 

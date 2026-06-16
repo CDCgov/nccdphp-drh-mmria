@@ -93,6 +93,8 @@ public sealed class HomeController : Controller
         ViewBag.is_offline_mode_enabled = configuration.GetBoolean("is_offline_mode_enabled", host_prefix) ?? false;
         ViewBag.is_offline_logging_enabled = configuration.GetBoolean("is_offline_logging_enabled", host_prefix) ?? false;
         ViewBag.offline_logging_max_logs = configuration.GetInteger("offline_logging_max_logs", host_prefix) ?? 10000;
+        ViewBag.omb_expiration_date = configuration.GetString("omb_expiration_date", host_prefix) ?? "05/31/2026";
+        ViewBag.mmria_version = configuration.GetString("mmria_version", host_prefix) ?? "MMRIA V 4.1";
         var LinkList = configuration.GetExternalHomePageLinks();
 
         

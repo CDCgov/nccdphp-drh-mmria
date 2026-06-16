@@ -175,6 +175,7 @@ function textarea_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_
                         tbw_change_paste("${p_object_path}","${p_metadata_path}","${p_dictionary_path}");
                     });
                 `);
+                p_post_html_render.push(`attach_narrative_paste_handler("${p_object_path}","${p_metadata_path}","${p_dictionary_path}");`);
             }
             else
             {
@@ -194,6 +195,69 @@ function textarea_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_
 }
 
 
+
+/**
+ * Attaches a Range API paste handler to the Trumbowyg narrative editor div.
+ * Uses the capture phase to intercept paste before Trumbowyg's built-in handler,
+ * ensuring content is inserted at the active cursor position.
+ * XSS-vector attributes (on*, javascript: hrefs) are stripped via DOMWalker;
+ * all structural HTML tags are preserved.
+ */
+function attach_narrative_paste_handler(p_object_path, p_metadata_path, p_dictionary_path)
+{
+    var editorElement = document.querySelector('.case-narrative-trumbowyg .trumbowyg-editor');
+    if (!editorElement) return;
+
+    editorElement.addEventListener('paste', function(event)
+    {
+        // Step 1: Capture selection synchronously at TOP — before any DOM manipulation
+        var selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0) return;
+        var range = selection.getRangeAt(0);
+
+        // Prevent browser default paste and Trumbowyg's bubble-phase paste handler
+        event.preventDefault();
+        event.stopImmediatePropagation();
+
+        // Step 2: Get clipboard data — prefer HTML, fall back to plain text
+        var clipboardData = event.clipboardData || window.clipboardData;
+        var pastedHtml = clipboardData ? clipboardData.getData('text/html') : '';
+        var pastedText = (!pastedHtml && clipboardData) ? (clipboardData.getData('text/plain') || '') : '';
+
+        // Step 3: Delete currently selected content (if any)
+        range.deleteContents();
+
+        // Step 4: Build DocumentFragment from XSS-cleaned paste content
+        var fragment = document.createDocumentFragment();
+        if (pastedHtml)
+        {
+            var cleanNode = document.createElement('div');
+            cleanNode.innerHTML = pastedHtml;
+            // DOMWalker strips on* attributes and javascript: hrefs; preserves all structural tags
+            DOMWalker(cleanNode);
+            while (cleanNode.firstChild)
+            {
+                fragment.appendChild(cleanNode.firstChild);
+            }
+        }
+        else if (pastedText)
+        {
+            fragment.appendChild(document.createTextNode(pastedText));
+        }
+
+        // Step 5: Insert at captured range
+        range.insertNode(fragment);
+
+        // Step 6: Collapse range to end of inserted content and restore selection
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
+
+        // Step 7: Save updated narrative content via the standard change path
+        tbw_onchange(p_object_path, p_metadata_path, p_dictionary_path);
+
+    }, true); // capture phase — runs before and suppresses Trumbowyg's bubble-phase handler
+}
 
 function tbw_change_paste(p_object_path, p_metadata_path, p_dictionary_path)
 {
@@ -339,14 +403,19 @@ function DOMWalker(p_node)
         for(let i = 0; i < p_node.attributes.length; i++)
         {
             let attr = p_node.attributes[i];
-           
-            if(attr.name != "style")
+            const lname = attr.name.toLowerCase();
+            const lvalue = attr.value.trim().toLowerCase();
+
+            // Remove only XSS-vector attributes: event handlers (on*) and javascript: scheme values.
+            // Structural attributes such as <font size="...">, <a href="...">, etc. are preserved.
+            if(lname.startsWith('on') || lvalue.startsWith('javascript:'))
             {
-                //console.log(`${attr.name} = ${attr.value}`);
                 remove_list.push(attr.name);
+                continue;
             }
 
-            if(attr.value.trim() != "")
+            // Normalize style attribute values (color names → hex, rem font-sizes → px equivalent)
+            if(lname === 'style' && attr.value.trim() !== '')
             {
                 let VarRegex =/var.*\(--([a-z ]+)\)/gi;
                 let array = attr.value.split(";")

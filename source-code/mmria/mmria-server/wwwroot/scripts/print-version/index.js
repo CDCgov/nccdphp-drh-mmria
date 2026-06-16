@@ -21,8 +21,11 @@ $(function ()
 });
 
 
-function create_print_version(p_metadata, p_data, p_section, p_type_output, p_number, p_metadata_summary, p_show_hidden)
+function create_print_version(p_metadata, p_data, p_section, p_type_output, p_number, p_metadata_summary, p_show_hidden, p_vital_sign_range)
 {
+	if (p_vital_sign_range !== undefined) {
+		window.mmria_vital_sign_range = p_vital_sign_range;
+	}
 	g_data = p_data;
 	g_metadata = p_metadata;
     if(p_show_hidden != null)

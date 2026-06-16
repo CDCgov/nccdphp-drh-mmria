@@ -1,6 +1,6 @@
 # Story 3.3: Remove Core Elements Only Print Option
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -19,33 +19,33 @@ so that users can no longer select an unauthorized print format.
 
 ## Tasks / Subtasks
 
-- [ ] Remove option from `form.mmria.js` (AC: #1)
-  - [ ] Open `wwwroot/scripts/editor/page_renderer/form.mmria.js`
-  - [ ] Navigate to ~line 2047, find `<option value="core-summary">Core Elements Only</option>`
-  - [ ] Remove that line only — do not touch surrounding option elements
-- [ ] Remove option from `form.committee_member.mmria.js` (AC: #2)
-  - [ ] Open `wwwroot/scripts/editor/page_renderer/form.committee_member.mmria.js`
-  - [ ] Navigate to ~line 1851, remove the same option element
-- [ ] Remove option and redirect guard from `de-identified/index.js` (AC: #3)
-  - [ ] Open `wwwroot/scripts/de-identified/index.js`
-  - [ ] Navigate to ~line 1131, remove `<option value="core-summary">Core Elements Only</option>`
-  - [ ] Navigate to ~line 933, read the redirect guard block
-  - [ ] **If the block exclusively guards `core-summary`:** remove the entire guard block
-  - [ ] **If the block guards multiple cases including `core-summary`:** remove only the `core-summary` branch, leave other branches intact
-- [ ] Clean up dead code in `pdf-version/index.js` (AC: #4)
-  - [ ] Open `wwwroot/scripts/pdf-version/index.js`
-  - [ ] ~line 38: remove `"core-summary": "Core"` entry from `TitleMap`
-  - [ ] ~line 729: remove `case 'core-summary': return 'Core Elements Only'` branch from `getReportTabName()`
-  - [ ] ~lines 774 and 1148: remove `case 'core-summary':` dispatch and its call to `core_summary()` from `formatContent()`
-  - [ ] Grep `pdf-version/index.js` for `core_summary` to confirm all call sites are removed
-  - [ ] Remove the `core_summary()` function body and declaration — only after confirming zero remaining references
-- [ ] Confirm PMSS files untouched (AC: #5)
-  - [ ] Do not open or modify any PMSS-related JS files
-  - [ ] Intentional `core-summary` comments in PMSS files must remain
-- [ ] Final grep verification (AC: #6)
-  - [ ] Run: grep `wwwroot/scripts` recursively for `core-summary`
-  - [ ] Expected: zero matches outside PMSS files
-  - [ ] If any non-PMSS matches remain, address them before completing the story
+- [x] Remove option from `form.mmria.js` (AC: #1)
+  - [x] Open `wwwroot/scripts/editor/page_renderer/form.mmria.js`
+  - [x] Navigate to ~line 2047, find `<option value="core-summary">Core Elements Only</option>`
+  - [x] Remove that line only — do not touch surrounding option elements
+- [x] Remove option from `form.committee_member.mmria.js` (AC: #2)
+  - [x] Open `wwwroot/scripts/editor/page_renderer/form.committee_member.mmria.js`
+  - [x] Navigate to ~line 1851, remove the same option element
+- [x] Remove option and redirect guard from `de-identified/index.js` (AC: #3)
+  - [x] Open `wwwroot/scripts/de-identified/index.js`
+  - [x] Navigate to ~line 1131, remove `<option value="core-summary">Core Elements Only</option>`
+  - [x] Navigate to ~line 933, read the redirect guard block
+  - [x] **If the block exclusively guards `core-summary`:** remove the entire guard block
+  - [x] **If the block guards multiple cases including `core-summary`:** remove only the `core-summary` branch, leave other branches intact
+- [x] Clean up dead code in `pdf-version/index.js` (AC: #4)
+  - [x] Open `wwwroot/scripts/pdf-version/index.js`
+  - [x] ~line 38: remove `"core-summary": "Core"` entry from `TitleMap`
+  - [x] ~line 729: remove `case 'core-summary': return 'Core Elements Only'` branch from `getReportTabName()`
+  - [x] ~lines 774 and 1148: remove `case 'core-summary':` dispatch and its call to `core_summary()` from `formatContent()`
+  - [x] Grep `pdf-version/index.js` for `core_summary` to confirm all call sites are removed
+  - [x] Remove the `core_summary()` function body and declaration — only after confirming zero remaining references
+- [x] Confirm PMSS files untouched (AC: #5)
+  - [x] Do not open or modify any PMSS-related JS files
+  - [x] Intentional `core-summary` comments in PMSS files must remain
+- [x] Final grep verification (AC: #6)
+  - [x] Run: grep `wwwroot/scripts` recursively for `core-summary`
+  - [x] Expected: zero matches outside PMSS files
+  - [x] If any non-PMSS matches remain, address them before completing the story
 
 ## Dev Notes
 
@@ -86,9 +86,32 @@ so that users can no longer select an unauthorized print format.
 ## Dev Agent Record
 
 ### Agent Model Used
+Claude Sonnet 4.6
 
 ### Debug Log References
 
+- AC #3 note: `de-identified/index.js` had no `<option>` push to remove — the story's "~line 1131" referred to a JS handler `if (section_name == 'core-summary')` block, not an HTML option element. Three exclusively-guarded `core-summary` if/else blocks were collapsed in `de-identified/index.js` (print_case_onchange, pdf_case_onclick, print_case_onclick).
+- AC #4 note: `async function core_summary()` confirmed removed; all remaining `core_summary` matches in `pdf-version/index.js` are `core_pdf_summary` (a distinct, unrelated function — kept).
+- AC #6 note: Two additional files beyond story scope required cleanup — `case/index.js` (pdf_case_onclick and print_case_onclick) and `pdf-version/render-pdf/get_header.js` — to reach zero non-PMSS matches.
+- PMSS files confirmed untouched: `form.pmss.js`, `form.committee_member.pmss.js`, `form.pmss.attachment.js` all retain their commented-out options.
+
 ### Completion Notes List
 
+- All `<option value="core-summary">` push calls removed from `form.mmria.js` and `form.committee_member.mmria.js`.
+- All exclusively-guarding `core-summary` if/else blocks in `de-identified/index.js` (3), `case/index.js` (2) collapsed — else-branch logic preserved inline.
+- `"core-summary": "Core"` removed from TitleMap; `case 'core-summary'` removed from `getReportTabName()` and `formatContent()`; `async function core_summary()` removed from `pdf-version/index.js`.
+- `else if (section_name === 'core-summary')` block removed from `pdf-version/render-pdf/get_header.js`.
+- Final grep: 3 matches remain, all in PMSS files as commented-out lines — AC #6 satisfied.
+
 ### File List
+
+- `source-code/mmria/mmria-server/wwwroot/scripts/editor/page_renderer/form.mmria.js`
+- `source-code/mmria/mmria-server/wwwroot/scripts/editor/page_renderer/form.committee_member.mmria.js`
+- `source-code/mmria/mmria-server/wwwroot/scripts/de-identified/index.js`
+- `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js`
+- `source-code/mmria/mmria-server/wwwroot/scripts/pdf-version/index.js`
+- `source-code/mmria/mmria-server/wwwroot/scripts/pdf-version/render-pdf/get_header.js`
+
+### Change Log
+
+- 2026-06-16: Implemented Story 3.3. Removed `core-summary` option from form.mmria.js and form.committee_member.mmria.js. Collapsed all exclusively-guarding core-summary if/else blocks in de-identified/index.js (3 functions) and case/index.js (2 functions). Removed TitleMap entry, getReportTabName case, formatContent case, async core_summary() function, and header else-if block from pdf-version/index.js and render-pdf/get_header.js. Final grep confirms zero non-PMSS matches.

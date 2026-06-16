@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 using mmria.common.util;
 
 namespace mmria.common.couchdb;
@@ -142,6 +143,7 @@ public sealed class OverridableConfiguration
     public string data_type { get; } = "configuration-master";
 
     public Dictionary<string, Dictionary<string, bool>> boolean_keys { get;set; }
+    [JsonConverter(typeof(NestedStringDictionaryConverter))]
     public Dictionary<string, Dictionary<string, string>> string_keys { get;set; }
     public Dictionary<string, Dictionary<string, int>> integer_keys { get;set; }
     public bool? GetBoolean(string key, string prefix)
