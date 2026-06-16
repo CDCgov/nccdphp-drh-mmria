@@ -3077,6 +3077,10 @@ async function window_on_hash_change(e)
 
 
             g_render();
+            if (g_data_is_checked_out && mmria_vitals_revalidate_all())
+            {
+                mmria_vitals_show_historical_modal();
+            }
             
         }
       } 
@@ -4573,6 +4577,10 @@ async function enable_edit_click()
     if ($global.case_document_begin_edit != null) 
     {
         $global.case_document_begin_edit();
+    }
+    if (mmria_vitals_revalidate_all())
+    {
+        mmria_vitals_show_historical_modal();
     }
   }
 }

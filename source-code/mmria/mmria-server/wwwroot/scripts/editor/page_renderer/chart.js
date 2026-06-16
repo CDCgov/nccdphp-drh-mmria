@@ -357,6 +357,145 @@ function mmria_vitals_show_field_modal(range, inputEl)
     }
 }
 
+function mmria_chart_has_excluded_values(p_metadata, p_object_path)
+{
+    if (!window.mmria_vital_sign_range) { return false; }
+    if (!p_metadata || !p_metadata.x_axis || !p_metadata.y_axis) { return false; }
+    try
+    {
+        var graph_prefix = "";
+        if (p_metadata.x_axis.indexOf("vital_signs") > -1)
+        {
+            graph_prefix = ".vital_signs.";
+        }
+
+        var y_fields = [];
+        p_metadata.y_axis.split(',').forEach(function(element)
+        {
+            var index = element.lastIndexOf("/") + 1;
+            y_fields.push(element.substr(index).trim());
+        });
+
+        var data = null;
+        var last_index = p_metadata.x_axis.lastIndexOf("/");
+        if (graph_prefix === "")
+        {
+            data = eval("g_data." + p_metadata.x_axis.trim().replace("/", ".").substring(0, last_index));
+        }
+        else
+        {
+            var object_path_last_index = p_object_path.lastIndexOf(".");
+            var pre_object = p_object_path.substring(0, object_path_last_index);
+            data = eval(pre_object + graph_prefix.substring(0, graph_prefix.length - 1));
+        }
+
+        if (!data || !Array.isArray(data)) { return false; }
+
+        for (var i = 0; i < data.length; i++)
+        {
+            for (var j = 0; j < y_fields.length; j++)
+            {
+                if (mmria_vitals_is_out_of_range(y_fields[j], data[i][y_fields[j]]))
+                {
+                    return true;
+                }
+            }
+        }
+    }
+    catch (e)
+    {
+        return false;
+    }
+    return false;
+}
+
+function mmria_vitals_revalidate_all()
+{
+    if (!window.mmria_vital_sign_range) { return false; }
+    var records = window.g_data && window.g_data.er_visit_and_hospital_medical_records;
+    if (!records || !Array.isArray(records)) { return false; }
+    var range_keys = Object.keys(window.mmria_vital_sign_range);
+    for (var i = 0; i < records.length; i++)
+    {
+        var vital_signs = records[i] && records[i].vital_signs;
+        if (!vital_signs || !Array.isArray(vital_signs)) { continue; }
+        for (var j = 0; j < vital_signs.length; j++)
+        {
+            var measurement = vital_signs[j];
+            for (var k = 0; k < range_keys.length; k++)
+            {
+                if (mmria_vitals_is_out_of_range(range_keys[k], measurement[range_keys[k]]))
+                {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+function mmria_vitals_show_historical_modal()
+{
+    var existingModal = document.getElementById('vitals-historical-modal');
+    if (existingModal && existingModal.parentNode) { existingModal.parentNode.removeChild(existingModal); }
+    var existingBackdrop = document.getElementById('vitals-historical-backdrop');
+    if (existingBackdrop && existingBackdrop.parentNode) { existingBackdrop.parentNode.removeChild(existingBackdrop); }
+
+    var modalHtml =
+        '<div id="vitals-historical-modal" class="modal fade" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="vitals-historical-modal-title" style="z-index: 1050;">'
+        + '<div class="modal-dialog" role="document">'
+        + '<div class="modal-content">'
+        + '<div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">'
+        + '<h4 id="vitals-historical-modal-title" class="modal-title" style="margin: 0; font-weight: 600; font-size: 17px;">Historical Vitals Data</h4>'
+        + '</div>'
+        + '<div class="modal-body" style="padding: 20px;">'
+        + '<p style="font-size: 16px; color: #333; margin: 0;">This case contains vital sign records with values outside the permitted range. These values are excluded from graphs, tables, print and pdf views.</p>'
+        + '</div>'
+        + '<div class="modal-footer" style="padding: 15px 20px; text-align: right;">'
+        + '<button type="button" id="vitals-historical-modal-ok" class="btn btn-primary" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">OK</button>'
+        + '</div>'
+        + '</div>'
+        + '</div>'
+        + '</div>'
+        + '<div id="vitals-historical-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>';
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    var modal = document.getElementById('vitals-historical-modal');
+    var backdrop = document.getElementById('vitals-historical-backdrop');
+
+    setTimeout(function()
+    {
+        if (modal) { modal.classList.add('show'); modal.style.display = 'block'; }
+        if (backdrop) { backdrop.classList.add('show'); }
+        var okBtn = document.getElementById('vitals-historical-modal-ok');
+        if (okBtn) { okBtn.focus(); }
+    }, 10);
+
+    function closeHistoricalModal()
+    {
+        if (modal) { modal.classList.remove('show'); }
+        if (backdrop) { backdrop.classList.remove('show'); }
+        setTimeout(function()
+        {
+            if (modal && modal.parentNode) { modal.parentNode.removeChild(modal); }
+            if (backdrop && backdrop.parentNode) { backdrop.parentNode.removeChild(backdrop); }
+        }, 150);
+        // No focus change on dismiss per AC #3
+    }
+
+    var okBtn = document.getElementById('vitals-historical-modal-ok');
+    if (okBtn) { okBtn.onclick = closeHistoricalModal; }
+
+    if (modal)
+    {
+        modal.addEventListener('keydown', function(e)
+        {
+            if (e.key === 'Escape') { e.preventDefault(); closeHistoricalModal(); }
+        });
+    }
+}
+
 function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_object_path, p_dictionary_path, p_is_grid_context, p_post_html_render, p_search_ctx, p_ctx, p_is_de_identified = false)
 {
 	let style_object = g_default_ui_specification.form_design[p_dictionary_path.substring(1)];
@@ -378,6 +517,11 @@ function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obj
   const map_key = convert_object_path_to_jquery_id(p_object_path);
   chart_function_params_map.set(map_key, function_params);
 
+  const chart_has_excluded = mmria_chart_has_excluded_values(p_metadata, p_object_path);
+  const chart_excluded_row = chart_has_excluded
+      ? `<tr><td colspan="100" style="padding:4px 8px;color:#c00;font-size:small;text-align:left;">Contains excluded values &#8212; one or more readings fall outside the permitted range.</td></tr>`
+      : '';
+
 	p_result.push
 	(
 		`<div id='${map_key}'
@@ -398,8 +542,9 @@ function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obj
                 </div>
               </th>
             </tr>
+            ${chart_excluded_row}
             <tr align=center><td>
-			<div id='${map_key}_chart'>
+		<div id='${map_key}_chart'>
             
             </div>
             </td></tr>
@@ -1153,6 +1298,11 @@ data.forEach(row => {
   data_table_body_html.push(`</tr>`);
 });
 
+    const chart_has_excluded_tbl = mmria_chart_has_excluded_values(metadata, params.p_object_path);
+    const chart_excluded_row_tbl = chart_has_excluded_tbl
+        ? `<tr><td colspan="100" style="padding:4px 8px;color:#c00;font-size:small;text-align:left;">Contains excluded values &#8212; one or more readings fall outside the permitted range.</td></tr>`
+        : '';
+
     el.outerHTML = 	`
         <div id='${convert_object_path_to_jquery_id(params.p_object_path)}'
         mpath='id='${params.p_metadata_path}' 
@@ -1181,7 +1331,7 @@ data.forEach(row => {
           </tr>     
         </thead>
         <tbody>
-          ${data_table_body_html.join("")}
+          ${chart_excluded_row_tbl}${data_table_body_html.join("")}
         </tbody>        
         </table>
     </div>`;
