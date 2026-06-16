@@ -66,6 +66,7 @@ public sealed class CaseController : Controller
 
         var vitalSignRangeConfig = VitalSignRangeHelper.GetVitalSignRangeConfig(configuration, host_prefix);
         TempData["vital_sign_range_config"] = JsonSerializer.Serialize(vitalSignRangeConfig);
+        TempData["omb_expiration_date"] = configuration.GetString("omb_expiration_date", host_prefix) ?? "05/31/2026";
 
         ViewBag.is_offline_mode_enabled = configuration.GetBoolean("is_offline_mode_enabled", host_prefix) ?? false;
         ViewBag.is_offline_logging_enabled = configuration.GetBoolean("is_offline_logging_enabled", host_prefix) ?? false;

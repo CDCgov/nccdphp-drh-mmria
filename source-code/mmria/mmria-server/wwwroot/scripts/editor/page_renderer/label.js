@@ -29,6 +29,9 @@ function label_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obj
         p_result.push(">");
     }
 
-    p_result.push(p_metadata.prompt);
+    var prompt_text = (p_metadata.name === 'omb_expiration_label' && typeof window.mmria_omb_expiration_date !== 'undefined')
+        ? 'Exp. Date ' + window.mmria_omb_expiration_date
+        : p_metadata.prompt;
+    p_result.push(prompt_text);
     p_result.push("</div>");
 }
