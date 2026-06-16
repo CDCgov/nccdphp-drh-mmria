@@ -220,8 +220,9 @@ function strip_paste_noise_styles(node)
     // the other noise properties so spans don't accumulate on each paste cycle.
     var DEFAULT_BG    = { 'rgb(255, 255, 255)':true, 'white':true, '#ffffff':true, '#fff':true, 'transparent':true };
     var DEFAULT_COLOR = { 'rgb(0, 0, 0)':true, 'rgb(51, 51, 51)':true, 'rgb(33, 33, 33)':true, 'black':true, '#000000':true, '#000':true };
-    // 16px is the base body font size in this app; explicitly tagging it is redundant.
-    var DEFAULT_FSIZE = { '16px':true };
+    // 16px, 1rem, 12px, and the legacy unit-less "12" are the base body font sizes
+    // in this app; 12 (no unit) is DOMWalker's old invalid rem-to-px output.
+    var DEFAULT_FSIZE = { '16px':true, '1rem':true, '12px':true, '12':true };
 
     var spans = node.querySelectorAll('span');
     for (var si = 0; si < spans.length; si++)
@@ -268,6 +269,49 @@ function strip_paste_noise_styles(node)
         if (!parent) continue;
         while (uspan.firstChild) { parent.insertBefore(uspan.firstChild, uspan); }
         parent.removeChild(uspan);
+    }
+
+    // Strip all inline styles from semantic inline formatting tags.
+    // <strong>, <em>, <u> etc. convey their formatting via the tag name itself;
+    // any style attribute is purely browser-computed noise from the clipboard.
+    var inlineTags = node.querySelectorAll('strong, em, u, b, i, s, strike');
+    for (var it = 0; it < inlineTags.length; it++)
+    {
+        inlineTags[it].removeAttribute('style');
+    }
+
+    // Flatten redundant nested same-tag inline elements.
+    // When block content is pasted at a position inside <strong>, the browser
+    // wraps the pasted paragraph in the outer <strong> AND the pasted content
+    // has its own inner <strong>, producing <strong><strong>text</strong></strong>.
+    // Unwrap the inner duplicate so the result is a single <strong>text</strong>.
+    var FLAT_TAGS = ['strong', 'b', 'em', 'i', 'u', 's', 'strike'];
+    for (var fti = 0; fti < FLAT_TAGS.length; fti++)
+    {
+        var nested = node.querySelectorAll(FLAT_TAGS[fti] + ' ' + FLAT_TAGS[fti]);
+        for (var ni = nested.length - 1; ni >= 0; ni--)
+        {
+            var innerTag = nested[ni];
+            var outerTag = innerTag.parentNode;
+            if (outerTag && outerTag.nodeName.toLowerCase() === FLAT_TAGS[fti])
+            {
+                while (innerTag.firstChild) { outerTag.insertBefore(innerTag.firstChild, innerTag); }
+                outerTag.removeChild(innerTag);
+            }
+        }
+    }
+
+    // Clean blank paragraphs — strip any inline wrappers from empty <p> elements.
+    // Pressing Enter after bold text creates <p><strong><br></strong></p> instead of
+    // <p><br></p>. When copied and pasted, those inline wrappers come along and can
+    // accumulate. Setting innerHTML = '<br>' here produces clean spacer paragraphs.
+    var pastedPs = node.querySelectorAll('p');
+    for (var ppi = 0; ppi < pastedPs.length; ppi++)
+    {
+        if (pastedPs[ppi].textContent.trim() === '')
+        {
+            pastedPs[ppi].innerHTML = '<br>';
+        }
     }
 
     var blocks = node.querySelectorAll('p, div');
@@ -376,10 +420,78 @@ function attach_narrative_paste_handler(p_object_path, p_metadata_path, p_dictio
             fragment.appendChild(document.createTextNode(pastedText));
         }
 
-        // Step 5: Insert at captured range
-        range.insertNode(fragment);
+        // Step 5: Insert at captured range — with block-level safety for block content.
+        // When the fragment contains <p>/<div> elements and the cursor is inside an inline
+        // element (e.g. <strong>), range.insertNode places the <p> inside that <strong>.
+        // The <strong> then bleeds into the pasted paragraph, making the entire paragraph
+        // bold/italic/etc. even though only one word in the source was formatted.
+        // Fix: detect this case and insert after the nearest block ancestor instead.
+        var PASTE_BLOCK_TAGS = { 'p':true, 'div':true, 'ul':true, 'ol':true, 'table':true };
+        var fragmentHasBlocks = false;
+        for (var _fci = 0; _fci < fragment.childNodes.length; _fci++)
+        {
+            var _fcn = fragment.childNodes[_fci];
+            if (_fcn.nodeType === Node.ELEMENT_NODE && PASTE_BLOCK_TAGS[_fcn.nodeName.toLowerCase()])
+            {
+                fragmentHasBlocks = true;
+                break;
+            }
+        }
+
+        var _insertedLastNode = null;
+        if (fragmentHasBlocks)
+        {
+            // Determine if the range start is inside an inline formatting element.
+            var _ctxEl = range.startContainer.nodeType === Node.ELEMENT_NODE
+                         ? range.startContainer
+                         : range.startContainer.parentElement;
+            var _inInlineCtx = _ctxEl
+                                && !PASTE_BLOCK_TAGS[_ctxEl.nodeName.toLowerCase()]
+                                && !_ctxEl.classList.contains('trumbowyg-editor');
+
+            if (_inInlineCtx)
+            {
+                // Walk up to the nearest <p> or <div> ancestor
+                var _blockAncestor = _ctxEl;
+                while (_blockAncestor
+                       && !PASTE_BLOCK_TAGS[_blockAncestor.nodeName.toLowerCase()]
+                       && !_blockAncestor.classList.contains('trumbowyg-editor'))
+                {
+                    _blockAncestor = _blockAncestor.parentElement;
+                }
+                if (_blockAncestor && PASTE_BLOCK_TAGS[_blockAncestor.nodeName.toLowerCase()])
+                {
+                    // Insert pasted blocks after the block ancestor — safe from inline bleed
+                    var _nextRef  = _blockAncestor.nextSibling;
+                    var _parentRef = _blockAncestor.parentNode;
+                    while (fragment.firstChild)
+                    {
+                        var _nodeToInsert = fragment.firstChild;
+                        if (_nextRef) { _parentRef.insertBefore(_nodeToInsert, _nextRef); }
+                        else          { _parentRef.appendChild(_nodeToInsert); }
+                        _insertedLastNode = _nodeToInsert;
+                    }
+                }
+                else
+                {
+                    range.insertNode(fragment);
+                }
+            }
+            else
+            {
+                range.insertNode(fragment);
+            }
+        }
+        else
+        {
+            range.insertNode(fragment);
+        }
 
         // Step 6: Collapse range to end of inserted content and restore selection
+        if (_insertedLastNode)
+        {
+            range.selectNodeContents(_insertedLastNode);
+        }
         range.collapse(false);
         selection.removeAllRanges();
         selection.addRange(range);
@@ -487,6 +599,73 @@ function textarea_control_strip_html_attributes(p_value)
         .replace(Replace4,"").trim();
 
     DOMWalker(node);
+
+    // Flatten redundant nested same-tag inline elements in stored HTML
+    // (e.g. accumulated <strong><strong>text</strong></strong> → <strong>text</strong>).
+    var SAVE_FLAT_TAGS = ['strong', 'b', 'em', 'i', 'u', 's', 'strike'];
+    for (var sfti = 0; sfti < SAVE_FLAT_TAGS.length; sfti++)
+    {
+        var sfNested = node.querySelectorAll(SAVE_FLAT_TAGS[sfti] + ' ' + SAVE_FLAT_TAGS[sfti]);
+        for (var sfni = sfNested.length - 1; sfni >= 0; sfni--)
+        {
+            var sfInner = sfNested[sfni];
+            var sfOuter = sfInner.parentNode;
+            if (sfOuter && sfOuter.nodeName.toLowerCase() === SAVE_FLAT_TAGS[sfti])
+            {
+                while (sfInner.firstChild) { sfOuter.insertBefore(sfInner.firstChild, sfInner); }
+                sfOuter.removeChild(sfInner);
+            }
+        }
+    }
+
+    // Progressive save-path span cleanup — mirrors paste-path strip_paste_noise_styles.
+    // Old stored content (pre-4.0) has accumulated <span> wrappers with browser-computed
+    // styles. Clean them on every save so old data is healed over time. Uses the same
+    // default-value sets to avoid stripping intentional user formatting.
+    var SPSV_BG    = { 'rgb(255, 255, 255)':true, 'white':true, '#ffffff':true, '#fff':true, 'transparent':true };
+    var SPSV_COLOR = { 'rgb(0, 0, 0)':true, 'rgb(51, 51, 51)':true, 'rgb(33, 33, 33)':true, 'black':true, '#000000':true, '#000':true };
+    var SPSV_FSIZE = { '16px':true, '1rem':true, '12px':true, '12':true };
+    var saveSpans = node.querySelectorAll('span');
+    for (var ssi = 0; ssi < saveSpans.length; ssi++)
+    {
+        var ssEl = saveSpans[ssi];
+        if (!ssEl.hasAttribute('style')) continue;
+        var ssParts = ssEl.getAttribute('style').split(';');
+        var ssKept = [];
+        for (var sspi = 0; sspi < ssParts.length; sspi++)
+        {
+            var ssT = ssParts[sspi].trim();
+            if (!ssT) continue;
+            var ssCi = ssT.indexOf(':');
+            if (ssCi === -1) continue;
+            var ssProp = ssT.substring(0, ssCi).trim().toLowerCase();
+            var ssVal  = ssT.substring(ssCi + 1).trim().toLowerCase();
+            if (ssProp === 'background-color' && !SPSV_BG[ssVal])    { ssKept.push(ssT); continue; }
+            if (ssProp === 'color'            && !SPSV_COLOR[ssVal]) { ssKept.push(ssT); continue; }
+            if (ssProp === 'font-size'        && !SPSV_FSIZE[ssVal]) { ssKept.push(ssT); continue; }
+        }
+        if (ssKept.length > 0) { ssEl.setAttribute('style', ssKept.join('; ')); }
+        else                   { ssEl.removeAttribute('style'); }
+    }
+    var saveUnstyled = node.querySelectorAll('span:not([style])');
+    for (var sui = saveUnstyled.length - 1; sui >= 0; sui--)
+    {
+        var suEl = saveUnstyled[sui];
+        var suPar = suEl.parentNode;
+        if (!suPar) continue;
+        while (suEl.firstChild) { suPar.insertBefore(suEl.firstChild, suEl); }
+        suPar.removeChild(suEl);
+    }
+
+    // Strip all style attributes from semantic inline formatting tags in stored content.
+    // Old data may have <strong style="font-size: 1rem;"> (or similar) from prior paste
+    // accumulation or browser execCommand behavior. The tag name carries the formatting;
+    // any inline style on it is noise that must be cleaned on save.
+    var saveInlineTags = node.querySelectorAll('strong, em, u, b, i, s, strike');
+    for (var sit = 0; sit < saveInlineTags.length; sit++)
+    {
+        saveInlineTags[sit].removeAttribute('style');
+    }
 
     // Restore <br> in <p> elements that have no text content so blank-line spacers
     // survive save/reload. Using textContent.trim() recurses into nested empty spans
@@ -603,7 +782,7 @@ function DOMWalker(p_node)
                     {
                         if(name_value[1].trim().endsWith("rem"))
                         {
-                            new_array.push(`font-size:12`);
+                            new_array.push(`font-size:12px`);
                         }
                         else
                         {
