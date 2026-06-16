@@ -2781,7 +2781,8 @@ function print_pdf_render_content(ctx) {
                             (
                                 y[y_axis_parts[0][2]] != null &&
                                 y[y_axis_parts[0][2]] != '' &&
-                                y[y_axis_parts[0][2]] != 'null'
+                                y[y_axis_parts[0][2]] != 'null' &&
+                                !mmria_vitals_is_out_of_range(y_axis_parts[0][2], y[y_axis_parts[0][2]])
                             )
                             {
                                 y_is_valid.push(true);
@@ -2803,7 +2804,8 @@ function print_pdf_render_content(ctx) {
                                     (
                                         y[y_axis_parts[0][2]] != null &&
                                         y[y_axis_parts[0][2]] != '' &&
-                                        y[y_axis_parts[0][2]] != 'null' 
+                                        y[y_axis_parts[0][2]] != 'null' &&
+                                        !mmria_vitals_is_out_of_range(y_axis_parts[0][2], y[y_axis_parts[0][2]])
                                     )
                                     {
                                         y_is_valid_one.push(true);
@@ -2819,7 +2821,8 @@ function print_pdf_render_content(ctx) {
                                     (
                                         y[y_axis_parts[1][2]] != null &&
                                         y[y_axis_parts[1][2]] != '' &&
-                                        y[y_axis_parts[1][2]] != 'null'
+                                        y[y_axis_parts[1][2]] != 'null' &&
+                                        !mmria_vitals_is_out_of_range(y_axis_parts[1][2], y[y_axis_parts[1][2]])
                                     )
                                     {
                                         y_is_valid_two.push(true);

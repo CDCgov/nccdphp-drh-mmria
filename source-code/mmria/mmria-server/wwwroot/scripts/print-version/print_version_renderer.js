@@ -884,7 +884,14 @@ function get_chart_y_range_from_path(p_metadata, p_metadata_path, p_multiform_in
 			const val = array[i][field];
 			if(val)
 			{
-				result.push(parseFloat(val).toFixed(2));
+                if (mmria_vitals_is_out_of_range(field, val))
+                {
+                    result.push('null');
+                }
+                else
+                {
+				    result.push(parseFloat(val).toFixed(2));
+                }
 			}
 			else
 			{
@@ -922,7 +929,10 @@ function get_chart_y_values_from_path(p_metadata, p_metadata_path, p_multiform_i
 			const val = array[i][field];
 			if(val)
 			{
-				result.push(parseFloat(val).toFixed(2));
+                if (!mmria_vitals_is_out_of_range(field, val))
+                {
+			        result.push(parseFloat(val).toFixed(2));
+                }
 			}		
 		}
 

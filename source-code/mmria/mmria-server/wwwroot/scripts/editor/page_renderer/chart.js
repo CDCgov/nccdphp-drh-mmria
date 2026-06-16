@@ -262,6 +262,15 @@ evahmrvs_b_dias Diastolic 40 20
 
 */
 
+function mmria_vitals_is_out_of_range(fieldName, value) {
+    if (!window.mmria_vital_sign_range) return false;
+    var range = window.mmria_vital_sign_range[fieldName];
+    if (!range) return false;
+    var v = parseFloat(value);
+    if (value === '' || value == null || isNaN(v)) return false;
+    return (v < parseFloat(range.min) || v > parseFloat(range.max));
+}
+
 function mmria_vitals_validate_field(inputEl)
 {
     if (!window.mmria_vital_sign_range) { return; }
@@ -822,8 +831,15 @@ function get_chart_y_range_from_path(p_metadata, p_metadata_path, p_ui, p_label)
 			const val = array[i][field];
 			if(val)
 			{
-                const parsed_value = Number.parseFloat(val);
-                result.push(Number.isFinite(parsed_value) ? parsed_value.toFixed(2) : 'null');
+                if (mmria_vitals_is_out_of_range(field, val))
+                {
+                    result.push('null');
+                }
+                else
+                {
+                    const parsed_value = Number.parseFloat(val);
+                    result.push(Number.isFinite(parsed_value) ? parsed_value.toFixed(2) : 'null');
+                }
 			}
 			else
 			{
@@ -861,10 +877,17 @@ function get_chart_y_values_from_path(p_metadata, p_metadata_path, p_multiform_i
 			const val = array[i][field];
 			if(val)
 			{
-                const parsed_value = Number.parseFloat(val);
-                if(Number.isFinite(parsed_value))
+                if (mmria_vitals_is_out_of_range(field, val))
                 {
-				    result.push(parsed_value.toFixed(2));
+                    // skip out-of-range values from axis range calculation
+                }
+                else
+                {
+                    const parsed_value = Number.parseFloat(val);
+                    if(Number.isFinite(parsed_value))
+                    {
+                        result.push(parsed_value.toFixed(2));
+                    }
                 }
 			}		
 		}
@@ -1123,7 +1146,9 @@ data.forEach(row => {
   }
   data_table_body_html.push(`<tr><td style="padding-left: 5px;">${date_string.replace(",", "")}</td>`)
   y_axis.forEach(col => {
-    data_table_body_html.push(`<td style="padding-left: 5px;">${row[col.replace(graph_prefix, "")]}</td>`)
+    const fieldName = col.replace(graph_prefix, "");
+    const rawVal = row[fieldName];
+    data_table_body_html.push(`<td style="padding-left: 5px;">${mmria_vitals_is_out_of_range(fieldName, rawVal) ? '' : rawVal}</td>`)
   });
   data_table_body_html.push(`</tr>`);
 });

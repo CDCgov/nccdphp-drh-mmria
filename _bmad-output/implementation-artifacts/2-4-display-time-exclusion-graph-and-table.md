@@ -1,6 +1,6 @@
 # Story 2.4: Display-Time Exclusion — Graph and Table Views
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -17,20 +17,20 @@ so that visual trends and tabular summaries only reflect clinically plausible da
 
 ## Tasks / Subtasks
 
-- [ ] Locate graph rendering in `chart.js` (AC: #1)
-  - [ ] Find the function(s) in `chart.js` that plot data points onto the graph
-  - [ ] Identify where the vitals value is read before being passed to the charting logic
-  - [ ] Add out-of-range check: if value is out of range, skip that data point entirely (no point plotted, no line to/from it)
-- [ ] Locate table rendering in `chart.js` (AC: #2)
-  - [ ] Find the function(s) that render the tabular view of vitals records
-  - [ ] Identify where each cell value is written
-  - [ ] Add out-of-range check: if value is out of range, render empty string instead
-- [ ] Confirm input fields unaffected (AC: #3)
-  - [ ] Verify the case form input field rendering path is not touched by these changes
-  - [ ] Input fields continue to show stored value regardless of range
-- [ ] Null-guard all checks (AC: #4)
-  - [ ] Wrap every exclusion check with `if (window.mmria_vital_sign_range) { ... }`
-  - [ ] If null: render all values normally in graph and table
+- [x] Locate graph rendering in `chart.js` (AC: #1)
+  - [x] Find the function(s) in `chart.js` that plot data points onto the graph
+  - [x] Identify where the vitals value is read before being passed to the charting logic
+  - [x] Add out-of-range check: if value is out of range, skip that data point entirely (no point plotted, no line to/from it)
+- [x] Locate table rendering in `chart.js` (AC: #2)
+  - [x] Find the function(s) that render the tabular view of vitals records
+  - [x] Identify where each cell value is written
+  - [x] Add out-of-range check: if value is out of range, render empty string instead
+- [x] Confirm input fields unaffected (AC: #3)
+  - [x] Verify the case form input field rendering path is not touched by these changes
+  - [x] Input fields continue to show stored value regardless of range
+- [x] Null-guard all checks (AC: #4)
+  - [x] Wrap every exclusion check with `if (window.mmria_vital_sign_range) { ... }`
+  - [x] If null: render all values normally in graph and table
 
 ## Dev Notes
 
@@ -79,8 +79,19 @@ If this function was already defined in Story 2.2 or 2.3, reuse it — do not du
 
 ### Agent Model Used
 
+Claude Sonnet 4.6
+
 ### Debug Log References
 
 ### Completion Notes List
 
+- Added `mmria_vitals_is_out_of_range()` helper function to `chart.js` immediately before `mmria_vitals_validate_field`. Not duplicated — reuses same pattern as `print_version_renderer.js` and `pdf-version/index.js`.
+- Graph exclusion: In `get_chart_y_range_from_path()`, out-of-range values now push `'null'` instead of the numeric value. The existing `y_has_value` null-filtering logic in `chart_render()` then excludes both that x and y data point from the plotted columns, satisfying AC #1.
+- Axis range: In `get_chart_y_values_from_path()`, out-of-range values are skipped so the y-axis min/max is computed only from in-range data.
+- Table exclusion: In `chart_switch_to_table()`, the `y_axis.forEach` cell render now extracts `fieldName` and `rawVal` explicitly and calls `mmria_vitals_is_out_of_range(fieldName, rawVal)` — renders `''` when out of range, satisfying AC #2.
+- Input fields unaffected: No changes were made to any input field rendering path (`page_renderer` form rendering, save path, etc.), satisfying AC #3.
+- Null-guard: `mmria_vitals_is_out_of_range` returns `false` immediately when `window.mmria_vital_sign_range` is null/undefined, satisfying AC #4.
+
 ### File List
+
+- `source-code/mmria/mmria-server/wwwroot/scripts/editor/page_renderer/chart.js`
