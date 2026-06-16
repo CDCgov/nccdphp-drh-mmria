@@ -197,6 +197,112 @@ function textarea_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_
 
 
 /**
+ * Strips browser-computed noise from style attributes on pasted content.
+ * When copying from a browser page (including from the Trumbowyg editor itself),
+ * the clipboard carries the full computed CSS of every element — font-family stacks,
+ * orphans, widows, letter-spacing, etc. These are not user-intentional formatting;
+ * preserving them causes deeply nested styled spans that accumulate on each paste cycle.
+ *
+ * Only three properties are considered meaningful to keep on <span> elements:
+ *   font-size  — set explicitly by the Trumbowyg font-size toolbar
+ *   color      — set explicitly by the Trumbowyg color toolbar
+ *   background-color — set explicitly by the Trumbowyg background-color toolbar
+ *
+ * All other style properties on <span> elements are dropped.
+ * Style attributes on <p> and <div> elements are removed entirely (Trumbowyg does
+ * not set inline styles on block elements).
+ */
+function strip_paste_noise_styles(node)
+{
+    // Browser-computed default values that carry no user intent.
+    // When copying from the editor, Chrome/Edge include the full computed CSS;
+    // these values represent "no formatting" and must be stripped along with
+    // the other noise properties so spans don't accumulate on each paste cycle.
+    var DEFAULT_BG    = { 'rgb(255, 255, 255)':true, 'white':true, '#ffffff':true, '#fff':true, 'transparent':true };
+    var DEFAULT_COLOR = { 'rgb(0, 0, 0)':true, 'rgb(51, 51, 51)':true, 'rgb(33, 33, 33)':true, 'black':true, '#000000':true, '#000':true };
+    // 16px is the base body font size in this app; explicitly tagging it is redundant.
+    var DEFAULT_FSIZE = { '16px':true };
+
+    var spans = node.querySelectorAll('span');
+    for (var si = 0; si < spans.length; si++)
+    {
+        var span = spans[si];
+        if (!span.hasAttribute('style')) continue;
+        var parts = span.getAttribute('style').split(';');
+        var kept = [];
+        for (var pi = 0; pi < parts.length; pi++)
+        {
+            var trimmed = parts[pi].trim();
+            if (!trimmed) continue;
+            var colonIdx = trimmed.indexOf(':');
+            if (colonIdx === -1) continue;
+            var prop = trimmed.substring(0, colonIdx).trim().toLowerCase();
+            var val  = trimmed.substring(colonIdx + 1).trim().toLowerCase();
+            // Keep only the three Trumbowyg-toolbar properties, and only when
+            // their value is not a browser-default (which would mean the user
+            // never intentionally set this property).
+            if (prop === 'background-color' && !DEFAULT_BG[val])    { kept.push(trimmed); continue; }
+            if (prop === 'color'            && !DEFAULT_COLOR[val]) { kept.push(trimmed); continue; }
+            if (prop === 'font-size'        && !DEFAULT_FSIZE[val]) { kept.push(trimmed); continue; }
+            // All other properties: drop
+        }
+        if (kept.length > 0)
+        {
+            span.setAttribute('style', kept.join('; '));
+        }
+        else
+        {
+            span.removeAttribute('style');
+        }
+    }
+
+    // Unwrap spans with no remaining style attribute — replace the span with its
+    // children so the default-value spans don't accumulate across paste cycles.
+    // querySelectorAll returns document order; iterating in reverse processes
+    // deepest descendants first, keeping parent references valid.
+    var unstyledSpans = node.querySelectorAll('span:not([style])');
+    for (var ui = unstyledSpans.length - 1; ui >= 0; ui--)
+    {
+        var uspan  = unstyledSpans[ui];
+        var parent = uspan.parentNode;
+        if (!parent) continue;
+        while (uspan.firstChild) { parent.insertBefore(uspan.firstChild, uspan); }
+        parent.removeChild(uspan);
+    }
+
+    var blocks = node.querySelectorAll('p, div');
+    for (var bi = 0; bi < blocks.length; bi++)
+    {
+        blocks[bi].removeAttribute('style');
+    }
+}
+
+/**
+ * Recursively removes clipboard-metadata nodes from a DOM subtree:
+ * - Comment nodes (<!--StartFragment-->, <!--EndFragment-->, and any other comments)
+ * - <br class="Apple-interchange-newline"> (Mac WebKit clipboard line-break artifact)
+ */
+function strip_clipboard_artifacts(node)
+{
+    for (var i = node.childNodes.length - 1; i >= 0; i--)
+    {
+        var child = node.childNodes[i];
+        if (child.nodeType === Node.COMMENT_NODE)
+        {
+            node.removeChild(child);
+        }
+        else if (child.nodeName === 'BR' && child.className === 'Apple-interchange-newline')
+        {
+            node.removeChild(child);
+        }
+        else
+        {
+            strip_clipboard_artifacts(child);
+        }
+    }
+}
+
+/**
  * Attaches a Range API paste handler to the Trumbowyg narrative editor div.
  * Uses the capture phase to intercept paste before Trumbowyg's built-in handler,
  * ensuring content is inserted at the active cursor position.
@@ -224,6 +330,24 @@ function attach_narrative_paste_handler(p_object_path, p_metadata_path, p_dictio
         var pastedHtml = clipboardData ? clipboardData.getData('text/html') : '';
         var pastedText = (!pastedHtml && clipboardData) ? (clipboardData.getData('text/plain') || '') : '';
 
+        // Extract only the fragment content between StartFragment/EndFragment markers.
+        // Browser clipboard HTML wraps the selection in a full <html><head><body> document
+        // and uses these markers to identify the actual copied content. Slicing to the
+        // fragment eliminates the document wrapper and the primary marker comments.
+        if (pastedHtml)
+        {
+            var sfStart = pastedHtml.indexOf('<!--StartFragment-->');
+            var sfEnd   = pastedHtml.indexOf('<!--EndFragment-->');
+            if (sfStart !== -1 && sfEnd !== -1 && sfEnd > sfStart)
+            {
+                pastedHtml = pastedHtml.substring(sfStart + '<!--StartFragment-->'.length, sfEnd);
+            }
+            else if (sfStart !== -1)
+            {
+                pastedHtml = pastedHtml.substring(sfStart + '<!--StartFragment-->'.length);
+            }
+        }
+
         // Step 3: Delete currently selected content (if any)
         range.deleteContents();
 
@@ -235,6 +359,13 @@ function attach_narrative_paste_handler(p_object_path, p_metadata_path, p_dictio
             cleanNode.innerHTML = pastedHtml;
             // DOMWalker strips on* attributes and javascript: hrefs; preserves all structural tags
             DOMWalker(cleanNode);
+            // Remove residual clipboard metadata that survived fragment extraction:
+            // Comment nodes (embedded StartFragment/EndFragment from prior paste cycles)
+            // and Mac WebKit Apple-interchange-newline <br> elements.
+            strip_clipboard_artifacts(cleanNode);
+            // Strip browser-computed noise styles; keep only font-size, color, background-color
+            // on spans, and remove all inline styles from block elements.
+            strip_paste_noise_styles(cleanNode);
             while (cleanNode.firstChild)
             {
                 fragment.appendChild(cleanNode.firstChild);
@@ -357,6 +488,18 @@ function textarea_control_strip_html_attributes(p_value)
 
     DOMWalker(node);
 
+    // Restore <br> in <p> elements that have no text content so blank-line spacers
+    // survive save/reload. Using textContent.trim() recurses into nested empty spans
+    // (e.g. <p><span></span></p>) which the old child-node walk counted as visible.
+    var allP = node.querySelectorAll('p');
+    for (var pi = 0; pi < allP.length; pi++)
+    {
+        if (allP[pi].textContent.trim() === '')
+        {
+            allP[pi].innerHTML = '<br>';
+        }
+    }
+
     return node.innerHTML;
     
 }
@@ -427,8 +570,14 @@ function DOMWalker(p_node)
                     if(att_value.match(VarRegex)!= null)
                     {
                         let new_att_value = colourNameToHex(name_value[1].replace(VarRegex,"$1").trim());
-                        
-                        new_array.push(`${name_value[0].trim()}:${new_att_value}`);
+                        if (new_att_value !== false)
+                        {
+                            new_array.push(`${name_value[0].trim()}:${new_att_value}`);
+                        }
+                        else
+                        {
+                            new_array.push(att_value);
+                        }
 
                     }
                     else if(att_value.trim().indexOf("color")== 0)
@@ -436,8 +585,14 @@ function DOMWalker(p_node)
                         if(name_value[1].trim().indexOf("#") != 0)
                         {
                             let new_att_value = colourNameToHex(name_value[1].trim());
-                        
-                            new_array.push(`${name_value[0].trim()}:${new_att_value}`);
+                            if (new_att_value !== false)
+                            {
+                                new_array.push(`${name_value[0].trim()}:${new_att_value}`);
+                            }
+                            else
+                            {
+                                new_array.push(att_value);
+                            }
                         }
                         else
                         {
