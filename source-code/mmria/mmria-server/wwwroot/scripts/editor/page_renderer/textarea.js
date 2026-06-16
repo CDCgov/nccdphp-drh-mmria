@@ -281,10 +281,14 @@ function strip_paste_noise_styles(node)
     }
 
     // Flatten redundant nested same-tag inline elements.
-    // When block content is pasted at a position inside <strong>, the browser
-    // wraps the pasted paragraph in the outer <strong> AND the pasted content
-    // has its own inner <strong>, producing <strong><strong>text</strong></strong>.
-    // Unwrap the inner duplicate so the result is a single <strong>text</strong>.
+    // Two cases:
+    // (A) Pure nesting — outer has only same-tag children: <strong><strong>text</strong></strong>
+    //     → flatten to <strong>text</strong> by lifting inner's children to outer.
+    // (B) Mixed-content outer — outer has both a same-tag child AND bare text (or other
+    //     element) siblings: <strong><strong>The&nbsp;</strong>decedent</strong>
+    //     This is a browser "context wrapper" added when copy starts inside <strong>.
+    //     It makes plain text siblings bold/italic when they shouldn't be.
+    //     → unwrap the outer entirely; the inner <strong> stays intact.
     var FLAT_TAGS = ['strong', 'b', 'em', 'i', 'u', 's', 'strike'];
     for (var fti = 0; fti < FLAT_TAGS.length; fti++)
     {
@@ -293,8 +297,31 @@ function strip_paste_noise_styles(node)
         {
             var innerTag = nested[ni];
             var outerTag = innerTag.parentNode;
-            if (outerTag && outerTag.nodeName.toLowerCase() === FLAT_TAGS[fti])
+            if (!outerTag || outerTag.nodeName.toLowerCase() !== FLAT_TAGS[fti]) continue;
+            // Does the outer have mixed content? (a non-whitespace text node, or a child
+            // element that is NOT the same inline tag — either makes it a context wrapper)
+            var outerHasMixed = false;
+            for (var fci = 0; fci < outerTag.childNodes.length; fci++)
             {
+                var fch = outerTag.childNodes[fci];
+                if (fch.nodeType === Node.TEXT_NODE && fch.nodeValue.trim() !== '')
+                    { outerHasMixed = true; break; }
+                if (fch.nodeType === Node.ELEMENT_NODE && fch.nodeName.toLowerCase() !== FLAT_TAGS[fti])
+                    { outerHasMixed = true; break; }
+            }
+            if (outerHasMixed)
+            {
+                // Case (B): spurious context wrapper — unwrap outer, children stay intact.
+                var outerParent = outerTag.parentNode;
+                if (outerParent)
+                {
+                    while (outerTag.firstChild) { outerParent.insertBefore(outerTag.firstChild, outerTag); }
+                    outerParent.removeChild(outerTag);
+                }
+            }
+            else
+            {
+                // Case (A): pure nesting — lift inner's children to outer, remove inner.
                 while (innerTag.firstChild) { outerTag.insertBefore(innerTag.firstChild, innerTag); }
                 outerTag.removeChild(innerTag);
             }
@@ -441,15 +468,21 @@ function attach_narrative_paste_handler(p_object_path, p_metadata_path, p_dictio
         var _insertedLastNode = null;
         if (fragmentHasBlocks)
         {
-            // Determine if the range start is inside an inline formatting element.
+            // For block-level paste content, NEVER use range.insertNode unless the cursor is
+            // at the editor root level (directly between paragraphs). Using range.insertNode
+            // when the cursor is inside ANY element — including inside a <p> at text level —
+            // creates <p><p>…</p></p> invalid nesting. The browser's resolution of that invalid
+            // structure can leave surrounding <strong>/<em> formatting bleeding into the pasted
+            // paragraph. The block-safe path (insert after nearest block ancestor) is always
+            // correct: pasted paragraphs become siblings, never children of existing blocks.
             var _ctxEl = range.startContainer.nodeType === Node.ELEMENT_NODE
                          ? range.startContainer
                          : range.startContainer.parentElement;
-            var _inInlineCtx = _ctxEl
-                                && !PASTE_BLOCK_TAGS[_ctxEl.nodeName.toLowerCase()]
-                                && !_ctxEl.classList.contains('trumbowyg-editor');
+            // Only skip block-safe insert when cursor is literally AT the editor root div
+            // (between paragraphs) — that position is already at block boundary.
+            var _isInsideStructure = _ctxEl && !_ctxEl.classList.contains('trumbowyg-editor');
 
-            if (_inInlineCtx)
+            if (_isInsideStructure)
             {
                 // Walk up to the nearest <p> or <div> ancestor
                 var _blockAncestor = _ctxEl;
@@ -462,6 +495,7 @@ function attach_narrative_paste_handler(p_object_path, p_metadata_path, p_dictio
                 if (_blockAncestor && PASTE_BLOCK_TAGS[_blockAncestor.nodeName.toLowerCase()])
                 {
                     // Insert pasted blocks after the block ancestor — safe from inline bleed
+                    // and from <p>-inside-<p> invalid nesting.
                     var _nextRef  = _blockAncestor.nextSibling;
                     var _parentRef = _blockAncestor.parentNode;
                     while (fragment.firstChild)
@@ -485,6 +519,52 @@ function attach_narrative_paste_handler(p_object_path, p_metadata_path, p_dictio
         else
         {
             range.insertNode(fragment);
+        }
+
+        // Step 5b: Post-insert nested inline cleanup.
+        // Run the same mixed-content-outer-unwrap + pure-nesting-flatten pass on the
+        // entire editor div. This catches any nesting that was created *after* the
+        // fragment cleanup ran — e.g. by browser DOM normalization when the insertion
+        // point was near an inline element boundary, or by Trumbowyg's semanticCode
+        // converting <b> tags.
+        var _postEditorEl = document.querySelector('.trumbowyg-editor');
+        if (_postEditorEl)
+        {
+            var _POST_FLAT = ['strong', 'b', 'em', 'i', 'u', 's', 'strike'];
+            for (var _pfi = 0; _pfi < _POST_FLAT.length; _pfi++)
+            {
+                var _pfTag = _POST_FLAT[_pfi];
+                var _pfNested = _postEditorEl.querySelectorAll(_pfTag + ' ' + _pfTag);
+                for (var _pfni = _pfNested.length - 1; _pfni >= 0; _pfni--)
+                {
+                    var _pfInner = _pfNested[_pfni];
+                    var _pfOuter = _pfInner.parentNode;
+                    if (!_pfOuter || _pfOuter.nodeName.toLowerCase() !== _pfTag) continue;
+                    var _pfMixed = false;
+                    for (var _pfci = 0; _pfci < _pfOuter.childNodes.length; _pfci++)
+                    {
+                        var _pfch = _pfOuter.childNodes[_pfci];
+                        if (_pfch.nodeType === Node.TEXT_NODE && _pfch.nodeValue.trim() !== '')
+                            { _pfMixed = true; break; }
+                        if (_pfch.nodeType === Node.ELEMENT_NODE && _pfch.nodeName.toLowerCase() !== _pfTag)
+                            { _pfMixed = true; break; }
+                    }
+                    if (_pfMixed)
+                    {
+                        var _pfPar = _pfOuter.parentNode;
+                        if (_pfPar)
+                        {
+                            while (_pfOuter.firstChild) { _pfPar.insertBefore(_pfOuter.firstChild, _pfOuter); }
+                            _pfPar.removeChild(_pfOuter);
+                        }
+                    }
+                    else
+                    {
+                        while (_pfInner.firstChild) { _pfOuter.insertBefore(_pfInner.firstChild, _pfInner); }
+                        _pfOuter.removeChild(_pfInner);
+                    }
+                }
+            }
         }
 
         // Step 6: Collapse range to end of inserted content and restore selection
@@ -600,8 +680,9 @@ function textarea_control_strip_html_attributes(p_value)
 
     DOMWalker(node);
 
-    // Flatten redundant nested same-tag inline elements in stored HTML
-    // (e.g. accumulated <strong><strong>text</strong></strong> → <strong>text</strong>).
+    // Flatten redundant nested same-tag inline elements in stored HTML.
+    // Same two-case logic as strip_paste_noise_styles: mixed-content outers are context
+    // wrappers and are unwrapped; pure same-tag nesting is flattened.
     var SAVE_FLAT_TAGS = ['strong', 'b', 'em', 'i', 'u', 's', 'strike'];
     for (var sfti = 0; sfti < SAVE_FLAT_TAGS.length; sfti++)
     {
@@ -610,7 +691,26 @@ function textarea_control_strip_html_attributes(p_value)
         {
             var sfInner = sfNested[sfni];
             var sfOuter = sfInner.parentNode;
-            if (sfOuter && sfOuter.nodeName.toLowerCase() === SAVE_FLAT_TAGS[sfti])
+            if (!sfOuter || sfOuter.nodeName.toLowerCase() !== SAVE_FLAT_TAGS[sfti]) continue;
+            var sfHasMixed = false;
+            for (var sfci = 0; sfci < sfOuter.childNodes.length; sfci++)
+            {
+                var sfch = sfOuter.childNodes[sfci];
+                if (sfch.nodeType === Node.TEXT_NODE && sfch.nodeValue.trim() !== '')
+                    { sfHasMixed = true; break; }
+                if (sfch.nodeType === Node.ELEMENT_NODE && sfch.nodeName.toLowerCase() !== SAVE_FLAT_TAGS[sfti])
+                    { sfHasMixed = true; break; }
+            }
+            if (sfHasMixed)
+            {
+                var sfPar = sfOuter.parentNode;
+                if (sfPar)
+                {
+                    while (sfOuter.firstChild) { sfPar.insertBefore(sfOuter.firstChild, sfOuter); }
+                    sfPar.removeChild(sfOuter);
+                }
+            }
+            else
             {
                 while (sfInner.firstChild) { sfOuter.insertBefore(sfInner.firstChild, sfInner); }
                 sfOuter.removeChild(sfInner);

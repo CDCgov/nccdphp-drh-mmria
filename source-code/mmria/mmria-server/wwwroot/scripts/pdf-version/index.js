@@ -1454,7 +1454,12 @@ function ConvertHTMLDOMWalker(p_result, p_node)
 			return;
 			break;
 		case "#TEXT":
-			p_result.push({ text: p_node.textContent.trim().replace("<br>", "\n") });
+			// Do NOT use .trim() here: it strips &nbsp; (\u00a0) to empty string, losing
+			// the space between an inline element and the following text (e.g. the gap
+			// between <strong>The</strong> and &nbsp;decedent becomes "Thedecedent").
+			// Instead: replace &nbsp; with a regular space, remove HTML formatting
+			// line-breaks/tabs, and preserve all space characters.
+			p_result.push({ text: p_node.textContent.replace(/\u00a0/g, ' ').replace(/[\n\r\t]/g, '').replace('<br>', '\n') });
 			return;
 			break;
 		case "P":
@@ -1496,7 +1501,7 @@ function ConvertHTMLDOMWalker(p_result, p_node)
 		case "STRONG":
         case "B":
 			let strong_attr = { bold: true };
-			p_result.push({ text: p_node.textContent.trim(), style: convert_attribute_to_pdf(p_node, strong_attr) });
+			p_result.push({ text: p_node.textContent.replace(/\u00a0/g, ' '), style: convert_attribute_to_pdf(p_node, strong_attr) });
 			return;
 			break;
 		case "BR":
@@ -1505,12 +1510,12 @@ function ConvertHTMLDOMWalker(p_result, p_node)
 			break;
 		case "EM":
 			let em_attr = { italics: true };
-			p_result.push({ text: p_node.textContent.trim(), style: convert_attribute_to_pdf(p_node, em_attr) });
+			p_result.push({ text: p_node.textContent.replace(/\u00a0/g, ' '), style: convert_attribute_to_pdf(p_node, em_attr) });
 			return;
 			break;
 		case "U":
-			let u_text = p_node.textContent.trim();
-			if (u_text.length > 0) {
+			let u_text = p_node.textContent.replace(/\u00a0/g, ' ');
+			if (u_text.trim().length > 0) {
 				p_result.push({ text: u_text, style: 'isUnderlined' });
 			}
 			return;
