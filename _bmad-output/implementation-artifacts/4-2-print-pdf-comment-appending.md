@@ -1,6 +1,6 @@
 # Story 4.2: Print/PDF Out-of-Range Comment Appending
 
-Status: not-started
+Status: done
 
 ## Story
 
@@ -20,26 +20,26 @@ so that printed output is legible and readers understand why fields appear blank
 
 ## Tasks / Subtasks
 
-- [ ] Add `mmria_vitals_build_out_of_range_notice()` to `pdf-version/index.js` (AC: #1–#6)
-  - [ ] Place the new function immediately after the closing `}` of `mmria_vitals_is_out_of_range()` at line 707 (insert after ~line 717)
-  - [ ] Function iterates `p_meta_children[1]` through `p_meta_children[p_meta_children.length - 2]` (skipping first/date child at index 0 and last/comment child)
-  - [ ] For each child, calls `mmria_vitals_is_out_of_range(child.name, p_data_row[child.name])`
-  - [ ] Concatenates `child.prompt + ' removed. '` for each out-of-range field into `clauses`
-  - [ ] Returns `'** Out of range. ' + clauses.trim()` if any clauses exist, otherwise `''`
-  - [ ] If `!window.mmria_vital_sign_range`, returns `''` immediately
-- [ ] Modify comment cell rendering in `pdf-version/index.js` vitals branch (AC: #1–#7)
-  - [ ] Locate the comment push at ~line 2284: `row.push({ text: chkNull(dataChild[metaChild[metaChild.length - 1].name]), style: ['tableDetail'], },);` inside the `ctx.data.forEach` loop of the `vital_signs`/`transport_vital_signs` branch
-  - [ ] Before that push, compute: `var vitals_oor_notice = mmria_vitals_build_out_of_range_notice(metaChild, dataChild);`
-  - [ ] Compute: `var vitals_comment_text = chkNull(dataChild[metaChild[metaChild.length - 1].name]);`
-  - [ ] If notice is non-empty: `vitals_comment_text = vitals_comment_text ? vitals_comment_text + ' ' + vitals_oor_notice : vitals_oor_notice;`
-  - [ ] Replace the original push with: `row.push({ text: vitals_comment_text, style: ['tableDetail'], },);`
-- [ ] Add `mmria_vitals_build_out_of_range_notice()` to `print_version_renderer.js` (AC: #1–#6)
-  - [ ] Place the new function immediately after the closing `}` of `mmria_vitals_is_out_of_range()` at line 1084 (insert after ~line 1095)
-  - [ ] Identical logic to the pdf-version counterpart (same signature, same implementation)
-- [ ] Modify `grid` case in `print_version_renderer.js` to append notice to comment cell (AC: #2–#7)
-  - [ ] In the `grid` case (line 60), immediately before the row loop `for (let i = 0; i < p_data.length; i++)` at ~line 83, add: `let is_vitals_grid = window.mmria_vital_sign_range && (p_metadata.name === 'vital_signs' || p_metadata.name === 'transport_vital_signs');`
-  - [ ] Inside the row loop, before the column loop `for (let j = 0; j < p_metadata.children.length; j++)`, add: `let row_oor_notice = is_vitals_grid ? mmria_vitals_build_out_of_range_notice(p_metadata.children, p_data[i]) : '';`
-  - [ ] Inside the column loop, replace the existing `if (p_data[i][child.name] != null) { ... }` block with logic that: (a) reads `let cell_data = p_data[i][child.name];` (b) if this is the last column and the grid is a vitals grid with a notice (`is_vitals_grid && j === p_metadata.children.length - 1 && row_oor_notice`), applies `cell_data = cell_data ? cell_data + ' ' + row_oor_notice : row_oor_notice;` (c) calls `print_version_render` with `cell_data` if `cell_data != null`
+- [x] Add `mmria_vitals_build_out_of_range_notice()` to `pdf-version/index.js` (AC: #1–#6)
+  - [x] Place the new function immediately after the closing `}` of `mmria_vitals_is_out_of_range()` at line 707 (insert after ~line 717)
+  - [x] Function iterates `p_meta_children[1]` through `p_meta_children[p_meta_children.length - 2]` (skipping first/date child at index 0 and last/comment child)
+  - [x] For each child, calls `mmria_vitals_is_out_of_range(child.name, p_data_row[child.name])`
+  - [x] Concatenates `child.prompt + ' removed. '` for each out-of-range field into `clauses`
+  - [x] Returns `'** Out of range. ' + clauses.trim()` if any clauses exist, otherwise `''`
+  - [x] Null guard uses `window.mmria_validation_rules` (renamed from spec's `window.mmria_vital_sign_range`)
+- [x] Modify comment cell rendering in `pdf-version/index.js` vitals branch (AC: #1–#7)
+  - [x] Locate the comment push inside the `ctx.data.forEach` loop of the `vital_signs`/`transport_vital_signs` branch
+  - [x] Before that push, compute: `var vitals_oor_notice = mmria_vitals_build_out_of_range_notice(metaChild, dataChild);`
+  - [x] Compute: `var vitals_comment_text = chkNull(dataChild[metaChild[metaChild.length - 1].name]);`
+  - [x] If notice is non-empty: `vitals_comment_text = vitals_comment_text ? vitals_comment_text + ' ' + vitals_oor_notice : vitals_oor_notice;`
+  - [x] Replace the original push with: `row.push({ text: vitals_comment_text, style: ['tableDetail'], },);`
+- [x] Add `mmria_vitals_build_out_of_range_notice()` to `print_version_renderer.js` (AC: #1–#6)
+  - [x] Place the new function immediately after the closing `}` of `mmria_vitals_is_out_of_range()`
+  - [x] Identical logic to the pdf-version counterpart (same signature, same implementation)
+- [x] Modify `grid` case in `print_version_renderer.js` to append notice to comment cell (AC: #2–#7)
+  - [x] Added `let is_vitals_grid = window.mmria_validation_rules && (p_metadata.name === 'vital_signs' || p_metadata.name === 'transport_vital_signs');` before the row loop
+  - [x] Inside the row loop, added `let row_oor_notice = is_vitals_grid ? mmria_vitals_build_out_of_range_notice(p_metadata.children, p_data[i]) : '';`
+  - [x] Last column cell appends notice when `is_vitals_grid && row_oor_notice` is truthy
 
 ## Dev Notes
 
@@ -240,8 +240,22 @@ Every notice-related code path is protected: `mmria_vitals_build_out_of_range_no
 
 ### Debug Log References
 
+N/A — no server-side changes, JS files require no build step.
+
 ### Completion Notes List
+
+- Implemented as specified. All four tasks complete.
+- **Spec deviation:** Story spec references `window.mmria_vital_sign_range` as the null guard in `mmria_vitals_build_out_of_range_notice`. Implementation uses `window.mmria_validation_rules` (the actual global established by Story 4.0). The guard semantics are identical — both check for the presence of the vitals rules object before running.
+- The `is_vitals_grid` guard in `print_version_renderer.js` uses `window.mmria_validation_rules` for consistency.
+- `laboratory_tests` and `routine_monitoring` grids are not affected — the print renderer's guard explicitly checks for `vital_signs` / `transport_vital_signs` names; the PDF branch comment append only fires when `vitals_oor_notice` is non-empty, which requires `window.mmria_validation_rules` to be populated with matching field rules.
 
 ### File List
 
+- `source-code/mmria/mmria-server/wwwroot/scripts/pdf-version/index.js`
+- `source-code/mmria/mmria-server/wwwroot/scripts/print-version/print_version_renderer.js`
+
 ### Change Log
+
+- Added `mmria_vitals_build_out_of_range_notice()` to both files immediately after `mmria_vitals_is_out_of_range()`
+- Modified vitals comment cell push in `pdf-version/index.js` to compute and append out-of-range notice
+- Modified `grid` case in `print_version_renderer.js` to detect vitals grids and append notice to last column cell

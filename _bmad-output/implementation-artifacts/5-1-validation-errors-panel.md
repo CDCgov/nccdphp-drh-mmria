@@ -1,6 +1,6 @@
 # Story 5.1: Implement the Validation Errors Panel
 
-Status: not-started
+Status: done
 
 ## Story
 
@@ -194,14 +194,14 @@ Then it meets Section 508 accessibility requirements: keyboard navigation, scree
 
 ### Phase 1 — Client-Side: Historical Scanning and State
 
-- [ ] Create validation state management module
-  - [ ] New file: `wwwroot/scripts/validation/validation-state.js`
-  - [ ] Export functions:
+- [x] Create validation state management module
+  - [x] New file: `wwwroot/scripts/validation/validation-state.js`
+  - [x] Export functions:
     - `initializeValidationState()` — called at case page load
     - `getValidationState()` — returns current state (errors, warnings, field info)
     - `updateValidationState(newState)` — updates state
     - `resetValidationState()` — clears state
-  - [ ] State shape:
+  - [x] State shape:
     ```javascript
     {
       errors: [
@@ -236,38 +236,38 @@ Then it meets Section 508 accessibility requirements: keyboard navigation, scree
     }
     ```
 
-- [ ] Implement historical evaluation engine (client-side)
-  - [ ] New function in `validation-state.js`: `evaluateHistoricalVitals(caseData, validationRules)`
-  - [ ] Function logic:
+- [x] Implement historical evaluation engine (client-side)
+  - [x] New function in `validation-state.js`: `evaluateHistoricalVitals(caseData, validationRules)`
+  - [x] Function logic:
     - Iterate through all vitals fields in case document (search by field_path patterns: `*/temperature`, `*/heart_rate`, etc.)
     - For each field, look up the rule in `window.mmria_validation_rules[field_path]`
     - Check if stored value is out of range per rule min/max
     - Downgrade all `severity: hard` rules to `warning` for historical context
     - Collect violations into warnings array with severity `"warning"` and stored_value
-  - [ ] Called at case page load, stores results in validation state
+  - [x] Called at case page load, stores results in validation state
 
-- [ ] Integrate historical evaluation into case page load
-  - [ ] Modify `case/index.js` (or equivalent page initialization code)
-  - [ ] After case data is loaded and `window.mmria_validation_rules` is available:
+- [x] Integrate historical evaluation into case page load
+  - [x] Modify `case/index.js` (or equivalent page initialization code)
+  - [x] After case data is loaded and `window.mmria_validation_rules` is available:
     - Call `evaluateHistoricalVitals(caseData, window.mmria_validation_rules)`
     - Call `initializeValidationState()` with combined errors and warnings from historical scan
-  - [ ] Store results in module-level state accessible to button/modal
+  - [x] Store results in module-level state accessible to button/modal
 
-- [ ] Create case data traversal utility
-  - [ ] New function in `validation-state.js`: `findFieldValueInCase(caseData, fieldPath)`
-  - [ ] Logic:
+- [x] Create case data traversal utility
+  - [x] New function in `validation-state.js`: `findFieldValueInCase(caseData, fieldPath)`
+  - [x] Logic:
     - Parse field_path (e.g., `"er_visit_and_hospital_medical_records/vital_signs/temperature"`)
     - Walk nested case object using path segments
     - Handle repeating records (arrays) by checking all elements
     - Return `{ value, recordIndex, recordPath }` or null if not found
-  - [ ] Used during historical scan and field navigation
+  - [x] Used during historical scan and field navigation
 
 ### Phase 2 — Client-Side: Button Visibility and State Display
 
-- [ ] Create button component
-  - [ ] New file: `wwwroot/scripts/validation/validation-errors-button.js`
-  - [ ] Export function: `renderValidationErrorsButton(validationState, editMode)`
-  - [ ] Logic:
+- [x] Create button component
+  - [x] New file: `wwwroot/scripts/validation/validation-errors-button.js`
+  - [x] Export function: `renderValidationErrorsButton(validationState, editMode)`
+  - [x] Logic:
     - If not in edit mode OR no violations (errors.length === 0 AND warnings.length === 0): return null
     - Otherwise, render button with counts:
       - Both counts: `"X Errors · Y Warnings"`
@@ -277,68 +277,68 @@ Then it meets Section 508 accessibility requirements: keyboard navigation, scree
     - Button click handler: open modal (see Phase 3)
     - Return button HTML or DOM element
 
-- [ ] Integrate button into page layout
-  - [ ] Locate case header area (above red line) in `case/index.js` or case template
-  - [ ] After page load and validation state initialized:
+- [x] Integrate button into page layout
+  - [x] Locate case header area (above red line) in `case/index.js` or case template
+  - [x] After page load and validation state initialized:
     - Call `renderValidationErrorsButton(getValidationState(), isEditMode())`
     - Insert button into header area if returned non-null
-  - [ ] Update button on case reload or validation state change
+  - [x] Update button on case reload or validation state change
 
-- [ ] Create helper to determine edit mode
-  - [ ] New function in `validation-state.js`: `isEditMode()`
-  - [ ] Logic: Check case status from page state; return true if not closed or decision-entered
-  - [ ] Reference: FR-6.1 — "only in edit mode"
+- [x] Create helper to determine edit mode
+  - [x] New function in `validation-state.js`: `isEditMode()`
+  - [x] Logic: Check case status from page state; return true if not closed or decision-entered
+  - [x] Reference: FR-6.1 — "only in edit mode"
 
 ### Phase 3 — Client-Side: Modal Display and Interaction
 
-- [ ] Create modal component
-  - [ ] New file: `wwwroot/scripts/validation/validation-errors-modal.js`
-  - [ ] Export function: `renderValidationErrorsModal(validationState)`
-  - [ ] Modal structure:
+- [x] Create modal component
+  - [x] New file: `wwwroot/scripts/validation/validation-errors-modal.js`
+  - [x] Export function: `renderValidationErrorsModal(validationState)`
+  - [x] Modal structure:
     - Header: `{validationState.errors.length} Errors · {validationState.warnings.length} Warnings`
     - Body: scrollable container with Errors and Warnings sections
     - Footer: Close button
-  - [ ] Return modal HTML or DOM element
+  - [x] Return modal HTML or DOM element
 
-- [ ] Implement Errors section renderer
-  - [ ] New function in `validation-errors-modal.js`: `renderErrorsSection(errors)`
-  - [ ] For each error:
+- [x] Implement Errors section renderer
+  - [x] New function in `validation-errors-modal.js`: `renderErrorsSection(errors)`
+  - [x] For each error:
     - Section header: **"Errors"** with red count badge (errors.length)
     - Red circle icon (or red filled circle SVG/unicode: ●)
     - Three-column row: Form Name | Field Label (link) | Message
     - Message uses standard FR-2.2 format
-  - [ ] Return section HTML
-  - [ ] Only render if errors.length > 0
+  - [x] Return section HTML
+  - [x] Only render if errors.length > 0
 
-- [ ] Implement Warnings section renderer
-  - [ ] New function in `validation-errors-modal.js`: `renderWarningsSection(warnings)`
-  - [ ] For each warning:
+- [x] Implement Warnings section renderer
+  - [x] New function in `validation-errors-modal.js`: `renderWarningsSection(warnings)`
+  - [x] For each warning:
     - Section header: **"Warnings"** with amber count badge (warnings.length)
     - Amber triangle-exclamation icon (or ⚠ unicode character)
     - Three-column row: Form Name | Field Label (link) | Message
     - Message uses FR-6.2 format: `"Value [X] is outside the expected range [min]–[max]."`
-  - [ ] Return section HTML
-  - [ ] Only render if warnings.length > 0
+  - [x] Return section HTML
+  - [x] Only render if warnings.length > 0
 
-- [ ] Integrate modal into page
-  - [ ] In `validation-errors-button.js`, button click handler:
+- [x] Integrate modal into page
+  - [x] In `validation-errors-button.js`, button click handler:
     - Call `renderValidationErrorsModal(getValidationState())`
     - Show modal using existing site modal pattern
     - Attach Close button click handler to close modal
-  - [ ] Ensure modal is page-scoped (not singleton)
+  - [x] Ensure modal is page-scoped (not singleton)
 
-- [ ] Add field label link handlers
-  - [ ] In `validation-errors-modal.js`, attach click handler to each Field Label link
-  - [ ] On click:
+- [x] Add field label link handlers
+  - [x] In `validation-errors-modal.js`, attach click handler to each Field Label link
+  - [x] On click:
     - Call `navigateToField(fieldPath, formId, recordIndex)` (see Phase 4)
     - Close modal after navigation completes
 
 ### Phase 4 — Client-Side: Field Navigation
 
-- [ ] Create field navigation utility
-  - [ ] New file: `wwwroot/scripts/validation/field-navigation.js`
-  - [ ] Export function: `navigateToField(fieldPath, formId, recordIndex)`
-  - [ ] Logic:
+- [x] Create field navigation utility
+  - [x] New file: `wwwroot/scripts/validation/field-navigation.js`
+  - [x] Export function: `navigateToField(fieldPath, formId, recordIndex)`
+  - [x] Logic:
     - Determine target form tab and activate it (if not already active)
     - For repeating records (ER Visits, etc.):
       - If recordIndex provided, find and open/expand the record at that index
@@ -346,36 +346,36 @@ Then it meets Section 508 accessibility requirements: keyboard navigation, scree
     - Scroll to the specific field using `scrollIntoView()` or similar
     - Return success boolean
 
-- [ ] Implement form tab activation
-  - [ ] In `field-navigation.js`: `activateFormTab(formId)`
-  - [ ] Logic: Find form tab by ID, click or show it, ensure it's active
-  - [ ] Reference existing tab system in case page
+- [x] Implement form tab activation
+  - [x] In `field-navigation.js`: `activateFormTab(formId)`
+  - [x] Logic: Find form tab by ID, click or show it, ensure it's active
+  - [x] Reference existing tab system in case page
 
-- [ ] Implement repeating record expansion
-  - [ ] In `field-navigation.js`: `expandRecord(recordPath, recordIndex)`
-  - [ ] Logic:
+- [x] Implement repeating record expansion
+  - [x] In `field-navigation.js`: `expandRecord(recordPath, recordIndex)`
+  - [x] Logic:
     - For ER Visit records (or similar repeating sections):
       - Find the record container at recordIndex
       - If collapsed, click expand button or show content
       - Wait for animation/rendering to complete (100ms timeout or event)
     - Reference existing expand/collapse mechanism in case page
 
-- [ ] Implement field scroll-into-view
-  - [ ] In `field-navigation.js`: `scrollToField(fieldPath, recordPath)`
-  - [ ] Logic:
+- [x] Implement field scroll-into-view
+  - [x] In `field-navigation.js`: `scrollToField(fieldPath, recordPath)`
+  - [x] Logic:
     - Find input element by field_path or similar identifier
     - Call `element.scrollIntoView({ behavior: 'smooth', block: 'center' })`
     - Set focus to element for keyboard accessibility
 
-- [ ] Handle complex field path matching
-  - [ ] In `field-navigation.js`: `findFormFieldElement(fieldPath, recordIndex)`
-  - [ ] Logic:
+- [x] Handle complex field path matching
+  - [x] In `field-navigation.js`: `findFormFieldElement(fieldPath, recordIndex)`
+  - [x] Logic:
     - Parse fieldPath (e.g., `"er_visit_and_hospital_medical_records/vital_signs/temperature"`)
     - For repeating records: append `[recordIndex]` to selector
     - Search DOM for matching input/field element
     - Return element or null
 
-### Phase 5 — Server-Side: Validation State Delivery (Optional)
+### Phase 5 — Server-Side: Validation State Delivery (Optional) — **Skipped: client-side approach used**
 
 - [ ] Consider server-side delivery of validation state at page render
   - [ ] This task is optional — can be deferred to future optimization
@@ -386,9 +386,9 @@ Then it meets Section 508 accessibility requirements: keyboard navigation, scree
 
 ### Phase 6 — Styling and Accessibility
 
-- [ ] Create stylesheet for button and modal
-  - [ ] New file: `wwwroot/css/validation-errors-panel.css` (or extend existing `validation.css`)
-  - [ ] Styles:
+- [x] Create stylesheet for button and modal
+  - [x] New file: `wwwroot/css/validation-errors-panel.css` (or extend existing `validation.css`)
+  - [x] Styles:
     - `.validation-errors-button` — link button style, positioned in header
     - `.validation-errors-modal` — existing modal pattern
     - `.validation-errors-section` — error/warning section container
@@ -399,48 +399,48 @@ Then it meets Section 508 accessibility requirements: keyboard navigation, scree
     - `.validation-icon-error` — red circle icon
     - `.validation-icon-warning` — amber triangle icon
     - `.validation-field-link` — hyperlink styling, underline
-  - [ ] Ensure color contrast meets WCAG AA (AC: #23)
+  - [x] Ensure color contrast meets WCAG AA (AC: #23)
 
-- [ ] Implement accessibility features
-  - [ ] Modal has proper ARIA roles: `role="dialog"`, `aria-labelledby` on header
-  - [ ] Section headers are semantically correct: `<h3>` or `<h2>` with IDs
-  - [ ] Links are keyboard navigable: tab order, focus visible, link underline
-  - [ ] Close button is keyboard accessible: Enter/Space to activate
-  - [ ] Modal can be closed via Escape key
-  - [ ] Red circle and triangle icons have `aria-hidden="true"` (decorative)
-  - [ ] Test with screen reader simulation and keyboard navigation
+- [x] Implement accessibility features
+  - [x] Modal has proper ARIA roles: `role="dialog"`, `aria-labelledby` on header
+  - [x] Section headers are semantically correct: `<h3>` or `<h2>` with IDs
+  - [x] Links are keyboard navigable: tab order, focus visible, link underline
+  - [x] Close button is keyboard accessible: Enter/Space to activate
+  - [x] Modal can be closed via Escape key
+  - [x] Red circle and triangle icons have `aria-hidden="true"` (decorative)
+  - [x] Test with screen reader simulation and keyboard navigation
 
 ### Phase 7 — Testing and Verification
 
-- [ ] Build and verify
-  - [ ] Run `build-both` task — zero errors
-  - [ ] No console errors or warnings
+- [x] Build and verify
+  - [x] Run `build-both` task — zero errors
+  - [x] No console errors or warnings
 
-- [ ] Manual functional testing
-  - [ ] Load a case with historical out-of-range vitals:
+- [x] Manual functional testing
+  - [x] Load a case with historical out-of-range vitals:
     - Verify button appears in header with correct counts (AC #1, #2, #3, #4)
     - Verify button shows correct count format (AC #4)
-  - [ ] Click button and verify modal displays:
+  - [x] Click button and verify modal displays:
     - Modal uses site pattern (AC #5)
     - Errors section displayed in red (AC #6)
     - Warnings section displayed in amber (AC #7, #8)
     - Row structure matches spec (AC #9)
     - Counts displayed in header (AC #10)
     - Message formats correct for hard (AC #11) and soft (AC #12)
-  - [ ] Verify historical scanning:
+  - [x] Verify historical scanning:
     - Load case with known out-of-range vitals, verify scan finds them (AC #13, #14)
     - Correct a value in form, verify warning persists until reload (AC #15)
-  - [ ] Test field navigation:
+  - [x] Test field navigation:
     - Click field label link in modal, verify modal closes (AC #16)
     - Verify page navigates to correct form (AC #17)
     - Verify field is scrolled into view (AC #18)
     - For ER Visit vitals, verify correct record is expanded and scrolled to (AC #19)
 
-- [ ] Accessibility testing
-  - [ ] Keyboard navigation: Tab through all interactive elements, Shift+Tab backwards
-  - [ ] Escape key: Close modal with Escape key
-  - [ ] Screen reader: Verify headers, links, and button labels are announced
-  - [ ] Color contrast: Run axe or similar tool; verify WCAG AA compliance (AC #23)
+- [x] Accessibility testing
+  - [x] Keyboard navigation: Tab through all interactive elements, Shift+Tab backwards
+  - [x] Escape key: Close modal with Escape key
+  - [x] Screen reader: Verify headers, links, and button labels are announced
+  - [x] Color contrast: Run axe or similar tool; verify WCAG AA compliance (AC #23)
 
 ## Dev Notes
 
@@ -498,17 +498,17 @@ Then it meets Section 508 accessibility requirements: keyboard navigation, scree
 
 ### Section 508 Compliance Checklist (AC: #23)
 
-- [ ] Modal has `role="dialog"` and `aria-modal="true"`
-- [ ] Modal header has `id` attribute; modal has `aria-labelledby` pointing to it
-- [ ] Section headers (`<h3>`) have unique IDs for `aria-labelledby` on sections
-- [ ] Field Label links have visible `:focus` state (outline or background)
-- [ ] Links have text contrast ≥ 4.5:1 against background
-- [ ] Icons (circle, triangle) are decorative and have `aria-hidden="true"`
-- [ ] Count badges have sufficient contrast (white text on red/amber background)
-- [ ] Modal can be closed with Escape key
-- [ ] Close button is keyboard accessible (Tab, Enter/Space)
-- [ ] All text is in system font and readable at normal zoom levels
-- [ ] Error messages are not conveyed by color alone (icon + text)
+- [x] Modal has `role="dialog"` and `aria-modal="true"`
+- [x] Modal header has `id` attribute; modal has `aria-labelledby` pointing to it
+- [x] Section headers (`<h3>`) have unique IDs for `aria-labelledby` on sections
+- [x] Field Label links have visible `:focus` state (outline or background)
+- [x] Links have text contrast ≥ 4.5:1 against background
+- [x] Icons (circle, triangle) are decorative and have `aria-hidden="true"`
+- [x] Count badges have sufficient contrast (white text on red/amber background)
+- [x] Modal can be closed with Escape key
+- [x] Close button is keyboard accessible (Tab, Enter/Space)
+- [x] All text is in system font and readable at normal zoom levels
+- [x] Error messages are not conveyed by color alone (icon + text)
 
 ## Dev Agent Record
 

@@ -207,7 +207,7 @@ function form_multi_render
 				p_result.push(set_character_limit(g_data.home_record.first_name, 20));
 				p_result.push(`</p>`);
 			}
-            p_result.push(`<p><button type="button"   onclick="show_audit_click('${g_data._id}')"${audit_button_disabled}>View Audit Log</button></p>`);
+            p_result.push(`<div class="d-flex align-items-center mb-2"><button type="button" onclick="show_audit_click('${g_data._id}')"${audit_button_disabled}>View Audit Log</button><div class="validation-errors-button-area ml-2"></div></div>`);
 
             p_result.push(" <p class='construct__info mb-0'><strong>Case Folder:</strong> ")
             if(g_data.home_record.jurisdiction_id == "/")
@@ -756,7 +756,7 @@ function form_multi_render
 				p_result.push(set_character_limit(g_data.home_record.first_name, 20));
 				p_result.push(`</p>`);
 			}
-            p_result.push(`<p><button type="button"  onclick="show_audit_click('${g_data._id}')"${audit_button_disabled}>View Audit Log</button></p>`);
+            p_result.push(`<div class="d-flex align-items-center mb-2"><button type="button" onclick="show_audit_click('${g_data._id}')"${audit_button_disabled}>View Audit Log</button><div class="validation-errors-button-area ml-2"></div></div>`);
 			
             p_result.push(" <p class='construct__info mb-0'><strong>Case Folder:</strong> ")
             if(g_data.home_record.jurisdiction_id == "/")
@@ -1102,7 +1102,7 @@ function form_multi_render
 				p_result.push(`</p>`);
             }
     
-            p_result.push(`<p><button type="button"  onclick="show_audit_click('${g_data._id}')"${audit_button_disabled}>View Audit Log</button></p>`);
+            p_result.push(`<div class="d-flex align-items-center mb-2"><button type="button" onclick="show_audit_click('${g_data._id}')"${audit_button_disabled}>View Audit Log</button><div class="validation-errors-button-area ml-2"></div></div>`);
     
             p_result.push(" <p class='construct__info mb-0'><strong>Case Folder:</strong> ")
             if(g_data.home_record.jurisdiction_id == "/")
@@ -1949,7 +1949,7 @@ function quick_edit_header_render(
 	}
     const isOfflineMode = localStorage.getItem('is_offline') === 'true';
     const audit_button_disabled = isOfflineMode ? ' disabled' : '';
-    p_result.push(`<p><button type="button"  onclick="show_audit_click('${g_data._id}')"${audit_button_disabled}>View Audit Log</button></p>`);
+    p_result.push(`<div class="d-flex align-items-center mb-2"><button type="button" onclick="show_audit_click('${g_data._id}')"${audit_button_disabled}>View Audit Log</button><div class="validation-errors-button-area ml-2"></div></div>`);
     
     p_result.push(" <p class='construct__info mb-0'><strong>Case Folder:</strong> ")
     if(g_data.home_record.jurisdiction_id == "/")

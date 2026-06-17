@@ -1,6 +1,6 @@
 # Story 4.1: Print/View/PDF Validation Gate (Supersedes Prior FR-2.6)
 
-Status: not-started
+Status: done
 
 ## Story
 
@@ -69,15 +69,14 @@ If `window.mmria_vital_sign_range` is `null`, `mmria_vitals_revalidate_all()` al
 
 ### Phase 1 — Remove prior FR-2.6 behavior from `chart.js`
 
-- [ ] **Remove** `mmria_chart_has_excluded_values()` function (AC: #7)
-  - Located at ~line 360, starts with `function mmria_chart_has_excluded_values(p_metadata, p_object_path)`, ends with the closing `}` at ~line 411, just before `function mmria_vitals_revalidate_all()`
-  - This function is called only by the indicator logic being removed in the next steps — verify no other callers exist before deleting
+- [x] **Remove** `mmria_chart_has_excluded_values()` function (AC: #7)
+  - Deleted from chart.js
 
-- [ ] **Remove** `mmria_vitals_show_historical_modal()` function (AC: #7)
+- [x] **Remove** `mmria_vitals_show_historical_modal()` function (AC: #7)
   - Located at ~line 437, starts with `function mmria_vitals_show_historical_modal()`, ends with its closing `}` at ~line 498, just before `function chart_render(`
   - This is the "Historical Vitals Data" modal shown on edit-mode entry and form navigation
 
-- [ ] **Remove** `chart_has_excluded` indicator block from `chart_render()` (AC: #7)
+- [x] **Remove** `chart_has_excluded` indicator block from `chart_render()` (AC: #7)
   - In `chart_render()`, locate the two lines at ~line 520:
     ```javascript
     const chart_has_excluded = mmria_chart_has_excluded_values(p_metadata, p_object_path);
@@ -90,7 +89,7 @@ If `window.mmria_vital_sign_range` is `null`, `mmria_vitals_revalidate_all()` al
     - Current: `</tr>\n            ${chart_excluded_row}\n            <tr align=center><td>`
     - After: `</tr>\n            <tr align=center><td>`
 
-- [ ] **Remove** `chart_has_excluded_tbl` indicator block from `chart_switch_to_table()` (AC: #7)
+- [x] **Remove** `chart_has_excluded_tbl` indicator block from `chart_switch_to_table()` (AC: #7)
   - In `chart_switch_to_table()`, locate the two lines at ~line 1301:
     ```javascript
     const chart_has_excluded_tbl = mmria_chart_has_excluded_values(metadata, params.p_object_path);
@@ -105,7 +104,7 @@ If `window.mmria_vital_sign_range` is `null`, `mmria_vitals_revalidate_all()` al
 
 ### Phase 2 — Remove prior FR-2.6 behavior from `case/index.js`
 
-- [ ] **Remove** edit-mode entry call at ~line 4556 (AC: #7)
+- [x] **Remove** edit-mode entry call at ~line 4556 (AC: #7)
   - Locate the block that immediately follows `$global.case_document_begin_edit()`:
     ```javascript
     if (mmria_vitals_revalidate_all())
@@ -115,7 +114,7 @@ If `window.mmria_vital_sign_range` is `null`, `mmria_vitals_revalidate_all()` al
     ```
   - Remove the entire `if` block (3 lines). Leave the surrounding code intact.
 
-- [ ] **Remove** form-navigation call at ~line 3080 (AC: #7)
+- [x] **Remove** form-navigation call at ~line 3080 (AC: #7)
   - Locate the block inside `window_on_hash_change` after `g_render()`:
     ```javascript
     if (g_data_is_checked_out && mmria_vitals_revalidate_all())
@@ -127,7 +126,7 @@ If `window.mmria_vital_sign_range` is `null`, `mmria_vitals_revalidate_all()` al
 
 ### Phase 3 — Add new helpers and gate modal to `chart.js`
 
-- [ ] **Add** `mmria_vitals_case_is_closed()` in `chart.js` (AC: #1)
+- [x] **Add** `mmria_vitals_case_is_closed()` in `chart.js` (AC: #1)
   - Insert immediately after the closing `}` of `mmria_vitals_revalidate_all()` (which ends at ~line 434, just before where `mmria_vitals_show_historical_modal` was)
   - Function:
     ```javascript
@@ -142,7 +141,7 @@ If `window.mmria_vital_sign_range` is `null`, `mmria_vitals_revalidate_all()` al
     ```
   - Note: uses `Number()` not `new Number()` (avoids object-vs-primitive comparison pitfall); no dependency on `g_is_confirm_for_case_lock` — the bypass is unconditional when the case is closed.
 
-- [ ] **Add** `mmria_vitals_has_hard_violations()` in `chart.js` (AC: #3)
+- [x] **Add** `mmria_vitals_has_hard_violations()` in `chart.js` (AC: #3)
   - Insert immediately after `mmria_vitals_case_is_closed()`
   - Function must evaluate all vitals in the current case against the rules document (provided by Story 4.0 in `window.mmria_validation_rules`) and return `true` if any `severity: "hard"` violations are detected, `false` otherwise.
   - Use the engine and rules from Story 4.0 — do not duplicate validation logic.
@@ -160,7 +159,7 @@ If `window.mmria_vital_sign_range` is `null`, `mmria_vitals_revalidate_all()` al
     }
     ```
 
-- [ ] **Add** `mmria_vitals_show_print_gate_modal(actionLabel, isHardBlock, onConfirm)` in `chart.js` (AC: #3, #4, #5)
+- [x] **Add** `mmria_vitals_show_print_gate_modal(actionLabel, isHardBlock, onConfirm)` in `chart.js` (AC: #3, #4, #5)
   - Insert immediately after `mmria_vitals_has_hard_violations()`, in the slot formerly occupied by `mmria_vitals_show_historical_modal()`
   - Parameters:
     - `actionLabel` — string: `"View"`, `"View PDF"`, or `"Save PDF"`
@@ -329,7 +328,7 @@ The strategy for both functions is identical: extract the `openTab` call into a 
 3. **Soft/warning violations exist?** → show soft-acknowledgment modal (two buttons, action gated on acknowledgment)
 4. **No violations?** → perform action directly
 
-- [ ] **Modify** `pdf_case_onclick(event, type_output)` (AC: #1–#6)
+- [x] **Modify** `pdf_case_onclick(event, type_output)` (AC: #1–#6)
   - Current function structure (~line 4234):
     ```javascript
     function pdf_case_onclick(event, type_output) {
@@ -398,7 +397,7 @@ The strategy for both functions is identical: extract the `openTab` call into a 
         }
     ```
 
-- [ ] **Modify** `print_case_onclick(event)` (AC: #1–#6)
+- [x] **Modify** `print_case_onclick(event)` (AC: #1–#6)
   - Current function structure (~line 4275):
     ```javascript
     function print_case_onclick(event) {

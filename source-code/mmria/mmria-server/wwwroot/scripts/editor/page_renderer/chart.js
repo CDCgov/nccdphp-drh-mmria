@@ -262,28 +262,47 @@ evahmrvs_b_dias Diastolic 40 20
 
 */
 
-function mmria_vitals_is_out_of_range(fieldName, value) {
-    if (!window.mmria_vital_sign_range) return false;
-    var range = window.mmria_vital_sign_range[fieldName];
-    if (!range) return false;
+function mmria_vitals_is_out_of_range(fieldPath, value) {
+    if (!window.mmria_validation_rules) return false;
+    var rule = window.mmria_validation_rules[fieldPath];
+    if (!rule) {
+        // Try to find a rule by searching for a matching field path ending
+        for (var key in window.mmria_validation_rules) {
+            if (key.endsWith('/' + fieldPath) || key === fieldPath) {
+                rule = window.mmria_validation_rules[key];
+                break;
+            }
+        }
+    }
+    if (!rule) return false;
     var v = parseFloat(value);
     if (value === '' || value == null || isNaN(v)) return false;
-    return (v < parseFloat(range.min) || v > parseFloat(range.max));
+    return (v < parseFloat(rule.min_value) || v > parseFloat(rule.max_value));
 }
 
 function mmria_vitals_validate_field(inputEl)
 {
-    if (!window.mmria_vital_sign_range) { return; }
+    if (!window.mmria_validation_rules) { return; }
     var fieldName = inputEl.name;
-    var range = window.mmria_vital_sign_range[fieldName];
-    if (!range) { return; }
+    var rule = null;
+    // Try to find a rule by searching for a matching field path ending
+    if (window.mmria_validation_rules[fieldName]) {
+        rule = window.mmria_validation_rules[fieldName];
+    } else {
+        for (var key in window.mmria_validation_rules) {
+            if (key.endsWith('/' + fieldName) || key === fieldName) {
+                rule = window.mmria_validation_rules[key];
+                break;
+            }
+        }
+    }
+    if (!rule) { return; }
     if (inputEl.value === '' || inputEl.value === null) { return; }
     var value = parseFloat(inputEl.value);
     if (isNaN(value)) { return; }
-    if (value < parseFloat(range.min) || value > parseFloat(range.max))
+    if (value < parseFloat(rule.min_value) || value > parseFloat(rule.max_value))
     {
-        inputEl.value = '';
-        mmria_vitals_show_field_modal(range, inputEl);
+        mmria_vitals_show_field_modal(rule, inputEl);
     }
 }
 
@@ -317,9 +336,9 @@ function mmria_vitals_show_field_modal(range, inputEl)
     var msgEl = document.getElementById('vitals-range-modal-msg');
     if (msgEl)
     {
-        msgEl.textContent = 'The value entered for the ' + range.label
-            + ' field falls outside of the permitted range.'
-            + ' Please enter a valid input between ' + range.min + '\u2013' + range.max + '.';
+        msgEl.textContent = range.message
+            || ('The value entered falls outside of the permitted range.'
+                + ' Please enter a valid input between ' + range.min_value + '\u2013' + range.max_value + '.');
     }
 
     var modal = document.getElementById('vitals-range-modal');
@@ -357,64 +376,14 @@ function mmria_vitals_show_field_modal(range, inputEl)
     }
 }
 
-function mmria_chart_has_excluded_values(p_metadata, p_object_path)
-{
-    if (!window.mmria_vital_sign_range) { return false; }
-    if (!p_metadata || !p_metadata.x_axis || !p_metadata.y_axis) { return false; }
-    try
-    {
-        var graph_prefix = "";
-        if (p_metadata.x_axis.indexOf("vital_signs") > -1)
-        {
-            graph_prefix = ".vital_signs.";
-        }
 
-        var y_fields = [];
-        p_metadata.y_axis.split(',').forEach(function(element)
-        {
-            var index = element.lastIndexOf("/") + 1;
-            y_fields.push(element.substr(index).trim());
-        });
-
-        var data = null;
-        var last_index = p_metadata.x_axis.lastIndexOf("/");
-        if (graph_prefix === "")
-        {
-            data = eval("g_data." + p_metadata.x_axis.trim().replace("/", ".").substring(0, last_index));
-        }
-        else
-        {
-            var object_path_last_index = p_object_path.lastIndexOf(".");
-            var pre_object = p_object_path.substring(0, object_path_last_index);
-            data = eval(pre_object + graph_prefix.substring(0, graph_prefix.length - 1));
-        }
-
-        if (!data || !Array.isArray(data)) { return false; }
-
-        for (var i = 0; i < data.length; i++)
-        {
-            for (var j = 0; j < y_fields.length; j++)
-            {
-                if (mmria_vitals_is_out_of_range(y_fields[j], data[i][y_fields[j]]))
-                {
-                    return true;
-                }
-            }
-        }
-    }
-    catch (e)
-    {
-        return false;
-    }
-    return false;
-}
 
 function mmria_vitals_revalidate_all()
 {
-    if (!window.mmria_vital_sign_range) { return false; }
+    if (!window.mmria_validation_rules) { return false; }
     var records = window.g_data && window.g_data.er_visit_and_hospital_medical_records;
     if (!records || !Array.isArray(records)) { return false; }
-    var range_keys = Object.keys(window.mmria_vital_sign_range);
+    var rule_keys = Object.keys(window.mmria_validation_rules);
     for (var i = 0; i < records.length; i++)
     {
         var vital_signs = records[i] && records[i].vital_signs;
@@ -422,9 +391,11 @@ function mmria_vitals_revalidate_all()
         for (var j = 0; j < vital_signs.length; j++)
         {
             var measurement = vital_signs[j];
-            for (var k = 0; k < range_keys.length; k++)
+            for (var k = 0; k < rule_keys.length; k++)
             {
-                if (mmria_vitals_is_out_of_range(range_keys[k], measurement[range_keys[k]]))
+                // Extract field name from the full path (e.g., "temperature" from "er_visit_and_hospital_medical_records/vital_signs/temperature")
+                var fieldName = rule_keys[k].split('/').pop();
+                if (mmria_vitals_is_out_of_range(rule_keys[k], measurement[fieldName]))
                 {
                     return true;
                 }
@@ -434,45 +405,91 @@ function mmria_vitals_revalidate_all()
     return false;
 }
 
-function mmria_vitals_show_historical_modal()
+function mmria_vitals_case_is_closed()
 {
-    var existingModal = document.getElementById('vitals-historical-modal');
+    if (!window.g_data) { return false; }
+    var hr = g_data.home_record;
+    if (!hr || !hr.case_status || !hr.case_status.overall_case_status) { return false; }
+    var status = Number(hr.case_status.overall_case_status);
+    return status === 4 || status === 5 || status === 6;
+}
+
+function mmria_vitals_has_hard_violations()
+{
+    if (!window.g_data || !window.mmria_validation_rules) { return false; }
+    var records = window.g_data.er_visit_and_hospital_medical_records;
+    if (!records || !Array.isArray(records)) { return false; }
+    var rule_keys = Object.keys(window.mmria_validation_rules);
+    for (var i = 0; i < records.length; i++)
+    {
+        var vital_signs = records[i] && records[i].vital_signs;
+        if (!vital_signs || !Array.isArray(vital_signs)) { continue; }
+        for (var j = 0; j < vital_signs.length; j++)
+        {
+            var measurement = vital_signs[j];
+            for (var k = 0; k < rule_keys.length; k++)
+            {
+                var rule = window.mmria_validation_rules[rule_keys[k]];
+                if (!rule || rule.severity !== 'hard') { continue; }
+                var fieldName = rule_keys[k].split('/').pop();
+                if (mmria_vitals_is_out_of_range(rule_keys[k], measurement[fieldName]))
+                {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+function mmria_vitals_show_print_gate_modal(actionLabel, isHardBlock, onConfirm)
+{
+    var existingModal = document.getElementById('vitals-print-gate-modal');
     if (existingModal && existingModal.parentNode) { existingModal.parentNode.removeChild(existingModal); }
-    var existingBackdrop = document.getElementById('vitals-historical-backdrop');
+    var existingBackdrop = document.getElementById('vitals-print-gate-backdrop');
     if (existingBackdrop && existingBackdrop.parentNode) { existingBackdrop.parentNode.removeChild(existingBackdrop); }
 
+    var message = isHardBlock
+        ? 'This case contains vital sign records with values outside the permitted range. These values must be corrected before printing or viewing.'
+        : 'This case contains vital sign records with values outside the permitted range. These values are excluded from graphs, tables, print and pdf views.';
+
+    var proceedButtonHtml = isHardBlock
+        ? ''
+        : '<button type="button" id="vitals-print-gate-modal-proceed" class="btn btn-primary" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">' + actionLabel + '</button>';
+
     var modalHtml =
-        '<div id="vitals-historical-modal" class="modal fade" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="vitals-historical-modal-title" style="z-index: 1050;">'
+        '<div id="vitals-print-gate-modal" class="modal fade" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="vitals-print-gate-modal-title" style="z-index: 1050;">'
         + '<div class="modal-dialog" role="document">'
         + '<div class="modal-content">'
         + '<div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">'
-        + '<h4 id="vitals-historical-modal-title" class="modal-title" style="margin: 0; font-weight: 600; font-size: 17px;">Historical Vitals Data</h4>'
+        + '<h4 id="vitals-print-gate-modal-title" class="modal-title" style="margin: 0; font-weight: 600; font-size: 17px;">Vital Signs Out of Range</h4>'
         + '</div>'
         + '<div class="modal-body" style="padding: 20px;">'
-        + '<p style="font-size: 16px; color: #333; margin: 0;">This case contains vital sign records with values outside the permitted range. These values are excluded from graphs, tables, print and pdf views.</p>'
+        + '<p style="font-size: 16px; color: #333; margin: 0;">' + message + '</p>'
         + '</div>'
         + '<div class="modal-footer" style="padding: 15px 20px; text-align: right;">'
-        + '<button type="button" id="vitals-historical-modal-ok" class="btn btn-primary" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">OK</button>'
+        + '<button type="button" id="vitals-print-gate-modal-close" class="btn btn-default" style="padding: 8px 20px; margin-right: 8px;">Close</button>'
+        + proceedButtonHtml
         + '</div>'
         + '</div>'
         + '</div>'
         + '</div>'
-        + '<div id="vitals-historical-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>';
+        + '<div id="vitals-print-gate-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>';
 
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 
-    var modal = document.getElementById('vitals-historical-modal');
-    var backdrop = document.getElementById('vitals-historical-backdrop');
+    var modal = document.getElementById('vitals-print-gate-modal');
+    var backdrop = document.getElementById('vitals-print-gate-backdrop');
 
     setTimeout(function()
     {
         if (modal) { modal.classList.add('show'); modal.style.display = 'block'; }
         if (backdrop) { backdrop.classList.add('show'); }
-        var okBtn = document.getElementById('vitals-historical-modal-ok');
-        if (okBtn) { okBtn.focus(); }
+        var closeBtn = document.getElementById('vitals-print-gate-modal-close');
+        if (closeBtn) { closeBtn.focus(); }
     }, 10);
 
-    function closeHistoricalModal()
+    function closeGateModal()
     {
         if (modal) { modal.classList.remove('show'); }
         if (backdrop) { backdrop.classList.remove('show'); }
@@ -481,17 +498,26 @@ function mmria_vitals_show_historical_modal()
             if (modal && modal.parentNode) { modal.parentNode.removeChild(modal); }
             if (backdrop && backdrop.parentNode) { backdrop.parentNode.removeChild(backdrop); }
         }, 150);
-        // No focus change on dismiss per AC #3
     }
 
-    var okBtn = document.getElementById('vitals-historical-modal-ok');
-    if (okBtn) { okBtn.onclick = closeHistoricalModal; }
+    var closeBtn = document.getElementById('vitals-print-gate-modal-close');
+    if (closeBtn) { closeBtn.onclick = closeGateModal; }
+
+    var proceedBtn = document.getElementById('vitals-print-gate-modal-proceed');
+    if (proceedBtn)
+    {
+        proceedBtn.onclick = function()
+        {
+            closeGateModal();
+            if (typeof onConfirm === 'function') { onConfirm(); }
+        };
+    }
 
     if (modal)
     {
         modal.addEventListener('keydown', function(e)
         {
-            if (e.key === 'Escape') { e.preventDefault(); closeHistoricalModal(); }
+            if (e.key === 'Escape') { e.preventDefault(); closeGateModal(); }
         });
     }
 }
@@ -517,10 +543,7 @@ function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obj
   const map_key = convert_object_path_to_jquery_id(p_object_path);
   chart_function_params_map.set(map_key, function_params);
 
-  const chart_has_excluded = mmria_chart_has_excluded_values(p_metadata, p_object_path);
-  const chart_excluded_row = chart_has_excluded
-      ? `<tr><td colspan="100" style="padding:4px 8px;color:#c00;font-size:small;text-align:left;">Contains excluded values &#8212; one or more readings fall outside the permitted range.</td></tr>`
-      : '';
+
 
 	p_result.push
 	(
@@ -542,7 +565,6 @@ function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obj
                 </div>
               </th>
             </tr>
-            ${chart_excluded_row}
             <tr align=center><td>
 		<div id='${map_key}_chart'>
             
@@ -1298,10 +1320,7 @@ data.forEach(row => {
   data_table_body_html.push(`</tr>`);
 });
 
-    const chart_has_excluded_tbl = mmria_chart_has_excluded_values(metadata, params.p_object_path);
-    const chart_excluded_row_tbl = chart_has_excluded_tbl
-        ? `<tr><td colspan="100" style="padding:4px 8px;color:#c00;font-size:small;text-align:left;">Contains excluded values &#8212; one or more readings fall outside the permitted range.</td></tr>`
-        : '';
+
 
     el.outerHTML = 	`
         <div id='${convert_object_path_to_jquery_id(params.p_object_path)}'
@@ -1331,7 +1350,7 @@ data.forEach(row => {
           </tr>     
         </thead>
         <tbody>
-          ${chart_excluded_row_tbl}${data_table_body_html.join("")}
+          ${data_table_body_html.join("")}
         </tbody>        
         </table>
     </div>`;

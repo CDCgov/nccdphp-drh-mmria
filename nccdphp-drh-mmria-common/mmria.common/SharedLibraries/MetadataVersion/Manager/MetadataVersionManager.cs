@@ -43,6 +43,14 @@ public sealed class MetadataVersionManager
             null);
     }
 
+    public async Task<mmria.common.metadata.app> GetAppMetadataAsync(string id, DBConfigurationDetail db_config)
+    {
+        return await _dal.GetDocumentAsync<mmria.common.metadata.app>(
+            $"{db_config.url}/metadata/version_specification-{id}/metadata",
+            null,
+            null);
+    }
+
     public async Task<document_put_response> SaveMetadataAsync(app metadata, DBConfigurationDetail db_config)
     {
         string object_string = JsonConvert.SerializeObject(metadata, CreateSerializerSettings());

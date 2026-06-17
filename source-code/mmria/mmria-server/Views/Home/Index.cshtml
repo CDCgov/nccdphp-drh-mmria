@@ -158,10 +158,12 @@
         else
         {
             <h1 class="h2 d-block" tabindex="-1">MMRIA Home</h1>
-
-             @await Html.PartialAsync("_BurdenStatement")
         }
     </div>
+    @if(!is_pmss_enhanced)
+    {
+        <div>@await Html.PartialAsync("_BurdenStatement")</div>
+    }
     <div id="offline-home-exit-widget" data-offline-exit-host="home" style="display: none;"></div>
 </div>
 <div class="row">
