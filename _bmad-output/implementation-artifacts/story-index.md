@@ -8,9 +8,9 @@ Start a new chat thread for each story. Use the prompt shown to invoke the dev a
 
 | Story | File | Status |
 |---|---|---|
-| 1.1 Fix Save-Path HTML Stripping | `1-1-fix-save-path-html-stripping.md` | ready-for-dev |
-| 1.2 Fix Paste Handler Cursor Integrity | `1-2-fix-paste-handler-cursor-integrity.md` | ready-for-dev |
-| 1.3 Update Case Narrative Instruction Text | `1-3-update-case-narrative-instruction-text.md` | ready-for-dev |
+| 1.1 Fix Save-Path HTML Stripping | `1-1-fix-save-path-html-stripping.md` | verification |
+| 1.2 Fix Paste Handler Cursor Integrity | `1-2-fix-paste-handler-cursor-integrity.md` | verification |
+| 1.3 Update Case Narrative Instruction Text | `1-3-update-case-narrative-instruction-text.md` | verification |
 
 **Story 1.1 prompt:**
 ```
@@ -33,11 +33,11 @@ dev this story _bmad-output/implementation-artifacts/1-3-update-case-narrative-i
 
 | Story | File | Status |
 |---|---|---|
-| 2.1 Add Vitals Range Config — CouchDB and Server Loading | `2-1-vitals-range-config-couchdb-and-server-loading.md` | ready-for-dev |
-| 2.2 On-Blur Vitals Validation and Invalid Entry Modal | `2-2-on-blur-vitals-validation-and-modal.md` | ready-for-dev |
-| 2.3 Display-Time Exclusion — Print, PDF, Date Fix | `2-3-display-time-exclusion-print-pdf-date-fix.md` | ready-for-dev |
-| 2.4 Display-Time Exclusion — Graph and Table Views | `2-4-display-time-exclusion-graph-and-table.md` | ready-for-dev |
-| 2.5 Historical Data Detection and Record Indicators | `2-5-historical-data-detection-and-indicators.md` | ready-for-dev |
+| 2.1 Add Vitals Range Config — CouchDB and Server Loading | `2-1-vitals-range-config-couchdb-and-server-loading.md` | verification |
+| 2.2 On-Blur Vitals Validation and Invalid Entry Modal | `2-2-on-blur-vitals-validation-and-modal.md` | verification |
+| 2.3 Display-Time Exclusion — Print, PDF, Date Fix | `2-3-display-time-exclusion-print-pdf-date-fix.md` | verification |
+| 2.4 Display-Time Exclusion — Graph and Table Views | `2-4-display-time-exclusion-graph-and-table.md` | verification |
+| 2.5 Historical Data Detection and Record Indicators | `2-5-historical-data-detection-and-indicators.md` | verification |
 
 > ⚠️ **Epic 2 sequencing:** Story 2.1 must be completed before 2.2–2.5. Stories 2.2–2.5 can be worked in any order after 2.1.
 
@@ -72,9 +72,9 @@ dev this story _bmad-output/implementation-artifacts/2-5-historical-data-detecti
 
 | Story | File | Status |
 |---|---|---|
-| 3.1 Config-Driven OMB Expiration Date | `3-1-config-driven-omb-expiration-date.md` | ready-for-dev |
-| 3.2 Config-Driven MMRIA Version Number | `3-2-config-driven-mmria-version.md` | ready-for-dev |
-| 3.3 Remove Core Elements Only Print Option | `3-3-remove-core-elements-print-option.md` | ready-for-dev |
+| 3.1 Config-Driven OMB Expiration Date | `3-1-config-driven-omb-expiration-date.md` | verification |
+| 3.2 Config-Driven MMRIA Version Number | `3-2-config-driven-mmria-version.md` | verification |
+| 3.3 Remove Core Elements Only Print Option | `3-3-remove-core-elements-print-option.md` | verification |
 
 > ℹ️ Stories 3.1, 3.2, and 3.3 are independent — any order.
 > ℹ️ Both 3.1 and 3.2 touch the same CouchDB config document in `database-scripts/`. If worked simultaneously, coordinate on that file.
@@ -96,12 +96,61 @@ dev this story _bmad-output/implementation-artifacts/3-3-remove-core-elements-pr
 
 ---
 
+## Epic 4: Vitals Validation Refinements *(2026-06-16 refinement session)*
+
+| Story | File | Status |
+|---|---|---|
+| 4.0 Validation Engine Foundation — Port, Seed, Replace Callsites | `4-0-validation-engine-foundation.md` | not-started |
+| 4.1 Remove Prior FR-2.6 Behavior + Print/View/PDF Validation Gate | `4-1-print-view-pdf-validation-gate.md` | not-started |
+| 4.2 Print/PDF Out-of-Range Comment Appending | `4-2-print-pdf-comment-appending.md` | not-started |
+| 4.3 OMB Block Right-Alignment — Home Page | `4-3-omb-block-right-alignment.md` | not-started |
+
+> ⚠️ **Epic 4 sequencing:** Story 4.0 must be completed before 4.1 and 5.1. Story 2.5 must be verified before 4.1 ships (4.1 removes the behavior 2.5 implemented). Stories 4.2 and 4.3 are independent.
+
+**Story 4.0 prompt:**
+```
+create story 4.0: Port the CaseValidationManager field_rules path from branch v4.1-case-data-validation-mode (manual port, vitals field_rules only — exclude connected_field_rules, form_status_rules, admin UI). Seed the 6 confirmed vitals rules at server startup (temperature, heart_rate, respiration_rate, systolic_bp, diastolic_bp, oxygen_saturation) using GetSeededNumericRange with severity: hard and review_status: reviewed. Expose rules to the client via a new API endpoint and set window.mmria_validation_rules in Views/Case/Index.cshtml (replacing window.mmria_vital_sign_range). Update the three mmria_vitals_is_out_of_range() functions (chart.js, print_version_renderer.js, pdf-version/index.js) to read from window.mmria_validation_rules by field_path instead of window.mmria_vital_sign_range by field name. Update pass-through calls in case/index.js, print-version/index.js, pdf-version/index.js. Delete VitalSignRangeHelper.cs and remove the two TempData vitals range lines from CaseController.cs. Add evaluation context flag: active-input (hard enforced on blur) vs historical (hard downgraded to warning at load time). No gate logic, no panel UI — engine and callsite wiring only. Callsite reference: docs/ai/callsite-map is in conversation context. Save to _bmad-output/implementation-artifacts/4-0-validation-engine-foundation.md
+```
+
+**Story 4.1 prompt:**
+```
+create story 4.1: Remove prior FR-2.6 behavior (edit-mode modal, form-navigation modal, red text indicator) and implement the print/View/PDF validation gate per FR-2.6 in _bmad-output/planning-artifacts/prds/prd-mmria-2026-06-12/prd.md. Gate branches on severity: hard violations block entirely (no proceed path); soft/warning violations require UI acknowledgment only (no case-doc persistence). Historical out-of-range vitals surface as warnings. Depends on Story 4.0 — engine and window.mmria_validation_rules are already wired; this story adds only the gate logic at the print/PDF call sites in case/index.js. Save to _bmad-output/implementation-artifacts/4-1-print-view-pdf-validation-gate.md
+```
+
+**Story 4.2 prompt:**
+```
+create story 4.2: Update print and PDF display-time exclusion to append out-of-range notice to the Comment(s) column per FR-2.4 in _bmad-output/planning-artifacts/prds/prd-mmria-2026-06-12/prd.md. Save to _bmad-output/implementation-artifacts/4-2-print-pdf-comment-appending.md
+```
+
+**Story 4.3 prompt:**
+```
+create story 4.3: Right-align the OMB block on the Home page per FR-3.4 in _bmad-output/planning-artifacts/prds/prd-mmria-2026-06-12/prd.md. Save to _bmad-output/implementation-artifacts/4-3-omb-block-right-alignment.md
+```
+
+---
+
+## Epic 5: Validation Errors Panel *(2026-06-16 refinement session)*
+
+| Story | File | Status |
+|---|---|---|
+| 5.1 Validation Errors Panel — Button, Modal, Field Navigation | `5-1-validation-errors-panel.md` | not-started |
+
+> ℹ️ **Story 5.1 — OI-PRD-4 resolved. Hold lifted. Depends on Story 4.0.** The validation architecture is finalized: dedicated version-scoped `case-validation-rules` CouchDB document; `severity: hard` for active-input blur validation; `severity: warning` for historical data surfaced at case load time. Engine and `window.mmria_validation_rules` are wired in Story 4.0 — this story builds the case-worker–facing panel on top. See FR-6 in the PRD for full panel spec including error/warning bifurcation and stored-value message format.
+
+**Story 5.1 prompt:**
+```
+create story 5.1: Implement the Validation Errors panel — button visibility (errors + warnings count) in edit mode, modal with bifurcated Errors (red) / Warnings (amber) sections and separate counts, field navigation, and load-time historical warning detection per FR-6.1, FR-6.2, FR-6.3 in _bmad-output/planning-artifacts/prds/prd-mmria-2026-06-12/prd.md. Depends on Story 4.0 — engine already ported, window.mmria_validation_rules already wired; do not re-port the engine. Warning rows must include stored value in message format 'Value [X] is outside expected range [min]–[max]'. Load-time historical scan runs in historical evaluation context (hard severity downgraded to warning). Save to _bmad-output/implementation-artifacts/5-1-validation-errors-panel.md
+```
+
+---
+
 ## Open Items — Resolve Before Affected Story
 
 | OI | Affects | What to resolve |
 |---|---|---|
-| OI-3 | Story 1.1 | Confirm `textarea_control_strip_html_attributes()` at `case/index.js:~4356` is the only stripping site on the narrative save path |
-| OI-4 | Story 2.2 | Confirm exact HTML `name` attributes on vitals inputs rendered by `chart.js`; confirm Oxygen Saturation field exists |
-| OI-5 | Stories 3.1, 3.2 | Identify controller action(s) serving Home page, Committee Decisions form, and footer |
-| OI-dev-B | Story 2.5 | Confirm the function/event in `case/index.js` that signals transition into case edit mode |
-| OI-dev-C | Story 2.5 | Confirm the DOM target in `chart.js` for the per-record red text indicator |
+| OI-3 | Story 1.1 | **Resolved** — Implementation complete; going to formal verification. |
+| OI-4 | Story 2.2 | **Resolved** — Vitals input `name` attributes confirmed during Story 2.2 implementation. |
+| OI-5 | Stories 3.1, 3.2 | **Resolved** — Controller actions confirmed during Story 3.1/3.2 implementation. |
+| OI-dev-B | Story 2.5 | **Resolved** — Edit-mode hook confirmed during Story 2.5 implementation. |
+| OI-dev-C | Story 2.5 | **Resolved** — Chart.js DOM target confirmed during Story 2.5 implementation. |
+| OI-PRD-4 | Stories 4.0, 4.1, 5.1 | **Resolved** — Dedicated version-scoped `case-validation-rules` CouchDB document; `severity: hard` for active-input blur; `severity: warning` for historical load-time scan; soft-acknowledgment print gate (UI-only, no persist); POC `CaseValidationManager` field_rules path ported in Story 4.0 (vitals-scoped). FR-2.1, FR-2.3, FR-2.6, FR-6 updated in PRD. Stories 4.0, 4.1, and 5.1 unblocked. |
