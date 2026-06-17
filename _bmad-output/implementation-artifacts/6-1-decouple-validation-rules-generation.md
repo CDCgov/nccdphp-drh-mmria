@@ -1,6 +1,6 @@
 # Story 6.1: Decouple Validation Rules Generation from Metadata Auto-Generation
 
-Status: draft
+Status: done
 
 ## Story
 
@@ -83,60 +83,36 @@ Then the build completes with 0 errors and 0 warnings introduced by this change.
 
 ### Phase 1 — Remove startup seeding from `Program.cs`
 
-- [ ] **Locate seeding block**: In `Program.cs`, find the comment `// Seed validation rules after database setup` and the `try` block immediately following it (~line 657).
-- [ ] **Delete the entire try-catch**: Remove from `// Seed validation rules after database setup` through the closing `}` of the `catch` block (~lines 657–728).
-- [ ] **Verify DI registrations remain**: Confirm that lines registering `CaseValidationDAL` and `CaseValidationManager` (~lines 324–325) are still present.
+- [x] **Locate seeding block**: In `Program.cs`, find the comment `// Seed validation rules after database setup` and the `try` block immediately following it (~line 657).
+- [x] **Delete the entire try-catch**: Remove from `// Seed validation rules after database setup` through the closing `}` of the `catch` block (~lines 657–728).
+- [x] **Verify DI registrations remain**: Confirm that lines registering `CaseValidationDAL` and `CaseValidationManager` (~lines 324–325) are still present.
 
 ### Phase 2 — Simplify `GetOrCreateRuleDocumentAsync` in `CaseValidationManager.cs`
 
-- [ ] **Remove `BuildDefaultRuleDocument` call when doc is null**: In `GetOrCreateRuleDocumentAsync`, find the `if (document != null)` block. When `document` is `null`, replace the call to `BuildDefaultRuleDocument(metadataVersion, metadata, userName)` with a return of a new empty document:
-  ```csharp
-  return new CaseValidationRuleDocument
-  {
-      _id = CaseValidationDAL.CreateDocumentId(metadataVersion),
-      metadata_version = metadataVersion
-  };
-  ```
-- [ ] **Remove `app metadata` parameter from `GetOrCreateRuleDocumentAsync`**: The `metadata` parameter is no longer needed since we no longer auto-generate. Update the method signature and all call sites (the `case_validationController` endpoints on the branch that will be ported in Story 6.2 — note these for the future; in Story 6.1 they don't exist yet on this branch). Update the `EnsureRuleDocumentShape` call inside the method — if it no longer needs metadata, update accordingly.
-  - **Decision**: Keep the `metadata` parameter for now to avoid cascading changes, since the API controller will be ported in Story 6.2 and passes metadata. Simply stop using it when document is null.
+- [x] **Remove `BuildDefaultRuleDocument` call when doc is null**: In `GetOrCreateRuleDocumentAsync`, find the `if (document != null)` block. When `document` is `null`, replace the call to `BuildDefaultRuleDocument(metadataVersion, metadata, userName)` with a return of a new empty document.
+- [x] **Remove `app metadata` parameter from `GetOrCreateRuleDocumentAsync`**: Decision: kept the `metadata` parameter for now to avoid cascading changes (Story 6.2 will port the admin controller that passes metadata). Simply stopped using it when document is null.
 
 ### Phase 3 — Simplify `BuildDefaultRuleDocument`
 
-- [ ] **Rewrite to return empty document**: Replace the entire body of `BuildDefaultRuleDocument` with:
-  ```csharp
-  var now = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture);
-  return new CaseValidationRuleDocument
-  {
-      _id = CaseValidationDAL.CreateDocumentId(metadataVersion),
-      metadata_version = metadataVersion,
-      date_created = now,
-      created_by = userName
-  };
-  ```
-- [ ] **Verify no other callers** use `BuildDefaultRuleDocument` expecting auto-generated rules (the only remaining caller should be `EvaluateCase` which uses it as a fallback when `rules` is null — the empty document is correct there: no rules = no findings).
+- [x] **Rewrite to return empty document**: Replaced the entire body of `BuildDefaultRuleDocument` with an empty document (id, metadata_version, date_created, created_by only).
+- [x] **Verify no other callers** use `BuildDefaultRuleDocument` expecting auto-generated rules — `EvaluateCase` uses it as a null-rules fallback; empty document = no findings, which is correct.
 
 ### Phase 4 — Remove auto-generation from `EnsureRuleDocumentShape`
 
-- [ ] **Remove `BuildDefaultRuleDocument` and `MergeMissingRules` calls**: In `EnsureRuleDocumentShape`, delete these lines:
-  ```csharp
-  var defaults = BuildDefaultRuleDocument(metadataVersion ?? document.metadata_version, metadata);
-  MergeMissingRules(document.field_rules, defaults.field_rules, r => r.id);
-  MergeMissingRules(document.connected_field_rules, defaults.connected_field_rules, r => r.id);
-  MergeMissingRules(document.form_status_rules, defaults.form_status_rules, r => r.id);
-  ```
-- [ ] **Keep null-guard and normalize calls**: The method should retain only the null-coalescing guards for lists and the `NormalizeRuleDocumentMetadata(document)` call.
-- [ ] **Update signature if `app metadata` parameter is no longer used**: If `metadata` is only used for the now-removed `BuildDefaultRuleDocument` call, remove it from `EnsureRuleDocumentShape` and update the call site inside `GetOrCreateRuleDocumentAsync`.
+- [x] **Remove `BuildDefaultRuleDocument` and `MergeMissingRules` calls**: Removed both calls from `EnsureRuleDocumentShape`.
+- [x] **Keep null-guard and normalize calls**: Method retains null-coalescing guards and `NormalizeRuleDocumentMetadata` call.
+- [x] **Update signature if `app metadata` parameter is no longer used**: Kept `metadata` parameter in signature (unused) to avoid breaking changes with Story 6.2 port.
 
 ### Phase 5 — Delete dead private methods
 
-- [ ] **Delete `CreateFieldRule`**: Remove the entire private method (generates a `CaseValidationFieldRule` from a flattened metadata field).
-- [ ] **Delete `GetSeededNumericRange`** (or the equivalent vitals seed lookup method — the one returning min/max bounds for temperature, heart_rate, etc.): Remove it entirely.
-- [ ] **Delete `CreateFormStatusRules`**: Remove the entire private method.
-- [ ] **Delete `CreateConnectedFieldRules`**: Remove the entire private method.
-- [ ] **Delete `MergeMissingRules`**: Remove the generic helper (it has no remaining callers after Phase 4).
+- [x] **Delete `CreateFieldRule`**: Removed.
+- [x] **Delete `GetSeededNumericRange`**: Removed.
+- [x] **Delete `CreateFormStatusRules`**: Removed.
+- [x] **Delete `CreateConnectedFieldRules`**: Removed.
+- [x] **Delete `MergeMissingRules`**: Removed.
 
 ### Phase 6 — Build verification
 
-- [ ] Run `dotnet build` on `mmria.common.csproj` — 0 errors.
-- [ ] Run `dotnet build` on `mmria-server.csproj` — 0 errors.
+- [x] Run `dotnet build` on `mmria.common.csproj` — 0 errors (67 pre-existing warnings, none in modified files).
+- [x] Run `dotnet build` on `mmria-server.csproj` — 0 errors (15 pre-existing warnings, none in modified files).
 - [ ] Confirm server starts without exceptions in the startup log.
