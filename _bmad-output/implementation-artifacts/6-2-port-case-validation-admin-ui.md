@@ -1,6 +1,6 @@
 # Story 6.2: Port Case Validation Admin UI from Branch
 
-Status: draft
+Status: done
 
 ## Story
 
@@ -107,25 +107,25 @@ Then the map functions match the versions from `v4.1-case-data-validation-mode` 
 
 > The recommended approach is: `git checkout v4.1-case-data-validation-mode -- <file>` for each new file, then selectively revert or merge any conflicts with current branch state.
 
-- [ ] **Port `case_validation_metadataController.cs`**:
+- [x] **Port `case_validation_metadataController.cs`**:
   ```
   git checkout v4.1-case-data-validation-mode -- source-code/mmria/mmria-server/Controllers/case_validation_metadataController.cs
   ```
   Verify it compiles — the controller references `tenantRuntime.RequireConfiguration()` and `tenantRuntime.EffectiveHostPrefix`, which are already available on the current branch.
 
-- [ ] **Port `case_validationController.cs`**:
+- [x] **Port `case_validationController.cs`**:
   ```
   git checkout v4.1-case-data-validation-mode -- source-code/mmria/mmria-server/Controllers/api/case_validationController.cs
   ```
   Verify all referenced types and methods exist: `CaseValidationManager`, `MetadataVersionManager`, `RequestTenantRuntime`, `JsonRequestBodyReader`, `CaseValidationRulePreviewRequest`, `CaseValidationFieldUpdateRequest`. These should all be present from Story 4.0 and existing infrastructure.
 
-- [ ] **Port `Views/case_validation_metadata/Index.cshtml`**:
+- [x] **Port `Views/case_validation_metadata/Index.cshtml`**:
   ```
   git checkout v4.1-case-data-validation-mode -- source-code/mmria/mmria-server/Views/case_validation_metadata/Index.cshtml
   ```
   Verify the view builds (check for any `@using` directives or Razor helpers that need to be available).
 
-- [ ] **Port `wwwroot/scripts/case/case-validation.js`**:
+- [x] **Port `wwwroot/scripts/case/case-validation.js`**:
   ```
   git checkout v4.1-case-data-validation-mode -- source-code/mmria/mmria-server/wwwroot/scripts/case/case-validation.js
   ```
@@ -133,13 +133,13 @@ Then the map functions match the versions from `v4.1-case-data-validation-mode` 
 
 ### Phase 2 — Merge modified files
 
-- [ ] **Add home page link in `Views/Home/Index.cshtml`**:
+- [x] **Add home page link in `Views/Home/Index.cshtml`**:
   Locate the Form Designer section. Inside the "Metadata Management" `<ul>` (which already has `/editor`, `/form-designer`, `/version-manager`), add after the version-manager line:
   ```html
   <li><a href="/case_validation_metadata">Open case validation rule manager</a></li>
   ```
 
-- [ ] **Update `database-scripts/case_design_sortable.json`**:
+- [x] **Update `database-scripts/case_design_sortable.json`**:
   ```
   git checkout v4.1-case-data-validation-mode -- source-code/mmria/mmria-server/database-scripts/case_design_sortable.json
   ```
@@ -147,14 +147,14 @@ Then the map functions match the versions from `v4.1-case-data-validation-mode` 
 
 ### Phase 3 — Verify no conflicts with existing Story 4.0 code
 
-- [ ] Confirm `CaseValidationManager` on the current branch is NOT overwritten by this port — only the controller and views are new additions.
-- [ ] Confirm `CaseController.cs` is not changed — it already delivers `TempData["validation_rules"]` to the case editor via a different endpoint path.
-- [ ] Confirm the new `case_validationController` route (`/api/case-validation/...`) does not conflict with the existing `api/validation_rules` endpoint.
+- [x] Confirm `CaseValidationManager` on the current branch is NOT overwritten by this port — only the controller and views are new additions.
+- [x] Confirm `CaseController.cs` is not changed — it already delivers `TempData["validation_rules"]` to the case editor via a different endpoint path.
+- [x] Confirm the new `case_validationController` route (`/api/case-validation/...`) does not conflict with the existing `api/validation_rules` endpoint.
 
 ### Phase 4 — Build and smoke test
 
-- [ ] Run `dotnet build mmria-server.csproj` — 0 errors.
-- [ ] Start the server, log in as `form_designer`.
-- [ ] Navigate to the home page — confirm link is present.
-- [ ] Navigate to `/case_validation_metadata` — confirm page loads.
-- [ ] Call `GET /api/case-validation/rules/current` — confirm it returns a valid JSON response.
+- [x] Run `dotnet build mmria-server.csproj` — 0 errors.
+- [ ] Start the server, log in as `form_designer`. *(manual smoke test)*
+- [ ] Navigate to the home page — confirm link is present. *(manual smoke test)*
+- [ ] Navigate to `/case_validation_metadata` — confirm page loads. *(manual smoke test)*
+- [ ] Call `GET /api/case-validation/rules/current` — confirm it returns a valid JSON response. *(manual smoke test)*

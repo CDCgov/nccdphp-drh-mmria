@@ -185,12 +185,10 @@
     <div class="case-validation-admin-header mb-3">
         <div class="case-validation-admin-title">
             <h1 class="h3 mb-1">Case Validation Rule Management</h1>
-            <p class="mb-0">Metadata version <strong id="case_validation_metadata_version">@metadataVersion</strong></p>
+            <span id="case_validation_metadata_version" hidden>@metadataVersion</span>
         </div>
         <div class="case-validation-admin-actions">
             <a class="btn btn-outline-secondary" href="/api/case-validation/rules/current/export">Export JSON</a>
-            <button type="button" class="btn btn-outline-primary" onclick="caseValidationMetadataPreview()">Preview Impact</button>
-            <button type="button" class="btn btn-primary" onclick="caseValidationMetadataSave()">Publish Rules</button>
         </div>
     </div>
 
@@ -225,10 +223,6 @@
                 <select id="case_validation_filter_severity" class="form-control form-control-sm" onchange="caseValidationMetadataRefreshList()"></select>
             </div>
             <div class="form-group case-validation-filter-field">
-                <label for="case_validation_filter_review">Review</label>
-                <select id="case_validation_filter_review" class="form-control form-control-sm" onchange="caseValidationMetadataRefreshList()"></select>
-            </div>
-            <div class="form-group case-validation-filter-field">
                 <label for="case_validation_filter_source">Source</label>
                 <select id="case_validation_filter_source" class="form-control form-control-sm" onchange="caseValidationMetadataRefreshList()"></select>
             </div>
@@ -250,17 +244,6 @@
         </div>
         <div class="case-validation-editor-column mb-3">
             <div id="case_validation_rule_detail" class="case-validation-rule-detail-panel border rounded p-3 mb-3"></div>
-            <div class="case-validation-preview-panel border rounded p-3">
-                <div class="form-group">
-                    <label for="case_validation_preview_case_id">Preview case id</label>
-                    <input id="case_validation_preview_case_id" class="form-control form-control-sm" placeholder="Optional current case id" />
-                </div>
-                <div class="form-group">
-                    <label for="case_validation_preview_case_json">Preview case JSON</label>
-                    <textarea id="case_validation_preview_case_json" class="form-control" rows="7" placeholder="Optional sample case JSON. Leave blank to preview rule inventory only."></textarea>
-                </div>
-                <div id="case_validation_preview_result" class="small text-muted">Preview has not run.</div>
-            </div>
         </div>
     </div>
 </div>
@@ -272,7 +255,6 @@
         let caseValidationMetadataFields = [];
         let caseValidationMetadataRows = [];
         let caseValidationMetadataSelectedKey = null;
-        let caseValidationMetadataPreviewSummary = null;
 
         const caseValidationMetadataLevels = ['metadata', 'impossibility', 'plausibility', 'timeline', 'conditional', 'form-completeness'];
         const caseValidationMetadataConfidences = ['high', 'medium', 'low'];
@@ -402,7 +384,6 @@
             caseValidationMetadataSelectOptions('case_validation_filter_level', [''].concat(caseValidationMetadataLevels), 'All');
             caseValidationMetadataSelectOptions('case_validation_filter_confidence', [''].concat(caseValidationMetadataConfidences), 'All');
             caseValidationMetadataSelectOptions('case_validation_filter_severity', [''].concat(caseValidationMetadataSeverities), 'All');
-            caseValidationMetadataSelectOptions('case_validation_filter_review', [''].concat(caseValidationMetadataReviews), 'All');
             caseValidationMetadataSelectOptions('case_validation_filter_source', [''].concat(caseValidationMetadataSources), 'All');
         }
 
@@ -415,17 +396,10 @@
         function caseValidationMetadataRenderSummary() {
             const total = caseValidationMetadataRows.length;
             const enabled = caseValidationMetadataRows.filter(r => r.rule.enabled !== false).length;
-            const pending = caseValidationMetadataRows.filter(r => r.rule.review_status === 'review-pending').length;
-            const changed = caseValidationMetadataRows.filter(r => (r.rule.last_changed_reason || '').trim() !== '').length;
-            const previewFindings = caseValidationMetadataPreviewSummary ? caseValidationMetadataPreviewSummary.finding_count : null;
-            const previewLevels = caseValidationMetadataPreviewSummary ? caseValidationMetadataFormatCounts(caseValidationMetadataPreviewSummary.findings_by_validation_level) : 'Run preview to see findings by level.';
 
             document.getElementById('case_validation_summary_cards').innerHTML = [
                 caseValidationMetadataSummaryCard('Total rules', total, 'Includes field, connected-field, and form-status rules.'),
-                caseValidationMetadataSummaryCard('Enabled', enabled, 'Rules that run in case validation.'),
-                caseValidationMetadataSummaryCard('Review pending', pending, 'Generated or seed rules awaiting form-designer review.'),
-                caseValidationMetadataSummaryCard('Changed', changed, 'Rules with an unsuppressed changed-since-publish reason.'),
-                caseValidationMetadataSummaryCard('Preview findings', previewFindings == null ? '--' : previewFindings, previewLevels)
+                caseValidationMetadataSummaryCard('Enabled', enabled, 'Rules that run in case validation.')
             ].join('');
         }
 
@@ -540,15 +514,11 @@
                     </div>
                 </div>
                 <div class="form-row">
-                    <div class="form-group col-md-4">
+                    <div class="form-group col-md-6">
                         <label for="case_validation_detail_severity">Severity</label>
                         ${caseValidationMetadataSelectHtml('case_validation_detail_severity', caseValidationMetadataSeverities, rule.severity)}
                     </div>
-                    <div class="form-group col-md-4">
-                        <label for="case_validation_detail_review">Review status</label>
-                        ${caseValidationMetadataSelectHtml('case_validation_detail_review', caseValidationMetadataReviews, rule.review_status)}
-                    </div>
-                    <div class="form-group col-md-4">
+                    <div class="form-group col-md-6">
                         <label for="case_validation_detail_source">Source</label>
                         ${caseValidationMetadataSelectHtml('case_validation_detail_source', caseValidationMetadataSources, rule.source)}
                     </div>
@@ -557,14 +527,6 @@
                 <div class="form-group">
                     <label for="case_validation_detail_message">Warning message</label>
                     <textarea id="case_validation_detail_message" class="form-control" rows="2">${case_validation_escape_html(rule.message || '')}</textarea>
-                </div>
-                <div class="form-group">
-                    <label for="case_validation_detail_rationale">Rationale</label>
-                    <textarea id="case_validation_detail_rationale" class="form-control" rows="3">${case_validation_escape_html(rule.rationale || '')}</textarea>
-                </div>
-                <div class="form-group">
-                    <label for="case_validation_detail_admin_notes">Admin notes</label>
-                    <textarea id="case_validation_detail_admin_notes" class="form-control" rows="2">${case_validation_escape_html(rule.admin_notes || '')}</textarea>
                 </div>
                 <div class="form-group">
                     <label for="case_validation_detail_change_reason">Last changed reason</label>
@@ -579,9 +541,12 @@
                     <label for="case_validation_detail_parameters">Parameters JSON</label>
                     <textarea id="case_validation_detail_parameters" class="form-control" rows="5">${case_validation_escape_html(JSON.stringify(rule.parameters || {}, null, 2))}</textarea>
                 </div>` : ''}
-                <div class="form-group mb-0">
-                    <label for="case_validation_detail_bands">Bands JSON</label>
-                    <textarea id="case_validation_detail_bands" class="form-control" rows="4">${case_validation_escape_html(JSON.stringify(rule.bands || [], null, 2))}</textarea>
+                <div hidden>
+                    <textarea id="case_validation_detail_bands">${case_validation_escape_html(JSON.stringify(rule.bands || [], null, 2))}</textarea>
+                </div>
+                <div class="mt-3 d-flex align-items-center" style="gap:.75rem;">
+                    <button type="button" class="btn btn-primary btn-sm" onclick="caseValidationMetadataSaveRule()">Save Rule</button>
+                    <span id="cv_detail_save_status" class="small text-muted"></span>
                 </div>`;
         }
 
@@ -603,11 +568,8 @@
             rule.validation_level = document.getElementById('case_validation_detail_level').value;
             rule.confidence = document.getElementById('case_validation_detail_confidence').value;
             rule.severity = document.getElementById('case_validation_detail_severity').value;
-            rule.review_status = document.getElementById('case_validation_detail_review').value;
             rule.source = document.getElementById('case_validation_detail_source').value;
             rule.message = document.getElementById('case_validation_detail_message').value;
-            rule.rationale = document.getElementById('case_validation_detail_rationale').value;
-            rule.admin_notes = document.getElementById('case_validation_detail_admin_notes').value;
             rule.last_changed_reason = document.getElementById('case_validation_detail_change_reason').value;
 
             if (row.kind === 'field') {
@@ -643,7 +605,6 @@
             const level = document.getElementById('case_validation_filter_level').value;
             const confidence = document.getElementById('case_validation_filter_confidence').value;
             const severity = document.getElementById('case_validation_filter_severity').value;
-            const review = document.getElementById('case_validation_filter_review').value;
             const source = document.getElementById('case_validation_filter_source').value;
             const enabled = document.getElementById('case_validation_filter_enabled').value;
 
@@ -656,57 +617,38 @@
                 if (level && rule.validation_level !== level) return false;
                 if (confidence && rule.confidence !== confidence) return false;
                 if (severity && rule.severity !== severity) return false;
-                if (review && rule.review_status !== review) return false;
                 if (source && rule.source !== source) return false;
                 if (enabled && String(rule.enabled !== false) !== enabled) return false;
                 return true;
             });
         }
 
-        async function caseValidationMetadataPreview() {
+        async function caseValidationMetadataSaveRule() {
+            const statusEl = document.getElementById('cv_detail_save_status');
+            if (statusEl) statusEl.textContent = 'Saving\u2026';
             try {
                 caseValidationMetadataApplyDetail();
-                caseValidationMetadataSyncRulesDocument();
-                const body = {
-                    rules: caseValidationMetadataRules,
-                    max_findings: 50
-                };
-                const caseId = document.getElementById('case_validation_preview_case_id').value.trim();
-                const caseJson = document.getElementById('case_validation_preview_case_json').value.trim();
-                if (caseId) {
-                    body.case_id = caseId;
-                }
-                if (caseJson) {
-                    body.case_data = JSON.parse(caseJson);
-                }
 
-                const response = await fetch('/api/case-validation/rules/preview', {
-                    method: 'POST',
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json; charset=utf-8'
-                    },
-                    body: JSON.stringify(body)
-                });
-                const result = await response.json();
-                if (!response.ok || result.ok !== true) {
-                    caseValidationMetadataStatus('danger', result.error_description || result.message || 'Unable to preview rules.');
+                // Upsert only the currently selected rule — do NOT sync all rows
+                const row = caseValidationMetadataRows.find(r => r.key === caseValidationMetadataSelectedKey);
+                if (!row) {
+                    if (statusEl) statusEl.textContent = 'No rule selected.';
                     return;
                 }
 
-                caseValidationMetadataPreviewSummary = result;
-                document.getElementById('case_validation_preview_result').innerHTML = caseValidationMetadataPreviewHtml(result);
-                caseValidationMetadataRenderSummary();
-                caseValidationMetadataStatus('success', result.message || 'Preview complete.');
-            } catch (ex) {
-                caseValidationMetadataStatus('danger', ex.message || ex);
-            }
-        }
+                const preparedRule = caseValidationMetadataPrepareRule(row);
+                const listKey = row.kind === 'field' ? 'field_rules'
+                    : row.kind === 'connected' ? 'connected_field_rules'
+                    : 'form_status_rules';
 
-        async function caseValidationMetadataSave() {
-            try {
-                caseValidationMetadataApplyDetail();
-                caseValidationMetadataSyncRulesDocument();
+                const list = caseValidationMetadataRules[listKey] || [];
+                const idx = list.findIndex(r => r.id === preparedRule.id);
+                if (idx >= 0) {
+                    list[idx] = preparedRule;
+                } else {
+                    list.push(preparedRule);
+                }
+                caseValidationMetadataRules[listKey] = list;
 
                 const metadataVersion = document.getElementById('case_validation_metadata_version').innerText.trim();
                 const response = await fetch(`/api/case-validation/rules/${encodeURIComponent(metadataVersion)}`, {
@@ -719,15 +661,18 @@
                 });
                 const result = await response.json();
                 if (!response.ok || result.ok !== true) {
-                    caseValidationMetadataStatus('danger', result.error_description || result.message || 'Unable to save validation metadata.');
+                    if (statusEl) statusEl.textContent = `Error: ${result.message || result.error_description || 'Save failed.'}`;
                     return;
                 }
 
                 caseValidationMetadataRules._rev = result.rev || caseValidationMetadataRules._rev;
-                caseValidationMetadataStatus('success', 'Validation rule metadata published.');
+                if (statusEl) {
+                    statusEl.textContent = 'Saved.';
+                    setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 3000);
+                }
                 caseValidationMetadataRenderSummary();
             } catch (ex) {
-                caseValidationMetadataStatus('danger', ex.message || ex);
+                if (statusEl) statusEl.textContent = `Error: ${ex.message || ex}`;
             }
         }
 

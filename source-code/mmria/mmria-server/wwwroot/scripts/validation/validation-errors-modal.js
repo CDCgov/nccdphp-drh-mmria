@@ -10,6 +10,7 @@
         var state = window.mmria_validation_state.get();
         var errorCount = state.errors.length;
         var warningCount = state.warnings.length;
+        var infoCount = state.infos ? state.infos.length : 0;
 
         // Remove any existing modal
         var existing = document.getElementById('validation-errors-modal');
@@ -17,12 +18,12 @@
         var existingBd = document.getElementById('validation-errors-backdrop');
         if (existingBd && existingBd.parentNode) { existingBd.parentNode.removeChild(existingBd); }
 
-        if (errorCount === 0 && warningCount === 0) { return; }
+        if (errorCount === 0 && warningCount === 0 && infoCount === 0) { return; }
 
-        var headerLabel = window.mmria_validation_state.buildButtonLabel(errorCount, warningCount);
+        var headerLabel = window.mmria_validation_state.buildButtonLabel(errorCount, warningCount, infoCount);
 
         var errorsHtml = renderErrorsSection(state.errors);
-        var warningsHtml = renderWarningsSection(state.warnings);
+        var warningsHtml = renderWarningsSection(state.warnings, state.infos || []);
 
         var modalHtml =
             '<div id="validation-errors-modal" class="modal fade" tabindex="-1" role="dialog"' +
@@ -103,19 +104,25 @@
             '</div>';
     }
 
-    function renderWarningsSection(warnings) {
-        if (!warnings || warnings.length === 0) { return ''; }
+    function renderWarningsSection(warnings, infos) {
+        var warningItems = (warnings || []).map(function(w) { return { v: w, type: 'warning' }; });
+        var infoItems = (infos || []).map(function(w) { return { v: w, type: 'info' }; });
+        var combined = warningItems.concat(infoItems);
+        if (combined.length === 0) { return ''; }
 
-        var rows = warnings.map(function (w) {
-            return renderViolationRow(w, 'warning');
+        var rows = combined.map(function (item) {
+            return renderViolationRow(item.v, item.type);
         }).join('');
+
+        var sectionTitle = (warningItems.length > 0 && infoItems.length > 0) ? 'Warnings & Info'
+            : warningItems.length > 0 ? 'Warnings' : 'Info';
 
         return '<div class="validation-errors-section validation-errors-section--warnings" style="background:#fffdf0;padding:12px 15px 4px;border-top:1px solid #eee;">' +
             '<h3 style="margin:0 0 8px;font-size:15px;font-weight:600;color:#8a6000;">' +
-            '<span class="validation-warning-badge" style="background:#f0ad00;color:#333;border-radius:4px;padding:1px 7px;margin-right:6px;" aria-label="' + warnings.length + ' warnings">' + warnings.length + '</span>' +
-            'Warnings' +
+            '<span class="validation-warning-badge" style="background:#f0ad00;color:#333;border-radius:4px;padding:1px 7px;margin-right:6px;" aria-label="' + combined.length + ' ' + sectionTitle + '">' + combined.length + '</span>' +
+            sectionTitle +
             '</h3>' +
-            '<table style="width:100%;border-collapse:collapse;" role="table" aria-label="Validation Warnings">' +
+            '<table style="width:100%;border-collapse:collapse;" role="table" aria-label="Validation Warnings and Info">' +
             '<thead><tr>' +
             '<th style="width:28%;text-align:left;padding:4px 6px;font-size:12px;color:#666;">Form</th>' +
             '<th style="width:28%;text-align:left;padding:4px 6px;font-size:12px;color:#666;">Field</th>' +
@@ -129,6 +136,8 @@
     function renderViolationRow(v, type) {
         var iconHtml = type === 'error'
             ? '<span aria-hidden="true" style="color:#c00;font-size:16px;margin-right:4px;">&#9679;</span>'
+            : type === 'info'
+            ? '<span aria-hidden="true" style="color:#0077cc;font-size:16px;margin-right:4px;">&#9432;</span>'
             : '<span aria-hidden="true" style="color:#f0ad00;font-size:16px;margin-right:4px;">&#9888;</span>';
 
         var fieldLinkHtml =
@@ -144,6 +153,8 @@
 
         var rowStyle = type === 'error'
             ? 'background:#fff0f0;border-bottom:1px solid #f5c6c6;'
+            : type === 'info'
+            ? 'background:#f0f7ff;border-bottom:1px solid #c6d9f5;'
             : 'background:#fffdf0;border-bottom:1px solid #f0e5a0;';
 
         return '<tr style="' + rowStyle + '">' +

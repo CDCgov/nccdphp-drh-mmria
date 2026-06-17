@@ -149,8 +149,8 @@ create story 5.1: Implement the Validation Errors panel — button visibility (e
 | Story | File | Status |
 |---|---|---|
 | 6.1 Decouple Validation Rules Generation from Metadata Auto-Generation | `6-1-decouple-validation-rules-generation.md` | draft |
-| 6.2 Port Case Validation Admin UI from Branch | `6-2-port-case-validation-admin-ui.md` | draft |
-| 6.3 Add/Edit Rule Modal with Cascading Metadata Dropdowns | `6-3-add-edit-rule-modal.md` | draft |
+| 6.2 Port Case Validation Admin UI from Branch | `6-2-port-case-validation-admin-ui.md` | done |
+| 6.3 Add/Edit Rule Modal with Cascading Metadata Dropdowns | `6-3-add-edit-rule-modal.md` | done |
 
 > ⚠️ **Epic 6 sequencing:** Story 6.1 must be completed before 6.2. Story 6.2 must be completed before 6.3. All three must be done in order.
 

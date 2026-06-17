@@ -8,11 +8,12 @@
     var _state = {
         errors: [],
         warnings: [],
+        infos: [],
         lastUpdated: null
     };
 
     function initializeValidationState() {
-        _state = { errors: [], warnings: [], lastUpdated: null };
+        _state = { errors: [], warnings: [], infos: [], lastUpdated: null };
     }
 
     function getValidationState() {
@@ -86,9 +87,10 @@
     function evaluateHistoricalVitals(caseData, validationRules) {
         var errors = [];
         var warnings = [];
+        var infos = [];
 
         if (!caseData || !validationRules) {
-            return { errors: errors, warnings: warnings };
+            return { errors: errors, warnings: warnings, infos: infos };
         }
 
         var ruleKeys = Object.keys(validationRules);
@@ -147,13 +149,15 @@
 
                 if (effectiveSeverity === 'hard') {
                     errors.push(violation);
+                } else if (effectiveSeverity === 'info') {
+                    infos.push(violation);
                 } else {
                     warnings.push(violation);
                 }
             }
         }
 
-        return { errors: errors, warnings: warnings };
+        return { errors: errors, warnings: warnings, infos: infos };
     }
 
     // Run historical scan and update state. Called after case data is loaded.
@@ -162,7 +166,7 @@
             return;
         }
         var result = evaluateHistoricalVitals(window.g_data, window.mmria_validation_rules);
-        updateValidationState({ errors: result.errors, warnings: result.warnings });
+        updateValidationState({ errors: result.errors, warnings: result.warnings, infos: result.infos });
         refreshValidationErrorsButton();
     }
 
@@ -179,7 +183,7 @@
 
         var state = getValidationState();
         var editMode = isEditMode();
-        var totalViolations = state.errors.length + state.warnings.length;
+        var totalViolations = state.errors.length + state.warnings.length + (state.infos ? state.infos.length : 0);
 
         if (!editMode || totalViolations === 0) {
             container.innerHTML = '';
@@ -187,7 +191,7 @@
             return;
         }
 
-        var label = buildButtonLabel(state.errors.length, state.warnings.length);
+        var label = buildButtonLabel(state.errors.length, state.warnings.length, state.infos ? state.infos.length : 0);
         container.innerHTML =
             '<button type="button" class="btn validation-errors-button" onclick="mmria_validation_show_panel()" title="View validation errors and warnings">' +
             label +
@@ -195,13 +199,16 @@
         container.style.display = 'inline-block';
     }
 
-    function buildButtonLabel(errorCount, warningCount) {
+    function buildButtonLabel(errorCount, warningCount, infoCount) {
         var parts = [];
         if (errorCount > 0) {
             parts.push(errorCount + (errorCount === 1 ? ' Error' : ' Errors'));
         }
         if (warningCount > 0) {
             parts.push(warningCount + (warningCount === 1 ? ' Warning' : ' Warnings'));
+        }
+        if (infoCount > 0) {
+            parts.push(infoCount + ' Info');
         }
         return parts.join(' \u00b7 ');
     }

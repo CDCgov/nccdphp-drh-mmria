@@ -1,36 +1,28 @@
-# Story 6.3: Add/Edit Rule Modal with Cascading Metadata Dropdowns
+# Story 6.3: Per-Rule Save via Inline Detail Panel
 
-Status: draft
+Status: done
 
 ## Story
 
 As a form designer,
-I want to add new validation rules and edit existing ones from the Case Validation Rule Manager,
-So that I can build and maintain the rule set without directly editing CouchDB documents.
+I want to save individual validation rules directly from the inline detail panel,
+So that I can build and maintain the rule set without a publish step or separate modal.
 
 ## Context and Scope
 
-This story adds Create and Edit capabilities to the admin UI delivered in Story 6.2. It introduces:
+This story replaces the originally planned Add/Edit modal with a simpler inline approach:
 
-1. **A new API endpoint** that returns the flattened metadata field list from the database (not the repo), organized by form — to power the cascading form/field dropdowns.
-2. **An "Add Rule" button** in the admin UI header that opens a modal dialog.
-3. **A cascading dropdown** in the modal: select Form → Field list filters to that form.
-4. **A rule creation/edit form** in the modal: after selecting a form and field, show all editable rule properties relevant to the selected rule type.
-5. **An "Edit" button** on each existing rule row that opens the modal pre-populated with that rule's current values.
-6. **Save** writes the updated document back via the existing `PUT /api/case-validation/rules/{metadata_version}` endpoint.
+1. **Remove "Publish Rules" button** — rules are managed in dev and pushed to production via deployment; a bulk-publish UI step is not needed.
+2. **Add "Save Rule" button** to the inline detail panel — clicking it persists the currently selected rule (create if new, update if existing) via the existing `PUT /api/case-validation/rules/{metadata_version}` endpoint.
+3. **No new API endpoint or modal** — the existing panel and PUT endpoint are sufficient.
+4. **1:1 field → rule** for `field_rules` — already enforced by the existing row-building logic; every metadata field has a row with default rule values until explicitly saved and enabled.
 
-All three rule types are supported: `field_rules`, `connected_field_rules`, and `form_status_rules`.
+The left-panel field list is already database-driven (loaded from the live DB metadata document). The "Enabled" count reflects rules that have been explicitly enabled in the rules document. `_rev` is kept current in memory after each save so sequential saves do not produce CouchDB conflict errors.
 
 ### Dependencies
 
-- **Story 6.1** must be complete — auto-generation is removed; the rule document starts empty and is built entirely through this UI.
-- **Story 6.2** must be complete — the admin page, `case-validation.js`, and all API routes must exist.
-
-### Metadata Source
-
-The form and field dropdown data comes from the database metadata document (fetched server-side via `MetadataVersionManager`), not from hardcoded or repo-side metadata. This ensures dropdown options always reflect the current deployed metadata version.
-
-The server uses the existing `CaseValidationManager.FlattenMetadata(app metadata)` method to build the field list. The new API endpoint calls this and serializes the result for the client.
+- **Story 6.1** must be complete.
+- **Story 6.2** must be complete — the admin page and all API routes must exist.
 
 ---
 
@@ -183,140 +175,50 @@ If a rule with the generated id already exists, append a counter suffix: `field:
 
 ## Acceptance Criteria
 
-**AC #1: Metadata fields endpoint returns data**
-When `GET /api/case-validation/metadata/fields` is called by a `form_designer`,
-Then it returns a JSON array of flattened metadata fields from the current DB metadata version, including at minimum: `field_path`, `form_path`, `form_prompt`, `prompt`, `type`, `is_scalar`.
+**AC #1: "Publish Rules" button removed**
+The "Publish Rules" button does not appear in the page header.
 
-**AC #2: Form dropdown populated from DB metadata**
-When the Add Rule modal opens,
-Then the Form dropdown is populated from the metadata fields API — showing the distinct `form_prompt` labels in metadata order, matching the list shown in the screenshot (Home Record, Death Certificate, Birth/Fetal Death Certificate, etc.).
+**AC #2: "Save Rule" button appears in detail panel**
+When a rule row is selected, the detail panel shows a "Save Rule" button at the bottom.
 
-**AC #3: Field dropdown filters on form selection**
-When the user selects a form in the Form dropdown,
-Then the Field dropdown updates to show only the scalar fields belonging to that form — not fields from other forms.
+**AC #3: Save persists new rule**
+Given a rule row in default/generated state (not yet explicitly saved),
+When the user configures values and clicks "Save Rule",
+Then the rule is written to the rules document via `PUT /api/case-validation/rules/{metadata_version}` and the Enabled summary count updates accordingly.
 
-**AC #4: Field auto-populates read-only metadata**
-When the user selects a field in the Field dropdown,
-Then the `form_path`, `field_path`, `field_type`, and `metadata_path` display fields are auto-populated from the API response and are read-only (not editable).
+**AC #4: Save updates existing rule**
+Given a rule that was previously saved,
+When the user changes a field (e.g. Severity) and clicks "Save Rule",
+Then the rules document is updated with the new value and "Saved." appears in the `#cv_detail_save_status` span.
 
-**AC #5: Add mode — empty modal**
-When the user clicks "Add Rule",
-Then the modal opens with rule type defaulting to "Field Rule", all dropdowns at their placeholder, and all text/number fields empty.
+**AC #5: `_rev` stays current**
+After each successful Save Rule, `caseValidationMetadataRules._rev` is updated from the API response so subsequent saves do not produce CouchDB conflict errors.
 
-**AC #6: Edit mode — pre-populated modal**
-When the user clicks "Edit" on an existing rule row,
-Then the modal opens pre-populated with that rule's current values in all fields, including the correct form and field dropdown selections.
+**AC #6: Save error shown inline**
+When the PUT call fails (network error or CouchDB conflict),
+Then an error message appears in `#cv_detail_save_status` and the page does not crash.
 
-**AC #7: Save creates a new rule**
-Given the user fills in form, field, severity, message, and at least one rule-specific field,
-When the user clicks Save,
-Then a new rule is appended to the appropriate rule list (`field_rules`, `connected_field_rules`, or `form_status_rules`) in the rule document, the document is saved via `PUT /api/case-validation/rules/{metadata_version}`, and the rule list re-renders showing the new rule.
-
-**AC #8: Save updates an existing rule**
-Given the user edits an existing rule and changes its message and severity,
-When the user clicks Save,
-Then the rule document is updated with the new values (matched by `id`), saved, and the rule list re-renders showing the updated values.
-
-**AC #9: Duplicate ID prevention**
-When a new rule is added with the same `field_path` as an existing rule,
-Then the generated `id` gets a counter suffix (`:2`, `:3`, etc.) so no two rules share the same `id`.
-
-**AC #10: Save validation**
-When the user clicks Save with no form selected (Add mode) or no message/rationale filled,
-Then the modal shows an inline validation message and does not call the save API.
-
-**AC #11: Section 508**
-The modal meets Section 508 requirements: `role="dialog"`, `aria-modal="true"`, `aria-labelledby` pointing to the header, focus goes to the first interactive element on open, Escape key dismisses.
-
-**AC #12: Build succeeds**
-When `dotnet build` is run on `mmria-server.csproj`,
-Then the build completes with 0 errors and 0 warnings introduced by this change.
+**AC #7: Build succeeds**
+`dotnet build mmria-server.csproj` completes with 0 errors introduced by this change.
 
 ---
 
 ## Tasks / Subtasks
 
-### Phase 1 — New API endpoint in `case_validationController.cs`
+### Phase 1 — Remove "Publish Rules" button
 
-- [ ] **Add `GetMetadataFields` action**:
-  ```csharp
-  [Authorize(Roles = "form_designer")]
-  [HttpGet("metadata/fields")]
-  [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-  public async Task<IActionResult> GetMetadataFields()
-  ```
-  - Calls `GetCurrentMetadataAsync(GetCurrentMetadataVersion())`
-  - Calls `_caseValidationManager.FlattenMetadata(metadata)`
-  - Returns `Ok(fields)` as JSON
-  - Wraps in try-catch returning 500 on error
+- [x] Remove the `<button>` for "Publish Rules" from `.case-validation-admin-actions` in `Index.cshtml`.
+- [x] Remove the `caseValidationMetadataSave()` async function from the `<script>` block.
 
-### Phase 2 — "Add Rule" button in admin UI
+### Phase 2 — Add "Save Rule" to detail panel
 
-- [ ] **Add button** in the admin UI header/actions area in `case-validation.js` (or in `Index.cshtml` — follow the pattern of existing buttons in the admin UI):
-  ```html
-  <button type="button" class="btn btn-primary" onclick="caseValidationMetadataOpenAddModal()">Add Rule</button>
-  ```
+- [x] Append Save Rule button + `#cv_detail_save_status` span to the `detail.innerHTML` string at the end of `caseValidationMetadataRenderDetail()`.
+- [x] Add `caseValidationMetadataSaveRule()` function.
 
-- [ ] **Add "Edit" button** to each rendered rule row. In the rule row render function, append:
-  ```html
-  <button type="button" class="btn btn-sm btn-outline-secondary" onclick="caseValidationMetadataOpenEditModal('{rule_id}', '{rule_category}')">Edit</button>
-  ```
-
-### Phase 3 — Modal HTML
-
-- [ ] **Define modal HTML** (add to the admin view or render dynamically in JS):
-  - Container: `<div id="case_validation_add_edit_modal" role="dialog" aria-modal="true" aria-labelledby="case_validation_modal_title" ...>`
-  - Purple header: `<div id="case_validation_modal_title">Add Validation Rule</div>`
-  - Body sections:
-    - Rule type radio/tabs
-    - Form dropdown (`<select id="cv_modal_form">`)
-    - Field dropdown (`<select id="cv_modal_field">` — for field/connected types)
-    - Related field dropdown (`<select id="cv_modal_related_field">` — connected type only)
-    - Read-only display: form_path, field_path, field_type, metadata_path
-    - Common fields: enabled, severity, validation_level, confidence, review_status, source, message, rationale, explanation, admin_notes
-    - Field-rule-specific: rule_type selector, conditional number/text inputs for min_value/max_value/max_length/regex/allowed_values
-    - Connected-field-rule-specific: comparison, max_difference, require_same_container, trigger_values
-    - Form-status-rule-specific: expected_status
-  - Footer: Save button, Cancel button, `<div id="cv_modal_status">` for inline messages
-
-### Phase 4 — Modal JavaScript
-
-- [ ] **`caseValidationMetadataOpenAddModal()`**: Clear all modal fields, set title to "Add Validation Rule", set mode to 'add', load metadata fields if not cached, open modal.
-
-- [ ] **`caseValidationMetadataOpenEditModal(ruleId, ruleCategory)`**: Find rule by id and category from loaded rules state, populate modal fields with rule values, set title to "Edit Validation Rule", set mode to 'edit', open modal.
-
-- [ ] **`caseValidationMetadataLoadMetadataFields()`**: Fetch from `GET /api/case-validation/metadata/fields`. Cache result in `case_validation_state.metadata_fields`. On success, populate Form dropdown with distinct form_prompt values (maintain metadata order).
-
-- [ ] **Form dropdown `change` handler**: Filter Field dropdown options to only fields where `form_path` matches selected form. Clear field selection.
-
-- [ ] **Field dropdown `change` handler**: Auto-populate the read-only metadata display fields (form_path, field_path, field_type, metadata_path) from the cached metadata_fields array.
-
-- [ ] **Rule type change handler**: Show/hide the field-type-specific input groups based on selected rule type. Hide "Field" dropdown row when rule type is "Form Status Rule". Hide "Related Field" row unless rule type is "Connected Field Rule".
-
-- [ ] **Rule type sub-type change handler** (field rule only): Show/hide min_value/max_value vs max_length vs regex vs allowed_values inputs based on selected `rule_type` value.
-
-- [ ] **`caseValidationMetadataSaveRule()`**:
-  1. Validate required fields — show error in `#cv_modal_status` and return if invalid.
-  2. Build rule object from modal fields based on rule type.
-  3. Generate `id` for new rules; use existing `id` for edits.
-  4. Clone the loaded rules document from `case_validation_state.rules`.
-  5. For add: append to the appropriate list. For edit: find and replace by `id`.
-  6. Call `PUT /api/case-validation/rules/{metadata_version}` with the updated document.
-  7. On success: close modal, reload rules via `GET /api/case-validation/rules/current`, re-render rule list.
-  8. On error: show error in `#cv_modal_status`, leave modal open.
-
-- [ ] **`caseValidationMetadataGenerateRuleId(ruleType, fieldPath, relatedFieldPath, formPath, existingIds)`**: Generate id based on rule type, deduplicate with counter suffix if needed.
-
-- [ ] **Focus management**: On modal open, move focus to the rule type selector. On close, return focus to the triggering button. Escape key closes modal.
-
-### Phase 5 — Build and smoke test
+### Phase 3 — Build and smoke test
 
 - [ ] Run `dotnet build mmria-server.csproj` — 0 errors.
 - [ ] Navigate to `/case_validation_metadata` as `form_designer`.
-- [ ] Click "Add Rule" — modal opens, Form dropdown populated with all forms from DB metadata.
-- [ ] Select "ER Visits and Hospitalizations" — Field dropdown filters to ER Visits fields only.
-- [ ] Select "Temperature" — metadata fields auto-populate: `field_path = er_visit_and_hospital_medical_records/vital_signs/temperature`, `field_type = number`.
-- [ ] Set severity = "warning", message = "Test rule", min_value = 80, max_value = 115.
-- [ ] Click Save — rule appears in the list.
-- [ ] Click Edit on the saved rule — modal reopens with pre-populated values.
-- [ ] Change severity to "hard" and save — list shows updated severity.
+- [ ] Select any rule — "Save Rule" button appears at bottom of detail panel; "Publish Rules" button is gone.
+- [ ] Toggle Enabled on a rule, click Save Rule — "Saved." appears; Enabled summary count updates.
+- [ ] Select another rule, save it — no CouchDB conflict (rev was updated correctly).

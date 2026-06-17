@@ -57,7 +57,7 @@ public sealed class CaseValidationDAL
 
     public static string CreateDocumentId(string metadataVersion)
     {
-        return $"case-validation-rules-{metadataVersion}";
+        return "case-validation-rules";
     }
 
     public static JsonSerializerSettings CreateSerializerSettings()
