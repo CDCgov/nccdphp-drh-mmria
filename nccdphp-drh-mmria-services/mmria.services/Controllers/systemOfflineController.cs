@@ -96,7 +96,9 @@ public sealed class systemOfflineController : Controller
                 warn_message = request?.warn_message,
                 offline_date = request?.offline_date,
                 offline_modal_message = request?.offline_modal_message,
-                offline_page_message = request?.offline_page_message
+                offline_page_message = request?.offline_page_message,
+                apply_to_all_jurisdictions = request?.apply_to_all_jurisdictions ?? true,
+                selected_jurisdictions = request?.selected_jurisdictions ?? new System.Collections.Generic.List<string>()
             };
 
             var settings = new Newtonsoft.Json.JsonSerializerSettings

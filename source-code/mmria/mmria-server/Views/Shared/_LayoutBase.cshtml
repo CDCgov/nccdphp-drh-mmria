@@ -112,16 +112,17 @@ if (top !== self) top.location.replace(self.location.href);
   <div id="mmria-warn-modal" role="dialog" aria-labelledby="mmria-warn-modal-title" aria-modal="true" aria-describedby="mmria-warn-modal-message" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:1050; overflow:auto;">
     <div class="modal-dialog" role="document">
       <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="mmria-warn-modal-title">System Notice</h5>
-          <button type="button" class="close mmria-warn-close-btn" onclick="closeWarnModal()" aria-label="Close">
-            <span aria-hidden="true">&times;</span>
+        <div class="modal-header" style="background-color:#7b2d8e; color:white; padding:10px 15px; display:flex; align-items:center; justify-content:space-between;">
+          <h5 class="modal-title" id="mmria-warn-modal-title" style="margin:0; font-weight:600; font-size:17px;">System Notice</h5>
+          <button type="button" class="mmria-warn-close-btn" onclick="closeWarnModal()" aria-label="Close"
+            style="background:none; border:none; color:white; font-size:24px; line-height:1; cursor:pointer; padding:0; opacity:0.9;">
+            &times;
           </button>
         </div>
-        <div class="modal-body">
-          <p id="mmria-warn-modal-message"></p>
+        <div class="modal-body" style="padding:15px 20px;">
+          <p id="mmria-warn-modal-message" style="margin:0;"></p>
         </div>
-        <div class="modal-footer">
+        <div class="modal-footer" style="padding:10px 15px;">
           <button type="button" class="btn btn-primary mmria-warn-close-btn" onclick="closeWarnModal()">Dismiss</button>
         </div>
       </div>
@@ -133,13 +134,13 @@ if (top !== self) top.location.replace(self.location.href);
   <div id="mmria-offline-modal" role="alertdialog" aria-labelledby="mmria-offline-modal-title" aria-modal="true" aria-describedby="mmria-offline-modal-message" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:1050; overflow:auto;">
     <div class="modal-dialog" role="document">
       <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="mmria-offline-modal-title">System Going Offline</h5>
+        <div class="modal-header" style="background-color:#7b2d8e; color:white; padding:10px 15px;">
+          <h5 class="modal-title" id="mmria-offline-modal-title" style="margin:0; font-weight:600; font-size:17px;">System Going Offline</h5>
         </div>
-        <div class="modal-body">
-          <p id="mmria-offline-modal-message"></p>
+        <div class="modal-body" style="padding:15px 20px;">
+          <p id="mmria-offline-modal-message" style="margin:0;"></p>
         </div>
-        <div class="modal-footer">
+        <div class="modal-footer" style="padding:10px 15px;">
           <button type="button" id="mmria-offline-modal-ok" class="btn btn-primary" onclick="mmria_offline_modal_ok_handler()">OK</button>
         </div>
       </div>
@@ -169,12 +170,8 @@ if (top !== self) top.location.replace(self.location.href);
           window.handleOfflineState(result, config);
         })
         .catch(function () { /* silently ignore network / parse errors */ });
-
-      // Periodic poll: check offline status every 2 minutes.
-      // The login page uses a separate layout and does not include this script,
-      // so no additional authentication guard is needed here.
-      window.startOfflineStatusPolling();
-    });
+      // Poll every 2 minutes while the user is on the page.
+      window.startOfflineStatusPolling(120000);    });
   </script>
 
   @*Html.ReactGetScriptPaths()*@

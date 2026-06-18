@@ -15,6 +15,7 @@
  */
 function checkOfflineStatus(config) {
     if (!config || (!config.warn_date && !config.offline_date)) {
+        console.log('[OfflineCheck] No dates configured — state: normal');
         return { state: 'normal' };
     }
 
@@ -22,18 +23,23 @@ function checkOfflineStatus(config) {
 
     if (config.offline_date) {
         var offlineTime = new Date(config.offline_date).getTime();
+        console.log('[OfflineCheck] offline_date raw:', config.offline_date, '→ parsed ms:', offlineTime, '| now:', now, '| past?', now >= offlineTime);
         if (!isNaN(offlineTime) && now >= offlineTime) {
+            console.log('[OfflineCheck] state: offline');
             return { state: 'offline' };
         }
     }
 
     if (config.warn_date) {
         var warnTime = new Date(config.warn_date).getTime();
+        console.log('[OfflineCheck] warn_date raw:', config.warn_date, '→ parsed ms:', warnTime, '| now:', now, '| past?', now >= warnTime);
         if (!isNaN(warnTime) && now >= warnTime) {
+            console.log('[OfflineCheck] state: warn');
             return { state: 'warn' };
         }
     }
 
+    console.log('[OfflineCheck] state: normal (dates in future)');
     return { state: 'normal' };
 }
 
@@ -50,14 +56,18 @@ function handleOfflineState(statusResult, config) {
     if (!statusResult) return;
 
     if (statusResult.state === 'warn') {
-        if (sessionStorage.getItem('warn_modal_shown') !== '1') {
+        var shownForDate = sessionStorage.getItem('warn_modal_shown');
+        console.log('[OfflineCheck] handleOfflineState: state=warn | warn_modal_shown sessionStorage gate =', shownForDate, '| current warn_date =', config.warn_date);
+        if (shownForDate !== config.warn_date) {
             showWarnModal(config.warn_message || 'The system will be going offline soon. Please save your work.');
-            sessionStorage.setItem('warn_modal_shown', '1');
+            sessionStorage.setItem('warn_modal_shown', config.warn_date);
         }
     } else if (statusResult.state === 'offline') {
-        if (localStorage.getItem('offline_modal_shown') !== '1') {
+        var shownForOfflineDate = localStorage.getItem('offline_modal_shown');
+        console.log('[OfflineCheck] handleOfflineState: state=offline | offline_modal_shown localStorage gate =', shownForOfflineDate, '| current offline_date =', config.offline_date);
+        if (shownForOfflineDate !== config.offline_date) {
             showOfflineModal(config.offline_modal_message || 'The system is now offline. You will be signed out.');
-            localStorage.setItem('offline_modal_shown', '1');
+            localStorage.setItem('offline_modal_shown', config.offline_date);
         }
     }
 }
@@ -73,7 +83,9 @@ function showWarnModal(message) {
     var msgEl = document.getElementById('mmria-warn-modal-message');
     if (msgEl) msgEl.textContent = message;
     if (backdrop) backdrop.style.display = 'block';
-    modal.style.display = 'block';
+    modal.style.display = 'flex';
+    modal.style.alignItems = 'center';
+    modal.style.justifyContent = 'center';
     var closeBtn = modal.querySelector('.mmria-warn-close-btn');
     if (closeBtn) setTimeout(function () { closeBtn.focus(); }, 0);
 }
@@ -99,7 +111,9 @@ function showOfflineModal(message) {
     var msgEl = document.getElementById('mmria-offline-modal-message');
     if (msgEl) msgEl.textContent = message;
     if (backdrop) backdrop.style.display = 'block';
-    modal.style.display = 'block';
+    modal.style.display = 'flex';
+    modal.style.alignItems = 'center';
+    modal.style.justifyContent = 'center';
     var okBtn = document.getElementById('mmria-offline-modal-ok');
     if (okBtn) setTimeout(function () { okBtn.focus(); }, 0);
 }
@@ -152,13 +166,11 @@ function mmria_offline_modal_ok_handler() {
 
 /**
  * Starts a periodic poll of /api/system-offline/status.
- * On each successful response, calls checkOfflineStatus(config) → handleOfflineState(state, config).
- * On network or parse errors, logs a warning to console and continues polling — no error is
- * surfaced to the user.
+ * On each response, calls checkOfflineStatus → handleOfflineState using the same
+ * gates as the initial page-load check, so modals are never shown twice.
  *
- * @param {number} [intervalMs=120000] - Poll interval in milliseconds (default: 2 minutes).
- *   Pass a shorter value in tests to speed up verification.
- * @returns {number} The interval ID returned by setInterval (can be passed to clearInterval).
+ * @param {number} intervalMs - Poll interval in milliseconds. Default: 120000 (2 min).
+ * @returns {number} The setInterval ID (can be passed to clearInterval if needed).
  */
 function startOfflineStatusPolling(intervalMs) {
     var ms = (typeof intervalMs === 'number' && intervalMs > 0) ? intervalMs : 120000;

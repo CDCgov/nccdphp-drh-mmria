@@ -45,6 +45,31 @@
             <label for="offline_page_message_id">Offline Page Message</label>
             <textarea id="offline_page_message_id" name="offline_page_message" class="form-control" rows="3"></textarea>
         </div>
+        <div class="form-group mt-4">
+            <fieldset>
+                <legend class="col-form-label pt-0" style="font-weight:600;">Jurisdiction Targeting</legend>
+                <p class="text-muted" style="font-size:0.9em;">Controls which sites receive the offline/warn window.</p>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="jurisdiction_scope" id="scope_all_id" value="all" checked onchange="onScopeChange(this)">
+                    <label class="form-check-label" for="scope_all_id">All Jurisdictions</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="jurisdiction_scope" id="scope_select_id" value="select" onchange="onScopeChange(this)">
+                    <label class="form-check-label" for="scope_select_id">Select Jurisdictions</label>
+                </div>
+            </fieldset>
+
+            <div id="jurisdiction_list_container_id" style="display:none; margin-top:12px; padding:12px; border:1px solid #ccc; border-radius:4px; max-height:300px; overflow-y:auto;">
+                <div style="margin-bottom:8px;">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="checkAllJurisdictions()">Check All</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary ml-2" onclick="uncheckAllJurisdictions()">Uncheck All</button>
+                </div>
+                <div id="jurisdiction_checkboxes_id">
+                    <em class="text-muted">Loading jurisdictions&hellip;</em>
+                </div>
+            </div>
+        </div>
+
         <button type="button" id="save_button_id" class="btn btn-primary" onclick="saveConfig()">Save</button>
     </form>
 </div>
@@ -54,38 +79,130 @@
 <script type="text/javascript">
 'use strict';
 
+var _allJurisdictions = [];
+
 window.addEventListener('load', function () {
     loadConfig();
 });
 
 async function loadConfig() {
     try {
-        var response = await fetch('/system-offline/GetConfig');
-        if (!response.ok) {
+        var [configResponse, jurisdictionsResponse] = await Promise.all([
+            fetch('/system-offline/GetConfig'),
+            fetch('/system-offline/GetJurisdictions')
+        ]);
+
+        if (!configResponse.ok) {
             showStatus('Failed to load configuration.', false);
             return;
         }
-        var config = await response.json();
+
+        var config = await configResponse.json();
+        _allJurisdictions = jurisdictionsResponse.ok ? await jurisdictionsResponse.json() : [];
+
         document.getElementById('warn_date_id').value = config.warn_date || '';
         document.getElementById('warn_message_id').value = config.warn_message || '';
         document.getElementById('offline_date_id').value = config.offline_date || '';
         document.getElementById('offline_modal_message_id').value = config.offline_modal_message || '';
         document.getElementById('offline_page_message_id').value = config.offline_page_message || '';
+
+        var applyToAll = config.apply_to_all_jurisdictions !== false;
+        document.getElementById('scope_all_id').checked = applyToAll;
+        document.getElementById('scope_select_id').checked = !applyToAll;
+
+        renderJurisdictionCheckboxes(config.selected_jurisdictions || []);
+        updateJurisdictionListVisibility(!applyToAll);
+
     } catch (err) {
         showStatus('Error loading configuration: ' + err, false);
     }
+}
+
+function renderJurisdictionCheckboxes(selectedJurisdictions) {
+    var container = document.getElementById('jurisdiction_checkboxes_id');
+    if (_allJurisdictions.length === 0) {
+        container.innerHTML = '<em class="text-muted">No jurisdictions found.</em>';
+        return;
+    }
+
+    var html = '';
+    _allJurisdictions.forEach(function (jur) {
+        var isCdc = jur.toLowerCase() === 'cdc';
+        var isChecked = isCdc || selectedJurisdictions.some(function (s) { return s.toLowerCase() === jur.toLowerCase(); });
+        var disabledAttr = isCdc ? ' disabled' : '';
+        var checkedAttr = isChecked ? ' checked' : '';
+        var labelSuffix = isCdc ? ' <span class="badge badge-secondary" style="font-size:0.75em;">required</span>' : '';
+        html += '<div class="form-check">' +
+            '<input class="form-check-input jurisdiction-checkbox" type="checkbox" id="jur_' + escapeAttr(jur) + '" value="' + escapeAttr(jur) + '"' + checkedAttr + disabledAttr + '>' +
+            '<label class="form-check-label" for="jur_' + escapeAttr(jur) + '">' + escapeHtml(jur) + labelSuffix + '</label>' +
+            '</div>';
+    });
+    container.innerHTML = html;
+}
+
+function escapeAttr(str) {
+    return str.replace(/[^a-zA-Z0-9_-]/g, function (c) { return '_'; });
+}
+
+function escapeHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function onScopeChange(radio) {
+    var isSelect = radio.value === 'select';
+    updateJurisdictionListVisibility(isSelect);
+}
+
+function updateJurisdictionListVisibility(show) {
+    var container = document.getElementById('jurisdiction_list_container_id');
+    container.style.display = show ? 'block' : 'none';
+
+    // Enable/disable checkboxes based on scope (cdc stays disabled always)
+    document.querySelectorAll('.jurisdiction-checkbox').forEach(function (cb) {
+        if (cb.value.toLowerCase() !== 'cdc') {
+            cb.disabled = !show;
+        }
+    });
+}
+
+function checkAllJurisdictions() {
+    document.querySelectorAll('.jurisdiction-checkbox').forEach(function (cb) {
+        if (!cb.disabled) cb.checked = true;
+    });
+}
+
+function uncheckAllJurisdictions() {
+    document.querySelectorAll('.jurisdiction-checkbox').forEach(function (cb) {
+        if (!cb.disabled) cb.checked = false;
+    });
+}
+
+function getSelectedJurisdictions() {
+    var selected = [];
+    document.querySelectorAll('.jurisdiction-checkbox:checked').forEach(function (cb) {
+        selected.push(cb.value);
+    });
+    // Ensure cdc is always included
+    if (!selected.some(function (s) { return s.toLowerCase() === 'cdc'; })) {
+        selected.unshift('cdc');
+    }
+    return selected;
 }
 
 async function saveConfig() {
     var btn = document.getElementById('save_button_id');
     btn.disabled = true;
 
+    var applyToAll = document.getElementById('scope_all_id').checked;
+
     var payload = {
         warn_date: document.getElementById('warn_date_id').value || null,
         warn_message: document.getElementById('warn_message_id').value || null,
         offline_date: document.getElementById('offline_date_id').value || null,
         offline_modal_message: document.getElementById('offline_modal_message_id').value || null,
-        offline_page_message: document.getElementById('offline_page_message_id').value || null
+        offline_page_message: document.getElementById('offline_page_message_id').value || null,
+        apply_to_all_jurisdictions: applyToAll,
+        selected_jurisdictions: applyToAll ? [] : getSelectedJurisdictions()
     };
 
     try {
