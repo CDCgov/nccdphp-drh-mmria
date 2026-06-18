@@ -1,6 +1,6 @@
 # Story 4.3: OMB Block Right-Alignment — Home Page
 
-Status: done
+Status: not-started
 
 ## Story
 
@@ -19,10 +19,10 @@ so that the layout matches the intended design with the heading on the left and 
 
 ## Tasks / Subtasks
 
-- [x] Move `_BurdenStatement` partial out of the heading `<div>` into a sibling `<div>` in `Views/Home/Index.cshtml` (AC: #1–#6)
-  - [x] Removed `@await Html.PartialAsync("_BurdenStatement")` from inside the `else` block
-  - [x] Added new sibling `<div>@await Html.PartialAsync("_BurdenStatement")</div>` guarded by `@if(!is_pmss_enhanced)`, after heading `<div>` and before `#offline-home-exit-widget`
-  - [x] Outer row `justify-content-between` already present — no class changes needed
+- [ ] Move `_BurdenStatement` partial out of the heading `<div>` into a sibling `<div>` in `Views/Home/Index.cshtml` (AC: #1–#6)
+  - [ ] Remove `@await Html.PartialAsync("_BurdenStatement")` from inside the `else` block of the `is_pmss_enhanced` conditional (currently appears after the `<h1>` tag)
+  - [ ] Add a new sibling `<div>` inside the outer `justify-content-between` row, after the heading `<div>` and before the `#offline-home-exit-widget` div, that renders `_BurdenStatement` only when `!is_pmss_enhanced`
+  - [ ] Verify the outer row already has `justify-content-between` — no class changes to the row div are needed
 
 ## Dev Notes
 
