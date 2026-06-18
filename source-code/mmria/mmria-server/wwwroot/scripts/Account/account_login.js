@@ -1,3 +1,7 @@
+// Clear the going-offline modal gate so it can fire again after the next login.
+// This runs every time the login page is loaded (i.e., after logout or session expiry).
+try { localStorage.removeItem('offline_modal_shown'); } catch (e) { /* storage unavailable */ }
+
 const login_button = document.getElementById('login_button');
 const username_element = document.getElementById('login_name');
 const password_element = document.getElementById('login_value');
