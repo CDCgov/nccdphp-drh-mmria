@@ -99,12 +99,16 @@ public AccountController
     }
 
     [AllowAnonymous] 
-    public IActionResult Login(string returnUrl = null)
+    public async Task<IActionResult> Login(string returnUrl = null)
     {
         TempData["returnUrl"] = returnUrl;
         ViewBag.is_offline_mode_enabled = _configuration.GetBoolean("is_offline_mode_enabled", host_prefix) ?? false;
         ViewBag.is_offline_logging_enabled = _configuration.GetBoolean("is_offline_logging_enabled", host_prefix) ?? false;
         ViewBag.offline_logging_max_logs = _configuration.GetInteger("offline_logging_max_logs", host_prefix) ?? 10000;
+
+        var offlineConfig = await LoadSystemOfflineConfigAsync();
+        ViewData["IsOffline"] = IsSystemOffline(offlineConfig.offline_date);
+        ViewData["OfflinePageMessage"] = offlineConfig.offline_page_message;
 
         return View();
     }
@@ -640,6 +644,42 @@ public AccountController
     private static string NormalizeUserName(string? userName)
     {
         return (userName ?? string.Empty).Trim().ToLowerInvariant();
+    }
+
+    private async Task<mmria.common.metadata.SystemOfflineConfig> LoadSystemOfflineConfigAsync()
+    {
+        var result = new mmria.common.metadata.SystemOfflineConfig();
+        try
+        {
+            var vitalsUrl = _configuration.GetString("vitals_url", host_prefix)
+                ?.Replace("/api/Message/IJESet", string.Empty);
+            if (string.IsNullOrWhiteSpace(vitalsUrl))
+                return result;
+
+            var getUrl = $"{vitalsUrl}/api/systemOffline/GetSystemOfflineConfig";
+            var requestOptions = new mmria.common.getset.CouchDbRequestOptions
+            {
+                VitalServiceKey = _configuration.GetString("vital_service_key", host_prefix)
+            };
+            var responseBody = await _couchDbHttpClient.ExecuteAsync(
+                "GET", getUrl, null, "application/json", requestOptions);
+            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.SystemOfflineConfig>(responseBody)
+                ?? new mmria.common.metadata.SystemOfflineConfig();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"AccountController.LoadSystemOfflineConfigAsync error: {ex}");
+        }
+        return result;
+    }
+
+    private static bool IsSystemOffline(string offlineDateStr)
+    {
+        if (string.IsNullOrWhiteSpace(offlineDateStr))
+            return false;
+        if (!DateTime.TryParse(offlineDateStr, null, System.Globalization.DateTimeStyles.RoundtripKind, out var offlineDate))
+            return false;
+        return DateTime.UtcNow >= offlineDate;
     }
 
 }

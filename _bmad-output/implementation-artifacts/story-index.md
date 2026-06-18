@@ -197,7 +197,7 @@ dev this story _bmad-output/implementation-artifacts/7-2-audit-logging-case-life
 | Story | File | Status |
 |---|---|---|
 | 8.1 System Offline Config — Document, mmria-services, Controller, Admin Page | `8-1-system-offline-config-services-admin-page.md` | not-started |
-| 8.2 Login Page Offline State | `8-2-login-page-offline-state.md` | not-started |
+| 8.2 Login Page Offline State | `8-2-login-page-offline-state.md` | verification |
 | 8.3 Warning and Going Offline Modals | `8-3-warning-and-offline-modals.md` | not-started |
 | 8.4 Periodic Offline Status Check | `8-4-periodic-status-check.md` | not-started |
 
