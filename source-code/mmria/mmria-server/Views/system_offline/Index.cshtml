@@ -1,0 +1,118 @@
+@using System.Security.Claims;
+@{
+  Layout = "_LayoutBase";
+
+  ViewBag.BreadCrumbs = true;
+
+  var userName = "";
+
+  if (User.Identities.Any(u => u.IsAuthenticated))
+  {
+    userName = User.Identities.First(
+        u => u.IsAuthenticated &&
+        u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+  }
+}
+
+@section styles {
+    <link rel="stylesheet" href="/css/index.css">
+}
+
+<div>
+    <h1 class="h2 no-print" tabindex="-1">System Offline Configuration</h1>
+    <p>Configure warn and offline dates and messages for a planned outage. Users will see the warn message before the offline date and the offline message after.</p>
+
+    <div id="status_message_id" role="alert" style="display:none;" class="alert"></div>
+
+    <form id="system_offline_form_id">
+        <div class="form-group">
+            <label for="warn_date_id">Warn Date</label>
+            <input type="datetime-local" id="warn_date_id" name="warn_date" class="form-control" />
+        </div>
+        <div class="form-group">
+            <label for="warn_message_id">Warn Message</label>
+            <textarea id="warn_message_id" name="warn_message" class="form-control" rows="3"></textarea>
+        </div>
+        <div class="form-group">
+            <label for="offline_date_id">Offline Date</label>
+            <input type="datetime-local" id="offline_date_id" name="offline_date" class="form-control" />
+        </div>
+        <div class="form-group">
+            <label for="offline_modal_message_id">Offline Modal Message</label>
+            <textarea id="offline_modal_message_id" name="offline_modal_message" class="form-control" rows="3"></textarea>
+        </div>
+        <div class="form-group">
+            <label for="offline_page_message_id">Offline Page Message</label>
+            <textarea id="offline_page_message_id" name="offline_page_message" class="form-control" rows="3"></textarea>
+        </div>
+        <button type="button" id="save_button_id" class="btn btn-primary" onclick="saveConfig()">Save</button>
+    </form>
+</div>
+
+@section HeadScripts
+{
+<script type="text/javascript">
+'use strict';
+
+window.addEventListener('load', function () {
+    loadConfig();
+});
+
+async function loadConfig() {
+    try {
+        var response = await fetch('/system-offline/GetConfig');
+        if (!response.ok) {
+            showStatus('Failed to load configuration.', false);
+            return;
+        }
+        var config = await response.json();
+        document.getElementById('warn_date_id').value = config.warn_date || '';
+        document.getElementById('warn_message_id').value = config.warn_message || '';
+        document.getElementById('offline_date_id').value = config.offline_date || '';
+        document.getElementById('offline_modal_message_id').value = config.offline_modal_message || '';
+        document.getElementById('offline_page_message_id').value = config.offline_page_message || '';
+    } catch (err) {
+        showStatus('Error loading configuration: ' + err, false);
+    }
+}
+
+async function saveConfig() {
+    var btn = document.getElementById('save_button_id');
+    btn.disabled = true;
+
+    var payload = {
+        warn_date: document.getElementById('warn_date_id').value || null,
+        warn_message: document.getElementById('warn_message_id').value || null,
+        offline_date: document.getElementById('offline_date_id').value || null,
+        offline_modal_message: document.getElementById('offline_modal_message_id').value || null,
+        offline_page_message: document.getElementById('offline_page_message_id').value || null
+    };
+
+    try {
+        var response = await fetch('/system-offline/SaveConfig', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        var result = await response.json();
+        if (result && result.ok) {
+            showStatus('Configuration saved successfully.', true);
+        } else {
+            showStatus('Save failed: ' + (result && result.error ? result.error : 'unknown error'), false);
+        }
+    } catch (err) {
+        showStatus('Error saving configuration: ' + err, false);
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+function showStatus(message, success) {
+    var el = document.getElementById('status_message_id');
+    el.textContent = message;
+    el.className = 'alert ' + (success ? 'alert-success' : 'alert-danger');
+    el.style.display = 'block';
+}
+</script>
+}
