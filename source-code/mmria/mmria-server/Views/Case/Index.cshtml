@@ -50,7 +50,7 @@
   var case_edit_inactivity_lock_minutes = TempData["case_edit_inactivity_lock_minutes"];
   var case_edit_inactivity_warning_minutes_before_lock = TempData["case_edit_inactivity_warning_minutes_before_lock"];
   var case_edit_auto_save_freq = TempData["case_edit_auto_save_freq"];
-  var vital_sign_range_config = TempData["vital_sign_range_config"];
+  var validation_rules = TempData["validation_rules"];
   var omb_expiration_date = TempData["omb_expiration_date"] ?? "05/31/2026";
 }
 
@@ -66,7 +66,7 @@
             warning_minutes_before_lock: @case_edit_inactivity_warning_minutes_before_lock,
             auto_save_freq_minutes: @case_edit_auto_save_freq
         };
-        window.mmria_vital_sign_range = @Html.Raw(vital_sign_range_config ?? "null");
+        window.mmria_validation_rules = @Html.Raw(validation_rules ?? "null");
         window.mmria_omb_expiration_date = "@omb_expiration_date";
     </script>
 
@@ -156,6 +156,10 @@
 
   <script src="/scripts/case/search_view.js" type="text/javascript"></script>
   <script src="/scripts/case/conversion-calculator.js" type="text/javascript"></script>
+  <script src="/scripts/validation/validation-state.js" type="text/javascript"></script>
+  <script src="/scripts/validation/validation-errors-modal.js" type="text/javascript"></script>
+  <script src="/scripts/validation/field-navigation.js" type="text/javascript"></script>
+  <link rel="stylesheet" type="text/css" href="/css/validation-errors-panel.css">
     
     
 

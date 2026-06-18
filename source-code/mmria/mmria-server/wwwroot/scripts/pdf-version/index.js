@@ -74,12 +74,12 @@ async function create_print_version
     p_number,
     p_metadata_summary,
     p_show_hidden,
-    p_vital_sign_range,
+    p_validation_rules,
     p_is_de_identified = false
 ) 
 {
-	if (p_vital_sign_range !== undefined) {
-		window.mmria_vital_sign_range = p_vital_sign_range;
+	if (p_validation_rules !== undefined) {
+		window.mmria_validation_rules = p_validation_rules;
 	}
 	// Validate input parameters
 	if (!p_metadata) {
@@ -704,13 +704,39 @@ function fmtDateTimeVitals(dt) {
 }
 
 // Returns true if fieldName is in the vital sign range config and value is out of range (AC #1, #2, #5)
-function mmria_vitals_is_out_of_range(fieldName, value) {
-	if (!window.mmria_vital_sign_range) return false;
-	var range = window.mmria_vital_sign_range[fieldName];
-	if (!range) return false;
+function mmria_vitals_is_out_of_range(fieldPath, value) {
+	if (!window.mmria_validation_rules) return false;
+	var rule = window.mmria_validation_rules[fieldPath];
+	if (!rule) {
+		// Try to find a rule by searching for a matching field path ending
+		for (var key in window.mmria_validation_rules) {
+			if (key.endsWith('/' + fieldPath) || key === fieldPath) {
+				rule = window.mmria_validation_rules[key];
+				break;
+			}
+		}
+	}
+	if (!rule) return false;
 	var v = parseFloat(value);
 	if (value === '' || value == null || isNaN(v)) return false;
-	return (v < parseFloat(range.min) || v > parseFloat(range.max));
+	return (v < parseFloat(rule.min_value) || v > parseFloat(rule.max_value));
+}
+
+// Builds the out-of-range notice string for a vitals record row.
+// p_meta_children: the metadata children array for the vitals grid
+// p_data_row: the data object for one vitals record
+// Returns '' if no values are out of range or if mmria_validation_rules is null.
+function mmria_vitals_build_out_of_range_notice(p_meta_children, p_data_row) {
+	if (!window.mmria_validation_rules) return '';
+	var clauses = '';
+	for (var i = 1; i < p_meta_children.length - 1; i++) {
+		var child = p_meta_children[i];
+		if (mmria_vitals_is_out_of_range(child.name, p_data_row[child.name])) {
+			clauses += child.prompt + ' removed. ';
+		}
+	}
+	if (!clauses) return '';
+	return '** Out of range. ' + clauses.trim();
 }
 
 // Get the header name
@@ -2280,7 +2306,10 @@ function print_pdf_render_content(ctx) {
 
 						// Put it into a table
 						row.push({ columns: [colPrompt, colData], },);
-						row.push({ text: chkNull(dataChild[metaChild[metaChild.length - 1].name]), style: ['tableDetail'], },);
+						var vitals_oor_notice = mmria_vitals_build_out_of_range_notice(metaChild, dataChild);
+						var vitals_comment_text = chkNull(dataChild[metaChild[metaChild.length - 1].name]);
+						if (vitals_oor_notice) { vitals_comment_text = vitals_comment_text ? vitals_comment_text + ' ' + vitals_oor_notice : vitals_oor_notice; }
+						row.push({ text: vitals_comment_text, style: ['tableDetail'], },);
 						gridBody.push(row)
 					});
 				}

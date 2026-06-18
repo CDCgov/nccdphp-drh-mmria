@@ -321,6 +321,8 @@ public sealed partial class Program
 
             // Register Session Manager (replaces actor-based Post_Session and Record_Session_Event)
             builder.Services.AddScoped<mmria.common.SharedLibraries.Session.Manager.SessionManager>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.CaseValidation.DAL.CaseValidationDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.CaseValidation.Manager.CaseValidationManager>();
 
             //var hosted_service_prefix = new HostedServicePrefix(host_prefix);
 
@@ -651,8 +653,9 @@ public sealed partial class Program
                             }
                         }
                     }
-                })
-            );
+
+                }));
+
             if (app.Environment.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();                

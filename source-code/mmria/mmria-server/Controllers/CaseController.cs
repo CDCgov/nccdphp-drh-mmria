@@ -5,9 +5,12 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using System.Text.Json;
+using System.Linq;
 
 using  mmria.server.extension; 
 using mmria.server.util;
+using mmria.common.SharedLibraries.CaseValidation.Manager;
+using mmria.common.SharedLibraries.MetadataVersion.Manager;
 namespace mmria.server.Controllers;
 
 [Authorize(Roles  = "abstractor,data_analyst")]
@@ -24,15 +27,21 @@ public sealed class CaseController : Controller
     mmria.common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly CaseValidationManager _caseValidationManager;
+    private readonly MetadataVersionManager _metadataVersionManager;
 
     public CaseController
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        CaseValidationManager caseValidationManager,
+        MetadataVersionManager metadataVersionManager
     )
     {
         _couchDbHttpClient = couchDbHttpClient;
+        _caseValidationManager = caseValidationManager;
+        _metadataVersionManager = metadataVersionManager;
         
         host_prefix = tenantRuntime.EffectiveHostPrefix;
         
@@ -41,7 +50,7 @@ public sealed class CaseController : Controller
         db_config = tenantRuntime.RequireDbConfig();
     }
         
-    public IActionResult Index()
+    public async Task<IActionResult> Index()
     {
         var configuredLockMinutes = configuration.GetInteger("case_edit_inactivity_lock_minutes", host_prefix) ?? 120;
         var configuredWarningMinutes = configuration.GetInteger("case_edit_inactivity_warning_minutes_before_lock", host_prefix) ?? 110;
@@ -64,8 +73,56 @@ public sealed class CaseController : Controller
         TempData["case_edit_inactivity_warning_minutes_before_lock"] = effectiveInactivityConfig.WarningMinutes;
         TempData["case_edit_auto_save_freq"] = configuration.GetInteger("case_edit_auto_save_freq", host_prefix) ?? 2;
 
-        var vitalSignRangeConfig = VitalSignRangeHelper.GetVitalSignRangeConfig(configuration, host_prefix);
-        TempData["vital_sign_range_config"] = JsonSerializer.Serialize(vitalSignRangeConfig);
+        // Get validation rules (keyed by field_path)
+        try
+        {
+            var metadataVersion = configuration.GetString("metadata_version", host_prefix);
+            if (!string.IsNullOrEmpty(metadataVersion))
+            {
+                var metadata = await _metadataVersionManager.GetAppMetadataAsync(metadataVersion, db_config);
+                if (metadata != null)
+                {
+                    var ruleDocument = await _caseValidationManager.GetOrCreateRuleDocumentAsync(
+                        metadataVersion,
+                        metadata,
+                        db_config,
+                        User?.Identity?.Name ?? "system");
+                    
+                    if (ruleDocument?.field_rules != null && ruleDocument.field_rules.Count > 0)
+                    {
+                        var fieldRulesByPath = ruleDocument.field_rules
+                            .Where(rule => rule.enabled == true && rule.min_value.HasValue && rule.max_value.HasValue)
+                            .ToDictionary(
+                                rule => rule.field_path,
+                                rule => new
+                                {
+                                    id = rule.id,
+                                    field_path = rule.field_path,
+                                    min_value = rule.min_value,
+                                    max_value = rule.max_value,
+                                    severity = rule.severity,
+                                    review_status = rule.review_status,
+                                    validation_level = rule.validation_level,
+                                    confidence = rule.confidence,
+                                    source = rule.source,
+                                    unit = rule.unit,
+                                    message = rule.message,
+                                    enabled = rule.enabled,
+                                    category = rule.category
+                                },
+                                StringComparer.OrdinalIgnoreCase);
+                        
+                        TempData["validation_rules"] = JsonSerializer.Serialize(fieldRulesByPath);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Console.WriteLine($"Error getting validation rules: {ex}");
+            // Fail gracefully - leave validation_rules unset
+        }
+
         TempData["omb_expiration_date"] = configuration.GetString("omb_expiration_date", host_prefix) ?? "05/31/2026";
 
         ViewBag.is_offline_mode_enabled = configuration.GetBoolean("is_offline_mode_enabled", host_prefix) ?? false;

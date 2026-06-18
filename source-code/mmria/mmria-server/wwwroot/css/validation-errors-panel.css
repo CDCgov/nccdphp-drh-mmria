@@ -1,0 +1,80 @@
+/* validation-errors-panel.css
+   Styles for the Validation Errors panel button and modal.
+   Story 5.1: Validation Errors Panel */
+
+/* Button in sidebar / print area */
+.validation-errors-button {
+    display: inline-block;
+    margin-top: 6px;
+    padding: 5px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #7b2d8e;
+    background: #fff;
+    border: 2px solid #7b2d8e;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    line-height: 1.4;
+}
+
+.validation-errors-button:hover,
+.validation-errors-button:focus {
+    background: #7b2d8e;
+    color: #fff;
+    outline: 2px solid #5a1f6e;
+    outline-offset: 2px;
+}
+
+/* Button area container — hidden by default, shown when violations exist */
+.validation-errors-button-area {
+    display: none;
+}
+
+/* Section containers in modal body */
+.validation-errors-section {
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.validation-errors-section:last-child {
+    border-bottom: none;
+}
+
+/* Error badge — red */
+.validation-error-badge {
+    display: inline-block;
+    background: #c00;
+    color: #fff;
+    border-radius: 4px;
+    padding: 1px 7px;
+    font-size: 12px;
+    font-weight: 700;
+    margin-right: 6px;
+}
+
+/* Warning badge — amber */
+.validation-warning-badge {
+    display: inline-block;
+    background: #f0ad00;
+    color: #333;
+    border-radius: 4px;
+    padding: 1px 7px;
+    font-size: 12px;
+    font-weight: 700;
+    margin-right: 6px;
+}
+
+/* Field link in modal rows */
+.validation-field-link {
+    color: #0056b3;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.validation-field-link:hover,
+.validation-field-link:focus {
+    color: #003d80;
+    text-decoration: underline;
+    outline: 2px solid #0056b3;
+    outline-offset: 2px;
+}

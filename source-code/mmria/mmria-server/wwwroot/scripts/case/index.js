@@ -1062,6 +1062,25 @@ async function g_set_data_object_from_path
 
       //g_data.last_updated_by = g_uid;
 
+      // Range validation: if the new value violates a min/max rule, restore the old value and show the Out of Range modal.
+      if (window.mmria_validation_rules && metadata.type && metadata.type.toLowerCase() === 'number') {
+        var _fieldName = p_object_path.split('/').pop();
+        var _rangeRule = window.mmria_validation_rules[_fieldName];
+        if (!_rangeRule) {
+          for (var _rk in window.mmria_validation_rules) {
+            if (_rk.endsWith('/' + _fieldName)) { _rangeRule = window.mmria_validation_rules[_rk]; break; }
+          }
+        }
+        var _numVal = parseFloat(value);
+        if (_rangeRule && !isNaN(_numVal) &&
+            (_numVal < parseFloat(_rangeRule.min_value) || _numVal > parseFloat(_rangeRule.max_value))) {
+          var _ctrlEl = document.getElementById(convert_object_path_to_jquery_id(p_object_path) + '_control');
+          if (typeof mmria_vitals_show_field_modal === 'function') {
+            mmria_vitals_show_field_modal(_rangeRule, _ctrlEl || { focus: function(){} });
+          }
+        }
+      }
+
       g_change_stack.push({
         _id: g_data._id,
         _rev: g_data._rev,
@@ -1106,6 +1125,9 @@ async function g_set_data_object_from_path
                 }
 
                 apply_validation();
+                if (window.mmria_validation_state && typeof window.mmria_validation_state.runHistoricalScan === 'function') {
+                  window.mmria_validation_state.runHistoricalScan();
+                }
             }
         );
     } 
@@ -1125,6 +1147,28 @@ async function g_set_data_object_from_path
 
     if(metadata === null)
       return;
+
+    // Range validation: if this is a number field with a min/max rule violation, show the Out of Range modal and reject.
+    if (window.mmria_validation_rules && metadata.type && metadata.type.toLowerCase() === 'number' && value !== '') {
+      var _dpath = p_dictionary_path ? p_dictionary_path.replace(/^\//, '') : '';
+      var _rangeRule = _dpath ? window.mmria_validation_rules[_dpath] : null;
+      var _numVal = parseFloat(value);
+      if (_rangeRule && !isNaN(_numVal) &&
+          (_numVal < parseFloat(_rangeRule.min_value) || _numVal > parseFloat(_rangeRule.max_value))) {
+        // Only block and clear if the user actually changed the value.
+        // If the stored value is already the same (historical invalid data), leave it alone.
+        var _storedNum = parseFloat(current_value);
+        var _isNewValue = isNaN(_storedNum) || _numVal !== _storedNum;
+        if (_isNewValue) {
+          var _ctrlEl = document.getElementById(convert_object_path_to_jquery_id(p_object_path) + '_control');
+          if (_ctrlEl) { _ctrlEl.value = ''; }
+          if (typeof mmria_vitals_show_field_modal === 'function') {
+            mmria_vitals_show_field_modal(_rangeRule, _ctrlEl || { focus: function(){} });
+          }
+          return;
+        }
+      }
+    }
 
     if(metadata.type.toLowerCase() == 'html_area')
     {
@@ -1640,6 +1684,9 @@ else
             }
 
             apply_validation();
+            if (window.mmria_validation_state && typeof window.mmria_validation_state.runHistoricalScan === 'function') {
+              window.mmria_validation_state.runHistoricalScan();
+            }
 
 
         }
@@ -3077,10 +3124,6 @@ async function window_on_hash_change(e)
 
 
             g_render();
-            if (g_data_is_checked_out && mmria_vitals_revalidate_all())
-            {
-                mmria_vitals_show_historical_modal();
-            }
             
         }
       } 
@@ -3994,6 +4037,11 @@ function g_render()
     }
   }
 
+  // Story 5.1: Run historical vitals scan and refresh validation button after render.
+  if (window.mmria_validation_state && typeof window.mmria_validation_state.runHistoricalScan === 'function') {
+    window.mmria_validation_state.runHistoricalScan();
+  }
+
   var section_list = document.getElementsByTagName('section');
 
 if (g_ui.url_state.path_array[0] == 'summary') 
@@ -4251,23 +4299,37 @@ function pdf_case_onclick(event, type_output)
         const record_number = selectedOption.dataset.record;
 				
 
-        if(section_name == "all_hidden")
-        {
-            section_name = 'all';
+        const is_all_hidden_pdf = section_name == "all_hidden";
+        if (is_all_hidden_pdf) { section_name = 'all'; }
 
-            window.setTimeout(function()
-            {
-                openTab('./pdf-version',  unique_tab_name, section_name, type_output, record_number, true);
-            }, 1000);	
+        function performPdfAction() {
+            window.setTimeout(function() {
+                if (is_all_hidden_pdf) {
+                    openTab('./pdf-version', unique_tab_name, section_name, type_output, record_number, true);
+                } else {
+                    openTab('./pdf-version', unique_tab_name, section_name, type_output, record_number);
+                }
+            }, 1000);
         }
-        else
-        {
-            window.setTimeout(function()
-            {
-                openTab('./pdf-version',  unique_tab_name, section_name, type_output, record_number);
-            }, 1000);	
+
+        if (mmria_vitals_case_is_closed()) {
+            performPdfAction();
+            return;
         }
-      
+
+        if (mmria_vitals_has_hard_violations()) {
+            var actionLabel = type_output === 'view' ? 'View PDF' : 'Save PDF';
+            mmria_vitals_show_print_gate_modal(actionLabel, true, null);
+            return;
+        }
+
+        if (mmria_vitals_revalidate_all()) {
+            var actionLabel = type_output === 'view' ? 'View PDF' : 'Save PDF';
+            mmria_vitals_show_print_gate_modal(actionLabel, false, performPdfAction);
+            return;
+        }
+
+        performPdfAction();
   }
 
 }
@@ -4286,23 +4348,35 @@ function print_case_onclick(event)
 		const selectedOption = dropdown.options[dropdown.options.selectedIndex];
 		const record_number = selectedOption.dataset.record;
   
-        if(section_name == "all_hidden")
-        {
-            section_name = 'all';
+        const is_all_hidden_print = section_name == "all_hidden";
+        if (is_all_hidden_print) { section_name = 'all'; }
 
-            window.setTimeout(function()
-            {
-                openTab('./print-version', unique_tab_name, section_name, 'print', record_number, true);
-            }, 1000);	
+        function performPrintAction() {
+            window.setTimeout(function() {
+                if (is_all_hidden_print) {
+                    openTab('./print-version', unique_tab_name, section_name, 'print', record_number, true);
+                } else {
+                    openTab('./print-version', unique_tab_name, section_name, 'print', record_number);
+                }
+            }, 1000);
         }
-        else
-        {
-  
-            window.setTimeout(function()
-            {
-                openTab('./print-version', unique_tab_name, section_name, 'print', record_number);
-            }, 1000);	
+
+        if (mmria_vitals_case_is_closed()) {
+            performPrintAction();
+            return;
         }
+
+        if (mmria_vitals_has_hard_violations()) {
+            mmria_vitals_show_print_gate_modal('View', true, null);
+            return;
+        }
+
+        if (mmria_vitals_revalidate_all()) {
+            mmria_vitals_show_print_gate_modal('View', false, performPrintAction);
+            return;
+        }
+
+        performPrintAction();
 	}
   
 }
@@ -4349,7 +4423,7 @@ function openTab(pageRoute, tabName, p_section, p_type_output, p_number, p_show_
         p_number,
         g_metadata_summary,
         p_show_hidden,
-        window.mmria_vital_sign_range
+        window.mmria_validation_rules
       );
     });
   } 
@@ -4364,7 +4438,7 @@ function openTab(pageRoute, tabName, p_section, p_type_output, p_number, p_show_
       p_number,
       g_metadata_summary,
       p_show_hidden,
-      window.mmria_vital_sign_range
+      window.mmria_validation_rules
     );
   }
 }
@@ -4552,10 +4626,6 @@ async function enable_edit_click()
     if ($global.case_document_begin_edit != null) 
     {
         $global.case_document_begin_edit();
-    }
-    if (mmria_vitals_revalidate_all())
-    {
-        mmria_vitals_show_historical_modal();
     }
   }
 }
