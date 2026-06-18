@@ -169,6 +169,11 @@ if (top !== self) top.location.replace(self.location.href);
           window.handleOfflineState(result, config);
         })
         .catch(function () { /* silently ignore network / parse errors */ });
+
+      // Periodic poll: check offline status every 2 minutes.
+      // The login page uses a separate layout and does not include this script,
+      // so no additional authentication guard is needed here.
+      window.startOfflineStatusPolling();
     });
   </script>
 

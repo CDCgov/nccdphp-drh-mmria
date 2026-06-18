@@ -150,6 +150,35 @@ function mmria_offline_modal_ok_handler() {
     doSignOut();
 }
 
+/**
+ * Starts a periodic poll of /api/system-offline/status.
+ * On each successful response, calls checkOfflineStatus(config) → handleOfflineState(state, config).
+ * On network or parse errors, logs a warning to console and continues polling — no error is
+ * surfaced to the user.
+ *
+ * @param {number} [intervalMs=120000] - Poll interval in milliseconds (default: 2 minutes).
+ *   Pass a shorter value in tests to speed up verification.
+ * @returns {number} The interval ID returned by setInterval (can be passed to clearInterval).
+ */
+function startOfflineStatusPolling(intervalMs) {
+    var ms = (typeof intervalMs === 'number' && intervalMs > 0) ? intervalMs : 120000;
+    return setInterval(function () {
+        fetch('/api/system-offline/status', { credentials: 'same-origin' })
+            .then(function (response) {
+                if (!response.ok) return null;
+                return response.json();
+            })
+            .then(function (config) {
+                if (!config) return;
+                var result = checkOfflineStatus(config);
+                handleOfflineState(result, config);
+            })
+            .catch(function (err) {
+                console.warn('Offline status poll failed:', err);
+            });
+    }, ms);
+}
+
 // Expose all public functions on window for external callers.
 window.checkOfflineStatus = checkOfflineStatus;
 window.handleOfflineState = handleOfflineState;
@@ -157,3 +186,4 @@ window.showWarnModal = showWarnModal;
 window.closeWarnModal = closeWarnModal;
 window.showOfflineModal = showOfflineModal;
 window.mmria_offline_modal_ok_handler = mmria_offline_modal_ok_handler;
+window.startOfflineStatusPolling = startOfflineStatusPolling;
