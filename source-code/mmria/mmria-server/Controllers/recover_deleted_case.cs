@@ -231,6 +231,25 @@ public sealed class recover_deleted_caseController : Controller
                 {
                     string delete_audit_url = $"{effectiveDbConfig.url}/{effectiveDbConfig.prefix}audit/{Model._id}?rev={audit_object._rev}";
                     var  delete_response = await _couchDbHttpClient.ExecuteAsync("DELETE", delete_audit_url, null, effectiveDbConfig.user_name, effectiveDbConfig.user_value);
+
+                    var auditEntry = new mmria.common.model.couchdb.Change_Stack
+                    {
+                        _id = Guid.NewGuid().ToString(),
+                        case_id = audit_object.case_id,
+                        user_name = userName,
+                        note = "admin change, case recovered",
+                        date_created = DateTime.UtcNow,
+                        doc_type = "Change_Stack"
+                    };
+                    var auditSettings = new Newtonsoft.Json.JsonSerializerSettings { NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore };
+                    var auditString = Newtonsoft.Json.JsonConvert.SerializeObject(auditEntry, auditSettings);
+                    try
+                    {
+                        await _couchDbHttpClient.ExecuteAsync("PUT",
+                            $"{effectiveDbConfig.url}/{effectiveDbConfig.prefix}audit/{auditEntry._id}",
+                            auditString, effectiveDbConfig.user_name, effectiveDbConfig.user_value);
+                    }
+                    catch (Exception auditEx) { Console.WriteLine($"Audit write failed: {auditEx.Message}"); }
                 }
             }
             catch(Exception ex)

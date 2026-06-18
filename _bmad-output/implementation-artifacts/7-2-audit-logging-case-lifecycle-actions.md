@@ -1,6 +1,6 @@
 # Story 7.2: Audit Logging for Case Status and Lifecycle Admin Actions
 
-Status: not-started
+Status: verification
 
 ## Story
 
@@ -20,16 +20,16 @@ so that there is a verifiable record of every case lifecycle change.
 
 ## Tasks / Subtasks
 
-- [ ] Audit `ClearCaseStatus` action in `clear_case_statusController.cs` (AC: #1, #4–#6)
-  - [ ] Capture old `overall_case_status` value before overwriting: read `case_status["overall_case_status"]?.ToString() ?? ""`
-  - [ ] After `document_put_response.ok == true`: construct `Change_Stack` with `note = "admin change, case unlocked, case status cleared"`, `_id = Guid.NewGuid().ToString()`, `case_id = model._id`, `user_name`, `date_created = DateTime.UtcNow`, no `items`
-  - [ ] Serialize with `NullValueHandling.Ignore`; PUT to `{effectiveDbConfig.url}/{effectiveDbConfig.prefix}audit/{changeStack._id}` using `_couchDbHttpClient`
-  - [ ] Log failure; do not surface to caller
-- [ ] Audit `UpdateDeletedCase` action in `recover_deleted_caseController.cs` (AC: #2, #4–#6)
-  - [ ] After `put_result.ok == true` (case successfully restored): construct `Change_Stack` with `note = "admin change, case recovered"`, `_id = Guid.NewGuid().ToString()`, `case_id = audit_object.case_id`, `user_name`, `date_created = DateTime.UtcNow`, no `items`
-  - [ ] PUT to audit database using `_couchDbHttpClient`; log failure; do not surface to caller
-- [ ] Update delete audit note in `DeleteCaseAsync()` in `CaseManager.cs` (AC: #3)
-  - [ ] Change `note = "deleted case"` → `note = "case deleted"` (line ~2204 in `CaseManager.cs`)
+- [x] Audit `ClearCaseStatus` action in `clear_case_statusController.cs` (AC: #1, #4–#6)
+  - [x] Capture old `overall_case_status` value before overwriting: read `case_status["overall_case_status"]?.ToString() ?? ""`
+  - [x] After `document_put_response.ok == true`: construct `Change_Stack` with `note = "admin change, case unlocked, case status cleared"`, `_id = Guid.NewGuid().ToString()`, `case_id = model._id`, `user_name`, `date_created = DateTime.UtcNow`, no `items`
+  - [x] Serialize with `NullValueHandling.Ignore`; PUT to `{effectiveDbConfig.url}/{effectiveDbConfig.prefix}audit/{changeStack._id}` using `_couchDbHttpClient`
+  - [x] Log failure; do not surface to caller
+- [x] Audit `UpdateDeletedCase` action in `recover_deleted_caseController.cs` (AC: #2, #4–#6)
+  - [x] After `put_result.ok == true` (case successfully restored): construct `Change_Stack` with `note = "admin change, case recovered"`, `_id = Guid.NewGuid().ToString()`, `case_id = audit_object.case_id`, `user_name`, `date_created = DateTime.UtcNow`, no `items`
+  - [x] PUT to audit database using `_couchDbHttpClient`; log failure; do not surface to caller
+- [x] Update delete audit note in `DeleteCaseAsync()` in `CaseManager.cs` (AC: #3)
+  - [x] Change `note = "deleted case"` → `note = "case deleted"` (line ~2204 in `CaseManager.cs`)
 - [ ] Build and verify (AC: #1–#6)
   - [ ] Run `build-server` task — zero errors
   - [ ] Manually trigger Clear Case Status on a test case; confirm `Change_Stack` appears in `audit` DB
@@ -121,12 +121,20 @@ Both controllers already use `Newtonsoft.Json.JsonConvert` — no new usings req
 ## Dev Agent Record
 
 ### Agent Model Used
+Claude Sonnet 4.6
 
 ### Debug Log References
+- Added `old_value` and `new_value` properties to `Change_Stack` model (`save_case_request.cs`) — AC required these but model lacked them.
+- Build blocked by file lock (DLL held by running server process) — no `error CS` errors; `mmria.common` build succeeded cleanly.
 
 ### Completion Notes List
+- All three code changes implemented: audit write in `ClearCaseStatus`, audit write in `UpdateDeletedCase`, note string fix in `DeleteCaseAsync`.
+- `Change_Stack` model extended with `old_value`/`new_value` to satisfy AC #1.
+- `NullValueHandling.Ignore` used so empty `old_value`/`new_value` fields are omitted from recover-case audit entry.
+- Manual verification steps remain for human tester.
 
 ### File List
 - `source-code/mmria/mmria-server/Controllers/clear_case_status.cs`
 - `source-code/mmria/mmria-server/Controllers/recover_deleted_case.cs`
 - `nccdphp-drh-mmria-common/mmria.common/SharedLibraries/Case/Manager/CaseManager.cs`
+- `nccdphp-drh-mmria-common/mmria.common/couchdb/save_case_request.cs`

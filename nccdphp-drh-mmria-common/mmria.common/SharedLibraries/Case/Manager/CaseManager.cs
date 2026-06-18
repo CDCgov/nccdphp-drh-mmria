@@ -2290,7 +2290,7 @@ public class CaseManager
                 first_name = first_name,
                 last_name = last_name,
 
-                note = "deleted case",
+                note = "case deleted",
 
                 metadata_version = "",
                 date_created = DateTime.UtcNow,

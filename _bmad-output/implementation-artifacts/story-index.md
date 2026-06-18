@@ -176,7 +176,7 @@ dev this story _bmad-output/implementation-artifacts/6-3-add-edit-rule-modal.md
 | Story | File | Status |
 |---|---|---|
 | 7.1 Audit Logging — Year of Death and Maiden Name | `7-1-audit-logging-year-of-death-maiden-name.md` | verification |
-| 7.2 Audit Logging — Case Lifecycle Actions | `7-2-audit-logging-case-lifecycle-actions.md` | not-started |
+| 7.2 Audit Logging — Case Lifecycle Actions | `7-2-audit-logging-case-lifecycle-actions.md` | verification |
 
 > ℹ️ Stories 7.1 and 7.2 are independent — can be worked in any order.
 
