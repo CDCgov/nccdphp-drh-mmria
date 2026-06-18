@@ -184,11 +184,8 @@
 <div class="container-fluid case-validation-admin-page">
     <div class="case-validation-admin-header mb-3">
         <div class="case-validation-admin-title">
-            <h1 class="h3 mb-1">Case Validation Rule Management</h1>
+            <h1 class="h3 mb-1">Case Validation Rule Management <span id="cv_locked_badge"></span></h1>
             <span id="case_validation_metadata_version" hidden>@metadataVersion</span>
-        </div>
-        <div class="case-validation-admin-actions">
-            <a class="btn btn-outline-secondary" href="/api/case-validation/rules/current/export">Export JSON</a>
         </div>
     </div>
 
@@ -255,6 +252,7 @@
         let caseValidationMetadataFields = [];
         let caseValidationMetadataRows = [];
         let caseValidationMetadataSelectedKey = null;
+        let caseValidationMetadataLocked = false;
 
         const caseValidationMetadataLevels = ['metadata', 'impossibility', 'plausibility', 'timeline', 'conditional', 'form-completeness'];
         const caseValidationMetadataConfidences = ['high', 'medium', 'low'];
@@ -271,6 +269,7 @@
                 const metadata = await metadataResponse.json();
                 const rulesResponse = await fetch('/api/case-validation/rules/current');
                 caseValidationMetadataRules = await rulesResponse.json();
+                caseValidationMetadataLocked = caseValidationMetadataRules.edit_status === 1;
                 caseValidationMetadataFields = case_validation_flatten_metadata(metadata).filter(f => f.is_scalar);
                 caseValidationMetadataBuildRows();
                 caseValidationMetadataPopulateFilters();
@@ -388,6 +387,10 @@
         }
 
         function caseValidationMetadataRender() {
+            const badge = document.getElementById('cv_locked_badge');
+            if (badge) badge.innerHTML = caseValidationMetadataLocked
+                ? '<span class="badge badge-secondary ml-2" style="font-size:.65em;vertical-align:middle;">&#128274; Locked</span>'
+                : '';
             caseValidationMetadataRenderSummary();
             caseValidationMetadataRenderList();
             caseValidationMetadataRenderDetail();
@@ -544,10 +547,12 @@
                 <div hidden>
                     <textarea id="case_validation_detail_bands">${case_validation_escape_html(JSON.stringify(rule.bands || [], null, 2))}</textarea>
                 </div>
-                <div class="mt-3 d-flex align-items-center" style="gap:.75rem;">
+                ${caseValidationMetadataLocked
+                    ? `<div class="mt-3"><span class="text-muted small">&#128274; Edits are locked.</span></div>`
+                    : `<div class="mt-3 d-flex align-items-center" style="gap:.75rem;">
                     <button type="button" class="btn btn-primary btn-sm" onclick="caseValidationMetadataSaveRule()">Save Rule</button>
                     <span id="cv_detail_save_status" class="small text-muted"></span>
-                </div>`;
+                </div>`}`;
         }
 
         function caseValidationMetadataSelectRule(key) {
@@ -624,6 +629,7 @@
         }
 
         async function caseValidationMetadataSaveRule() {
+            if (caseValidationMetadataLocked) { return; }
             const statusEl = document.getElementById('cv_detail_save_status');
             if (statusEl) statusEl.textContent = 'Saving\u2026';
             try {

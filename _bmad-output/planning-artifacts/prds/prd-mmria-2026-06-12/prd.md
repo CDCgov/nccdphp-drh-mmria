@@ -189,6 +189,99 @@ The modal is scoped to vitals validation violations in V4.1 and is explicitly de
 **FR-6.3 — Field navigation**
 Clicking a Field Label link closes the modal, changes to the form containing the error if not already on it, and scrolls to the specific field. For vitals within ER Visits, the navigation must identify the correct visit record, open/expand it, and scroll to the specific vital sign row within that visit. Multiple errors within the same visit each appear as separate rows in the modal list.
 
+---
+
+### FR-7 — Admin Action Audit Logging
+
+Five admin actions are not currently captured in the case audit log. Each action is added to the log using the existing audit log pattern: **Update Date/Time, Update By, Update Action, MMRIA Field Prompt, MMRIA Field Path, Old Value, New Value**.
+
+**FR-7.1 — Update Year of Death**
+When an admin updates the year of death for a case, an audit entry is written with Update Action `admin change, year of death updated`. Old Value is the previous year value; New Value is the updated year value.
+
+**FR-7.2 — Update Maiden Name**
+When an admin updates the maiden name for a case, an audit entry is written with Update Action `admin change, maiden name updated`. Old Value is the previous maiden name value; New Value is the updated maiden name value.
+
+**FR-7.3 — Unlock and Clear Case Status**
+When an admin unlocks a case and clears its status, an audit entry is written with Update Action `admin change, case unlocked, case status cleared`. Old Value is the previous case status value; New Value is empty string.
+
+**FR-7.4 — Recover Deleted Case**
+When an admin recovers a deleted case, an audit entry is written with Update Action `admin change, case recovered`. MMRIA Field Prompt, MMRIA Field Path, Old Value, and New Value are all blank — the entry records actor and timestamp only.
+
+**FR-7.5 — Delete Case**
+When an admin deletes a case, an audit entry is written with Update Action `case deleted`. MMRIA Field Prompt, MMRIA Field Path, Old Value, and New Value are all blank — the entry records actor and timestamp only. The delete is a hard delete; recovery is handled separately (FR-7.4).
+
+> FR-7 scope: write the audit entry at the point each admin action succeeds. No changes to the audit log display, filtering, or admin UI are required.
+
+---
+
+### FR-8 — System Going Offline
+
+A configuration-driven mechanism allows administrators to schedule a planned system outage. The system transitions through three states — normal, warning, and offline — controlled by two date/time thresholds and three configurable messages.
+
+**FR-8.1 — Config Document and Storage**
+A `system-offline-config` document is stored in the CouchDB `metadata` database on the CDC instance. The document carries the following fields:
+
+| Field | Type | Purpose |
+|---|---|---|
+| `warn_date` | ISO 8601 datetime string | Threshold for warning modal |
+| `warn_message` | Multiline string | Body text of warning modal |
+| `offline_date` | ISO 8601 datetime string | Threshold for going-offline modal; login is disabled at or after this date |
+| `offline_modal_message` | Multiline string | Body text of going-offline modal |
+| `offline_page_message` | Multiline string | Text shown on login page in place of login form when offline |
+
+Config is fetched and saved via mmria-server controller → mmria-services → CDC instance `metadata` DB. The config is global and applies to all tenants.
+
+**FR-8.2 — Warning Modal**
+At or after `warn_date`, logged-in users are shown a warning modal once per browser session.
+
+- **Trigger — on login:** immediately after a successful login, if `now >= warn_date`, show the modal.
+- **Trigger — periodic check:** if the periodic check (FR-8.5) determines `now >= warn_date` and the session flag is not set, show the modal.
+- The modal displays `warn_message` with an OK/dismiss button.
+- After dismissal, a `sessionStorage` flag is set. The modal does not reappear until the browser tab is closed and a new session starts.
+- If `warn_date` is null or empty, no modal is shown.
+
+**FR-8.3 — Going Offline Modal**
+At or after `offline_date`, logged-in users are shown a "going offline" modal.
+
+- **Trigger — periodic check (FR-8.5):** when `now >= offline_date` and a `localStorage` flag is not set, show the modal.
+- The modal displays `offline_modal_message` with a single **OK** button (no dismiss or cancel path).
+- On OK:
+  1. If a case is currently open in edit mode: invoke save (best-effort — same behavior as autosave; sign out proceeds regardless of save outcome).
+  2. Sign the user out and navigate to the login page (which renders in offline state per FR-8.4).
+- After the OK action, a `localStorage` flag is set to prevent re-display. This is a safety net — pressing OK signs the user out, making re-display effectively impossible under normal flow.
+- If `offline_date` is null or empty, this modal never appears.
+
+**FR-8.4 — Login Page Offline State**
+When `now >= offline_date`, the login page renders in offline state:
+- The login form fields (username input, password input, login button) are hidden.
+- The "please contact your jurisdiction admin…" text is replaced with `offline_page_message`, displayed in white text.
+- No other login page elements are affected. Login is effectively disabled — no authentication path is presented.
+
+This state is evaluated server-side when a user navigates to the login page (FR-8.6).
+
+**FR-8.5 — Periodic Status Check**
+While a user is logged in, the client polls the mmria-server every **2 minutes** for the current offline config.
+
+- The poll endpoint returns the current `warn_date`, `offline_date`, and messages.
+- On each poll response, the client evaluates the date thresholds and triggers FR-8.2 or FR-8.3 as applicable.
+- The poll is active from login to logout, regardless of which page the user is on.
+
+**FR-8.6 — Login Page Server-Side Check**
+When a user navigates to the login page, the server checks the current offline config:
+- If `now >= offline_date`: render the login page in offline state (FR-8.4).
+- If `now >= warn_date` but `< offline_date`: render the login page normally; the warning modal fires client-side after successful login per FR-8.2.
+- If neither threshold is met or the config document is absent: render the login page normally.
+
+**FR-8.7 — Admin Page**
+An admin page is added, modeled on the existing `/broadcast-message` page.
+- Accessible to **installation admin** role only.
+- A link to this page is added in the installation admin navigation alongside the broadcast-message link.
+- The form presents all five config fields as editable inputs (two datetime pickers, three multiline text areas).
+- Save calls the mmria-server controller, which delegates to mmria-services to write the config to the CDC instance `metadata` DB.
+- The form loads current values from the same path on page load.
+
+---
+
 **NFR-1 — Browser support**
 All changes must function correctly in Microsoft Edge and Google Chrome. No other browsers are in scope.
 

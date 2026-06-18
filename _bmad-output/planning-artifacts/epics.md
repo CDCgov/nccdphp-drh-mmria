@@ -31,6 +31,18 @@ FR-3.3: Both FR-3.1 and FR-3.2 values are updated by a developer editing the Cou
 FR-4.1: The "Core Elements Only" option (section key: `core-summary`) is removed from all three affected MMRIA print dropdowns. The option does not appear for any user role.
 FR-4.2: Dead code related to `core-summary` in `pdf-version/index.js` (TitleMap entry, getReportTabName case, formatContent case, and `core_summary()` function) is removed.
 FR-5.1: On the Case Narrative form, the two existing instruction lines are removed and replaced with the approved replacement text (preserving line breaks). No behavior, configuration, or data changes.
+FR-7.1: When an admin updates the year of death for a case, an audit entry is written with Update Action `admin change, year of death updated`, recording old and new values.
+FR-7.2: When an admin updates the maiden name for a case, an audit entry is written with Update Action `admin change, maiden name updated`, recording old and new values.
+FR-7.3: When an admin unlocks a case and clears its status, an audit entry is written with Update Action `admin change, case unlocked, case status cleared`, recording old status as Old Value and empty string as New Value.
+FR-7.4: When an admin recovers a deleted case, an audit entry is written with Update Action `admin change, case recovered`. Field prompt, field path, old value, and new value are blank.
+FR-7.5: When an admin deletes a case, an audit entry is written with Update Action `case deleted`. Field prompt, field path, old value, and new value are blank.
+FR-8.1: A `system-offline-config` document in the CDC instance `metadata` CouchDB database stores: `warn_date`, `warn_message`, `offline_date`, `offline_modal_message`, `offline_page_message`. Saved and fetched via mmria-server controller → mmria-services. Config is global across all tenants.
+FR-8.2: At or after `warn_date`, logged-in users see a warning modal (displaying `warn_message`) once per browser session. Triggered on login and by the periodic check. Gated by `sessionStorage` flag.
+FR-8.3: At or after `offline_date`, logged-in users see a going-offline modal (displaying `offline_modal_message`) with a single OK button. OK invokes best-effort save if a case is in edit mode, then signs the user out. Shown only once, gated by `localStorage` flag.
+FR-8.4: At or after `offline_date`, the login page hides the login form fields and displays `offline_page_message` in white text in place of the login form area.
+FR-8.5: While logged in, the client polls mmria-server every 2 minutes for current offline config and evaluates thresholds to trigger FR-8.2 or FR-8.3 as applicable.
+FR-8.6: When a user navigates to the login page, the server checks the offline config and renders the page in offline state (FR-8.4) if `now >= offline_date`.
+FR-8.7: An installation-admin-only admin page (modeled on `/broadcast-message`, linked from installation admin nav) allows editing and saving all five offline config fields. Saves via mmria-server → mmria-services → CDC instance `metadata` DB.
 
 ### NonFunctional Requirements
 
@@ -75,6 +87,18 @@ FR-3.3: Epic 3 — Developer update workflow (no admin UI, script-driven)
 FR-4.1: Epic 3 — Remove core-summary option from three print dropdowns
 FR-4.2: Epic 3 — Remove core-summary dead code from pdf-version/index.js
 FR-5.1: Epic 1 — Case Narrative instruction text replacement
+FR-7.1: Epic 7 — Audit log entry for Year of Death admin change
+FR-7.2: Epic 7 — Audit log entry for Maiden Name admin change
+FR-7.3: Epic 7 — Audit log entry for Unlock and Clear Case Status
+FR-7.4: Epic 7 — Audit log entry for Recover Deleted Case
+FR-7.5: Epic 7 — Audit log entry for Delete Case
+FR-8.1: Epic 8 — System offline config document, mmria-services, controller
+FR-8.2: Epic 8 — Warning modal (warn date, session-gated)
+FR-8.3: Epic 8 — Going offline modal (offline date, localStorage-gated, save + sign out)
+FR-8.4: Epic 8 — Login page offline state (hide form, show message)
+FR-8.5: Epic 8 — Periodic status check (2-minute client poll)
+FR-8.6: Epic 8 — Login page server-side offline check
+FR-8.7: Epic 8 — Installation admin page for offline config
 
 ## Epic List
 
@@ -89,6 +113,14 @@ Reviewers entering vitals data are immediately alerted when values fall outside 
 ### Epic 3: System Configuration & Print Cleanup
 Developers can update the OMB expiration date and MMRIA version number without a code deployment. The "Core Elements Only" unauthorized print option is removed from all affected dropdowns and dead code is cleaned up.
 **FRs covered:** FR-3.1, FR-3.2, FR-3.3, FR-4.1, FR-4.2
+
+### Epic 7: Admin Action Audit Logging
+Admin actions that modify case data or case lifecycle state are fully captured in the existing case audit log, giving reviewers and administrators a complete record of who changed what and when.
+**FRs covered:** FR-7.1, FR-7.2, FR-7.3, FR-7.4, FR-7.5
+
+### Epic 8: System Going Offline
+Installation administrators can schedule a planned system outage. Logged-in users receive advance warning, are guided to save their work and sign out before the system goes offline, and are prevented from logging in once the offline date is reached.
+**FRs covered:** FR-8.1, FR-8.2, FR-8.3, FR-8.4, FR-8.5, FR-8.6, FR-8.7
 
 ---
 
@@ -409,3 +441,195 @@ So that users can no longer select an unauthorized print format.
 **Given** all removals are complete
 **When** the developer greps `wwwroot/scripts` for `core-summary`
 **Then** zero matches exist outside of PMSS files (where the intentional comment is acceptable)
+
+---
+
+## Epic 7: Admin Action Audit Logging
+
+Admin actions that modify case data or case lifecycle state are fully captured in the existing case audit log, giving reviewers and administrators a complete record of who changed what and when.
+
+### Story 7.1: Audit Logging for Year of Death and Maiden Name Admin Changes
+
+As an installation administrator,
+I want my Year of Death and Maiden Name updates to appear in the case audit log,
+So that there is a complete record of who changed these fields and what the values were before and after.
+
+**Acceptance Criteria:**
+
+**Given** an admin updates the year of death for a case
+**When** the action succeeds
+**Then** an audit entry is written with Update Action `admin change, year of death updated`, Old Value set to the previous year value, and New Value set to the updated year value
+
+**Given** an admin updates the maiden name for a case
+**When** the action succeeds
+**Then** an audit entry is written with Update Action `admin change, maiden name updated`, Old Value set to the previous maiden name value, and New Value set to the updated maiden name value
+
+**Given** the existing audit log pattern (Update Date/Time, Update By, Update Action, MMRIA Field Prompt, MMRIA Field Path, Old Value, New Value)
+**When** these entries are written
+**Then** they follow the identical pattern used by existing case-edit audit entries — no new fields, no schema changes
+
+**Given** the admin action fails (e.g., save error)
+**When** the failure occurs
+**Then** no audit entry is written
+
+### Story 7.2: Audit Logging for Case Status and Lifecycle Admin Actions
+
+As an installation administrator,
+I want Unlock/Clear, Recover, and Delete actions to appear in the case audit log,
+So that there is a verifiable record of every case lifecycle change.
+
+**Acceptance Criteria:**
+
+**Given** an admin unlocks a case and clears its case status
+**When** the action succeeds
+**Then** an audit entry is written with Update Action `admin change, case unlocked, case status cleared`, Old Value set to the previous case status value, and New Value set to empty string
+
+**Given** an admin recovers a deleted case
+**When** the action succeeds
+**Then** an audit entry is written with Update Action `admin change, case recovered`; MMRIA Field Prompt, MMRIA Field Path, Old Value, and New Value are all blank
+
+**Given** an admin deletes a case
+**When** the delete action succeeds (hard delete)
+**Then** an audit entry is written with Update Action `case deleted`; MMRIA Field Prompt, MMRIA Field Path, Old Value, and New Value are all blank
+
+**Given** the existing audit log pattern
+**When** these entries are written
+**Then** they follow the identical pattern used by existing case-edit audit entries — no new fields, no schema changes
+
+**Given** any of the above admin actions fails
+**When** the failure occurs
+**Then** no audit entry is written
+
+---
+
+## Epic 8: System Going Offline
+
+Installation administrators can schedule a planned system outage. Logged-in users receive advance warning, are guided to save their work and sign out before the system goes offline, and are prevented from logging in once the offline date is reached.
+
+### Story 8.1: System Offline Config — Document, mmria-services, Controller, and Admin Page
+
+As an installation administrator,
+I want a dedicated admin page where I can configure warn and offline dates and messages,
+So that I can schedule a planned outage and control the messaging users see at each stage.
+
+**Acceptance Criteria:**
+
+**Given** the CDC instance `metadata` CouchDB database
+**When** the developer creates the config document
+**Then** a document with `_id: "system-offline-config"` exists carrying these five fields: `warn_date` (ISO 8601 string), `warn_message` (string), `offline_date` (ISO 8601 string), `offline_modal_message` (string), `offline_page_message` (string)
+
+**Given** mmria-services
+**When** a get or save request arrives for the offline config
+**Then** mmria-services fetches from or writes to the `system-offline-config` document in the CDC instance `metadata` database — following the existing pattern for other metadata documents
+
+**Given** a GET endpoint on the mmria-server controller
+**When** called
+**Then** it delegates to mmria-services and returns the current config as JSON; if the document does not exist, it returns an object with all five fields as null/empty
+
+**Given** a POST/PUT endpoint on the mmria-server controller
+**When** called with a valid config payload
+**Then** it delegates to mmria-services to write the document and returns success
+
+**Given** an installation admin navigates to the system offline admin page
+**When** the page loads
+**Then** a form is displayed with: two datetime picker inputs (`warn_date`, `offline_date`) and three multiline text areas (`warn_message`, `offline_modal_message`, `offline_page_message`), pre-populated with current values from the GET endpoint
+
+**Given** the installation admin submits the form
+**When** save succeeds
+**Then** a success confirmation is displayed; the saved values are reflected on reload
+
+**Given** a non-installation-admin user attempts to access the page
+**When** the request is made
+**Then** the page returns 403 / unauthorized — same access control pattern as `/broadcast-message`
+
+**Given** a link to the new admin page is needed
+**When** the installation admin nav is rendered
+**Then** a link to the system offline admin page appears alongside the broadcast-message link
+
+### Story 8.2: Login Page Offline State and Server-Side Check
+
+As a user attempting to log in during a planned outage,
+I want to see a clear offline message instead of a non-functional login form,
+So that I understand the system is unavailable and what to do.
+
+**Acceptance Criteria:**
+
+**Given** a user navigates to the login page and `now >= offline_date`
+**When** the server renders the login page
+**Then** the login form fields (username input, password input, login button) are hidden; `offline_page_message` is displayed in white text in the area where the login form was
+
+**Given** the "please contact your jurisdiction admin…" text currently appears on the login page
+**When** the login page renders in offline state
+**Then** that text is replaced by `offline_page_message`; no other login page elements are changed
+
+**Given** a user navigates to the login page and `now < offline_date` (or `offline_date` is null)
+**When** the server renders the login page
+**Then** the login page renders normally — no offline state applied
+
+**Given** the `system-offline-config` document is absent or `offline_date` is null/empty
+**When** the login page is requested
+**Then** the login page renders normally
+
+### Story 8.3: Warning Modal and Going Offline Modal
+
+As a logged-in user,
+I want to be warned before the system goes offline and prompted to save my work before the offline date,
+So that I can complete my work and sign out cleanly without losing data.
+
+**Acceptance Criteria:**
+
+**Given** a user has just logged in and `now >= warn_date` and `now < offline_date`
+**When** the post-login page loads
+**Then** a warning modal is displayed showing `warn_message` with an OK/dismiss button; a `sessionStorage` flag is set so the modal does not reappear during the same browser session
+
+**Given** the warning modal's `sessionStorage` flag is already set for this session
+**When** the post-login check runs
+**Then** no modal is shown
+
+**Given** `warn_date` is null/empty or `now < warn_date`
+**When** the post-login check runs
+**Then** no warning modal is shown
+
+**Given** the periodic check (Story 5.4) fires and `now >= warn_date` and `now < offline_date` and the session flag is not set
+**When** the check result is evaluated
+**Then** the warning modal is displayed and the `sessionStorage` flag is set
+
+**Given** the periodic check fires and `now >= offline_date` and the `localStorage` flag is not set
+**When** the check result is evaluated
+**Then** the going-offline modal is displayed showing `offline_modal_message` with a single **OK** button (no dismiss/cancel path)
+
+**Given** the user clicks OK on the going-offline modal
+**When** OK is clicked
+**Then** (1) if a case is currently open in edit mode, save is invoked (best-effort autosave behavior; sign-out proceeds regardless of save outcome); (2) the user is signed out and navigated to the login page (which will render in offline state per Story 5.2)
+
+**Given** the going-offline modal has been shown (OK was clicked and user signed out)
+**When** a `localStorage` flag is checked on the next session attempt
+**Then** the flag is set — the modal cannot reappear (login is also disabled by this point)
+
+**Given** `offline_date` is null/empty
+**When** the periodic check evaluates
+**Then** the going-offline modal never fires
+
+### Story 8.4: Periodic Status Check
+
+As a logged-in user,
+I want the system to automatically check for planned outage status while I'm working,
+So that I receive warning and going-offline notifications without needing to reload the page.
+
+**Acceptance Criteria:**
+
+**Given** a user is logged in
+**When** every 2 minutes elapses
+**Then** the client sends a request to the mmria-server offline config endpoint and receives the current config (warn_date, offline_date, messages)
+
+**Given** the poll response is received
+**When** the client evaluates thresholds
+**Then** it applies the same logic as the post-login check: warn modal if `now >= warn_date` and session flag not set; going-offline modal if `now >= offline_date` and localStorage flag not set
+
+**Given** the user signs out or the session ends
+**When** the sign-out completes
+**Then** the periodic poll is stopped
+
+**Given** the poll request fails (network error, server unavailable)
+**When** the error is received
+**Then** the failure is silently swallowed — no error is surfaced to the user and polling continues on the next interval
