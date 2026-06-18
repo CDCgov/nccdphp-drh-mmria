@@ -20,5 +20,14 @@ public sealed class SystemOfflineConfig
     /// "cdc" is always treated as included regardless of this list.
     /// </summary>
     public System.Collections.Generic.List<string> selected_jurisdictions { get; set; } = new();
+    /// <summary>
+    /// Expected duration of the maintenance window in hours.
+    /// Used by {{outage_duration}} and {{estimated_restoration}} message tokens.
+    /// </summary>
+    public int restoration_hours { get; set; } = 2;
+    /// <summary>
+    /// Minutes after the offline modal appears before the user is automatically signed out.
+    /// </summary>
+    public int auto_logout_minutes { get; set; } = 5;
     public string data_type { get; } = "system_offline_config";
 }

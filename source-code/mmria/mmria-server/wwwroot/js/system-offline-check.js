@@ -5,6 +5,9 @@
  * check (wired in _LayoutBase.cshtml) and by the polling module (Story 8.4).
  */
 
+// Auto-logout countdown state.
+var _autoLogoutCountdownInterval = null;
+
 /**
  * Evaluates the offline config dates against the current time.
  *
@@ -66,7 +69,10 @@ function handleOfflineState(statusResult, config) {
         var shownForOfflineDate = localStorage.getItem('offline_modal_shown');
         console.log('[OfflineCheck] handleOfflineState: state=offline | offline_modal_shown localStorage gate =', shownForOfflineDate, '| current offline_date =', config.offline_date);
         if (shownForOfflineDate !== config.offline_date) {
-            showOfflineModal(config.offline_modal_message || 'The system is now offline. You will be signed out.');
+            showOfflineModal(
+                config.offline_modal_message || 'The system is now offline. You will be signed out.',
+                config.auto_logout_minutes
+            );
             localStorage.setItem('offline_modal_shown', config.offline_date);
         }
     }
@@ -101,10 +107,14 @@ function closeWarnModal() {
 }
 
 /**
- * Shows the non-dismissable going-offline modal with the given message.
+ * Shows the non-dismissable going-offline modal with the given message and
+ * starts an auto-logout countdown. When the countdown reaches zero, or when
+ * the user clicks OK, any unsaved case changes are saved before signing out.
+ *
  * @param {string} message
+ * @param {number} [autoLogoutMinutes] - Minutes before automatic sign-out (default 5).
  */
-function showOfflineModal(message) {
+function showOfflineModal(message, autoLogoutMinutes) {
     var modal = document.getElementById('mmria-offline-modal');
     var backdrop = document.getElementById('mmria-offline-modal-backdrop');
     if (!modal) return;
@@ -116,6 +126,41 @@ function showOfflineModal(message) {
     modal.style.justifyContent = 'center';
     var okBtn = document.getElementById('mmria-offline-modal-ok');
     if (okBtn) setTimeout(function () { okBtn.focus(); }, 0);
+
+    // Start auto-logout countdown.
+    clearAutoLogoutTimer();
+    var minutes = (typeof autoLogoutMinutes === 'number' && autoLogoutMinutes > 0) ? autoLogoutMinutes : 5;
+    var endTime = Date.now() + minutes * 60 * 1000;
+    var countdownEl = document.getElementById('mmria-offline-modal-countdown');
+
+    function tick() {
+        var remaining = Math.max(0, endTime - Date.now());
+        var totalSecs = Math.ceil(remaining / 1000);
+        var m = Math.floor(totalSecs / 60);
+        var s = totalSecs % 60;
+        if (countdownEl) {
+            countdownEl.textContent = 'Automatically signing out in ' + m + ':' + (s < 10 ? '0' : '') + s + '.';
+        }
+        if (remaining <= 0) {
+            clearAutoLogoutTimer();
+            mmria_offline_modal_ok_handler();
+        }
+    }
+
+    tick();
+    _autoLogoutCountdownInterval = setInterval(tick, 1000);
+}
+
+/**
+ * Clears the auto-logout countdown interval and resets the countdown display.
+ */
+function clearAutoLogoutTimer() {
+    if (_autoLogoutCountdownInterval !== null) {
+        clearInterval(_autoLogoutCountdownInterval);
+        _autoLogoutCountdownInterval = null;
+    }
+    var countdownEl = document.getElementById('mmria-offline-modal-countdown');
+    if (countdownEl) countdownEl.textContent = '';
 }
 
 /**
@@ -124,6 +169,7 @@ function showOfflineModal(message) {
  * then navigates to sign-out by submitting a POST form to /Account/Logout.
  */
 function mmria_offline_modal_ok_handler() {
+    clearAutoLogoutTimer();
     var okBtn = document.getElementById('mmria-offline-modal-ok');
     if (okBtn) okBtn.disabled = true;
 
@@ -197,5 +243,6 @@ window.handleOfflineState = handleOfflineState;
 window.showWarnModal = showWarnModal;
 window.closeWarnModal = closeWarnModal;
 window.showOfflineModal = showOfflineModal;
+window.clearAutoLogoutTimer = clearAutoLogoutTimer;
 window.mmria_offline_modal_ok_handler = mmria_offline_modal_ok_handler;
 window.startOfflineStatusPolling = startOfflineStatusPolling;

@@ -98,7 +98,9 @@ public sealed class systemOfflineController : Controller
                 offline_modal_message = request?.offline_modal_message,
                 offline_page_message = request?.offline_page_message,
                 apply_to_all_jurisdictions = request?.apply_to_all_jurisdictions ?? true,
-                selected_jurisdictions = request?.selected_jurisdictions ?? new System.Collections.Generic.List<string>()
+                selected_jurisdictions = request?.selected_jurisdictions ?? new System.Collections.Generic.List<string>(),
+                restoration_hours = request?.restoration_hours ?? 2,
+                auto_logout_minutes = request?.auto_logout_minutes ?? 5
             };
 
             var settings = new Newtonsoft.Json.JsonSerializerSettings

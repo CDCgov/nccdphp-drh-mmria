@@ -46,6 +46,7 @@ public sealed class system_offlineController : Controller
     public IActionResult GetJurisdictions()
     {
         var jurisdictions = ConfigDB.detail_list.Keys
+            .Where(k => !string.Equals(k, "vital_import", StringComparison.OrdinalIgnoreCase))
             .OrderBy(k => k, StringComparer.OrdinalIgnoreCase)
             .ToList();
         return EscapedJsonResultFactory.Create(jurisdictions);
@@ -61,13 +62,7 @@ public sealed class system_offlineController : Controller
         {
             var request = await JsonRequestBodyReader.ReadAsync<mmria.common.metadata.SystemOfflineConfig>(Request);
 
-            // Ensure "cdc" is always in selected_jurisdictions when not applying to all.
             var selectedJurisdictions = request?.selected_jurisdictions ?? new System.Collections.Generic.List<string>();
-            if (!(request?.apply_to_all_jurisdictions ?? true) &&
-                !selectedJurisdictions.Contains("cdc", StringComparer.OrdinalIgnoreCase))
-            {
-                selectedJurisdictions.Insert(0, "cdc");
-            }
 
             // Sanitize: discard any client-supplied _rev and data_type.
             var sanitized = new mmria.common.metadata.SystemOfflineConfig
@@ -79,7 +74,9 @@ public sealed class system_offlineController : Controller
                 offline_modal_message = request?.offline_modal_message,
                 offline_page_message = request?.offline_page_message,
                 apply_to_all_jurisdictions = request?.apply_to_all_jurisdictions ?? true,
-                selected_jurisdictions = selectedJurisdictions
+                selected_jurisdictions = selectedJurisdictions,
+                restoration_hours = request?.restoration_hours ?? 2,
+                auto_logout_minutes = request?.auto_logout_minutes ?? 5
             };
 
             var servicesBaseUrl = GetServicesBaseUrl();
@@ -121,8 +118,7 @@ public sealed class system_offlineController : Controller
         if (!config.apply_to_all_jurisdictions)
         {
             var selected = config.selected_jurisdictions ?? new System.Collections.Generic.List<string>();
-            var isCdc = string.Equals(host_prefix, "cdc", StringComparison.OrdinalIgnoreCase);
-            var isSelected = isCdc || selected.Contains(host_prefix, StringComparer.OrdinalIgnoreCase);
+            var isSelected = selected.Contains(host_prefix, StringComparer.OrdinalIgnoreCase);
             if (!isSelected)
             {
                 // Return empty status — this tenant is not in the offline window.
@@ -141,9 +137,10 @@ public sealed class system_offlineController : Controller
         {
             config.warn_date,
             config.offline_date,
-            config.warn_message,
-            config.offline_modal_message,
-            config.offline_page_message
+            config.auto_logout_minutes,
+            warn_message             = mmria.server.util.SystemOfflineMessageFormatter.Substitute(config.warn_message,            config.warn_date, config.offline_date, config.restoration_hours),
+            offline_modal_message    = mmria.server.util.SystemOfflineMessageFormatter.Substitute(config.offline_modal_message, config.warn_date, config.offline_date, config.restoration_hours),
+            offline_page_message     = mmria.server.util.SystemOfflineMessageFormatter.Substitute(config.offline_page_message,  config.warn_date, config.offline_date, config.restoration_hours)
         };
         return EscapedJsonResultFactory.Create(status);
     }

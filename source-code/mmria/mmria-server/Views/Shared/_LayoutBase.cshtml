@@ -120,7 +120,7 @@ if (top !== self) top.location.replace(self.location.href);
           </button>
         </div>
         <div class="modal-body" style="padding:15px 20px;">
-          <p id="mmria-warn-modal-message" style="margin:0;"></p>
+          <p id="mmria-warn-modal-message" style="margin:0; white-space:pre-wrap;"></p>
         </div>
         <div class="modal-footer" style="padding:10px 15px;">
           <button type="button" class="btn btn-primary mmria-warn-close-btn" onclick="closeWarnModal()">Dismiss</button>
@@ -138,7 +138,8 @@ if (top !== self) top.location.replace(self.location.href);
           <h5 class="modal-title" id="mmria-offline-modal-title" style="margin:0; font-weight:600; font-size:17px;">System Going Offline</h5>
         </div>
         <div class="modal-body" style="padding:15px 20px;">
-          <p id="mmria-offline-modal-message" style="margin:0;"></p>
+          <p id="mmria-offline-modal-message" style="margin:0; white-space:pre-wrap;"></p>
+          <p id="mmria-offline-modal-countdown" style="margin:10px 0 0; font-weight:bold; font-size:0.9em;" aria-live="polite"></p>
         </div>
         <div class="modal-footer" style="padding:10px 15px;">
           <button type="button" id="mmria-offline-modal-ok" class="btn btn-primary" onclick="mmria_offline_modal_ok_handler()">OK</button>
