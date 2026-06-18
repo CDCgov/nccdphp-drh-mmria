@@ -171,6 +171,60 @@ dev this story _bmad-output/implementation-artifacts/6-3-add-edit-rule-modal.md
 
 ---
 
+## Epic 7: Admin Action Audit Logging *(2026-06-17 session)*
+
+| Story | File | Status |
+|---|---|---|
+| 7.1 Audit Logging — Year of Death and Maiden Name | `7-1-audit-logging-year-of-death-maiden-name.md` | verification |
+| 7.2 Audit Logging — Case Lifecycle Actions | `7-2-audit-logging-case-lifecycle-actions.md` | verification |
+
+> ℹ️ Stories 7.1 and 7.2 are independent — can be worked in any order.
+
+**Story 7.1 prompt:**
+```
+dev this story _bmad-output/implementation-artifacts/7-1-audit-logging-year-of-death-maiden-name.md
+```
+
+**Story 7.2 prompt:**
+```
+dev this story _bmad-output/implementation-artifacts/7-2-audit-logging-case-lifecycle-actions.md
+```
+
+---
+
+## Epic 8: System Going Offline *(2026-06-17 session)*
+
+| Story | File | Status |
+|---|---|---|
+| 8.1 System Offline Config — Document, mmria-services, Controller, Admin Page | `8-1-system-offline-config-services-admin-page.md` | not-started |
+| 8.2 Login Page Offline State | `8-2-login-page-offline-state.md` | verification |
+| 8.3 Warning and Going Offline Modals | `8-3-warning-and-offline-modals.md` | not-started |
+| 8.4 Periodic Offline Status Check | `8-4-periodic-status-check.md` | not-started |
+
+> ⚠️ **Epic 8 sequencing:** Story 8.1 must be completed before 8.2, 8.3, and 8.4. Stories 8.2, 8.3, and 8.4 can be worked in any order after 8.1. Story 8.4 depends on Story 8.3 (`system-offline-check.js` module and modal handlers must exist first).
+
+**Story 8.1 prompt:**
+```
+dev this story _bmad-output/implementation-artifacts/8-1-system-offline-config-services-admin-page.md
+```
+
+**Story 8.2 prompt:**
+```
+dev this story _bmad-output/implementation-artifacts/8-2-login-page-offline-state.md
+```
+
+**Story 8.3 prompt:**
+```
+dev this story _bmad-output/implementation-artifacts/8-3-warning-and-offline-modals.md
+```
+
+**Story 8.4 prompt:**
+```
+dev this story _bmad-output/implementation-artifacts/8-4-periodic-status-check.md
+```
+
+---
+
 ## Open Items — Resolve Before Affected Story
 
 | OI | Affects | What to resolve |

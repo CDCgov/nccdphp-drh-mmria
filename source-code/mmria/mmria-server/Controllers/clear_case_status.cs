@@ -226,6 +226,7 @@ public sealed class clear_case_statusController : Controller
                     var case_status = home_record["case_status"] as IDictionary<string,object>;
                     if(case_status != null)
                     {
+                        var oldCaseStatus = case_status.ContainsKey("overall_case_status") ? case_status["overall_case_status"]?.ToString() ?? "" : "";
                         case_status["overall_case_status"] = 9999;
                         case_status["case_locked_date"] = "";
 
@@ -257,6 +258,27 @@ public sealed class clear_case_statusController : Controller
                         if(document_put_response.ok)
                         {
                             model.CaseStatusDisplay = "(blank)";
+
+                            var auditEntry = new mmria.common.model.couchdb.Change_Stack
+                            {
+                                _id = Guid.NewGuid().ToString(),
+                                case_id = model._id,
+                                user_name = userName,
+                                note = "admin change, case unlocked, case status cleared",
+                                old_value = oldCaseStatus,
+                                new_value = "",
+                                date_created = DateTime.UtcNow,
+                                doc_type = "Change_Stack"
+                            };
+                            var auditSettings = new Newtonsoft.Json.JsonSerializerSettings { NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore };
+                            var auditString = Newtonsoft.Json.JsonConvert.SerializeObject(auditEntry, auditSettings);
+                            try
+                            {
+                                await _couchDbHttpClient.ExecuteAsync("PUT",
+                                    $"{effectiveDbConfig.url}/{effectiveDbConfig.prefix}audit/{auditEntry._id}",
+                                    auditString, effectiveDbConfig.user_name, effectiveDbConfig.user_value);
+                            }
+                            catch (Exception auditEx) { Console.WriteLine($"Audit write failed: {auditEx.Message}"); }
                         }
                         else
                         {

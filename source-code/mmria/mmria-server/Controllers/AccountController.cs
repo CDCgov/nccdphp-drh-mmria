@@ -99,12 +99,18 @@ public AccountController
     }
 
     [AllowAnonymous] 
-    public IActionResult Login(string returnUrl = null)
+    public async Task<IActionResult> Login(string returnUrl = null)
     {
         TempData["returnUrl"] = returnUrl;
         ViewBag.is_offline_mode_enabled = _configuration.GetBoolean("is_offline_mode_enabled", host_prefix) ?? false;
         ViewBag.is_offline_logging_enabled = _configuration.GetBoolean("is_offline_logging_enabled", host_prefix) ?? false;
         ViewBag.offline_logging_max_logs = _configuration.GetInteger("offline_logging_max_logs", host_prefix) ?? 10000;
+
+        var offlineConfig = await LoadSystemOfflineConfigAsync();
+        var offlineForThisTenant = IsJurisdictionAffected(offlineConfig, host_prefix) && IsSystemOffline(offlineConfig.offline_date);
+        ViewData["IsOffline"] = offlineForThisTenant;
+        ViewData["OfflinePageMessage"] = mmria.server.util.SystemOfflineMessageFormatter.Substitute(
+            offlineConfig.offline_page_message, offlineConfig.warn_date, offlineConfig.offline_date, offlineConfig.restoration_hours);
 
         return View();
     }
@@ -120,6 +126,16 @@ public AccountController
         if (use_sams.HasValue && use_sams.Value)
         {
             return RedirectToAction("SignIn");
+        }
+
+        // Block login if system is offline for this tenant
+        var postOfflineConfig = await LoadSystemOfflineConfigAsync();
+        if (IsJurisdictionAffected(postOfflineConfig, host_prefix) && IsSystemOffline(postOfflineConfig.offline_date))
+        {
+            ViewData["IsOffline"] = true;
+            ViewData["OfflinePageMessage"] = mmria.server.util.SystemOfflineMessageFormatter.Substitute(
+                postOfflineConfig.offline_page_message, postOfflineConfig.warn_date, postOfflineConfig.offline_date, postOfflineConfig.restoration_hours);
+            return View();
         }
 
         // Validate basic input
@@ -640,6 +656,52 @@ public AccountController
     private static string NormalizeUserName(string? userName)
     {
         return (userName ?? string.Empty).Trim().ToLowerInvariant();
+    }
+
+    private async Task<mmria.common.metadata.SystemOfflineConfig> LoadSystemOfflineConfigAsync()
+    {
+        var result = new mmria.common.metadata.SystemOfflineConfig();
+        try
+        {
+            var vitalsUrl = _configuration.GetString("vitals_url", host_prefix)
+                ?.Replace("/api/Message/IJESet", string.Empty);
+            if (string.IsNullOrWhiteSpace(vitalsUrl))
+                return result;
+
+            var getUrl = $"{vitalsUrl}/api/systemOffline/GetSystemOfflineConfig";
+            var requestOptions = new mmria.common.getset.CouchDbRequestOptions
+            {
+                VitalServiceKey = _configuration.GetString("vital_service_key", host_prefix)
+            };
+            var responseBody = await _couchDbHttpClient.ExecuteAsync(
+                "GET", getUrl, null, "application/json", requestOptions);
+            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.SystemOfflineConfig>(responseBody)
+                ?? new mmria.common.metadata.SystemOfflineConfig();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"AccountController.LoadSystemOfflineConfigAsync error: {ex}");
+        }
+        return result;
+    }
+
+    private static bool IsSystemOffline(string offlineDateStr)
+    {
+        if (string.IsNullOrWhiteSpace(offlineDateStr))
+            return false;
+        // Dates are stored as UTC ISO strings (with Z) via the admin UI.
+        // RoundtripKind correctly parses the Z suffix and sets Kind=Utc.
+        if (!DateTime.TryParse(offlineDateStr, null, System.Globalization.DateTimeStyles.RoundtripKind, out var offlineDate))
+            return false;
+        return DateTime.UtcNow >= offlineDate.ToUniversalTime();
+    }
+
+    private static bool IsJurisdictionAffected(mmria.common.metadata.SystemOfflineConfig config, string hostPrefix)
+    {
+        if (config.apply_to_all_jurisdictions)
+            return true;
+        var selected = config.selected_jurisdictions ?? new System.Collections.Generic.List<string>();
+        return selected.Contains(hostPrefix, StringComparer.OrdinalIgnoreCase);
     }
 
 }

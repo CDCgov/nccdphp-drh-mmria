@@ -40,6 +40,19 @@
     <div class="justify-content-center pt-3 col-md-12">
       @model ApplicationUser
       @{
+        bool isOffline = (bool)(ViewData["IsOffline"] ?? false);
+        string offlineMessage = ViewData["OfflinePageMessage"] as string ?? string.Empty;
+      }
+      @if (isOffline)
+      {
+        <div class="mt-4 mb-4" style="padding:0 15px;">
+          <div style="background-color:#7b2d8e; border-radius:4px; padding:40px 30px; display:flex; align-items:center; justify-content:center; min-height:200px; max-width:96%; margin:0 auto;">
+            <p style="color:white; font-size:18px; margin:0; line-height:1.6; text-align:center; white-space:pre-wrap;">@offlineMessage</p>
+          </div>
+        </div>
+      }
+      else
+      {
         <div class="mt-4 mb-4">
         <form id="user_login" class="login container" asp-antiforgery="true" asp-controller="Account" asp-action="Login"
           method="POST">

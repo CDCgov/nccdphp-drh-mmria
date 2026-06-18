@@ -229,6 +229,8 @@ public class CaseManager
 
         var case_response = CaseJsonSerialization.DeserializeMmriaCase(responseFromServer);
 
+        var oldYear = case_response.home_record.date_of_death.year;
+
         if (yearOfDeathReplacement.HasValue)
             case_response.home_record.date_of_death.year = yearOfDeathReplacement.Value;
 
@@ -281,6 +283,51 @@ public class CaseManager
             result.StatusText = "(blank)";
             result.IsSuccessful = true;
             result.StatusCode = 200;
+
+            if (yearOfDeathReplacement.HasValue)
+            {
+                var auditDbConfig = role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase)
+                    ? dbConfigSet.detail_list[stateDatabase]
+                    : db_config;
+                var changeStack = new Change_Stack
+                {
+                    _id = Guid.NewGuid().ToString(),
+                    case_id = caseId,
+                    user_name = userName,
+                    note = "admin change, year of death updated",
+                    date_created = DateTime.UtcNow,
+                    doc_type = "Change_Stack",
+                    items = new List<Change_Stack_Item>
+                    {
+                        new Change_Stack_Item
+                        {
+                            user_name = userName,
+                            prompt = "Year of Death",
+                            object_path = "/home_record/date_of_death/year",
+                            old_value = oldYear.ToString(),
+                            new_value = yearOfDeathReplacement.Value.ToString(),
+                            doc_type = "Change_Stack_Item"
+                        }
+                    }
+                };
+                JsonSerializerSettings auditSettings = new JsonSerializerSettings();
+                auditSettings.NullValueHandling = NullValueHandling.Ignore;
+                var audit_string = JsonConvert.SerializeObject(changeStack, auditSettings);
+                string audit_url = auditDbConfig.Get_Prefix_DB_Url($"audit/{changeStack._id}");
+                try
+                {
+                    string auditResponse = await _couchDbHttpClient.ExecuteAsync(
+                        "PUT", audit_url, audit_string,
+                        auditDbConfig.user_name, auditDbConfig.user_value);
+                    var audit_result = JsonConvert.DeserializeObject<document_put_response>(auditResponse);
+                    if (audit_result == null || !audit_result.ok)
+                        Console.WriteLine($"Audit save failed for case {caseId}, audit {changeStack._id}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Audit save threw for case {caseId}, audit {changeStack._id}: {ex.Message}");
+                }
+            }
         }
         else
         {
@@ -415,6 +462,7 @@ public class CaseManager
                     var certificate_identification = death_certificate["certificate_identification"] as IDictionary<string, object>;
                     if (certificate_identification != null)
                     {
+                        var oldMaidenName = certificate_identification["dmaiden"]?.ToString() ?? "";
                         dictionary["last_updated_by"] = userName;
                         dictionary["date_last_updated"] = DateTime.Now;
                         certificate_identification["dmaiden"] = maidenNameReplacement;
@@ -452,6 +500,48 @@ public class CaseManager
                             result.StatusText = "(blank)";
                             result.IsSuccessful = true;
                             result.StatusCode = 200;
+
+                            var auditDbConfig = role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase)
+                                ? dbConfigSet.detail_list[stateDatabase]
+                                : db_config;
+                            var changeStack = new Change_Stack
+                            {
+                                _id = Guid.NewGuid().ToString(),
+                                case_id = caseId,
+                                user_name = userName,
+                                note = "admin change, maiden name updated",
+                                date_created = DateTime.UtcNow,
+                                doc_type = "Change_Stack",
+                                items = new List<Change_Stack_Item>
+                                {
+                                    new Change_Stack_Item
+                                    {
+                                        user_name = userName,
+                                        prompt = "Maiden Name",
+                                        object_path = "/death_certificate/certificate_identification/dmaiden",
+                                        old_value = oldMaidenName,
+                                        new_value = maidenNameReplacement,
+                                        doc_type = "Change_Stack_Item"
+                                    }
+                                }
+                            };
+                            JsonSerializerSettings auditSettings = new JsonSerializerSettings();
+                            auditSettings.NullValueHandling = NullValueHandling.Ignore;
+                            var audit_string = JsonConvert.SerializeObject(changeStack, auditSettings);
+                            string audit_url = auditDbConfig.Get_Prefix_DB_Url($"audit/{changeStack._id}");
+                            try
+                            {
+                                string auditResponse = await _couchDbHttpClient.ExecuteAsync(
+                                    "PUT", audit_url, audit_string,
+                                    auditDbConfig.user_name, auditDbConfig.user_value);
+                                var audit_result = JsonConvert.DeserializeObject<document_put_response>(auditResponse);
+                                if (audit_result == null || !audit_result.ok)
+                                    Console.WriteLine($"Audit save failed for case {caseId}, audit {changeStack._id}");
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"Audit save threw for case {caseId}, audit {changeStack._id}: {ex.Message}");
+                            }
                         }
                         else
                         {
@@ -2200,7 +2290,7 @@ public class CaseManager
                 first_name = first_name,
                 last_name = last_name,
 
-                note = "deleted case",
+                note = "case deleted",
 
                 metadata_version = "",
                 date_created = DateTime.UtcNow,
