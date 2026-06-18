@@ -298,6 +298,9 @@ function mmria_vitals_validate_field(inputEl)
     }
     if (!rule) { return; }
     if (inputEl.value === '' || inputEl.value === null) { return; }
+    // Skip the modal if the value has not changed from the originally rendered value
+    // (i.e. this is historical invalid data — the user just tabbed through without editing).
+    if (inputEl.value === inputEl.defaultValue) { return; }
     var value = parseFloat(inputEl.value);
     if (isNaN(value)) { return; }
     if (value < parseFloat(rule.min_value) || value > parseFloat(rule.max_value))
@@ -1315,7 +1318,7 @@ data.forEach(row => {
   y_axis.forEach(col => {
     const fieldName = col.replace(graph_prefix, "");
     const rawVal = row[fieldName];
-    data_table_body_html.push(`<td style="padding-left: 5px;">${mmria_vitals_is_out_of_range(fieldName, rawVal) ? '' : rawVal}</td>`)
+    data_table_body_html.push(`<td style="padding-left: 5px;">${mmria_vitals_is_out_of_range(fieldName, rawVal) ? '<span style="color:#b87a00;font-style:italic;font-size:small;">Out of range</span>' : rawVal}</td>`)
   });
   data_table_body_html.push(`</tr>`);
 });

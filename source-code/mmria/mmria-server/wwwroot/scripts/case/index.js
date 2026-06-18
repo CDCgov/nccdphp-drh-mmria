@@ -1155,9 +1155,17 @@ async function g_set_data_object_from_path
       var _numVal = parseFloat(value);
       if (_rangeRule && !isNaN(_numVal) &&
           (_numVal < parseFloat(_rangeRule.min_value) || _numVal > parseFloat(_rangeRule.max_value))) {
-        var _ctrlEl = document.getElementById(convert_object_path_to_jquery_id(p_object_path) + '_control');
-        if (typeof mmria_vitals_show_field_modal === 'function') {
-          mmria_vitals_show_field_modal(_rangeRule, _ctrlEl || { focus: function(){} });
+        // Only block and clear if the user actually changed the value.
+        // If the stored value is already the same (historical invalid data), leave it alone.
+        var _storedNum = parseFloat(current_value);
+        var _isNewValue = isNaN(_storedNum) || _numVal !== _storedNum;
+        if (_isNewValue) {
+          var _ctrlEl = document.getElementById(convert_object_path_to_jquery_id(p_object_path) + '_control');
+          if (_ctrlEl) { _ctrlEl.value = ''; }
+          if (typeof mmria_vitals_show_field_modal === 'function') {
+            mmria_vitals_show_field_modal(_rangeRule, _ctrlEl || { focus: function(){} });
+          }
+          return;
         }
       }
     }
