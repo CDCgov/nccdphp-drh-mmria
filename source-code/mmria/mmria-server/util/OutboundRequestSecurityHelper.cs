@@ -42,7 +42,11 @@ public static class OutboundRequestSecurityHelper
             throw new ArgumentException("Bearer token contains unexpected characters.", paramName);
         }
 
-        return new AuthenticationHeaderValue("Bearer", sanitizedToken);
+        // Explicitly strip CR and LF to prevent HTTP header injection (defense in depth).
+        var safeToken = sanitizedToken
+            .Replace("\r", string.Empty, StringComparison.Ordinal)
+            .Replace("\n", string.Empty, StringComparison.Ordinal);
+        return new AuthenticationHeaderValue("Bearer", safeToken);
     }
 
     public static string ValidateHeaderValue(string value, string paramName, int maxLength = 4096)
