@@ -30,6 +30,14 @@ FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-imag
 # Switch to root temporarily to create directories
 USER root
 
+RUN if command -v microdnf >/dev/null 2>&1; then \
+        microdnf upgrade -y aspnetcore-runtime-9.0 dotnet-host dotnet-hostfxr-9.0 dotnet-runtime-9.0 openssl-libs && \
+        microdnf clean all; \
+    else \
+        dnf upgrade -y aspnetcore-runtime-9.0 dotnet-host dotnet-hostfxr-9.0 dotnet-runtime-9.0 openssl-libs && \
+        dnf clean all; \
+    fi
+
 WORKDIR /app
 COPY --from=publish /app/publish .
 RUN rm -f ./wwwroot/test*.html ./wwwroot/test.js ./wwwroot/pdf-version/test*.html ./wwwroot/print-version/test*.html || true
