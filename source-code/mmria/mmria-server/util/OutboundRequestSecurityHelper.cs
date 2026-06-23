@@ -42,7 +42,14 @@ public static class OutboundRequestSecurityHelper
             throw new ArgumentException("Bearer token contains unexpected characters.", paramName);
         }
 
-        return new AuthenticationHeaderValue("Bearer", sanitizedToken);
+        if (!AuthenticationHeaderValue.TryParse("Bearer " + sanitizedToken, out var headerValue) ||
+            !string.Equals(headerValue.Scheme, "Bearer", StringComparison.Ordinal) ||
+            !string.Equals(headerValue.Parameter, sanitizedToken, StringComparison.Ordinal))
+        {
+            throw new ArgumentException("Token value is not valid for an authorization header.", paramName);
+        }
+
+        return headerValue;
     }
 
     public static string ValidateHeaderValue(string value, string paramName, int maxLength = 4096)
