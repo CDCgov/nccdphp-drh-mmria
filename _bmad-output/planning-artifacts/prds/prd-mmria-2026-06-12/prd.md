@@ -2,7 +2,7 @@
 title: "PRD: MMRIA V4.1"
 status: final
 created: 2026-06-12
-updated: 2026-06-16 (OI-4 resolved — validation mode design)
+updated: 2026-06-25 (FR-9 added — Data Summary Checks field filter bug)
 ---
 
 # PRD: MMRIA V4.1
@@ -12,6 +12,7 @@ updated: 2026-06-16 (OI-4 resolved — validation mode design)
 MMRIA V4.1 restores predictable behavior to the case narrative editor, prevents unreliable vitals data from entering the system, and eliminates two categories of operational risk — hardcoded values that require code deployments to change, and an unauthorized print option that exposes system output users should not access.
 
 **Success looks like:**
+
 - Case reviewers stop reporting editor and formatting complaints
 - CDC analysts stop receiving out-of-range vitals data from state submissions
 - The next OMB expiration date change is handled by a developer running a script in minutes, not a release cycle
@@ -26,7 +27,8 @@ The case narrative editor is a rich text field with a metadata-driven default. R
 
 **FR-1.1 — Line break persistence**
 When a reviewer saves and reopens a case narrative, all explicit line breaks entered or present in the content are preserved in the editor view. Display is consistent between editor, print view, and PDF output.
-> *Note: A prior fix has been applied to the save path. This requirement remains active — the fix is a candidate solution, not a confirmed resolution. Verification through testing is required.*
+
+> _Note: A prior fix has been applied to the save path. This requirement remains active — the fix is a candidate solution, not a confirmed resolution. Verification through testing is required._
 
 **FR-1.2 — Formatting persistence (underline, horizontal rule, font size)**
 Underline, horizontal rule, and font size formatting applied in the editor are retained after save and reload. These formatting attributes render consistently across editor view, print view, and PDF output.
@@ -52,6 +54,7 @@ When a vitals field value is rejected per FR-2.1, a modal dialog is displayed wi
 Vitals validation rules are stored in a dedicated CouchDB document with `_id: "case-validation-rules-{metadata_version}"`, separate from the general application configuration document. This document is seeded automatically at server startup if it does not exist for the current metadata version. A developer can update rules by editing the document directly — no code deployment required.
 
 The document schema:
+
 - `schema_version` — semver string (required)
 - `seeded_version` — sprint version that generated the seed (e.g., `"4.1"`); startup seeder skips re-seeding if version matches
 - `rules` — array of typed field rule entries, each carrying: `rule_id`, `field_path` (dot-notation), `severity` (`"hard"` | `"soft"`), `rule_type` (`"range"` | `"range-list"`), `min_value`, `max_value`, `message`, `enabled`, `confidence`, `review_status`, `source`, `rationale`
@@ -59,14 +62,14 @@ The document schema:
 
 V4.1 seeds the following six vitals fields with `severity: "hard"` and `review_status: "reviewed"`:
 
-| Field | field_path pattern | Min | Max | Unit |
-|---|---|---|---|---|
-| Temperature | `*/temperature` | 80 | 115 | °F |
-| Heart Rate | `*/heart_rate` | 20 | 250 | bpm |
-| Respiration Rate | `*/respiration_rate` | 4 | 80 | breaths/min |
-| Systolic BP | `*/systolic*` | 40 | 300 | mmHg |
-| Diastolic BP | `*/diastolic*` | 20 | 200 | mmHg |
-| Oxygen Saturation | `*/oxygen_saturation` | 0 | 100 | % |
+| Field             | field_path pattern    | Min | Max | Unit        |
+| ----------------- | --------------------- | --- | --- | ----------- |
+| Temperature       | `*/temperature`       | 80  | 115 | °F          |
+| Heart Rate        | `*/heart_rate`        | 20  | 250 | bpm         |
+| Respiration Rate  | `*/respiration_rate`  | 4   | 80  | breaths/min |
+| Systolic BP       | `*/systolic*`         | 40  | 300 | mmHg        |
+| Diastolic BP      | `*/diastolic*`        | 20  | 200 | mmHg        |
+| Oxygen Saturation | `*/oxygen_saturation` | 0   | 100 | %           |
 
 The evaluation engine applies the rule `severity` as written during active input (on-blur). When evaluating persisted case data at load time (historical scan), all rule severities are downgraded one step: `hard → warning`. This ensures hard rules block new entry but only warn on historical data.
 
@@ -82,9 +85,10 @@ Out-of-range vitals values are excluded from graph and table views within the ca
 When a user initiates a View, View PDF, or Save PDF action, the system applies the following logic before proceeding:
 
 **Closed-state bypass.** If the case status is one of the following, the action is performed directly — no validation runs:
-- *Review complete and decision entered*
-- *Out of Scope and death certificate entered*
-- *False Positive and death certificate entered*
+
+- _Review complete and decision entered_
+- _Out of Scope and death certificate entered_
+- _False Positive and death certificate entered_
 
 **Open-state validation.** Otherwise, all vitals values in the case are evaluated against the `field-validation-rules` document.
 
@@ -95,12 +99,13 @@ When a user initiates a View, View PDF, or Save PDF action, the system applies t
 > Historical out-of-range vitals data (values persisted before rule enforcement) are evaluated as `severity: warning`. These trigger the soft-acknowledgment path, not the hard-block path.
 
 **Validation modal.**
+
 - Style: matches the existing site modal pattern (purple header, white body, two-button footer).
-- Hard-block message: *"This case contains vital sign records with values outside the permitted range. These values must be corrected before printing or viewing."* Close button only.
-- Soft-acknowledgment message: *"This case contains vital sign records with values outside the permitted range. These values are excluded from graphs, tables, print and pdf views."* Two buttons: **Close** (action not performed) and **[Contextual action]** (*View*, *View PDF*, or *Save PDF*).
+- Hard-block message: _"This case contains vital sign records with values outside the permitted range. These values must be corrected before printing or viewing."_ Close button only.
+- Soft-acknowledgment message: _"This case contains vital sign records with values outside the permitted range. These values are excluded from graphs, tables, print and pdf views."_ Two buttons: **Close** (action not performed) and **[Contextual action]** (_View_, _View PDF_, or _Save PDF_).
 - Modal meets Section 508 requirements (see NFR-2).
 
-> *The prior FR-2.6 behavior — modal on edit-mode entry, modal on form navigation, and red text indicator per vitals record — is removed. Story 2.5 covers the implementation that was built under the prior requirement; the prior behavior is removed as part of the story implementing this requirement. This requirement fully supersedes the prior FR-2.6.*
+> _The prior FR-2.6 behavior — modal on edit-mode entry, modal on form navigation, and red text indicator per vitals record — is removed. Story 2.5 covers the implementation that was built under the prior requirement; the prior behavior is removed as part of the story implementing this requirement. This requirement fully supersedes the prior FR-2.6._
 
 ---
 
@@ -134,6 +139,7 @@ PMSS-related print dropdowns are not in scope and must not be modified.
 
 **FR-5.1 — Replace instruction text**
 On the Case Narrative form, remove both existing instruction lines:
+
 - `"Use the pre-fill text below, and copy and paste from Reviewer's Notes below to create a comprehensive case narrative. Whatever you type here is what will be printed in the Print Version."`
 - `"CTRL+B to bold, CTRL+I to italicize, CTRL+U to underline"`
 
@@ -165,11 +171,13 @@ While in edit mode, a "Validation Errors" link button is displayed above the red
 Clicking the button opens a modal (existing site modal pattern) containing a Close button and a scrollable panel with two visually distinct sections:
 
 **Errors section** (hard violations):
+
 - Section header: **"Errors"** with count badge on a red background.
 - Each item carries a filled red circle icon.
 - Rendered first, always visible when hard violations exist.
 
 **Warnings section** (soft / historical violations):
+
 - Section header: **"Warnings"** with count badge on an amber background.
 - Each item carries a filled amber triangle-exclamation icon.
 - Rendered below Errors. Omitted entirely when warning count is zero.
@@ -221,13 +229,13 @@ A configuration-driven mechanism allows administrators to schedule a planned sys
 **FR-8.1 — Config Document and Storage**
 A `system-offline-config` document is stored in the CouchDB `metadata` database on the CDC instance. The document carries the following fields:
 
-| Field | Type | Purpose |
-|---|---|---|
-| `warn_date` | ISO 8601 datetime string | Threshold for warning modal |
-| `warn_message` | Multiline string | Body text of warning modal |
-| `offline_date` | ISO 8601 datetime string | Threshold for going-offline modal; login is disabled at or after this date |
-| `offline_modal_message` | Multiline string | Body text of going-offline modal |
-| `offline_page_message` | Multiline string | Text shown on login page in place of login form when offline |
+| Field                   | Type                     | Purpose                                                                    |
+| ----------------------- | ------------------------ | -------------------------------------------------------------------------- |
+| `warn_date`             | ISO 8601 datetime string | Threshold for warning modal                                                |
+| `warn_message`          | Multiline string         | Body text of warning modal                                                 |
+| `offline_date`          | ISO 8601 datetime string | Threshold for going-offline modal; login is disabled at or after this date |
+| `offline_modal_message` | Multiline string         | Body text of going-offline modal                                           |
+| `offline_page_message`  | Multiline string         | Text shown on login page in place of login form when offline               |
 
 Config is fetched and saved via mmria-server controller → mmria-services → CDC instance `metadata` DB. The config is global and applies to all tenants.
 
@@ -253,6 +261,7 @@ At or after `offline_date`, logged-in users are shown a "going offline" modal.
 
 **FR-8.4 — Login Page Offline State**
 When `now >= offline_date`, the login page renders in offline state:
+
 - The login form fields (username input, password input, login button) are hidden.
 - The "please contact your jurisdiction admin…" text is replaced with `offline_page_message`, displayed in white text.
 - No other login page elements are affected. Login is effectively disabled — no authentication path is presented.
@@ -268,17 +277,35 @@ While a user is logged in, the client polls the mmria-server every **2 minutes**
 
 **FR-8.6 — Login Page Server-Side Check**
 When a user navigates to the login page, the server checks the current offline config:
+
 - If `now >= offline_date`: render the login page in offline state (FR-8.4).
 - If `now >= warn_date` but `< offline_date`: render the login page normally; the warning modal fires client-side after successful login per FR-8.2.
 - If neither threshold is met or the config document is absent: render the login page normally.
 
 **FR-8.7 — Admin Page**
 An admin page is added, modeled on the existing `/broadcast-message` page.
+
 - Accessible to **installation admin** role only.
 - A link to this page is added in the installation admin navigation alongside the broadcast-message link.
 - The form presents all five config fields as editable inputs (two datetime pickers, three multiline text areas).
 - Save calls the mmria-server controller, which delegates to mmria-services to write the config to the CDC instance `metadata` DB.
 - The form loads current values from the same path on page load.
+
+---
+
+### FR-9 — Data Summary Checks Field Filter
+
+The MMRIA Data Summary Checks page includes a Form dropdown and a Field dropdown with an "ALL" toggle option.
+
+**Current correct behavior (must be preserved):**
+
+- When no Form is selected, the Field dropdown shows all fields across all forms (default state).
+- When a Form is selected and "ALL" is unchecked, the Field dropdown correctly filters to show only fields belonging to that Form.
+
+**FR-9.1 — "ALL" selection must respect the active Form filter**
+When a Form is selected and the user selects the "ALL" option in the Field dropdown, the Field dropdown enables and displays only the fields belonging to the selected Form — not all fields across all forms. The "ALL" toggle is scoped to the current Form context.
+
+> _This is a bug fix. The defect: selecting "ALL" while a Form is chosen causes the Field dropdown to show all fields regardless of the selected Form, bypassing the form-scoped filter. Unchecking "ALL" already correctly filters by the selected Form — that behavior is working and must not be changed. No other behavior, layout, or data changes are in scope._
 
 ---
 
@@ -298,20 +325,20 @@ Before V4.2 production deployment, the project SHALL establish and document a ru
 
 ## Constraints & Dependencies
 
-| Constraint | Detail |
-|---|---|
-| Auto-save must not be disrupted | Hard validation rejects invalid values at the field level (on-blur) before they enter form state. Save triggers at any point must not encounter invalid vitals values. Auto-save is never blocked. |
-| Admin UI scope | Configuration updates for OMB date and MMRIA version are developer-managed via CouchDB document and production script only. The `field-validation-rules` document is also developer-managed for V4.1. The rule management admin UI delivered by the POC (`/case_validation_metadata`) is operator tooling available in V4.1 but is not a V4.1 end-user deliverable and has no formal acceptance criteria in this sprint — acceptance criteria will be added in V4.2. |
-| Existing out-of-range vitals data | Historical out-of-range vitals values are not cleared or corrected. They are surfaced as `severity: warning` in the Validation Errors Panel (FR-6) and trigger the soft-acknowledgment print gate path. The stored database value is not modified. |
-| PMSS dropdowns | PMSS-related print dropdowns must not be modified. |
+| Constraint                        | Detail                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Auto-save must not be disrupted   | Hard validation rejects invalid values at the field level (on-blur) before they enter form state. Save triggers at any point must not encounter invalid vitals values. Auto-save is never blocked.                                                                                                                                                                                                                                                                   |
+| Admin UI scope                    | Configuration updates for OMB date and MMRIA version are developer-managed via CouchDB document and production script only. The `field-validation-rules` document is also developer-managed for V4.1. The rule management admin UI delivered by the POC (`/case_validation_metadata`) is operator tooling available in V4.1 but is not a V4.1 end-user deliverable and has no formal acceptance criteria in this sprint — acceptance criteria will be added in V4.2. |
+| Existing out-of-range vitals data | Historical out-of-range vitals values are not cleared or corrected. They are surfaced as `severity: warning` in the Validation Errors Panel (FR-6) and trigger the soft-acknowledgment print gate path. The stored database value is not modified.                                                                                                                                                                                                                   |
+| PMSS dropdowns                    | PMSS-related print dropdowns must not be modified.                                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 ---
 
 ## Open Items
 
-| # | Item | Blocker? | Owner | Condition to Resolve |
-|---|---|---|---|---|
-| OI-1 | Vitals valid ranges not yet defined | **Resolved** | Program team | Ranges confirmed — see FR-2.3. |
-| OI-2 | Three specific print dropdown render locations for `core-summary` need identification | No | Developer | Identify all client-side render sites before FR-4 implementation |
-| OI-3 | FR-1.1 prior fix status | **Resolved** | Developer | Implementation complete; going to formal verification. |
-| OI-4 | Validation mode design discussion | **Resolved** | Architect + Analyst | Validation mode is implemented as a `severity` property (`hard` \| `soft`) on each rule in a dedicated version-scoped `case-validation-rules-{metadata_version}` CouchDB document; no user-facing mode toggle exists; active-input hard validation clears fields on blur; historical data is downgraded to `warning` at load time; soft-warning acknowledgment is UI-only with no case-document persistence. FR-2.3 updated. |
+| #    | Item                                                                                  | Blocker?     | Owner               | Condition to Resolve                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ---- | ------------------------------------------------------------------------------------- | ------------ | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OI-1 | Vitals valid ranges not yet defined                                                   | **Resolved** | Program team        | Ranges confirmed — see FR-2.3.                                                                                                                                                                                                                                                                                                                                                                                               |
+| OI-2 | Three specific print dropdown render locations for `core-summary` need identification | No           | Developer           | Identify all client-side render sites before FR-4 implementation                                                                                                                                                                                                                                                                                                                                                             |
+| OI-3 | FR-1.1 prior fix status                                                               | **Resolved** | Developer           | Implementation complete; going to formal verification.                                                                                                                                                                                                                                                                                                                                                                       |
+| OI-4 | Validation mode design discussion                                                     | **Resolved** | Architect + Analyst | Validation mode is implemented as a `severity` property (`hard` \| `soft`) on each rule in a dedicated version-scoped `case-validation-rules-{metadata_version}` CouchDB document; no user-facing mode toggle exists; active-input hard validation clears fields on blur; historical data is downgraded to `warning` at load time; soft-warning acknowledgment is UI-only with no case-document persistence. FR-2.3 updated. |
