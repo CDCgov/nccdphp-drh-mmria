@@ -43,6 +43,7 @@ FR-8.4: At or after `offline_date`, the login page hides the login form fields a
 FR-8.5: While logged in, the client polls mmria-server every 2 minutes for current offline config and evaluates thresholds to trigger FR-8.2 or FR-8.3 as applicable.
 FR-8.6: When a user navigates to the login page, the server checks the offline config and renders the page in offline state (FR-8.4) if `now >= offline_date`.
 FR-8.7: An installation-admin-only admin page (modeled on `/broadcast-message`, linked from installation admin nav) allows editing and saving all five offline config fields. Saves via mmria-server → mmria-services → CDC instance `metadata` DB.
+FR-9.1: On the Data Summary Checks page, when a Form is selected and the user toggles "ALL" in the Field dropdown, only fields belonging to the selected Form are shown and enabled. The no-Form-selected default state (all fields shown) is preserved unchanged.
 
 ### NonFunctional Requirements
 
@@ -64,6 +65,7 @@ NFR-3: Vitals range configuration is loaded once at server startup and held in m
 - FR-4: Confirm `core_summary()` function has no remaining references before deleting the declaration.
 - FR-5: Developer locates the render source by searching for the first distinctive phrase of the existing text. If the text originates from `metadata.json` or a CouchDB document, update via the database-scripts update path. Do not change surrounding markup or field structure.
 - All open items (OI-3, OI-4, OI-5, OI-dev-B, OI-dev-C): do not block story creation but must be resolved before the affected implementation begins.
+- FR-9: Client-side only. Locate both the Form-select event handler and the ALL-toggle event handler in the Data Summary Checks page JS. Both handlers must enforce form-scoped field population when a Form is selected. Developer confirms the form-to-field association mechanism (metadata-driven or hardcoded) at implementation time.
 
 ### UX Design Requirements
 
@@ -99,26 +101,32 @@ FR-8.4: Epic 8 — Login page offline state (hide form, show message)
 FR-8.5: Epic 8 — Periodic status check (2-minute client poll)
 FR-8.6: Epic 8 — Login page server-side offline check
 FR-8.7: Epic 8 — Installation admin page for offline config
+FR-9.1: Standalone Bug Fix — Data Summary Checks "ALL" toggle scoped to selected Form
 
 ## Epic List
 
 ### Epic 1: Case Narrative Editor Fidelity
+
 Reviewers can write, format, and paste content in the case narrative editor with confidence that what they enter is what gets saved and printed. Updated instructions guide users toward better narrative practices.
 **FRs covered:** FR-1.1, FR-1.2, FR-1.3, FR-5.1
 
 ### Epic 2: Vitals Field Validation
+
 Reviewers entering vitals data are immediately alerted when values fall outside clinical ranges, preventing unreliable data from entering graphs, tables, print, and PDF views. Existing cases with out-of-range values are flagged at review time.
 **FRs covered:** FR-2.1, FR-2.2, FR-2.3, FR-2.4, FR-2.5, FR-2.6, FR-2.7
 
 ### Epic 3: System Configuration & Print Cleanup
+
 Developers can update the OMB expiration date and MMRIA version number without a code deployment. The "Core Elements Only" unauthorized print option is removed from all affected dropdowns and dead code is cleaned up.
 **FRs covered:** FR-3.1, FR-3.2, FR-3.3, FR-4.1, FR-4.2
 
 ### Epic 7: Admin Action Audit Logging
+
 Admin actions that modify case data or case lifecycle state are fully captured in the existing case audit log, giving reviewers and administrators a complete record of who changed what and when.
 **FRs covered:** FR-7.1, FR-7.2, FR-7.3, FR-7.4, FR-7.5
 
 ### Epic 8: System Going Offline
+
 Installation administrators can schedule a planned system outage. Logged-in users receive advance warning, are guided to save their work and sign out before the system goes offline, and are prevented from logging in once the offline date is reached.
 **FRs covered:** FR-8.1, FR-8.2, FR-8.3, FR-8.4, FR-8.5, FR-8.6, FR-8.7
 
@@ -189,10 +197,11 @@ So that I understand how to write an effective, compliant case narrative using t
 **Acceptance Criteria:**
 
 **Given** the Case Narrative form currently shows two instruction lines:
-  - "Use the pre-fill text below, and copy and paste from Reviewer's Notes below to create a comprehensive case narrative. Whatever you type here is what will be printed in the Print Version."
-  - "CTRL+B to bold, CTRL+I to italicize, CTRL+U to underline"
-**When** the developer locates the render source (Razor view, metadata.json, or CouchDB document) by searching for the first distinctive phrase
-**Then** both lines are removed and replaced with the approved replacement text (preserving line breaks as specified in FR-5.1)
+
+- "Use the pre-fill text below, and copy and paste from Reviewer's Notes below to create a comprehensive case narrative. Whatever you type here is what will be printed in the Print Version."
+- "CTRL+B to bold, CTRL+I to italicize, CTRL+U to underline"
+  **When** the developer locates the render source (Razor view, metadata.json, or CouchDB document) by searching for the first distinctive phrase
+  **Then** both lines are removed and replaced with the approved replacement text (preserving line breaks as specified in FR-5.1)
 
 **Given** the surrounding markup and field structure for the instruction text
 **When** the replacement is made
@@ -633,3 +642,41 @@ So that I receive warning and going-offline notifications without needing to rel
 **Given** the poll request fails (network error, server unavailable)
 **When** the error is received
 **Then** the failure is silently swallowed — no error is surfaced to the user and polling continues on the next interval
+
+---
+
+## Standalone Bug Fixes
+
+_Single-story bug fixes that do not warrant a full epic._
+
+### Story 9.1: Fix Data Summary Checks Field Filter for ALL Toggle
+
+As a user of the Data Summary Checks page,
+I want the Field dropdown to show only the fields from the selected Form when I select "ALL",
+So that my data summary reflects the correct form-scoped fields and not all fields across all forms.
+
+**Acceptance Criteria:**
+
+**Given** no Form is selected on the Data Summary Checks page
+**When** the page loads or the Form selection is cleared
+**Then** the Field dropdown shows all fields across all forms (existing default behavior — preserved unchanged)
+
+**Given** a Form is selected and the user manually selects or deselects individual fields ("ALL" not toggled)
+**When** the Field dropdown is populated
+**Then** only fields belonging to the selected Form are shown (existing working behavior — preserved unchanged)
+
+**Given** a Form is selected in the Form dropdown
+**When** the user toggles "ALL" ON in the Field dropdown
+**Then** the Field dropdown enables and displays only the fields belonging to the selected Form — not all fields globally
+
+**Given** the ALL-toggle event handler in the Data Summary Checks page JS
+**When** ALL is toggled ON while a Form is selected
+**Then** the handler re-populates the field list from the currently selected Form's fields only — not from the global field list; both the Form-select handler and the ALL-toggle handler enforce form-scoped field population when a Form is active
+
+**Given** a Form is selected and "ALL" is toggled ON
+**When** the user then clears the Form selection
+**Then** the Field dropdown reverts to showing all fields (the default no-Form state)
+
+**Given** the fix is validated in Edge and Chrome (NFR-1)
+**When** tested in both browsers
+**Then** behavior is consistent and correct in both

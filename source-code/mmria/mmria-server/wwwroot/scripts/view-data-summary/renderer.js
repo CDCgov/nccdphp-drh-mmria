@@ -267,7 +267,9 @@ function render_field_filter(p_filter)
     for(const [k, v] of g_form_field_map)
     {
         // Hide form groups that are filtered out so we render less HTML on each refresh.
-        if(!all_selected && selected_form && selected_form != '' && selected_form != 'all' && k != selected_form)
+        // NOTE: guard intentionally does NOT short-circuit on all_selected — the ALL toggle
+        // must still respect the active form filter (Story 9.1 fix).
+        if(selected_form && selected_form != '' && selected_form != 'all' && k != selected_form)
         {
             continue;
         }
