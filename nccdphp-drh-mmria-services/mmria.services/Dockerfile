@@ -35,6 +35,11 @@ USER 1001
 
 # ----- Stage 3: Runtime -----
 FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-90-runtime:9.0-1779914985@sha256:5802a3771fa3e6854f2dadef6b69065a955e4d26cf954f80465ea5faee7a9e44 AS runtime
+
+# Patch OS packages with available security fixes (CVE-2026-45591, CVE-2026-45447)
+USER root
+RUN dnf update -y aspnetcore-runtime-9.0 dotnet-host dotnet-hostfxr-9.0 dotnet-runtime-9.0 openssl-libs && dnf clean all
+
 WORKDIR /app
 
 # Copy published output from build image

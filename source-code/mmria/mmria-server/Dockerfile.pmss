@@ -28,6 +28,12 @@ USER 1001
 
 # Runtime image (smaller)
 FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-90-runtime:9.0.9-1758211314@sha256:699c83e64b5e931eb0158c803de38cfe176d1a107030ae3b07f678e15c37a88e AS runtime
+
+# Patch OS packages with available security fixes (CVE-2026-45591, CVE-2026-45447)
+USER root
+RUN dnf update -y aspnetcore-runtime-9.0 dotnet-host dotnet-hostfxr-9.0 dotnet-runtime-9.0 openssl-libs && dnf clean all
+USER 1001
+
 WORKDIR /app
 COPY --from=publish /app/publish .
 
