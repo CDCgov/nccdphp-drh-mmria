@@ -309,6 +309,15 @@ When a Form is selected and the user selects the "ALL" option in the Field dropd
 
 ---
 
+### FR-10 — Manage Users Export Respects Active Filter
+
+**FR-10.1 — Export User List must export only the currently displayed (filtered) users**
+When an admin has applied a Role or Username filter on the Manage Users page, clicking "Export User List" must download an XLSX that contains only the users visible in the filtered table — not all users in the system. When no filter is active, the export continues to include all users.
+
+> _This is a bug fix (added 2026-06-25). The defect: `export_user_list_click()` in `index.js` joins against `g_ui.user_summary_list` (always the full unfiltered list) instead of `g_filtered_user_list` (the active filter result maintained by `summary_renderer.js`). Fix: one-token substitution. No server-side or XLSX format changes are in scope._
+
+---
+
 **NFR-1 — Browser support**
 All changes must function correctly in Microsoft Edge and Google Chrome. No other browsers are in scope.
 

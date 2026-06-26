@@ -44,6 +44,7 @@ FR-8.5: While logged in, the client polls mmria-server every 2 minutes for curre
 FR-8.6: When a user navigates to the login page, the server checks the offline config and renders the page in offline state (FR-8.4) if `now >= offline_date`.
 FR-8.7: An installation-admin-only admin page (modeled on `/broadcast-message`, linked from installation admin nav) allows editing and saving all five offline config fields. Saves via mmria-server → mmria-services → CDC instance `metadata` DB.
 FR-9.1: On the Data Summary Checks page, when a Form is selected and the user toggles "ALL" in the Field dropdown, only fields belonging to the selected Form are shown and enabled. The no-Form-selected default state (all fields shown) is preserved unchanged.
+FR-10.1: On the Manage Users page, clicking "Export User List" when a Role or Username filter is active exports only the currently displayed users. When no filter is active, all users are exported (existing default preserved).
 
 ### NonFunctional Requirements
 
@@ -66,6 +67,7 @@ NFR-3: Vitals range configuration is loaded once at server startup and held in m
 - FR-5: Developer locates the render source by searching for the first distinctive phrase of the existing text. If the text originates from `metadata.json` or a CouchDB document, update via the database-scripts update path. Do not change surrounding markup or field structure.
 - All open items (OI-3, OI-4, OI-5, OI-dev-B, OI-dev-C): do not block story creation but must be resolved before the affected implementation begins.
 - FR-9: Client-side only. Locate both the Form-select event handler and the ALL-toggle event handler in the Data Summary Checks page JS. Both handlers must enforce form-scoped field population when a Form is selected. Developer confirms the form-to-field association mechanism (metadata-driven or hardcoded) at implementation time.
+- FR-10: Client-side only. In `export_user_list_click()` in `manage-users/index.js`, replace the join target from `g_ui.user_summary_list` to `g_filtered_user_list`. No server-side changes.
 
 ### UX Design Requirements
 
@@ -102,6 +104,7 @@ FR-8.5: Epic 8 — Periodic status check (2-minute client poll)
 FR-8.6: Epic 8 — Login page server-side offline check
 FR-8.7: Epic 8 — Installation admin page for offline config
 FR-9.1: Standalone Bug Fix — Data Summary Checks "ALL" toggle scoped to selected Form
+FR-10.1: Standalone Bug Fix — Manage Users Export scoped to active filter
 
 ## Epic List
 
@@ -129,6 +132,8 @@ Admin actions that modify case data or case lifecycle state are fully captured i
 
 Installation administrators can schedule a planned system outage. Logged-in users receive advance warning, are guided to save their work and sign out before the system goes offline, and are prevented from logging in once the offline date is reached.
 **FRs covered:** FR-8.1, FR-8.2, FR-8.3, FR-8.4, FR-8.5, FR-8.6, FR-8.7
+
+- FR-10: Client-side only. In `export_user_list_click()` in `manage-users/index.js`, replace the join target from `g_ui.user_summary_list` to `g_filtered_user_list`. No server-side changes.
 
 ---
 

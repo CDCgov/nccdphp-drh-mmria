@@ -371,7 +371,7 @@ async function export_user_list_click()
     console.log("export user list clicked");
     const excel_user_lists = g_user_role_jurisdiction
         .filter(item => item.user_id !== null && item.user_id !== "")
-        .filter(item => g_ui.user_summary_list.find(user => user.name === item.user_id))
+        .filter(item => g_filtered_user_list.find(user => user.name === item.user_id)) // depends on g_filtered_user_list initialized by summary_renderer.js
         .sort((a, b) => a.user_id.localeCompare(b.user_id));
     
     // Prepare data for export
