@@ -254,14 +254,21 @@ dev this story _bmad-output/implementation-artifacts/8-4-periodic-status-check.m
 
 ## Standalone Bug Fixes
 
-| Story                                                   | File                                          | Status      |
-| ------------------------------------------------------- | --------------------------------------------- | ----------- |
-| 9.1 Fix Data Summary Checks Field Filter for ALL Toggle | `9-1-fix-data-summary-checks-field-filter.md` | not-started |
+| Story                                                   | File                                             | Status        |
+| ------------------------------------------------------- | ------------------------------------------------ | ------------- |
+| 9.1 Fix Data Summary Checks Field Filter for ALL Toggle | `9-1-fix-data-summary-checks-field-filter.md`    | done          |
+| 9.2 Fix Manage Users Export Ignores Active Filter       | `9-2-fix-manage-users-export-respects-filter.md` | ready-for-dev |
 
 **Story 9.1 prompt:**
 
 ```
 dev this story _bmad-output/implementation-artifacts/9-1-fix-data-summary-checks-field-filter.md
+```
+
+**Story 9.2 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/9-2-fix-manage-users-export-respects-filter.md
 ```
 
 ---
