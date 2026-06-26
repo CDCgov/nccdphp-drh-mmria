@@ -114,6 +114,9 @@ This is intentional. An export that showed only the filtered role's rows would g
   - [x] File: `source-code/mmria/mmria-server/wwwroot/scripts/manage-users/index.js`
   - [x] Function: `export_user_list_click()` (~line 374)
   - [x] Change: `.filter(item => g_ui.user_summary_list.find(...))` → `.filter(item => g_filtered_user_list.find(...))`
+- [x] Fix: include role-less users in export (discovered during DEV testing)
+  - [x] Users visible in the filtered table but absent from `g_user_role_jurisdiction` now receive a sentinel row with empty `role_name`/`jurisdiction_id` fields
+  - [x] AC-1 and AC-4 test assertions updated to strict equality (`=== getFilteredUserCount()`)
 - [x] Manual smoke test (AC-1 through AC-4)
   - [x] No filter → export all users ✓
   - [x] Role filter "Data Analyst" → export only those users ✓
@@ -131,11 +134,12 @@ This is intentional. An export that showed only the filtered role's rows would g
 ### Implementation Notes
 
 - Applied the one-token fix in `export_user_list_click()`: replaced `g_ui.user_summary_list` with `g_filtered_user_list` at line 374 of `index.js`. Identical character-of-change to Story 9.1.
+- **Follow-up fix (DEV testing):** Users in `g_filtered_user_list` with no entries in `g_user_role_jurisdiction` were silently absent from the export. Fixed by building a `no_role_rows` sentinel list from `g_filtered_user_list` minus users already in `role_rows`, then merging before sort. These rows carry empty `role_name` and `jurisdiction_id` strings.
 - Created Playwright E2E regression spec covering all 4 ACs.
-  - AC-1: `> 0` assertion rather than strict equality — the export source (`g_user_role_jurisdiction`) only includes users with role assignments, which is a subset of the total DOM count. The DOM shows 79 users; the unfiltered export returns 71 (users with at least one role). The assertion `> 0` correctly validates the export works without mis-asserting an impossible equality.
-  - AC-2 and AC-3: `exportedUserIds.length === getFilteredUserCount()` — role-filtered and username-filtered subsets all have role assignments in the test environment, so this equality holds.
-  - AC-4: Captures an unfiltered export baseline first, then after clearing the filter asserts the export count returns to the baseline (71) rather than the DOM count (79).
-  - `getFilteredUserCount()` reads `g_filtered_user_list.length` indirectly via the "Showing X-Y of N user(s)" navigation text in the DOM using `page.evaluate`. `const`/`let` globals are NOT on `window`, so DOM parsing is the correct approach.
+  - AC-1: strict `=== totalUserCount` — all 79 DOM users now appear in the export (role-less users included via sentinel rows).
+  - AC-2 and AC-3: `exportedUserIds.length === getFilteredUserCount()` — unchanged.
+  - AC-4: strict `=== unfilteredCount` — simplified (no longer needs a separate export baseline capture).
+  - `getFilteredUserCount()` reads `g_filtered_user_list.length` indirectly via the "Showing X-Y of N user(s)" navigation text using `page.evaluate`. `const`/`let` globals are NOT on `window`, so DOM parsing is the correct approach.
 - All 5 Playwright tests pass (1 auth setup + 4 ACs).
 
 ### File List
@@ -147,6 +151,7 @@ This is intentional. An export that showed only the filtered role's rows would g
 
 ### Change Log
 
-| Date       | Author | Change                                                      |
-| ---------- | ------ | ----------------------------------------------------------- |
-| 2026-06-25 | Amelia | Initial implementation — fix + E2E tests, all 4 ACs passing |
+| Date       | Author | Change                                                                                                                |
+| ---------- | ------ | --------------------------------------------------------------------------------------------------------------------- |
+| 2026-06-25 | Amelia | Initial implementation — fix + E2E tests, all 4 ACs passing                                                           |
+| 2026-06-26 | Amelia | Follow-up: include role-less users in export via sentinel rows; AC-1 and AC-4 assertions tightened to strict equality |
