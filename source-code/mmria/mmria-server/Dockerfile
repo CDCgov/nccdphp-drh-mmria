@@ -31,6 +31,8 @@ FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-imag
 USER root
 
 WORKDIR /app
+RUN microdnf update -y aspnetcore-runtime-9.0 dotnet-host dotnet-hostfxr-9.0 dotnet-runtime-9.0 openssl-libs && \
+    microdnf clean all
 COPY --from=publish /app/publish .
 RUN rm -f ./wwwroot/test*.html ./wwwroot/test.js ./wwwroot/pdf-version/test*.html ./wwwroot/print-version/test*.html || true
 COPY --from=build /src/source-code/mmria/mmria-server/database-scripts ./database-scripts
