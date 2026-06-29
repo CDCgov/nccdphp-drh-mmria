@@ -10,6 +10,7 @@ namespace mmria.server.util;
 public static class OutboundRequestSecurityHelper
 {
     private static readonly Regex BearerTokenPattern = new("^[A-Za-z0-9._~+/=-]{1,4096}$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
+    private static readonly char[] HeaderInjectionChars = { '\r', '\n', '\0' };
 
     public static HttpClient CreateNoRedirectClient(TimeSpan? timeout = null)
     {
@@ -53,7 +54,7 @@ public static class OutboundRequestSecurityHelper
         }
 
         // Explicitly reject CR, LF, and null bytes to prevent HTTP header injection (CWE-113).
-        if (value.IndexOfAny(new[] { '\r', '\n', '\0' }) >= 0)
+        if (value.IndexOfAny(HeaderInjectionChars) >= 0)
         {
             throw new ArgumentException("Header value must not contain CR, LF, or null characters.", paramName);
         }
