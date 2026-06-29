@@ -52,6 +52,12 @@ public static class OutboundRequestSecurityHelper
             throw new ArgumentException("Header value is required.", paramName);
         }
 
+        // Explicitly reject CR, LF, and null bytes to prevent HTTP header injection (CWE-113).
+        if (value.IndexOfAny(new[] { '\r', '\n', '\0' }) >= 0)
+        {
+            throw new ArgumentException("Header value must not contain CR, LF, or null characters.", paramName);
+        }
+
         var trimmedValue = value.Trim();
         if (trimmedValue.Length > maxLength)
         {
