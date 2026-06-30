@@ -27,8 +27,17 @@ USER 1001
 # ----- Stage 3: Runtime -----
 FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-90-runtime:9.0-1779914985@sha256:5802a3771fa3e6854f2dadef6b69065a955e4d26cf954f80465ea5faee7a9e44 AS runtime
 
-# Switch to root temporarily to create directories
+# Switch to root temporarily for security patches and directory creation
 USER root
+
+# Patch OS packages with available fixes (CVE-2026-45591, CVE-2026-45447)
+RUN dnf update -y --setopt=tsflags=nodocs \
+      aspnetcore-runtime-9.0 \
+      dotnet-hostfxr-9.0 \
+      dotnet-runtime-9.0 \
+      dotnet-host \
+      openssl-libs \
+    && dnf clean all -y
 
 WORKDIR /app
 COPY --from=publish /app/publish .
