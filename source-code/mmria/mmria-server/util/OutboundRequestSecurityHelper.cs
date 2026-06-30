@@ -52,7 +52,10 @@ public static class OutboundRequestSecurityHelper
             throw new ArgumentException("Header value is required.", paramName);
         }
 
-        var trimmedValue = value.Trim();
+        // Explicitly strip CR and LF to prevent HTTP header injection (CWE-113 / Header Manipulation)
+        var crlfStripped = value.Replace("\r", string.Empty, StringComparison.Ordinal)
+                                .Replace("\n", string.Empty, StringComparison.Ordinal);
+        var trimmedValue = crlfStripped.Trim();
         if (trimmedValue.Length > maxLength)
         {
             throw new ArgumentException("Header value exceeds the maximum allowed length.", paramName);
