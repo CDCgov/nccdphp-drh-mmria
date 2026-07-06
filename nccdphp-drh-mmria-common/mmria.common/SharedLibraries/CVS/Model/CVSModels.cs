@@ -11,4 +11,5 @@ public sealed class CVSFileStatusResult
     public bool is_valid_address { get; set; } = true;
     public bool is_valid_year { get; set; } = true;
     public byte[] PdfBytes { get; set; }
+    public string message { get; set; }
 }

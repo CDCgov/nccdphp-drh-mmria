@@ -277,8 +277,8 @@ dev this story _bmad-output/implementation-artifacts/9-2-fix-manage-users-export
 
 | Story                                                         | File                                                   | Status |
 | ------------------------------------------------------------- | ------------------------------------------------------ | ------ |
-| 10.1 Fix BatchSupervisor Busy-Wait CPU Spin                   | `10-1-fix-cvs-batch-supervisor-busy-wait.md`           | review |
-| 10.2 Server-Side CVS Error Hardening                          | `10-2-server-side-cvs-error-hardening.md`              | review |
+| 10.1 Fix BatchSupervisor Busy-Wait CPU Spin                   | `10-1-fix-cvs-batch-supervisor-busy-wait.md`           | done   |
+| 10.2 Server-Side CVS Error Hardening                          | `10-2-server-side-cvs-error-hardening.md`              | done   |
 | 10.3 Client-Side CVS Retry Mechanism with Countdown           | `10-3-client-side-cvs-retry-mechanism.md`              | review |
 | 10.4 CVS Parent-Page Button State via BroadcastChannel        | `10-4-cvs-parent-page-broadcast-channel-status.md`     | review |
 

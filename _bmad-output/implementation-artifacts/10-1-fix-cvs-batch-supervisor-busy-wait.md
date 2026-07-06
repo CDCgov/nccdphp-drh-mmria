@@ -6,7 +6,7 @@ baseline_commit: 8c3ee1c08758912c02928633b0d52e4a5c1e2b9c
 
 **Epic:** 10 — CVS PDF Export Tool Reliability
 **Story ID:** 10.1
-**Status:** review
+**Status:** done
 **Date added:** 2026-07-06
 
 ---
@@ -149,3 +149,28 @@ Console.WriteLine($"{DateTime.Now:o} BatchSupervisor: wait complete, retrying CV
 ### Sequencing
 
 This story is independent of all other Epic 10 stories — it touches only the mmria-services layer.
+
+---
+
+## Dev Agent Record
+
+### Completion Notes
+
+All five ACs verified against `BatchSupervisor.cs`:
+- AC-1: `await Task.Delay(CvsServerRetryDelayMs)` replaces the former busy-wait spin loop.
+- AC-2: `CvsServerRetryDelayMs = 40 * 1000` preserves the 40-second retry interval.
+- AC-3: Constructor calls only `Become(Initializing)`; `PreStart()` sends `InitializeBatchList.Instance` to self.
+- AC-4: `Initializing()` behavior stashes all non-init messages; `finally` block calls `Become(Ready); Stash.UnstashAll()`.
+- AC-5: `catch (Exception ex)` logs the error; `finally` always transitions to `Ready` so the actor remains functional.
+
+Build: `dotnet build mmria.services.csproj` — 0 errors, 144 pre-existing warnings (unchanged).
+
+### File List
+
+- `nccdphp-drh-mmria-services/mmria.services/Actors/BatchSupervisor.cs` — modified
+
+### Change Log
+
+| Date | Change |
+|------|--------|
+| 2026-07-06 | Implemented IWithStash, InitializeBatchList deferred init, CvsServerRetryDelayMs constant, async Task.Delay replacing busy-wait |

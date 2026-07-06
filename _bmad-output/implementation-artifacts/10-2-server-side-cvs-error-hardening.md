@@ -6,7 +6,7 @@ baseline_commit: cb40e16bdf2867eb10a552897456c446bbde041f
 
 **Epic:** 10 — CVS PDF Export Tool Reliability
 **Story ID:** 10.2
-**Status:** review
+**Status:** done
 **Date added:** 2026-07-06
 
 ---
