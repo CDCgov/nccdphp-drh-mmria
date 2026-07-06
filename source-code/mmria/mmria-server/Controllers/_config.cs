@@ -306,6 +306,8 @@ public sealed class _configController : Controller
             result.integer_keys["shared"].Add("unsuccessful_login_attempts_within_number_of_minutes", unsuccessful_login_attempts_within_number_of_minutes);
             result.integer_keys["shared"].Add("unsuccessful_login_attempts_lockout_number_of_minutes", unsuccessful_login_attempts_lockout_number_of_minutes);
             result.integer_keys["shared"].Add("tenant_database_counts_mmrds_watch_threshold", tenant_database_counts_mmrds_watch_threshold);
+            result.integer_keys["shared"].Add("CVS_MAX_ATTEMPTS", 10);
+            result.integer_keys["shared"].Add("CVS_RETRY_DELAY_SECONDS", 60);
 
         }
         catch(System.Exception ex)

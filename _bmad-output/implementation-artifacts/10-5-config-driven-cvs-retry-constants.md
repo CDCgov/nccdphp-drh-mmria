@@ -1,5 +1,5 @@
 ---
-status: not-started
+status: done
 ---
 
 # Story 10.5 — Config-Driven CVS Retry Constants

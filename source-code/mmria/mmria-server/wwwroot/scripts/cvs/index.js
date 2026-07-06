@@ -7,8 +7,8 @@ var report_log = [];
 var g_is_running = false;
 var g_countdown_timer = null;
 
-const CVS_MAX_ATTEMPTS = 10;
-const CVS_RETRY_DELAY_SECONDS = 30;
+const CVS_MAX_ATTEMPTS = window.CVS_MAX_ATTEMPTS ?? 10;
+const CVS_RETRY_DELAY_SECONDS = window.CVS_RETRY_DELAY_SECONDS ?? 60;
 
 const bc = new BroadcastChannel('cvs_channel');
 bc.onmessage = (message_data) => {

@@ -57,6 +57,9 @@ public sealed class CvsController : Controller
             id = id
         };
 
+        TempData["CVS_MAX_ATTEMPTS"] = configuration.GetInteger("CVS_MAX_ATTEMPTS", host_prefix) ?? 10;
+        TempData["CVS_RETRY_DELAY_SECONDS"] = configuration.GetInteger("CVS_RETRY_DELAY_SECONDS", host_prefix) ?? 60;
+
         return View(model);
     }
 
