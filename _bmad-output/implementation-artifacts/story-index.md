@@ -34,13 +34,15 @@ dev this story _bmad-output/implementation-artifacts/1-3-update-case-narrative-i
 
 ## Epic 2: Vitals Field Validation
 
-| Story                                                    | File                                                    | Status       |
-| -------------------------------------------------------- | ------------------------------------------------------- | ------------ |
-| 2.1 Add Vitals Range Config — CouchDB and Server Loading | `2-1-vitals-range-config-couchdb-and-server-loading.md` | verification |
-| 2.2 On-Blur Vitals Validation and Invalid Entry Modal    | `2-2-on-blur-vitals-validation-and-modal.md`            | verification |
-| 2.3 Display-Time Exclusion — Print, PDF, Date Fix        | `2-3-display-time-exclusion-print-pdf-date-fix.md`      | verification |
-| 2.4 Display-Time Exclusion — Graph and Table Views       | `2-4-display-time-exclusion-graph-and-table.md`         | verification |
-| 2.5 Historical Data Detection and Record Indicators      | `2-5-historical-data-detection-and-indicators.md`       | verification |
+| Story                                                       | File                                                    | Status        |
+| ----------------------------------------------------------- | ------------------------------------------------------- | ------------- |
+| 2.1 Add Vitals Range Config — CouchDB and Server Loading    | `2-1-vitals-range-config-couchdb-and-server-loading.md` | verification  |
+| 2.2 On-Blur Vitals Validation and Invalid Entry Modal       | `2-2-on-blur-vitals-validation-and-modal.md`            | verification  |
+| 2.6 Fix Vitals Data Wipe on Re-Validation (regression)      | `2-6-fix-vitals-data-wipe-on-revalidation.md`           | ready-for-dev |
+| 2.7 Fix Missing Range Validation — Prenatal BP (regression) | `2-7-fix-missing-prenatal-bp-validation.md`             | ready-for-dev |
+| 2.3 Display-Time Exclusion — Print, PDF, Date Fix           | `2-3-display-time-exclusion-print-pdf-date-fix.md`      | verification  |
+| 2.4 Display-Time Exclusion — Graph and Table Views          | `2-4-display-time-exclusion-graph-and-table.md`         | verification  |
+| 2.5 Historical Data Detection and Record Indicators         | `2-5-historical-data-detection-and-indicators.md`       | verification  |
 
 > ⚠️ **Epic 2 sequencing:** Story 2.1 must be completed before 2.2–2.5. Stories 2.2–2.5 can be worked in any order after 2.1.
 
@@ -72,6 +74,18 @@ dev this story _bmad-output/implementation-artifacts/2-4-display-time-exclusion-
 
 ```
 dev this story _bmad-output/implementation-artifacts/2-5-historical-data-detection-and-indicators.md
+```
+
+**Story 2.6 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/2-6-fix-vitals-data-wipe-on-revalidation.md
+```
+
+**Story 2.7 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/2-7-fix-missing-prenatal-bp-validation.md
 ```
 
 ---

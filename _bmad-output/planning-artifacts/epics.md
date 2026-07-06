@@ -117,6 +117,7 @@ Reviewers can write, format, and paste content in the case narrative editor with
 
 Reviewers entering vitals data are immediately alerted when values fall outside clinical ranges, preventing unreliable data from entering graphs, tables, print, and PDF views. Existing cases with out-of-range values are flagged at review time.
 **FRs covered:** FR-2.1, FR-2.2, FR-2.3, FR-2.4, FR-2.5, FR-2.6, FR-2.7
+**Regression fixes (added 2026-07-02, found during verification):** Story 2.6 — vitals data wiped on re-validation (ER Visits & Hospitalizations, Prenatal Care Record); Story 2.7 — missing range validation for Prenatal Care Record Systolic/Diastolic BP
 
 ### Epic 3: System Configuration & Print Cleanup
 
@@ -365,6 +366,50 @@ So that I understand why those values are absent from graphs, tables, and printe
 **Given** `window.mmria_vital_sign_range` is `null`
 **When** edit mode is entered or form navigation occurs
 **Then** no re-validation runs, no modal appears, no indicators are applied
+
+### Story 2.6: Fix Vitals Data Wipe on Re-Validation
+
+_Regression fix — found during verification, 2026-07-02._
+
+As a case reviewer,
+I want previously saved out-of-range vitals values to be retained when validation rules are re-enabled and I edit other fields,
+So that historical data is never destroyed by a validation state change unrelated to that data.
+
+**Acceptance Criteria:**
+
+**Given** validation rules for all six ER Visits & Hospitalization vitals fields (Temperature, Heart Rate, Respiration, Systolic BP, Diastolic BP, Oxygen Saturation) are disabled, and a case is saved with out-of-range values in all six while disabled
+**When** the rules are re-enabled and the reviewer enters new out-of-range values in those fields
+**Then** the system shows the correct error messages for the new values, and the previously saved out-of-range values for all six fields are retained — not wiped
+
+**Given** validation rules for Prenatal Care Record's Systolic BP, Diastolic BP, Heart Rate, and Oxygen Saturation are disabled, and the form is saved with out-of-range values in all four while disabled
+**When** the rules are re-enabled and the reviewer enters new out-of-range values in Heart Rate and Oxygen Saturation
+**Then** the system shows correct error messages for Heart Rate and Oxygen Saturation, and the previously saved out-of-range values for those two fields are retained — not wiped
+
+**Given** a vitals field the reviewer is actively editing (not historical/untouched data)
+**When** the new value is out-of-range on blur/tab-out/paste
+**Then** the existing Story 2.2 behavior (clear the actively-edited field, show the field-level modal) is unchanged by this fix
+
+### Story 2.7: Fix Missing Range Validation — Prenatal Care Record BP Fields
+
+_Regression fix — found during verification, 2026-07-02._
+
+As a case reviewer,
+I want Systolic BP and Diastolic BP on the Prenatal Care Record to be validated against their configured ranges,
+So that out-of-range blood pressure values are caught and blocked, consistent with the other vitals fields already working on that page.
+
+**Acceptance Criteria:**
+
+**Given** validation rules for Prenatal Care Record's Systolic BP, Diastolic BP, Heart Rate, and Oxygen Saturation are disabled, and the form is saved with out-of-range values in all four while disabled
+**When** the rules are re-enabled and the reviewer enters new out-of-range values in all four fields
+**Then** the system displays the correct out-of-range error message for Systolic BP and Diastolic BP, matching the behavior already working for Heart Rate and Oxygen Saturation
+
+**Given** an out-of-range Systolic BP or Diastolic BP value is entered on the Prenatal Care Record once validation is fixed
+**When** validation fires
+**Then** the value is not saved to the case record unvalidated — it is handled the same way Story 2.2 handles any other out-of-range vitals field
+
+**Given** Heart Rate and Oxygen Saturation on the Prenatal Care Record already validate correctly
+**When** this fix is applied
+**Then** their validation behavior is unchanged
 
 ---
 
