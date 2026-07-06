@@ -796,3 +796,27 @@ So that I cannot accidentally open duplicate CVS windows and I know when the rep
 **Given** `window.open` returns `null` (popup blocked)
 **When** the null return is detected
 **Then** `endCvsReportRequest(id)` is called immediately — no orphaned in-progress state
+
+### Story 10.5: Config-Driven CVS Retry Constants
+
+As a system administrator,
+I want the CVS retry attempt count and delay interval to be configurable via the CouchDB configuration document,
+So that these values can be tuned per environment without a code deployment.
+
+**Acceptance Criteria:**
+
+**Given** the CouchDB configuration document
+**When** applied
+**Then** `integer_keys.shared` contains `CVS_MAX_ATTEMPTS: 10` and `CVS_RETRY_DELAY_SECONDS: 60`
+
+**Given** `CvsController.Index()` executes
+**When** the view is served
+**Then** `TempData["CVS_MAX_ATTEMPTS"]` and `TempData["CVS_RETRY_DELAY_SECONDS"]` are set using `configuration.GetInteger(key, host_prefix) ?? default` — no helper class
+
+**Given** `Views/cvs/Index.cshtml` renders
+**When** the `<head>` is emitted
+**Then** an inline `<script>` placed before the `cvs/index.js` tag emits `window.CVS_MAX_ATTEMPTS` and `window.CVS_RETRY_DELAY_SECONDS` from TempData
+
+**Given** `cvs/index.js` loads
+**When** module-level constants are evaluated
+**Then** `const CVS_MAX_ATTEMPTS = window.CVS_MAX_ATTEMPTS ?? 10` and `const CVS_RETRY_DELAY_SECONDS = window.CVS_RETRY_DELAY_SECONDS ?? 60` are used

@@ -18,6 +18,9 @@
         u => u.IsAuthenticated && 
         u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
   }
+
+  var cvs_max_attempts = TempData["CVS_MAX_ATTEMPTS"] ?? 10;
+  var cvs_retry_delay_seconds = TempData["CVS_RETRY_DELAY_SECONDS"] ?? 60;
 }
 
 <html lang="en">
@@ -39,6 +42,10 @@
 
     <script src="../scripts/mmria.js" type="text/javascript"></script>
 
+    <script>
+        window.CVS_MAX_ATTEMPTS = @cvs_max_attempts;
+        window.CVS_RETRY_DELAY_SECONDS = @cvs_retry_delay_seconds;
+    </script>
     <script src="../scripts/cvs/index.js" type="text/javascript"></script>
 
 </head>

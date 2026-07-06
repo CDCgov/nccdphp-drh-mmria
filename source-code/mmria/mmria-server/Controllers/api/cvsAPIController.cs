@@ -16,6 +16,8 @@ using Microsoft.AspNetCore.Identity;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 
+using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 using  mmria.server.extension;   
 using mmria.common.cvs;
 using mmria.server.util;
@@ -39,6 +41,7 @@ public sealed class cvsAPIController: ControllerBase
 
         public bool is_valid_address { get;set; } = true;
         public bool is_valid_year { get;set; } = true;
+        public string message { get;set; }
 
     }
 
@@ -50,16 +53,19 @@ public sealed class cvsAPIController: ControllerBase
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly System.Net.Http.HttpClient _externalHttpClient;
     private readonly mmria.common.SharedLibraries.CVS.Manager.CVSManager _cvsManager;
+    private readonly ILogger<cvsAPIController> _logger;
     public cvsAPIController
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
-        mmria.common.SharedLibraries.CVS.Manager.CVSManager cvsManager
+        mmria.common.SharedLibraries.CVS.Manager.CVSManager cvsManager,
+        ILogger<cvsAPIController> logger
     )
     {
         _couchDbHttpClient = couchDbHttpClient;
         _cvsManager = cvsManager;
+        _logger = logger;
         var httpClientFactory = new mmria.common.SimpleHttpClientFactory();
         _externalHttpClient = httpClientFactory.CreateClient("external");
         host_prefix = tenantRuntime.EffectiveHostPrefix;
@@ -169,21 +175,24 @@ public sealed class cvsAPIController: ControllerBase
                 case "dashboard":
 
                     var file_status_result = new CVS_File_Status();
+                    var dashboardStopwatch = Stopwatch.StartNew();
                     var dashboardResult = await _cvsManager.GetDashboardAsync(safePayload, cvs, db_config);
+                    dashboardStopwatch.Stop();
                     file_status_result.file_status = dashboardResult.file_status;
                     file_status_result.updated_lat = dashboardResult.updated_lat;
                     file_status_result.updated_lon = dashboardResult.updated_lon;
                     file_status_result.updated_year = dashboardResult.updated_year;
                     file_status_result.is_valid_address = dashboardResult.is_valid_address;
-                     file_status_result.is_valid_year = dashboardResult.is_valid_year;
-                     if (dashboardResult.PdfBytes != null)
-                     {
-                         var file_name = GetCvsPdfFileName(safePayload.id);
-                         await using var fileStream = ContainedPathHelper.OpenContainedWriteStream(folder_name, file_name);
-                         await fileStream.WriteAsync(dashboardResult.PdfBytes, 0, dashboardResult.PdfBytes.Length);
-                     }
+                    file_status_result.is_valid_year = dashboardResult.is_valid_year;
+                    file_status_result.message = dashboardResult.message;
+                    if (dashboardResult.PdfBytes != null)
+                    {
+                        var file_name = GetCvsPdfFileName(safePayload.id);
+                        await using var fileStream = ContainedPathHelper.OpenContainedWriteStream(folder_name, file_name);
+                        await fileStream.WriteAsync(dashboardResult.PdfBytes, 0, dashboardResult.PdfBytes.Length);
+                    }
                     result = Ok(file_status_result);
-                    
+                    _logger.LogInformation("CVS dashboard request completed. status={Status} duration_ms={DurationMs}", file_status_result.file_status ?? "unknown", dashboardStopwatch.ElapsedMilliseconds);
                     break;
             }
         }

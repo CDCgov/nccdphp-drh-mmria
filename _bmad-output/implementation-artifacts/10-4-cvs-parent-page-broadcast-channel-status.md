@@ -200,3 +200,30 @@ if (!reportWindow) {
 
 - Depends on Story 10.3 — `post_cvs_status` and the BroadcastChannel message schema are defined there.
 - Independent of Stories 10.1 and 10.2.
+
+---
+
+## File List
+
+| File | Change |
+|------|--------|
+| `source-code/mmria/mmria-server/wwwroot/scripts/mmria.js` | Added `cvsReportControls`, `cvsReportTerminalStatuses`, `cvsReportButtonFallbackMs`, `cvsReportChannel`, `getCvsReportKey`, `setControlText`, `beginCvsReportRequest`, `endCvsReportRequest` to the module closure; initialized `BroadcastChannel('cvs_channel')` once; updated `get_cvs_api_dashboard_info` to add `p_control` parameter, use `URLSearchParams`, call `beginCvsReportRequest`/`endCvsReportRequest`, handle null `window.open` return; updated all four `get_cvs_api_dashboard_info` call sites in `dc_plc_cvs_button_click` and `cvs_view_community_vital_signs_button_click` to pass `p_control` |
+
+---
+
+## Dev Agent Record
+
+### Completion Notes
+
+- AC-1: `beginCvsReportRequest` disables control, sets `aria-busy="true"`, sets label to "Generating…"
+- AC-2: `cvsReportChannel.onmessage` calls `endCvsReportRequest` on terminal statuses (`ready`, `failed`, `max_retries`, `validation_error`), which re-enables the button, removes `aria-busy`, and restores original label
+- AC-3: `cvsReportControls` is a `Map` keyed by `getCvsReportKey(recordId)` — each record tracked independently
+- AC-4: `setTimeout(…, cvsReportButtonFallbackMs)` (20 min) stored in `state.fallbackTimerId` fires `endCvsReportRequest` if no BroadcastChannel message arrives
+- AC-5: `clearTimeout(state.fallbackTimerId)` is called at the top of `endCvsReportRequest` before restoring the button
+- AC-6: `window.open` return value is checked; if falsy, `endCvsReportRequest(id)` is called immediately
+- AC-7: URL is built with `new URLSearchParams({ lat, lon, year, id })` — raw string concatenation removed
+- AC-8: `cvsReportChannel = new BroadcastChannel('cvs_channel')` is initialized once in the module closure before `return {`
+
+### Change Log
+
+- 2026-07-06: Implemented Story 10.4 — CVS parent-page button state via BroadcastChannel
