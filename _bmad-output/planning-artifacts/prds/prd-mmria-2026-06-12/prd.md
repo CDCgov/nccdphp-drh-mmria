@@ -2,7 +2,7 @@
 title: "PRD: MMRIA V4.1"
 status: final
 created: 2026-06-12
-updated: 2026-07-06 (FR-11 added — CVS PDF Export Tool Reliability)
+updated: 2026-07-06 (FR-11 added — CVS PDF Export Tool Reliability; FR-11.3 updated — retry constants are config-driven)
 ---
 
 # PRD: MMRIA V4.1
@@ -349,6 +349,8 @@ The CVS page polling loop retries automatically when the service reports `"gener
 - Shows attempt progress: _"Generating PDF... Checking Community Vital Signs service, attempt N of MAX."_
 - On exhausting all attempts without a terminal result, displays a **Try again** button that restarts the polling loop without requiring a page refresh.
 - A `g_is_running` guard prevents concurrent polling runs if the user clicks **Try again** before the current run finalizes.
+
+`CVS_MAX_ATTEMPTS` and `CVS_RETRY_DELAY_SECONDS` are read from the CouchDB configuration document at request time via `CvsController.Index()` and emitted into the page as `window` globals. Default values (10 attempts, 60-second delay) are applied when the keys are absent from the configuration document. No helper class is required — the controller follows the inline `configuration.GetInteger(key, host_prefix) ?? default` / `TempData` pattern used throughout the application.
 
 **FR-11.4 — Status Feedback and Parent-Page Button State**
 The CVS page and the parent case page maintain consistent, user-visible status:

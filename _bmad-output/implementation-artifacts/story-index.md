@@ -278,12 +278,14 @@ dev this story _bmad-output/implementation-artifacts/9-2-fix-manage-users-export
 | Story                                                         | File                                                   | Status |
 | ------------------------------------------------------------- | ------------------------------------------------------ | ------ |
 | 10.1 Fix BatchSupervisor Busy-Wait CPU Spin                   | `10-1-fix-cvs-batch-supervisor-busy-wait.md`           | done   |
-| 10.2 Server-Side CVS Error Hardening                          | `10-2-server-side-cvs-error-hardening.md`              | done   |
-| 10.3 Client-Side CVS Retry Mechanism with Countdown           | `10-3-client-side-cvs-retry-mechanism.md`              | done   |
+| 10.2 Server-Side CVS Error Hardening                          | `10-2-server-side-cvs-error-hardening.md`              | review |
+| 10.3 Client-Side CVS Retry Mechanism with Countdown           | `10-3-client-side-cvs-retry-mechanism.md`              | review |
 | 10.4 CVS Parent-Page Button State via BroadcastChannel        | `10-4-cvs-parent-page-broadcast-channel-status.md`     | review |
+| 10.5 Config-Driven CVS Retry Constants                        | `10-5-config-driven-cvs-retry-constants.md`            | not-started |
 
 > ℹ️ Stories 10.1 and 10.2 are independent of each other and of 10.3/10.4.
 > ⚠️ Story 10.4 depends on Story 10.3 — `post_cvs_status` and the BroadcastChannel message schema are defined in 10.3.
+> ⚠️ Story 10.5 depends on Story 10.3 — the constants being made configurable are defined there.
 
 **Story 10.1 prompt:**
 
@@ -309,6 +311,12 @@ dev this story _bmad-output/implementation-artifacts/10-3-client-side-cvs-retry-
 dev this story _bmad-output/implementation-artifacts/10-4-cvs-parent-page-broadcast-channel-status.md
 ```
 
+**Story 10.5 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/10-5-config-driven-cvs-retry-constants.md
+```
+
 ---
 
 ## Open Items — Resolve Before Affected Story
@@ -318,7 +326,7 @@ dev this story _bmad-output/implementation-artifacts/10-4-cvs-parent-page-broadc
 | OI-3     | Story 1.1             | **Resolved** — Implementation complete; going to formal verification.                                                                                                                                                                                                                                                                                                                                  |
 | OI-4     | Story 2.2             | **Resolved** — Vitals input `name` attributes confirmed during Story 2.2 implementation.                                                                                                                                                                                                                                                                                                               |
 | OI-5     | Stories 3.1, 3.2      | **Resolved** — Controller actions confirmed during Story 3.1/3.2 implementation.                                                                                                                                                                                                                                                                                                                       |
-| OI-5-CVS | Stories 10.3          | Confirm final values of `CVS_MAX_ATTEMPTS` and `CVS_RETRY_DELAY_SECONDS` with the program team before release. Current implementation uses compile-time constants in `cvs/index.js`.                                                                                                                                                                                                                   |
+| OI-5-CVS | Stories 10.3, 10.5    | **Resolved** — Constants are config-driven via `integer_keys.shared` in the CouchDB config document (Story 10.5). Defaults: 10 attempts, 60-second delay (changed from 30s branch value per FR-11.3).                                                                                                                                                                             |
 | OI-dev-B | Story 2.5             | **Resolved** — Edit-mode hook confirmed during Story 2.5 implementation.                                                                                                                                                                                                                                                                                                                               |
 | OI-dev-C | Story 2.5             | **Resolved** — Chart.js DOM target confirmed during Story 2.5 implementation.                                                                                                                                                                                                                                                                                                                          |
 | OI-PRD-4 | Stories 4.0, 4.1, 5.1 | **Resolved** — Dedicated version-scoped `case-validation-rules` CouchDB document; `severity: hard` for active-input blur; `severity: warning` for historical load-time scan; soft-acknowledgment print gate (UI-only, no persist); POC `CaseValidationManager` field_rules path ported in Story 4.0 (vitals-scoped). FR-2.1, FR-2.3, FR-2.6, FR-6 updated in PRD. Stories 4.0, 4.1, and 5.1 unblocked. |
