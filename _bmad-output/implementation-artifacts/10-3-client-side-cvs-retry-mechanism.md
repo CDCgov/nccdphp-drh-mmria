@@ -6,7 +6,7 @@ baseline_commit: cb40e16bdf2867eb10a552897456c446bbde041f
 
 **Epic:** 10 — CVS PDF Export Tool Reliability
 **Story ID:** 10.3
-**Status:** review
+**Status:** done
 **Date added:** 2026-07-06
 
 ---
@@ -141,3 +141,30 @@ function post_cvs_status(status) { /* BroadcastChannel — see Story 10.4 */ }
 
 - Story 10.2 (server error hardening) should be merged first so the `message` field and improved `file_status` values are available for client testing, but Story 10.3 is not strictly blocked by 10.2 — the client handles unknown statuses gracefully.
 - Story 10.4 depends on Story 10.3 (`post_cvs_status` is defined here and consumed there).
+
+---
+
+## Dev Agent Record
+
+### Completion Notes
+
+All 10 ACs implemented in `source-code/mmria/mmria-server/wwwroot/scripts/cvs/index.js`:
+
+- AC-1: `while(!is_finished)` loop replaced with `for (let attempt = 1; attempt <= CVS_MAX_ATTEMPTS; attempt++)`.
+- AC-2: `show_active_request(header, el, attempt)` called at the start of each iteration with required text.
+- AC-3: `wait_for_next_attempt` uses `setInterval` / `g_countdown_timer`; `update_countdown_message` fires each second.
+- AC-4: After loop exhaustion, spinner shows close + enabled Try again button; `post_cvs_status("max_retries")` broadcast; focus moved to try_again_button.
+- AC-5: `try_again_button_click` renders disabled Try again button immediately, then calls `run_cvs_report_polling(..., false)`.
+- AC-6: `g_is_running` guard returns early on concurrent call.
+- AC-7: `finally` block resets `g_is_running` and clears `g_countdown_timer`.
+- AC-8: `normalize_file_status` returns `String(file_status).trim().toLowerCase()` or `""` for null/undefined; all branching uses normalized value.
+- AC-9: `get_cvs_api_dashboard_info` checks `!response.ok` and returns synthetic `{ file_status: "unavailable"|"error", status, detail }`.
+- AC-10: `catch(ex)` returns `{ file_status: "unavailable", detail: ex.message || String(ex) }`.
+
+`post_cvs_status` stub (`bc.postMessage({ type: "cvs_status", status })`) defined for Story 10.4 consumption.
+
+### Change Log
+
+| File | Change |
+|------|--------|
+| `source-code/mmria/mmria-server/wwwroot/scripts/cvs/index.js` | Full rewrite of polling logic: bounded `for` loop, countdown timer, try-again mechanism, concurrency guard, status normalization, HTTP error handling |
