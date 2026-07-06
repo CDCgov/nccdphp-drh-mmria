@@ -190,6 +190,76 @@ var $mmria = function()
 
     setupAntiforgery();
 
+    // CVS report button-state tracking
+    const cvsReportControls = new Map();
+    const cvsReportTerminalStatuses = new Set(["ready", "failed", "max_retries", "validation_error"]);
+    const cvsReportButtonFallbackMs = 20 * 60 * 1000;
+    let cvsReportChannel = null;
+
+    const getCvsReportKey = (recordId) => String(recordId ?? '').trim().toLowerCase();
+
+    const setControlText = (control, text) => {
+        if (!control) return;
+        if ("value" in control) { control.value = text; }
+        else { control.textContent = text; }
+    };
+
+    const beginCvsReportRequest = (recordId, control) => {
+        const key = getCvsReportKey(recordId);
+        let state = cvsReportControls.get(key);
+        if (!state) {
+            state = {
+                control,
+                originalText: control?.value ?? control?.textContent,
+                fallbackTimerId: null
+            };
+            cvsReportControls.set(key, state);
+        } else {
+            state.control = control;
+        }
+        if (control) {
+            control.disabled = true;
+            if (typeof control.setAttribute === "function") {
+                control.setAttribute("aria-busy", "true");
+            }
+            setControlText(control, "Generating\u2026");
+        }
+        state.fallbackTimerId = setTimeout(() => endCvsReportRequest(recordId), cvsReportButtonFallbackMs);
+    };
+
+    const endCvsReportRequest = (recordId) => {
+        const key = getCvsReportKey(recordId);
+        const state = cvsReportControls.get(key);
+        if (!state) return;
+        if (state.fallbackTimerId != null) {
+            clearTimeout(state.fallbackTimerId);
+            state.fallbackTimerId = null;
+        }
+        if (state.control) {
+            state.control.disabled = false;
+            if (typeof state.control.removeAttribute === "function") {
+                state.control.removeAttribute("aria-busy");
+            }
+            setControlText(state.control, state.originalText);
+        }
+        cvsReportControls.delete(key);
+    };
+
+    // Initialize BroadcastChannel once for CVS report status
+    cvsReportChannel = new BroadcastChannel('cvs_channel');
+    cvsReportChannel.onmessage = (event) => {
+        const message = event.data;
+        if (!message || message.type !== "cvs-report-status") return;
+        if (message.status === "started") {
+            const state = cvsReportControls.get(getCvsReportKey(message.record_id));
+            if (state?.control) { beginCvsReportRequest(message.record_id, state.control); }
+            return;
+        }
+        if (cvsReportTerminalStatuses.has(message.status)) {
+            endCvsReportRequest(message.record_id);
+        }
+    };
+
     return {
         escapeHtml: escapeHtml,
         get_request_verification_token: getRequestVerificationToken,
@@ -252,7 +322,8 @@ var $mmria = function()
                     lat,
                     lon,
                     year,
-                    record_id
+                    record_id,
+                    p_control
                 );
 
             }
@@ -311,7 +382,8 @@ var $mmria = function()
                             lat,
                             lon,
                             year,
-                            record_id
+                            record_id,
+                            p_control
                         );
                     }
                 }
@@ -333,7 +405,8 @@ var $mmria = function()
                     lat,
                     lon,
                     year,
-                    record_id
+                    record_id,
+                    p_control
                 );
 
             }
@@ -375,7 +448,8 @@ var $mmria = function()
                             lat,
                             lon,
                             year,
-                            record_id
+                            record_id,
+                            p_control
                         );
                     }
                 }
@@ -686,18 +760,24 @@ var $mmria = function()
             lon, 
             year,
             id,
+            p_control,
             p_success_call_back,
             p_error_call_back
         )
         {           
-            
-            http://localhost:12345/community-vital-signs?lat=33.880577&lon=-84.29106&year=2012&id=GA-2012-1234
+            const query = new URLSearchParams({
+                lat: lat ?? "",
+                lon: lon ?? "",
+                year: year ?? "",
+                id: id ?? ""
+            });
+            const base_url = `${location.protocol}//${location.host}/community-vital-signs?${query.toString()}`;
 
-
-
-            var base_url = `${location.protocol}//${location.host}/community-vital-signs?lat=${lat}&lon=${lon}&year=${year}&id=${id}`
-
-            window.open(base_url, target=id)
+            beginCvsReportRequest(id, p_control);
+            const reportWindow = window.open(base_url, id);
+            if (!reportWindow) {
+                endCvsReportRequest(id);
+            }
 /*
             fetch
             (
