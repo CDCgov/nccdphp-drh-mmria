@@ -2,7 +2,7 @@
 title: "PRD: MMRIA V4.1"
 status: final
 created: 2026-06-12
-updated: 2026-06-25 (FR-9 added — Data Summary Checks field filter bug)
+updated: 2026-07-06 (FR-11 added — CVS PDF Export Tool Reliability)
 ---
 
 # PRD: MMRIA V4.1
@@ -318,6 +318,49 @@ When an admin has applied a Role or Username filter on the Manage Users page, cl
 
 ---
 
+### FR-11 — CVS PDF Export Tool Reliability
+
+The Community Vital Signs (CVS) PDF export tool periodically fails when the external CVS service is unavailable, still generating the report, or returns unexpected responses. V4.1 hardens the integration at the services, server, and client layers; introduces an automatic retry mechanism with user-visible countdown; and improves status feedback to the user and the parent page.
+
+**FR-11.1 — Services Layer: Replace Busy-Wait with Async Delay**
+The `BatchSupervisor` actor in mmria-services replaces the 40-second busy-wait loop — which caused 100% CPU spin — with `await Task.Delay`. The actor's initial batch-list load is moved out of the constructor into a deferred `PreStart` → async message pattern using `IWithStash` so that construction does not block on a CouchDB round-trip and incoming messages are held in the stash until initialization completes.
+
+**FR-11.2 — Server-Side Error Hardening**
+`CVSManager.GetDashboardAsync` returns a structured result for all failure conditions rather than allowing exceptions to propagate unhandled. The result carries both a `file_status` field and a human-readable `message` field. The following failure conditions are handled explicitly:
+
+| Failure condition | `file_status` | `message` |
+|---|---|---|
+| `HttpRequestException` or `TaskCanceledException` | `"unavailable"` | "The CVS service did not respond." |
+| HTTP 5xx / 408 / 429 | `"unavailable"` | "The CVS service returned HTTP {code}." |
+| Other non-2xx HTTP status | `"error"` | "The CVS service returned HTTP {code}." |
+| Empty or whitespace response body | `"unavailable"` | "The CVS service returned an empty response." |
+| JSON parse failure — body matches generating pattern | `"generating"` | "The CVS service is preparing the PDF." |
+| JSON parse failure — body matches unavailable pattern | `"unavailable"` | "The CVS service is unavailable." |
+| JSON parse failure — other | `"error"` | "The CVS service returned an unexpected response." |
+| Base64 decode failure | `"error"` | "The CVS service returned an invalid PDF response." |
+
+The `message` field is propagated through the API controller to the client response.
+
+**FR-11.3 — Client-Side Retry Mechanism**
+The CVS page polling loop retries automatically when the service reports `"generating"` or `"unavailable"`. The loop behavior:
+
+- Makes up to `CVS_MAX_ATTEMPTS` total attempts before stopping.
+- Waits `CVS_RETRY_DELAY_SECONDS` between attempts and displays a live second-by-second countdown to the user.
+- Shows attempt progress: _"Generating PDF... Checking Community Vital Signs service, attempt N of MAX."_
+- On exhausting all attempts without a terminal result, displays a **Try again** button that restarts the polling loop without requiring a page refresh.
+- A `g_is_running` guard prevents concurrent polling runs if the user clicks **Try again** before the current run finalizes.
+
+**FR-11.4 — Status Feedback and Parent-Page Button State**
+The CVS page and the parent case page maintain consistent, user-visible status:
+
+- The `message` field returned by the server is included in the activity log rendered on the CVS page.
+- The CVS page broadcasts structured status events to the parent page via `BroadcastChannel('cvs_channel')`: `"started"`, `"ready"`, `"failed"`, `"max_retries"`, `"validation_error"`.
+- The parent page button that opened the CVS window is disabled (`aria-busy="true"`) while a report is in progress and re-enabled when a terminal status is received.
+- A fallback timer (20 minutes) re-enables the button if no terminal BroadcastChannel message is received — for example, when the CVS window is closed unexpectedly.
+- The server logs a structured telemetry entry on each completed request: `"CVS dashboard request completed. status={Status} duration_ms={DurationMs}"`.
+
+---
+
 **NFR-1 — Browser support**
 All changes must function correctly in Microsoft Edge and Google Chrome. No other browsers are in scope.
 
@@ -340,6 +383,7 @@ Before V4.2 production deployment, the project SHALL establish and document a ru
 | Admin UI scope                    | Configuration updates for OMB date and MMRIA version are developer-managed via CouchDB document and production script only. The `field-validation-rules` document is also developer-managed for V4.1. The rule management admin UI delivered by the POC (`/case_validation_metadata`) is operator tooling available in V4.1 but is not a V4.1 end-user deliverable and has no formal acceptance criteria in this sprint — acceptance criteria will be added in V4.2. |
 | Existing out-of-range vitals data | Historical out-of-range vitals values are not cleared or corrected. They are surfaced as `severity: warning` in the Validation Errors Panel (FR-6) and trigger the soft-acknowledgment print gate path. The stored database value is not modified.                                                                                                                                                                                                                   |
 | PMSS dropdowns                    | PMSS-related print dropdowns must not be modified.                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| CVS retry constants               | `CVS_MAX_ATTEMPTS` and `CVS_RETRY_DELAY_SECONDS` are compile-time constants in `cvs/index.js` for V4.1. They are not runtime-configurable via CouchDB in this release.                                                                                                                                                                                                                                                                                               |
 
 ---
 
@@ -351,3 +395,4 @@ Before V4.2 production deployment, the project SHALL establish and document a ru
 | OI-2 | Three specific print dropdown render locations for `core-summary` need identification | No           | Developer           | Identify all client-side render sites before FR-4 implementation                                                                                                                                                                                                                                                                                                                                                             |
 | OI-3 | FR-1.1 prior fix status                                                               | **Resolved** | Developer           | Implementation complete; going to formal verification.                                                                                                                                                                                                                                                                                                                                                                       |
 | OI-4 | Validation mode design discussion                                                     | **Resolved** | Architect + Analyst | Validation mode is implemented as a `severity` property (`hard` \| `soft`) on each rule in a dedicated version-scoped `case-validation-rules-{metadata_version}` CouchDB document; no user-facing mode toggle exists; active-input hard validation clears fields on blur; historical data is downgraded to `warning` at load time; soft-warning acknowledgment is UI-only with no case-document persistence. FR-2.3 updated. |
+| OI-5 | CVS retry constant values (`CVS_MAX_ATTEMPTS`, `CVS_RETRY_DELAY_SECONDS`)             | No           | Developer           | Confirm final values with program team before release. Current implementation uses compile-time constants; confirm whether runtime configurability is needed for V4.2.                                                                                                                                                                                                                                                        |

@@ -105,6 +105,10 @@ FR-8.6: Epic 8 — Login page server-side offline check
 FR-8.7: Epic 8 — Installation admin page for offline config
 FR-9.1: Standalone Bug Fix — Data Summary Checks "ALL" toggle scoped to selected Form
 FR-10.1: Standalone Bug Fix — Manage Users Export scoped to active filter
+FR-11.1: Epic 10 — Fix BatchSupervisor busy-wait CPU spin (mmria-services)
+FR-11.2: Epic 10 — Server-side CVS structured error handling (CVSManager, CVSDAL, CVSModels, cvsAPIController)
+FR-11.3: Epic 10 — Client-side CVS retry loop with countdown and try-again button
+FR-11.4: Epic 10 — BroadcastChannel CVS status and parent-page button state (mmria.js)
 
 ## Epic List
 
@@ -132,6 +136,11 @@ Admin actions that modify case data or case lifecycle state are fully captured i
 
 Installation administrators can schedule a planned system outage. Logged-in users receive advance warning, are guided to save their work and sign out before the system goes offline, and are prevented from logging in once the offline date is reached.
 **FRs covered:** FR-8.1, FR-8.2, FR-8.3, FR-8.4, FR-8.5, FR-8.6, FR-8.7
+
+### Epic 10: CVS PDF Export Tool Reliability
+
+The Community Vital Signs PDF export tool is hardened against transient failures at every layer — services, server, and client. Users receive actionable status messages, automatic retries with visible countdown, and a "Try again" path instead of a browser refresh. The parent case page button reflects in-progress state via BroadcastChannel.
+**FRs covered:** FR-11.1, FR-11.2, FR-11.3, FR-11.4
 
 - FR-10: Client-side only. In `export_user_list_click()` in `manage-users/index.js`, replace the join target from `g_ui.user_summary_list` to `g_filtered_user_list`. No server-side changes.
 
@@ -685,3 +694,105 @@ So that my data summary reflects the correct form-scoped fields and not all fiel
 **Given** the fix is validated in Edge and Chrome (NFR-1)
 **When** tested in both browsers
 **Then** behavior is consistent and correct in both
+
+---
+
+## Epic 10: CVS PDF Export Tool Reliability
+
+The Community Vital Signs PDF export tool is hardened against transient failures at every layer — services, server, and client. Users receive actionable status messages, automatic retries with visible countdown, and a "Try again" path instead of a browser refresh. The parent case page button reflects in-progress state via BroadcastChannel.
+
+### Story 10.1: Fix BatchSupervisor Busy-Wait CPU Spin
+
+As a system operator,
+When the CVS service is not yet available at startup,
+I want the mmria-services BatchSupervisor to wait without consuming CPU,
+So that the server remains responsive while retrying the CVS ping.
+
+**Acceptance Criteria:**
+
+**Given** the CVS service ping returns a non-ready result
+**When** BatchSupervisor waits before the next retry
+**Then** the wait is `await Task.Delay(CvsServerRetryDelayMs)` — not a spin loop — and CPU utilization during the wait is negligible
+
+**Given** `BatchSupervisor` previously called `GetBatchSet(...).Result` synchronously inside its constructor
+**When** the actor is created
+**Then** the constructor no longer blocks on a CouchDB round-trip; the batch-list load is deferred via `Self.Tell(InitializeBatchList.Instance)` in `PreStart()`
+
+**Given** a message arrives before the initial batch-list load has finished
+**When** `BatchSupervisor` receives it in the `Initializing` behavior
+**Then** the message is stashed; after `GetBatchSet` returns, `Become(Ready)` and `Stash.UnstashAll()` are called so no messages are lost
+
+**Given** `GetBatchSet` throws during initialization
+**When** the exception is caught
+**Then** the actor logs the error, transitions to `Ready`, and releases the stash — subsequent messages are handled normally
+
+### Story 10.2: Server-Side CVS Error Hardening
+
+As a case reviewer generating a CVS PDF,
+When the external CVS service fails for any reason,
+I want the server to return a structured, descriptive result instead of an unhandled exception,
+So that the client can display a meaningful message and react appropriately.
+
+**Acceptance Criteria:**
+
+**Given** any failure condition (network error, non-2xx HTTP, empty body, JSON parse error, Base64 decode error)
+**When** `CVSManager.GetDashboardAsync` encounters it
+**Then** a `CVSFileStatusResult` is returned with appropriate `file_status` and human-readable `message` — no unhandled exception propagates
+
+**Given** the `message` field is set on `CVSFileStatusResult`
+**When** `cvsAPIController` builds the response
+**Then** `file_status_result.message = dashboardResult.message` is mapped and serialized in the JSON response
+
+**Given** a CVS dashboard request completes
+**When** the controller logs it
+**Then** a structured log entry is written: `"CVS dashboard request completed. status={Status} duration_ms={DurationMs}"`
+
+### Story 10.3: Client-Side CVS Retry Mechanism with Countdown
+
+As a case reviewer generating a CVS PDF,
+When the service is still preparing the report,
+I want the page to automatically retry and show me a countdown between attempts,
+So that I don't have to refresh the browser and I can see the system is actively working.
+
+**Acceptance Criteria:**
+
+**Given** the CVS page starts polling
+**When** `run_cvs_report_polling` executes
+**Then** polling is a bounded `for` loop up to `CVS_MAX_ATTEMPTS` — not a `while (!is_finished)` loop
+
+**Given** the service returns `"generating"` or `"unavailable"` and more attempts remain
+**When** `wait_for_next_attempt` is called
+**Then** a live countdown (`CVS_RETRY_DELAY_SECONDS` down to 0) is shown in the UI; the retry fires automatically when the countdown reaches zero
+
+**Given** max attempts are exhausted without a terminal result
+**When** the loop exits
+**Then** a **Try again** button is shown; clicking it restarts the loop without a page refresh
+
+**Given** a polling run is already in progress
+**When** `run_cvs_report_polling` is called again
+**Then** the second call returns immediately (`g_is_running` guard)
+
+### Story 10.4: CVS Parent-Page Button State via BroadcastChannel
+
+As a case reviewer on the case form,
+When I click the CVS report button and the report is generating in a separate tab,
+I want the button to show it is busy and re-enable automatically when the report finishes,
+So that I cannot accidentally open duplicate CVS windows and I know when the report is ready.
+
+**Acceptance Criteria:**
+
+**Given** the user clicks a CVS report button
+**When** `beginCvsReportRequest(record_id, p_control)` is called
+**Then** the button is disabled, `aria-busy="true"` is set, and the label changes to indicate in-progress state
+
+**Given** the CVS window broadcasts a terminal status (`"ready"`, `"failed"`, `"max_retries"`, `"validation_error"`)
+**When** the `BroadcastChannel('cvs_channel')` message handler receives it
+**Then** the matching button is re-enabled, `aria-busy` is removed, and the original label is restored
+
+**Given** no terminal BroadcastChannel message arrives within 20 minutes
+**When** the fallback timer fires
+**Then** the button is re-enabled automatically
+
+**Given** `window.open` returns `null` (popup blocked)
+**When** the null return is detected
+**Then** `endCvsReportRequest(id)` is called immediately — no orphaned in-progress state
