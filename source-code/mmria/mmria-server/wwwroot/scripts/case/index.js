@@ -1152,16 +1152,29 @@ async function g_set_data_object_from_path
     if (window.mmria_validation_rules && metadata.type && metadata.type.toLowerCase() === 'number' && value !== '') {
       var _dpath = p_dictionary_path ? p_dictionary_path.replace(/^\//, '') : '';
       var _rangeRule = _dpath ? window.mmria_validation_rules[_dpath] : null;
+      // Normalized-path fallback: strip array indices from _dpath and compare against rule field_path keys.
+      // This is form-scoped (matches by full path minus indices, not just field name), preventing
+      // cross-form rule bleeding where an enabled rule on Form A would fire on Form B's same-named
+      // field when Form B's own rule is disabled (Bug #4 fix).
+      if (!_rangeRule && _dpath) {
+        var _dnorm = _dpath.replace(/\/\d+/g, '');
+        for (var _rk2 in window.mmria_validation_rules) {
+          if (_dnorm.endsWith(_rk2) || _rk2.endsWith(_dnorm)) {
+            _rangeRule = window.mmria_validation_rules[_rk2]; break;
+          }
+        }
+      }
       var _numVal = parseFloat(value);
       if (_rangeRule && !isNaN(_numVal) &&
           (_numVal < parseFloat(_rangeRule.min_value) || _numVal > parseFloat(_rangeRule.max_value))) {
-        // Only block and clear if the user actually changed the value.
+        // Only block if the user actually changed the value.
         // If the stored value is already the same (historical invalid data), leave it alone.
         var _storedNum = parseFloat(current_value);
         var _isNewValue = isNaN(_storedNum) || _numVal !== _storedNum;
         if (_isNewValue) {
           var _ctrlEl = document.getElementById(convert_object_path_to_jquery_id(p_object_path) + '_control');
-          if (_ctrlEl) { _ctrlEl.value = ''; }
+          // Restore the previously stored value instead of blanking the field (fixes Bug #1 and Bug #2).
+          if (_ctrlEl) { _ctrlEl.value = (current_value !== null && current_value !== undefined) ? String(current_value) : ''; }
           if (typeof mmria_vitals_show_field_modal === 'function') {
             mmria_vitals_show_field_modal(_rangeRule, _ctrlEl || { focus: function(){} });
           }

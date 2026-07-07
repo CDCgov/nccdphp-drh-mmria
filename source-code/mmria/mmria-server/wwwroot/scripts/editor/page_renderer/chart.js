@@ -284,18 +284,33 @@ function mmria_vitals_validate_field(inputEl)
 {
     if (!window.mmria_validation_rules) { return; }
     var fieldName = inputEl.name;
+    var chartFormPath = (inputEl.dataset && inputEl.dataset.chartFormPath) ? inputEl.dataset.chartFormPath : null;
     var rule = null;
-    // Try to find a rule by searching for a matching field path ending
-    if (window.mmria_validation_rules[fieldName]) {
-        rule = window.mmria_validation_rules[fieldName];
-    } else {
+
+    if (chartFormPath) {
+        // Form-scoped lookup: match only rules whose field_path prefix equals chartFormPath.
+        // Prevents an enabled rule on Form A from firing on Form B's same-named field (Bug #4).
         for (var key in window.mmria_validation_rules) {
-            if (key.endsWith('/' + fieldName) || key === fieldName) {
-                rule = window.mmria_validation_rules[key];
-                break;
+            var kParts = key.split('/');
+            if (kParts[kParts.length - 1] !== fieldName) { continue; }
+            var kPrefix = kParts.slice(0, -1).join('/');
+            if (kPrefix === chartFormPath) { rule = window.mmria_validation_rules[key]; break; }
+        }
+    } else {
+        // No form context (e.g. called from validation-state.js focusout on a non-chart input).
+        // Non-chart saves are separately guarded by the normalized-path lookup in index.js Block 2.
+        if (window.mmria_validation_rules[fieldName]) {
+            rule = window.mmria_validation_rules[fieldName];
+        } else {
+            for (var key2 in window.mmria_validation_rules) {
+                if (key2.endsWith('/' + fieldName) || key2 === fieldName) {
+                    rule = window.mmria_validation_rules[key2];
+                    break;
+                }
             }
         }
     }
+
     if (!rule) { return; }
     if (inputEl.value === '' || inputEl.value === null) { return; }
     // Skip the modal if the value has not changed from the originally rendered value
@@ -864,11 +879,17 @@ function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obj
         " if (!chartEl) { return; }" +
         " var parent = chartEl.parentElement;" +
         " if (!parent) { return; }" +
+        // Compute the form path prefix for rule scoping: strip array indices so
+        // 'er_visit_and_hospital_medical_records/0/vital_signs' becomes
+        // 'er_visit_and_hospital_medical_records/vital_signs', matching the
+        // field_path prefix used in mmria_validation_rules keys (Bug #4 fix).
+        " var chartFormPath = '" + p_object_path.replace(/\/\d+/g, '') + "';" +
         " var inputs = parent.querySelectorAll('input.number');" +
         " for (var i = 0; i < inputs.length; i++) {" +
         "  var inp = inputs[i];" +
         "  if (inp.dataset.vitalsValidationAttached) { continue; }" +
         "  inp.dataset.vitalsValidationAttached = '1';" +
+        "  inp.dataset.chartFormPath = chartFormPath;" +
         "  inp.addEventListener('blur', function(e) { mmria_vitals_validate_field(e.target); });" +
         "  inp.addEventListener('keydown', function(e) { if (e.key === 'Tab') { mmria_vitals_validate_field(e.target); } });" +
         "  inp.addEventListener('paste', (function(t) { return function() { setTimeout(function() { mmria_vitals_validate_field(t); }, 0); }; })(inp));" +

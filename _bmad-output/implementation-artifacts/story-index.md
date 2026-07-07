@@ -41,8 +41,9 @@ dev this story _bmad-output/implementation-artifacts/1-3-update-case-narrative-i
 | 2.3 Display-Time Exclusion — Print, PDF, Date Fix        | `2-3-display-time-exclusion-print-pdf-date-fix.md`      | verification |
 | 2.4 Display-Time Exclusion — Graph and Table Views       | `2-4-display-time-exclusion-graph-and-table.md`         | verification |
 | 2.5 Historical Data Detection and Record Indicators      | `2-5-historical-data-detection-and-indicators.md`       | verification |
+| 2.6 Vitals Validation Bug Fixes — Data Retention and Prenatal Coverage | `2-6-vitals-validation-bug-fixes.md` | draft |
 
-> ⚠️ **Epic 2 sequencing:** Story 2.1 must be completed before 2.2–2.5. Stories 2.2–2.5 can be worked in any order after 2.1.
+> ⚠️ **Epic 2 sequencing:** Story 2.1 must be completed before 2.2–2.5. Stories 2.2–2.5 can be worked in any order after 2.1. Story 2.6 depends on 2.2 and 2.4 being complete.
 
 **Story 2.1 prompt:**
 
@@ -72,6 +73,12 @@ dev this story _bmad-output/implementation-artifacts/2-4-display-time-exclusion-
 
 ```
 dev this story _bmad-output/implementation-artifacts/2-5-historical-data-detection-and-indicators.md
+```
+
+**Story 2.6 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/2-6-vitals-validation-bug-fixes.md
 ```
 
 ---
