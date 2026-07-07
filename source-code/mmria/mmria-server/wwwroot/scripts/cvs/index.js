@@ -10,6 +10,15 @@ var g_countdown_timer = null;
 const CVS_MAX_ATTEMPTS = window.CVS_MAX_ATTEMPTS ?? 10;
 const CVS_RETRY_DELAY_SECONDS = window.CVS_RETRY_DELAY_SECONDS ?? 60;
 
+// CVS_FORCE_MODE — append ?cvs_force_mode=N (or &cvs_force_mode=N) to the CVS popup URL to force a specific scenario.
+// Useful for UX testing and demo. Survives F5 since it lives in the URL.
+//   1 = Error              — stops immediately with error message
+//   2 = Retrying           — returns unavailable on every attempt; shows countdown
+//                            (tip: also add &cvs_retry_delay_seconds=5 to speed up)
+//   3 = Retry limit exceeded — same response as 2; combine with &cvs_max_attempts=2 to reach limit quickly
+//   4 = Success            — returns file ready; shows download button (no real PDF is produced)
+const CVS_FORCE_MODE = new URLSearchParams(window.location.search).get('cvs_force_mode');
+
 const bc = new BroadcastChannel('cvs_channel');
 bc.onmessage = (message_data) => {
 
@@ -105,7 +114,7 @@ async function run_cvs_report_polling(header, el, spinner, report_output_element
             else if (file_status == "error")
             {
                 header.innerHTML = "Error: Community Vital Sign PDF";
-                el.innerHTML = "PDF cannot be generated.<br/><br/><span style='color:FF0000;'>External Community Vital Signs Server is unavailable.</span> <br/><br/> Please wait 60 seconds, then click the refresh button on the browser toolbar. If still unsuccessful, please try again later.";
+                el.innerHTML = "PDF cannot be generated.<br/><br/><span style='color:FF0000;'>External Community Vital Signs Server cannot generate PDF for this location and year.</span> <br/><br/> Please try again later.";
                 spinner.innerHTML = render_close_button_html();
                 post_cvs_status("error");
                 window.setTimeout(()=> { const close_button = document.getElementById("close_button"); close_button.focus(); }, 0);
@@ -121,6 +130,8 @@ async function run_cvs_report_polling(header, el, spinner, report_output_element
         }
 
         // Max retries exhausted without a terminal result
+        header.innerHTML = "Community Vital Signs PDF";
+        el.innerHTML = "PDF cannot be generated.<br/><br/><span style='color:FF0000;'>Maximum retry attempts reached.</span> <br/><br/> Please try again later.";
         spinner.innerHTML = `${render_close_button_html()}&nbsp;${render_try_again_button_html()}`;
         post_cvs_status("max_retries");
         window.setTimeout(()=> { const try_again_button = document.getElementById("try_again_button"); try_again_button.focus(); }, 0);
@@ -217,6 +228,16 @@ async function get_cvs_api_dashboard_info
     id,
 )
 {            
+    if (CVS_FORCE_MODE != null)
+    {
+        const forced = { 1: "error", 2: "unavailable", 3: "unavailable", 4: "file ready" };
+        const file_status = forced[CVS_FORCE_MODE];
+        if (file_status !== undefined)
+        {
+            return { file_status };
+        }
+    }
+
     var base_url = `${location.protocol}//${location.host}/api/cvsAPI`
 
     try
