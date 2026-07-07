@@ -245,7 +245,10 @@ public static class ContainedPathHelper
 
     private static void EnsureContainedPath(string trustedBaseDirectory, string resolvedPath, string paramName)
     {
-        if (!resolvedPath.StartsWith(trustedBaseDirectory, StringComparison.OrdinalIgnoreCase))
+        // Use Path.GetRelativePath to detect traversal attempts: if the resolved path
+        // is outside the trusted base, the relative path will start with ".." or be rooted.
+        var relativePath = Path.GetRelativePath(trustedBaseDirectory, resolvedPath);
+        if (relativePath.StartsWith("..", StringComparison.Ordinal) || Path.IsPathRooted(relativePath))
         {
             throw new ArgumentException("Resolved path escaped the configured base directory.", paramName);
         }

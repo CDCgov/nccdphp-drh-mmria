@@ -58,6 +58,12 @@ public static class OutboundRequestSecurityHelper
             throw new ArgumentException("Header value exceeds the maximum allowed length.", paramName);
         }
 
+        // Explicitly reject HTTP response-splitting characters (CWE-113 / RFC 7230 §3.2.6)
+        if (trimmedValue.IndexOfAny(['\r', '\n', '\0']) >= 0)
+        {
+            throw new ArgumentException("Header value contains HTTP response-splitting characters.", paramName);
+        }
+
         if (trimmedValue.Any(character => !IsVisibleAsciiHeaderCharacter(character)))
         {
             throw new ArgumentException("Header value contains unsupported characters.", paramName);
