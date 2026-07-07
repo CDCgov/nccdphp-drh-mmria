@@ -114,7 +114,7 @@ async function run_cvs_report_polling(header, el, spinner, report_output_element
             else if (file_status == "error")
             {
                 header.innerHTML = "Community Vital Signs";
-                el.innerHTML = "<span style='color:FF0000;'>This report could not be generated for this location and year.</span><br/><br/>Please try again later.";
+                el.innerHTML = "<span style='color:FF0000;'>The PDF could not be generated.</span><br/><br/>Please try again later. If you continue to receive this message, please contact your jurisdiction admin.";
                 spinner.innerHTML = `${render_close_button_html()}&nbsp;${render_try_again_button_html()}`;
                 post_cvs_status("error");
                 window.setTimeout(()=> { const try_again_button = document.getElementById("try_again_button"); try_again_button.focus(); }, 0);
@@ -131,7 +131,7 @@ async function run_cvs_report_polling(header, el, spinner, report_output_element
 
         // Max retries exhausted without a terminal result
         header.innerHTML = "Community Vital Signs";
-        el.innerHTML = "<span style='color:FF0000;'>This report could not be generated for this location and year.</span><br/><br/>Please try again later.";
+        el.innerHTML = "<span style='color:FF0000;'>The PDF could not be generated.</span><br/><br/>Please try again later. If you continue to receive this message, please contact your jurisdiction admin.";
         spinner.innerHTML = `${render_close_button_html()}&nbsp;${render_try_again_button_html()}`;
         post_cvs_status("max_retries");
         window.setTimeout(()=> { const try_again_button = document.getElementById("try_again_button"); try_again_button.focus(); }, 0);
