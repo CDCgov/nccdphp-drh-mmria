@@ -322,7 +322,7 @@ public sealed class CVSManager
 
     private static bool IsTransientHttpStatus(int statusCode) =>
         statusCode == 408 || statusCode == 429 || statusCode == 500 ||
-        statusCode == 502 || statusCode == 503 || statusCode == 504;
+        statusCode == 503 || statusCode == 504;
 
     private static bool IsGeneratingResponse(string body) =>
         body != null && (
