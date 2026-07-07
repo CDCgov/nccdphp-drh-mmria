@@ -2,7 +2,7 @@
 title: "PRD: MMRIA V4.1"
 status: final
 created: 2026-06-12
-updated: 2026-07-06 (FR-11 added — CVS PDF Export Tool Reliability; FR-11.3 updated — retry constants are config-driven)
+updated: 2026-07-07 (FR-12 added — Vitals Import NAT/FET Numeric Field Type Normalization; FR-13 added — Data Migration Project Environment Configuration; FR-14 added — Vitals Import Retrospective Data Correction Migration)
 ---
 
 # PRD: MMRIA V4.1
@@ -360,6 +360,66 @@ The CVS page and the parent case page maintain consistent, user-visible status:
 - The parent page button that opened the CVS window is disabled (`aria-busy="true"`) while a report is in progress and re-enabled when a terminal status is received.
 - A fallback timer (20 minutes) re-enables the button if no terminal BroadcastChannel message is received — for example, when the CVS window is closed unexpectedly.
 - The server logs a structured telemetry entry on each completed request: `"CVS dashboard request completed. status={Status} duration_ms={DurationMs}"`.
+
+---
+
+### FR-12 — Vitals Import NAT/FET Numeric Field Type Normalization
+
+Source: Bug 117351 (VA-reported, 2/6/2026). Cases created via vitals import display "Select Value" in dropdown fields instead of the coded label. Root cause: `mmria.services` `BatchItemProcessingService` writes certain NAT/FET fields to CouchDB as JSON strings (e.g., `"mother_married": "0"`) while mmria-server writes the same fields as JSON numbers (`"mother_married": 0`). The front-end dropdown renderer expects integer values and silently falls back to "Select Value" when it finds a string. The Rule methods (`MARN_Rule`, `ACKN_Rule`, etc.) correctly map IJE characters to numeric string codes but those codes are stored as JSON strings because `C_Get_Set_Value.set_value` always writes `string` to the document. The fix requires that integer-coded fields are stored as integers in the JSON document.
+
+**FR-12.1 — Integer storage for coded dropdown fields at `set_value` call sites**
+For `MARN` (`birth_fetal_death_certificate_parent/demographic_of_mother/mother_married`) and `ACKN` (`birth_fetal_death_certificate_parent/demographic_of_mother/If_mother_not_married_has_paternity_acknowledgement_been_signed_in_the_hospital`), and all other NAT/FET fields whose MMRIA metadata type is `number` and whose values are always numeric strings, the call to `gs.set_value()` in `BatchItemProcessingService` stores the value as a JSON integer in the CouchDB document — not as a JSON string. The implementation approach (adding an object overload to `C_Get_Set_Value`, modifying the existing method, or directly setting the dictionary key) is developer discretion, subject to: no regressions on string-typed fields, and matching the type that mmria-server produces for the same fields.
+
+**FR-12.2 — Post-fix verification**
+After FR-12.1, a newly imported NAT record with a Y/N value for `MARN` or `ACKN` results in a JSON integer stored in CouchDB (e.g., `"mother_married": 0`). The front-end dropdown for both affected fields displays the correct coded label. The developer audits adjacent non-wrapped fields (MEDUC, FEDUC, ATTEND, TRAN, PAY, WIC) and applies the same integer storage fix to any that the front-end expects as integers.
+
+---
+
+### FR-13 — Data Migration Project Environment Configuration
+
+The `data-migration` project requires source-code edits to target a different environment — CouchDB URL, credentials, and the jurisdiction prefix list are all hardcoded in `Program.cs` and `appsettings.json`. The `Replication` project solved this problem with a layered `appsettings.json`/`appsettings.local.json` pattern backed by typed configuration classes (`EnvironmentSettings`, `CouchDBSettings.DatabaseUrlTemplates`, per-environment `Credentials`, per-environment `JurisdictionLists`). `data-migration` must adopt the same pattern.
+
+**FR-13.1 — Layered appsettings pattern**
+`data-migration/appsettings.json` is restructured to define the full configuration schema with blank/safe defaults. `appsettings.local.json` (gitignored, documented in `HTTPS-SETUP-INSTRUCTIONS.md` or an equivalent README section) holds local credentials and active run settings. `Program.cs` loads both files via `ConfigurationBuilder.AddJsonFile("appsettings.local.json", optional: true, reloadOnChange: true)`.
+
+**FR-13.2 — Typed configuration model**
+A `Configuration.cs` class is added to `data-migration` defining a root `DataMigrationAppConfiguration` with the following sections — modeled directly on the Replication project's `Configuration.cs`:
+- `MigrationSettings`: `RunType` (string), `IsReportOnlyMode` (bool, default `true`), `DatabaseName` (string, default `"mmrds"`)
+- `EnvironmentSettings`: `ConfigEnvironment` (string), `IntOrProd` (string) — identical shape to Replication
+- `CouchDBSettings`: `DatabaseUrlTemplates` with properties `Localhost`, `Development`, `QA`, `Integration`, `Production`
+- `Credentials`: `Dictionary<string, CredentialConfig>` keyed by environment name, each with `Username` and `Password`
+- `JurisdictionLists`: `Dictionary<string, List<string>>` with keys `Localhost`, `Development`, `QA`, `Integration`, `Production`, `Alternate`, `Filtered`
+
+**FR-13.3 — Hardcoded list removal**
+`run_list`, `test_list`, `prefix_list`, and the `is_test_list` boolean in `Program.cs` are removed. The active prefix list is selected at startup by reading `JurisdictionLists[ConfigEnvironment]`. The `has_been_done_set` skip mechanism is retained.
+
+**FR-13.4 — URL and credential construction**
+The active CouchDB URL per jurisdiction is constructed from `CouchDBSettings.DatabaseUrlTemplates[ConfigEnvironment]`, with `{prefix}` substituted. Credentials are sourced from `Credentials[ConfigEnvironment]`. The legacy flat keys `data_migration:couchdb_url`, `data_migration:timer_user_name`, and `data_migration:timer_value` are removed from `appsettings.json` and from `Program.cs`.
+
+---
+
+### FR-14 — Vitals Import Retrospective Data Correction Migration
+
+Cases processed by vitals import before the FR-12 fix are persisted in CouchDB with string values for fields that must be integers. The front-end cannot self-correct these — they remain broken until the underlying document is fixed. The `data-migration` project is the correct tool for this correction.
+
+**FR-14.1 — New migration run type**
+`VitalsTypeCorrection` is added to the `RunTypeEnum` in `data-migration/Program.cs`. When `MigrationSettings.RunType` is `VitalsTypeCorrection`, the program executes the string-to-integer field correction logic across all case documents in the configured jurisdiction databases.
+
+**FR-14.2 — Target field list**
+The initial set of CouchDB field paths subject to correction:
+- `birth_fetal_death_certificate_parent/demographic_of_mother/mother_married`
+- `birth_fetal_death_certificate_parent/demographic_of_mother/If_mother_not_married_has_paternity_acknowledgement_been_signed_in_the_hospital`
+
+Additional paths are appended as the developer confirms which other NAT/FET fields with MMRIA metadata type `number` were affected by the import defect.
+
+**FR-14.3 — Correction logic**
+For each case document retrieved from the target database: for each target field path, if the stored value is a JSON string whose trimmed content parses as a valid integer via `int.TryParse`, the stored value is replaced with the corresponding JSON number. Documents where the field already holds a JSON number, null, or is absent are skipped without modification.
+
+**FR-14.4 — Report-only mode**
+The migration uses `MigrationSettings.IsReportOnlyMode` (default `true`). In report-only mode, the document `_id`, the field path, and the current string value are written to the run output log but no CouchDB writes are issued. Setting `IsReportOnlyMode = false` applies corrections and persists the updated documents via existing CouchDB update infrastructure. This mirrors the behavior of existing migrations (`VitalsMigration01`).
+
+**FR-14.5 — Environment dependency**
+FR-14 depends on FR-13. The migration uses the `EnvironmentSettings`/`CouchDBSettings`/`Credentials` configuration added by FR-13 to connect to the target environment and iterate the configured jurisdiction list.
 
 ---
 

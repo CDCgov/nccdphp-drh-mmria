@@ -326,6 +326,43 @@ dev this story _bmad-output/implementation-artifacts/10-5-config-driven-cvs-retr
 
 ---
 
+## Epic 11 — Vitals Import Integer Type Fix
+
+| Story | File | Status |
+|-------|------|--------|
+| 11.1 — Vitals Import: Store Integer-Coded Fields as JSON Numbers | [11-1-vitals-import-integer-type-fix.md](11-1-vitals-import-integer-type-fix.md) | not-started |
+
+**Sequencing:** Independent — can be worked immediately.
+
+**Dev prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/11-1-vitals-import-integer-type-fix.md
+```
+
+---
+
+## Epic 12 — Data Migration Tool Modernization
+
+| Story | File | Status |
+|-------|------|--------|
+| 12.1 — Data Migration Environment Configuration Parity | [12-1-data-migration-environment-config.md](12-1-data-migration-environment-config.md) | not-started |
+| 12.2 — Vitals Retrospective Type Correction Migration | [12-2-vitals-type-correction-migration.md](12-2-vitals-type-correction-migration.md) | not-started |
+
+**Sequencing:** 12.1 must be completed before 12.2. Both are independent of Epic 11.
+
+**Dev prompts:**
+
+```
+dev this story _bmad-output/implementation-artifacts/12-1-data-migration-environment-config.md
+```
+
+```
+dev this story _bmad-output/implementation-artifacts/12-2-vitals-type-correction-migration.md
+```
+
+---
+
 ## Open Items — Resolve Before Affected Story
 
 | OI       | Affects               | What to resolve                                                                                                                                                                                                                                                                                                                                                                                        |
