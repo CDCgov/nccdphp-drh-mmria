@@ -113,11 +113,11 @@ async function run_cvs_report_polling(header, el, spinner, report_output_element
             }
             else if (file_status == "error")
             {
-                header.innerHTML = "Error: Community Vital Sign PDF";
-                el.innerHTML = "PDF cannot be generated.<br/><br/><span style='color:FF0000;'>External Community Vital Signs Server cannot generate PDF for this location and year.</span> <br/><br/> Please try again later.";
-                spinner.innerHTML = render_close_button_html();
+                header.innerHTML = "Community Vital Signs";
+                el.innerHTML = "<span style='color:FF0000;'>This report could not be generated for this location and year.</span><br/><br/>Please try again later.";
+                spinner.innerHTML = `${render_close_button_html()}&nbsp;${render_try_again_button_html()}`;
                 post_cvs_status("error");
-                window.setTimeout(()=> { const close_button = document.getElementById("close_button"); close_button.focus(); }, 0);
+                window.setTimeout(()=> { const try_again_button = document.getElementById("try_again_button"); try_again_button.focus(); }, 0);
                 return;
             }
             else if (file_status == "generating" || file_status == "unavailable" || file_status == "")
@@ -130,8 +130,8 @@ async function run_cvs_report_polling(header, el, spinner, report_output_element
         }
 
         // Max retries exhausted without a terminal result
-        header.innerHTML = "Community Vital Signs PDF";
-        el.innerHTML = "PDF cannot be generated.<br/><br/><span style='color:FF0000;'>Maximum retry attempts reached.</span> <br/><br/> Please try again later.";
+        header.innerHTML = "Community Vital Signs";
+        el.innerHTML = "<span style='color:FF0000;'>This report could not be generated for this location and year.</span><br/><br/>Please try again later.";
         spinner.innerHTML = `${render_close_button_html()}&nbsp;${render_try_again_button_html()}`;
         post_cvs_status("max_retries");
         window.setTimeout(()=> { const try_again_button = document.getElementById("try_again_button"); try_again_button.focus(); }, 0);
@@ -169,14 +169,14 @@ function wait_for_next_attempt(header, el, next_attempt)
 
 function update_countdown_message(header, el, remaining_seconds, next_attempt)
 {
-    header.innerHTML = "Please wait.";
-    el.innerHTML = `The Community Vital Signs report is being prepared. Next check in ${remaining_seconds} seconds. Attempt ${next_attempt} of ${CVS_MAX_ATTEMPTS} will run automatically.`;
+    header.innerHTML = "Community Vital Signs";
+    el.innerHTML = "Preparing your report. This may take a minute.";
 }
 
 function show_active_request(header, el, attempt)
 {
-    header.innerHTML = "Please wait.";
-    el.innerHTML = `Generating PDF... Checking Community Vital Signs service, attempt ${attempt} of ${CVS_MAX_ATTEMPTS}.`;
+    header.innerHTML = "Community Vital Signs";
+    el.innerHTML = "Preparing your report. This may take a minute.";
 }
 
 function normalize_file_status(file_status)
