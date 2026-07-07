@@ -330,7 +330,7 @@ dev this story _bmad-output/implementation-artifacts/10-5-config-driven-cvs-retr
 
 | Story | File | Status |
 |-------|------|--------|
-| 11.1 — Vitals Import: Store Integer-Coded Fields as JSON Numbers | [11-1-vitals-import-integer-type-fix.md](11-1-vitals-import-integer-type-fix.md) | not-started |
+| 11.1 — Vitals Import: Store Integer-Coded Fields as JSON Numbers | [11-1-vitals-import-integer-type-fix.md](11-1-vitals-import-integer-type-fix.md) | verification |
 
 **Sequencing:** Independent — can be worked immediately.
 

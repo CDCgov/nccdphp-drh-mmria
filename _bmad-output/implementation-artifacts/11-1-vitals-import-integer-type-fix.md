@@ -2,7 +2,7 @@
 
 **Epic:** 11 — Vitals Import Integer Type Fix
 **Story ID:** 11.1
-**Status:** not-started
+**Status:** verification
 **Date added:** 2026-07-07
 
 ---
@@ -174,8 +174,10 @@ _To be completed by dev agent after implementation._
 
 ### Completion Notes
 
+Used the existing `set_objectvalue` method on `C_Get_Set_Value` (already present in `single_form_value.cs`) to store MARN and ACKN as .NET `int` values. The `if/else` guard preserves "9999" (blank sentinel) as a string per AC-5. No new methods or overloads were needed.
+
 ### Change Log
 
 | File | Change |
 |------|--------|
-| | |
+| `nccdphp-drh-mmria-services/mmria.services/Services/BatchItemProcessingService.cs` | NAT path: replaced `set_value` with `set_objectvalue(int)` for MARN and ACKN (lines ~1477–1484). FET path: same fix for MARN (line ~1794). |
