@@ -367,11 +367,6 @@ async function reset_click()
     const search_text_control = document.getElementById("search_text");
     search_text_control.value = ""
 
-    const field_filter_checkboxes = document.getElementsByClassName("filter-field-checkbox");
-    Array.from(field_filter_checkboxes).forEach(element => {
-        element.checked = true;
-    });
-
     const form_filter_control = document.getElementById("form_filter");
     form_filter_control.value = "all";
 
@@ -440,6 +435,15 @@ async function reset_click()
     if (g_default_filter.date_of_death) {
         g_filter.date_of_death.begin = new Date(g_default_filter.date_of_death.begin);
         g_filter.date_of_death.end = new Date(g_default_filter.date_of_death.end);
+    }
+
+    // Re-render the Field list from the reset (form-unscoped) filter — g_filter.selected_form
+    // is now '' after the clone above, so render_field_filter's form guard passes and all
+    // forms' fields render again. Just toggling .checked on the existing checkboxes (as this
+    // used to do) left the Field list scoped to whichever form was selected before Reset.
+    const checkboxes_el = document.getElementById("checkboxes");
+    if (checkboxes_el) {
+        checkboxes_el.innerHTML = render_field_filter(g_filter);
     }
 
     let search_result_list = document.getElementById("search_result_list");
