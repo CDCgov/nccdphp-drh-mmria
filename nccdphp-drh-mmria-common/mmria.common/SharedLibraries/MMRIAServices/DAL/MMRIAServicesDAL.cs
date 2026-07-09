@@ -603,7 +603,7 @@ public sealed class MMRIAServicesDAL
         return allDocs?.rows?.Length ?? 0;
     }
 
-    public async Task<List<(string id, DateTime? dateLastUpdated)>> GetOpenCaseStubsAsync(
+    public async Task<List<(string id, DateTime? dateLastCheckedOut)>> GetOpenCaseStubsAsync(
         string databaseUrl,
         string userName,
         string userValue,
@@ -611,8 +611,9 @@ public sealed class MMRIAServicesDAL
     {
         string requestUrl = $"{databaseUrl}/_find";
         string requestBody =
-            "{\"selector\":{\"checked_out_by_tab_id\":{\"$exists\":true}}," +
-            "\"fields\":[\"_id\",\"date_last_updated\"],\"limit\":1000}";
+            "{\"selector\":{\"checked_out_by_tab_id\":{\"$exists\":true,\"$ne\":\"\"}," +
+            "\"last_checked_out_by\":{\"$exists\":true,\"$ne\":\"\"}}," +
+            "\"fields\":[\"_id\",\"date_last_checked_out\"],\"limit\":1000}";
 
         string response = await _couchDbHttpClient.ExecuteAsync(
             "POST",
@@ -623,7 +624,7 @@ public sealed class MMRIAServicesDAL
             timeoutSeconds: timeoutSeconds,
             throwOnError: true);
 
-        var result = new List<(string id, DateTime? dateLastUpdated)>();
+        var result = new List<(string id, DateTime? dateLastCheckedOut)>();
         var payload = Newtonsoft.Json.Linq.JObject.Parse(response);
         var docs = payload["docs"] as Newtonsoft.Json.Linq.JArray;
         if (docs == null) return result;
@@ -631,19 +632,19 @@ public sealed class MMRIAServicesDAL
         foreach (var doc in docs)
         {
             var id = doc.Value<string>("_id");
-            DateTime? dateLastUpdated = null;
-            var rawDate = doc["date_last_updated"];
+            DateTime? dateLastCheckedOut = null;
+            var rawDate = doc["date_last_checked_out"];
             if (rawDate != null && rawDate.Type != Newtonsoft.Json.Linq.JTokenType.Null)
             {
                 if (DateTime.TryParse(rawDate.ToString(), null,
                     System.Globalization.DateTimeStyles.RoundtripKind, out var parsed))
                 {
-                    dateLastUpdated = parsed.Kind == DateTimeKind.Unspecified
+                    dateLastCheckedOut = parsed.Kind == DateTimeKind.Unspecified
                         ? DateTime.SpecifyKind(parsed, DateTimeKind.Utc)
                         : parsed.ToUniversalTime();
                 }
             }
-            result.Add((id, dateLastUpdated));
+            result.Add((id, dateLastCheckedOut));
         }
 
         return result;

@@ -1270,7 +1270,7 @@ public sealed class MMRIAServicesManager
         return entry;
     }
 
-    private const int OpenCaseActiveThresholdMinutes = 10;
+    private const int OpenCaseActiveThresholdMinutes = 30;
 
     private async Task<(int? active, int? stale, string error)> TryGetOpenCaseCountsAsync(
         string databaseUrl,
@@ -1289,9 +1289,9 @@ public sealed class MMRIAServicesManager
             int active = 0;
             int stale = 0;
 
-            foreach (var (_, dateLastUpdated) in stubs)
+            foreach (var (_, dateLastCheckedOut) in stubs)
             {
-                if (dateLastUpdated.HasValue && dateLastUpdated.Value >= cutoff)
+                if (dateLastCheckedOut.HasValue && dateLastCheckedOut.Value >= cutoff)
                     active++;
                 else
                     stale++;
