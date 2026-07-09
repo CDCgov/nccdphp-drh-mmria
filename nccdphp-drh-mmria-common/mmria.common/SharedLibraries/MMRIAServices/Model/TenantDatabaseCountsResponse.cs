@@ -11,6 +11,8 @@ public sealed class TenantDatabaseCountsResponse
     public int ok_entry_count { get; set; }
     public int partial_error_entry_count { get; set; }
     public int error_entry_count { get; set; }
+    public int total_open_case_count_active { get; set; }
+    public int total_open_case_count_stale { get; set; }
     public List<TenantDatabaseCountEntryResponse> entries { get; set; } = new();
 }
 
@@ -29,4 +31,7 @@ public sealed class TenantDatabaseCountEntryResponse
     public string mmrds_error { get; set; }
     public string de_id_error { get; set; }
     public string report_error { get; set; }
+    public int? open_case_count_active { get; set; }
+    public int? open_case_count_stale { get; set; }
+    public string open_case_error { get; set; }
 }

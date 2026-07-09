@@ -2,7 +2,7 @@
 
 **Epic:** 15 — Admin Monitoring Enhancements
 **Story ID:** 15.1
-**Status:** not-started
+**Status:** done
 **Date added:** 2026-07-09
 **Depends on:** none
 **Source requirements:** FR-20.1–FR-20.5

@@ -603,6 +603,52 @@ public sealed class MMRIAServicesDAL
         return allDocs?.rows?.Length ?? 0;
     }
 
+    public async Task<List<(string id, DateTime? dateLastUpdated)>> GetOpenCaseStubsAsync(
+        string databaseUrl,
+        string userName,
+        string userValue,
+        int timeoutSeconds = 20)
+    {
+        string requestUrl = $"{databaseUrl}/_find";
+        string requestBody =
+            "{\"selector\":{\"checked_out_by_tab_id\":{\"$exists\":true}}," +
+            "\"fields\":[\"_id\",\"date_last_updated\"],\"limit\":1000}";
+
+        string response = await _couchDbHttpClient.ExecuteAsync(
+            "POST",
+            requestUrl,
+            requestBody,
+            userName,
+            userValue,
+            timeoutSeconds: timeoutSeconds,
+            throwOnError: true);
+
+        var result = new List<(string id, DateTime? dateLastUpdated)>();
+        var payload = Newtonsoft.Json.Linq.JObject.Parse(response);
+        var docs = payload["docs"] as Newtonsoft.Json.Linq.JArray;
+        if (docs == null) return result;
+
+        foreach (var doc in docs)
+        {
+            var id = doc.Value<string>("_id");
+            DateTime? dateLastUpdated = null;
+            var rawDate = doc["date_last_updated"];
+            if (rawDate != null && rawDate.Type != Newtonsoft.Json.Linq.JTokenType.Null)
+            {
+                if (DateTime.TryParse(rawDate.ToString(), null,
+                    System.Globalization.DateTimeStyles.RoundtripKind, out var parsed))
+                {
+                    dateLastUpdated = parsed.Kind == DateTimeKind.Unspecified
+                        ? DateTime.SpecifyKind(parsed, DateTimeKind.Utc)
+                        : parsed.ToUniversalTime();
+                }
+            }
+            result.Add((id, dateLastUpdated));
+        }
+
+        return result;
+    }
+
     private static string TryExtractErrorDetail(string responseBody)
     {
         if (string.IsNullOrWhiteSpace(responseBody))

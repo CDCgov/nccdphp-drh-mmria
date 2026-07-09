@@ -17,6 +17,8 @@ public sealed class TenantDatabaseCountsPageModel
     public int MmrdsAtOrAboveThresholdCount { get; set; }
     public int DeIdMismatchCount { get; set; }
     public int EntriesWithErrorsCount { get; set; }
+    public int TotalOpenCaseCountActive { get; set; }
+    public int TotalOpenCaseCountStale { get; set; }
     public List<TenantDatabaseCountEntryResponse> SortedEntries { get; set; } = new();
 }
 
@@ -64,6 +66,8 @@ public sealed class TenantDatabaseCountsController : Controller
                 item.de_id_delta_from_mmrds.Value != 0);
             model.EntriesWithErrorsCount = model.SortedEntries.Count(item =>
                 !string.Equals(item.status, "ok", StringComparison.OrdinalIgnoreCase));
+            model.TotalOpenCaseCountActive = counts?.total_open_case_count_active ?? 0;
+            model.TotalOpenCaseCountStale = counts?.total_open_case_count_stale ?? 0;
         }
         catch (Exception ex)
         {
