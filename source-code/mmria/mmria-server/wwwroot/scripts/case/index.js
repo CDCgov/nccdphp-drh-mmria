@@ -26,6 +26,7 @@ var g_use_position_information = true;
 var g_look_up = {};
 var g_release_version = null;
 var g_autosave_interval = null;
+var g_is_case_stale = false; // true when a rev conflict has been detected — pauses autosave until reload
 var g_value_to_display_lookup = {};
 var g_name_to_value_lookup = {};
 var g_display_to_value_lookup = {};
@@ -2598,6 +2599,19 @@ async function load_and_set_data()
     window.onhashchange = window_on_hash_change;
     window.onbeforeunload = navigation_away;
 
+    // Expose case data reload for stale-case modal/banner (Story 12.4)
+    window.mmria_reload_case_data = function () {
+        if (typeof get_specific_case === 'function' && g_data && g_data._id) {
+            g_is_case_stale = false;
+            return get_specific_case(g_data._id);
+        }
+    };
+
+    // Allow system-offline-check.js to mark the case stale (pauses autosave)
+    window.mmria_mark_case_stale = function () {
+        g_is_case_stale = true;
+    };
+
     // Load the case set - hash changes will be handled naturally by browser navigation
     await get_case_set();
 }
@@ -3040,6 +3054,17 @@ async function window_on_hash_change(e)
       var new_url = e.newURL || window.location.href;
       g_ui.url_state = url_monitor.get_url_state(new_url);
 
+      // Stop _rev polling when navigating away from a case to a non-case view (e.g. summary list).
+      // get_specific_case will restart polling when the user opens a different case.
+      const isLeavingCaseView = !(
+        g_ui.url_state.path_array &&
+        g_ui.url_state.path_array.length > 0 &&
+        parseInt(g_ui.url_state.path_array[0]) >= 0
+      );
+      if (isLeavingCaseView && typeof window.stopCaseRevPolling === 'function') {
+        window.stopCaseRevPolling();
+      }
+
       if 
       (
         g_ui.url_state.path_array &&
@@ -3414,6 +3439,13 @@ async function get_specific_case(p_id)
 
         g_data = case_response;
         g_data_is_checked_out = is_case_checked_out(g_data);
+
+        // Start _rev polling for write-access users only (AC-2–AC-5, Story 12.4)
+        if (g_is_data_analyst_mode == null && g_data._id && g_data._rev) {
+            if (typeof window.startCaseRevPolling === 'function') {
+                window.startCaseRevPolling(g_data._id, g_data._rev);
+            }
+        }
 
         if (g_autosave_interval != null && g_data_is_checked_out == false) 
         {
@@ -3831,8 +3863,9 @@ async function process_save_case()
           err_object.responseText.indexOf("(409) Conflict") > -1
         )
         {
-          err_object.responseText = "Unable to save document Conflict";
-          $mmria.save_error_500_dialog_show(err_object, `${item.note} (409) Conflict`);
+          // Pause autosave and show the stale-case modal (AC-1, Story 12.4)
+          g_is_case_stale = true;
+          if (typeof window.showStaleCaseModal === 'function') window.showStaleCaseModal();
           fail_item(err_object);
           return;
         }
@@ -3856,6 +3889,13 @@ async function process_save_case()
       if(case_response.rev != null)
       {
         g_data._rev = case_response.rev;
+      }
+
+      // Restart _rev polling with the updated rev to prevent false-positive stale banners (Story 12.4)
+      if (g_is_data_analyst_mode == null && g_data._id && g_data._rev) {
+        if (typeof window.startCaseRevPolling === 'function') {
+          window.startCaseRevPolling(g_data._id, g_data._rev);
+        }
       }
 
       g_data.last_updated_by = g_user_name;
@@ -5022,6 +5062,7 @@ function mmria_get_case_edit_auto_save_freq_minutes()
 function autosave() 
 {
     if (g_case_session_autologin_in_progress === true) return;
+    if (g_is_case_stale) return; // paused until user reloads the latest version
 
     const split_one = window.location.href.split('#');
 
@@ -5289,6 +5330,9 @@ function g_textarea_oninput
 
 function navigation_away(e) 
 {
+
+  // Stop _rev polling on page unload (AC-5, Story 12.4)
+  if (typeof window.stopCaseRevPolling === 'function') window.stopCaseRevPolling();
 
   // BACKUP: Finalize unload cleanup using sendBeacon when page is unloading.
   // - Releases current case edit lock (tab-validated)

@@ -2,7 +2,7 @@
 
 **Epic:** 12 — Data Migration Tool Modernization
 **Story ID:** 12.4
-**Status:** not-started
+**Status:** done
 **Date added:** 2026-07-08
 **Depends on:** Story 12.3 (Case Rev Endpoint — needed for the `_rev` polling and `X-Offline-Date` header)
 **Source requirements:** FR-19.1–FR-19.5
@@ -392,8 +392,22 @@ _To be completed by dev agent after implementation._
 
 ### Completion Notes
 
+Implemented following the existing `mmria-offline-modal` pattern exactly:
+
+- **Modal markup** added to `_LayoutBase.cshtml` adjacent to the going-offline modal, using the same Bootstrap `.modal-dialog`/`.modal-content` structure and the same purple header (`background-color:#7b2d8e`). Non-dismissable (no close button), single **Reload Case** button calls `window.location.reload()`.
+- **Banner** created dynamically via `showStaleCaseBanner()` – appended as `position:fixed` at the top of the page with `role="alert"` and `aria-live="assertive"`. Contains **Reload** and **Dismiss** buttons.
+- **Polling** (`startCaseRevPolling` / `stopCaseRevPolling`) added to `system-offline-check.js` following the `startOfflineStatusPolling` pattern. Poll interval: 45 s normal, 10 s when `X-Offline-Date` header indicates migration window is active.
+- **Write-access gate**: polling starts only when `g_is_data_analyst_mode == null` (abstracter/write role). Data analyst (`/analyst-case` route sets `g_is_data_analyst_mode = 'da'`) gets no polling.
+- **409 intercept**: replaced existing `$mmria.save_error_500_dialog_show()` call for `(409) Conflict` with `window.showStaleCaseModal()`. Does not fall through to generic error handler.
+- **Poll restart on save**: after successful save, `startCaseRevPolling` is called with the updated `_rev` from `case_response.rev` to avoid false-positive stale banners.
+- **Stop on unload**: `stopCaseRevPolling()` called at the top of `navigation_away()` (the `window.onbeforeunload` handler).
+
+AC-6 (508): stale modal uses `role="alertdialog"`, `aria-modal="true"`, `aria-labelledby`/`aria-describedby`; focus moves to **Reload Case** button. Banner uses `role="alert"` and `aria-live="assertive"`. All buttons are keyboard-accessible.
+
 ### Change Log
 
 | File | Change |
 |------|--------|
-| | |
+| `source-code/mmria/mmria-server/Views/Shared/_LayoutBase.cshtml` | Added stale-case modal `<div>` markup adjacent to existing offline modals |
+| `source-code/mmria/mmria-server/wwwroot/js/system-offline-check.js` | Added `showStaleCaseModal`, `showStaleCaseBanner`, `stopCaseRevPolling`, `startCaseRevPolling`; exposed all four on `window` |
+| `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js` | (1) Replaced 409 conflict error handler with `showStaleCaseModal()`. (2) Start `startCaseRevPolling` after online case load, gated on write-access. (3) Restart polling with new `_rev` after successful save. (4) Call `stopCaseRevPolling()` in `navigation_away`. |

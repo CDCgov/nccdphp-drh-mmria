@@ -84,7 +84,7 @@ public sealed class caseController: ControllerBase
             if (string.IsNullOrWhiteSpace(sanitizedId))
                 return BadRequest();
 
-            string url = $"{db_config.url}/{Uri.EscapeDataString(sanitizedId)}";
+            string url = $"{db_config.url}/{db_config.prefix}mmrds/{Uri.EscapeDataString(sanitizedId)}";
             string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
                 "GET", url, null, db_config.user_name, db_config.user_value);
 

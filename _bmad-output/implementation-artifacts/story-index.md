@@ -425,6 +425,24 @@ dev this story _bmad-output/implementation-artifacts/14-1-replication-curl-to-co
 
 ---
 
+## Epic 15 — Admin Monitoring Enhancements _(2026-07-09)_
+
+| Story | File | Status |
+|-------|------|--------|
+| 15.1 — Tenant Database Counts: Open Cases Column | [15-1-tenant-database-counts-open-cases.md](15-1-tenant-database-counts-open-cases.md) | not-started |
+
+**Sequencing:** Independent. No dependencies on other epics.
+
+> ℹ️ Adds a Mango `_find` query per tenant to count cases with `checked_out_by_tab_id` present, classified as active (≤10 min) or possibly stale (>10 min). Changes span `mmria.common` (model, DAL, manager) and `mmria-server` (controller, view). The `mmria-tenant-database-counts` utility inherits model changes automatically with no code changes of its own.
+
+**Dev prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/15-1-tenant-database-counts-open-cases.md
+```
+
+---
+
 ## Open Items — Resolve Before Affected Story
 
 | OI       | Affects               | What to resolve                                                                                                                                                                                                                                                                                                                                                                                        |

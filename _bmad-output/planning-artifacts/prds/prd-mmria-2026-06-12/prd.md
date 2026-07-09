@@ -547,6 +547,57 @@ The stale-case banner (FR-19.2) and the 409 modal (FR-19.1) meet Section 508 acc
 
 ---
 
+### FR-20 — Tenant Database Counts: Open Cases Visibility
+
+The `/tenant-database-counts` page is an installation-admin tool for monitoring database health across all tenants. Adding open-case visibility gives administrators a real-time signal of active checkout lock activity and orphaned checkout states without requiring a separate query or tool.
+
+A case document in the MMRDS database is considered **open for editing** when the field `checked_out_by_tab_id` is present and non-null in the CouchDB document. The presence of this field is the existing checkout mechanism used by the case edit lock system.
+
+**FR-20.1 — Active vs. possibly-stale classification**
+Open cases are classified at query time using a fixed 10-minute boundary applied to `date_last_updated` (UTC):
+
+- **Active**: `checked_out_by_tab_id` is present AND `date_last_updated` is within the past 10 minutes. This indicates a user is actively editing the case or has edited it very recently.
+- **Possibly stale**: `checked_out_by_tab_id` is present AND `date_last_updated` is more than 10 minutes in the past. These cases likely represent orphaned checkouts — browser crashes, session expiry, or tab closes that did not trigger a clean unlock. They are informational signals, not errors.
+
+The 10-minute threshold is a fixed constant and is not read from the CouchDB configuration document.
+
+**FR-20.2 — Per-tenant open case query**
+For each tenant entry, the system issues a CouchDB Mango query (`POST /{mmrds_db}/_find`) against the tenant's MMRDS database:
+
+```json
+{
+  "selector": { "checked_out_by_tab_id": { "$exists": true } },
+  "fields": ["_id", "date_last_updated"],
+  "limit": 1000
+}
+```
+
+No pre-built index is required. Because `/tenant-database-counts` is an on-demand, installation-admin-only page (not a polling loop), a full collection scan is acceptable at current data volumes. The query runs in parallel with the existing mmrds/de_id/report count queries already issued per tenant.
+
+The server-side C# layer partitions the returned document stubs into active and possibly-stale counts using the 10-minute threshold.
+
+**FR-20.3 — Summary tile**
+A fifth summary tile is added to the page header row alongside the existing Entries, MMRDS Threshold, and De-ID Mismatch tiles. The tile is labeled **Open Cases** and displays system-wide totals:
+
+- `{N} active` — sum of active open cases across all tenant entries.
+- `{N} possibly stale` — sum of possibly-stale open cases across all tenant entries, displayed in amber text when non-zero.
+
+When both counts are zero, the tile displays a single `0` with no further classification.
+
+**FR-20.4 — Table column**
+A new **Open Cases** column is added to the Counts by Entry table. For each tenant row:
+
+- When the query succeeds and both counts are zero: display `0`.
+- When active count is non-zero and stale is zero: display the active count (e.g. `2`).
+- When both counts are non-zero: display active count with stale count in amber parentheses (e.g. `2 (1)`).
+- When only stale cases exist: display `0 (1)` with the stale count in amber.
+- When the query fails (timeout, network error, permission error): display `-`, consistent with the `-` convention used in other error-state cells in the table.
+
+**FR-20.5 — Error handling and status isolation**
+An open-case query failure for a single tenant does not affect that tenant's `status` field — `status` remains computed solely from the existing mmrds/de_id/report error logic. The open-case error is captured in a separate `open_case_error` field on the per-entry response model and surfaced only as `-` in the table cell. It does not contribute to the EntriesWithErrors summary count.
+
+---
+
 
 **NFR-1 — Browser support**
 All changes must function correctly in Microsoft Edge and Google Chrome. No other browsers are in scope.

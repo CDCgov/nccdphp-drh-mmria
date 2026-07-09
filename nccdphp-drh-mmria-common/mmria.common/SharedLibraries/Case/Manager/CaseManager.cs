@@ -1126,6 +1126,18 @@ public class CaseManager
             caseData.last_updated_by = userName;
             caseData.date_last_updated = DateTime.Now;
 
+            // Detect rev conflict: reject the save when the client's revision is stale (Story 12.4).
+            // Both must be valid CouchDB revisions and they must differ for this to be a conflict.
+            if (CouchDbRevisionHelper.IsValidRevision(caseData._rev) &&
+                CouchDbRevisionHelper.IsValidRevision(existingRevision) &&
+                !string.Equals(caseData._rev.Trim(), existingRevision.Trim(), StringComparison.Ordinal))
+            {
+                response.ok = false;
+                response.error_description = "(409) Conflict - case has been updated since you last loaded it.";
+                result.Response = response;
+                return result;
+            }
+
             var caseRevisionHandling = DescribeRevisionHandling(caseData._rev, existingRevision);
             caseData._rev = CouchDbRevisionHelper.ResolveServerOwnedRevision(caseData._rev, existingRevision);
             var changeStackRevisionHandling = DescribeIncomingRevisionHandling(changeStack._rev);
