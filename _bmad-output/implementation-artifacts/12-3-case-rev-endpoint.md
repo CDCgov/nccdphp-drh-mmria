@@ -2,7 +2,7 @@
 
 **Epic:** 12 — Data Migration Tool Modernization
 **Story ID:** 12.3
-**Status:** not-started
+**Status:** done
 **Date added:** 2026-07-08
 **Depends on:** Story 8.1 (system-offline-config and `/api/system-offline/status` — needed for `X-Offline-Date` header)
 **Source requirements:** FR-18.1–FR-18.3
@@ -180,8 +180,22 @@ _To be completed by dev agent after implementation._
 
 ### Completion Notes
 
+- Added `GetRev(string case_id)` action at `[HttpGet("{case_id}/rev")]` in `caseController.cs`. No route collision with the existing parameterless `[HttpGet]`.
+- Uses `JObject.Parse` to extract only `_id` and `_rev` from the full CouchDB document, returning `{ "_id": "...", "_rev": "..." }` via `mmria.server.util.EscapedJsonResultFactory.Create`.
+- `GetOfflineDateAsync()` private helper follows the exact pattern from `AccountController.LoadSystemOfflineConfigAsync` — strips `/api/Message/IJESet` from `vitals_url`, uses `CouchDbRequestOptions.VitalServiceKey`, and swallows exceptions so the header is always optional.
+- `EscapedJsonResultFactory` is referenced with its full namespace (`mmria.server.util.EscapedJsonResultFactory`) since `caseController.cs` does not have a `using mmria.server.util;` directive.
+- Build verified: zero C# compile errors. One MSB3021 file-lock warning is expected (running server holds the DLL) and does not affect correctness.
+
+### Manual Verification Steps
+
+1. Start the server and authenticate as an abstractor or data_analyst.
+2. `GET /api/case/{known-case-id}/rev` → expect `200` with `{ "_id": "...", "_rev": "..." }` only.
+3. `GET /api/case/nonexistent-id/rev` → expect `404`.
+4. Unauthenticated `GET /api/case/{id}/rev` → expect `401`.
+5. With `offline_date` set in system config, verify `X-Offline-Date` header appears; without it, verify header is absent.
+
 ### Change Log
 
 | File | Change |
 |------|--------|
-| | |
+| `source-code/mmria/mmria-server/Controllers/api/caseController.cs` | Added `GetRev` action (`[HttpGet("{case_id}/rev")]`) and `GetOfflineDateAsync()` private helper |
