@@ -346,10 +346,13 @@ dev this story _bmad-output/implementation-artifacts/11-1-vitals-import-integer-
 
 | Story | File | Status |
 |-------|------|--------|
-| 12.1 — Data Migration Environment Configuration Parity | [12-1-data-migration-environment-config.md](12-1-data-migration-environment-config.md) | not-started |
+| 12.1 — Data Migration Environment Configuration Parity | [12-1-data-migration-environment-config.md](12-1-data-migration-environment-config.md) | done |
+| 12.1.1 — Fix Data Migration Project Reference _(build blocker)_ | [12-1-1-fix-data-migration-project-reference.md](12-1-1-fix-data-migration-project-reference.md) | done |
 | 12.2 — Vitals Retrospective Type Correction Migration | [12-2-vitals-type-correction-migration.md](12-2-vitals-type-correction-migration.md) | not-started |
 
-**Sequencing:** 12.1 must be completed before 12.2. Both are independent of Epic 11.
+**Sequencing:** 12.1 must be completed before 12.1.1. 12.1.1 must be completed before 12.2. Both 12.1 and 12.1.1 are independent of Epic 11.
+
+> ⚠️ **12.1.1 is a build blocker.** Story 12.1's `Program.cs` refactor left a pre-existing broken `ProjectReference` in `migrate.csproj` uncorrected. This causes 401 cascading compile errors. Story 12.1.1 is a single-line csproj fix that unblocks all downstream work.
 
 **Dev prompts:**
 
@@ -358,7 +361,47 @@ dev this story _bmad-output/implementation-artifacts/12-1-data-migration-environ
 ```
 
 ```
+dev this story _bmad-output/implementation-artifacts/12-1-1-fix-data-migration-project-reference.md
+```
+
+```
 dev this story _bmad-output/implementation-artifacts/12-2-vitals-type-correction-migration.md
+```
+
+---
+
+## Epic 13 — HTTP Client Modernization: data-migration _(2026-07-08)_
+
+| Story | File | Status |
+|-------|------|--------|
+| 13.1 — Replace cURL with CouchDbHttpClient in data-migration | [13-1-data-migration-curl-to-couchdbhttpclient.md](13-1-data-migration-curl-to-couchdbhttpclient.md) | not-started |
+
+**Sequencing:** Independent. Can be worked in parallel with Epic 14.
+
+> ℹ️ `data-migration` already references `mmria.common`. The main work is adding DI packages, wiring `ServiceProvider` in `Program.cs`, threading `CouchDbHttpClient` through all migration class constructors, and replacing every `new cURL(...)` call site. One sync `execute()` call in `SaveRecord.cs` must be made async.
+
+**Dev prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/13-1-data-migration-curl-to-couchdbhttpclient.md
+```
+
+---
+
+## Epic 14 — HTTP Client Modernization: Replication _(2026-07-08)_
+
+| Story | File | Status |
+|-------|------|--------|
+| 14.1 — Replace cURL with CouchDbHttpClient in Replication | [14-1-replication-curl-to-couchdbhttpclient.md](14-1-replication-curl-to-couchdbhttpclient.md) | not-started |
+
+**Sequencing:** Independent. Can be worked in parallel with Epic 13.
+
+> ℹ️ `Replication` does **not** yet reference `mmria.common` — adding the project reference is the first step. Both CouchDB-credentialed calls and unauthenticated external API calls (image tags, redeploy, trivy, scale ops) are migrated to `CouchDbHttpClient.ExecuteAsync`. `Program.cs` is large (~2900+ lines) — work top-to-bottom by `new cURL` occurrences.
+
+**Dev prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/14-1-replication-curl-to-couchdbhttpclient.md
 ```
 
 ---

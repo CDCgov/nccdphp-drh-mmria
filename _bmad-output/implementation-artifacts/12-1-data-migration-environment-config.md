@@ -2,7 +2,7 @@
 
 **Epic:** 12 — Data Migration Tool Modernization
 **Story ID:** 12.1
-**Status:** not-started
+**Status:** done
 **Date added:** 2026-07-07
 
 ---
@@ -267,8 +267,14 @@ _To be completed by dev agent after implementation._
 
 ### Completion Notes
 
+All 8 ACs satisfied. Pre-existing `mmria.common.metadata` build errors in `process_node` / `get_look_up` (dead code, never called) are unchanged from before this story; my changes actually removed 2 pre-existing errors by eliminating the `ConfigurationSet` field declaration and `GetConfiguration` method. `appsettings.local.json` is gitignored via the existing `**/appsettings.local.json` entry in `.gitignore`.
+
 ### Change Log
 
 | File | Change |
 |------|--------|
-| | |
+| `data-migration/Configuration.cs` | **New** — `DataMigrationAppConfiguration` typed model with `MigrationSettings`, `EnvironmentSettings`, `CouchDBSettings` (+ `DatabaseUrlTemplates.GetTemplate()`), `CredentialConfig`, dict-keyed `Credentials` and `JurisdictionLists` |
+| `data-migration/appsettings.json` | **Replaced** — new structured schema; removed legacy `mmria_settings`/`data_migration` flat keys; blank credentials; `ConfigEnvironment` defaulting to `"QA"` |
+| `data-migration/appsettings.local.json` | **New** (gitignored) — developer-local template with `QA` environment stub |
+| `data-migration/migrate.csproj` | **Updated** — added `Microsoft.Extensions.Configuration`, `.Json`, `.Binder` v9.0.0; added `appsettings.json` and `appsettings.local.json` `CopyToOutputDirectory` items |
+| `data-migration/Program.cs` | **Refactored** — removed static fields (`ConfigurationSet`, `config_couchdb_url`, `config_timer_*`, `run_list`, `test_list`, `prefix_list`); new `ConfigurationBuilder` loading `DataMigrationAppConfiguration`; per-prefix `db_url`/`username`/`password` from config; `RunType`/`IsReportOnlyMode` from config; removed `GetConfiguration` CouchDB fetch; updated `backup()` signature; updated all live migration constructor call sites |

@@ -2,7 +2,7 @@
 
 **Epic:** 12 — Data Migration Tool Modernization
 **Story ID:** 12.2
-**Status:** not-started
+**Status:** done
 **Date added:** 2026-07-07
 **Depends on:** Story 12.1 (data-migration environment config)
 
@@ -230,12 +230,18 @@ These are the only two paths with confirmed defects from Bug 117351. The migrati
 
 ## Dev Agent Record
 
-_To be completed by dev agent after implementation._
-
 ### Completion Notes
+
+- All 8 ACs verified against the current codebase.
+- `VitalsTypeCorrectionMigration.cs` was implemented using `CouchDbHttpClient` (FR-15 pattern), not the `cURL` pattern shown in the story's dev notes — this is correct and more current.
+- `RunTypeEnum.VitalsTypeCorrection` is present in `Program.cs` (line 34). Dispatch and instantiation are wired correctly (lines 146–157), passing `couchDbHttpClient` from DI.
+- Program.cs uses the FR-13 typed config for `db_url`, `username`/`password`, and the prefix list — AC-8 confirmed.
+- The dev notes constructor signature omits `CouchDbHttpClient` but the actual implementation includes it; no discrepancy in behavior.
+- Note: FR-17 hardening (retry-on-409, `SaveResult` enum, pre-flight offline check, run summary) is tracked separately and does **not** block this story's completion — those are new requirements added after this story was written.
 
 ### Change Log
 
 | File | Change |
 |------|--------|
-| | |
+| `data-migration/migration-set/VitalsTypeCorrectionMigration.cs` | New file — migration class (uses `CouchDbHttpClient`) |
+| `data-migration/Program.cs` | `VitalsTypeCorrection` added to `RunTypeEnum`; dispatch case and instantiation added |

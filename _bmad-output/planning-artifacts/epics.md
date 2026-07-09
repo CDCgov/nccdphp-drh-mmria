@@ -924,3 +924,81 @@ So that cases imported before the fix display the correct dropdown labels.
 **Given** a case document where `mother_married` is already `0` (JSON number)
 **When** the migration processes it
 **Then** no write is performed (idempotent)
+
+### Story 12.3: Migration Tool Hardening
+
+As a database administrator running a data migration,
+I want the migration tool to retry on CouchDB 409 conflicts and halt on unrecoverable errors,
+So that every case document is guaranteed to be processed and no case is silently skipped.
+
+**Acceptance Criteria:**
+
+**Given** a CouchDB PUT returns 409 (conflict)
+**When** the migration processes that document
+**Then** the migration fetches the fresh document, re-applies the transform, and retries up to 3 times
+**And** on retry exhaustion the failure is counted and the loop continues to the next document
+
+**Given** any retry has exhausted all 3 attempts for a document
+**When** the run finishes
+**Then** exit code is 3 and the final summary includes `Failed (retries exhausted): N`
+
+**Given** a CouchDB PUT returns a non-409 error (network, auth, 500)
+**When** the migration encounters it
+**Then** the migration logs the `_id`, HTTP status, and response body to stderr and calls `Environment.Exit(1)` immediately
+
+**Given** `DateTime.UtcNow < offline_date`
+**When** the migration starts
+**Then** it writes `"PRE-FLIGHT FAIL: system is not offline. Aborting."` to stderr and calls `Environment.Exit(2)`
+
+**Given** the migration completes normally
+**When** `failed_count == 0`
+**Then** exit code is 0 and stdout shows `Processed: N | Already migrated: N | Failed (retries exhausted): 0`
+
+### Story 12.4: Case Rev Endpoint
+
+As the client-side case polling module,
+I want a lightweight endpoint that returns only the current `_rev` of a case document,
+So that I can detect whether the open case has been modified without fetching the full document.
+
+**Acceptance Criteria:**
+
+**Given** an authenticated GET to `/api/case/{id}/rev`
+**When** the document exists in CouchDB
+**Then** the response is `200 { "_id": "<id>", "_rev": "<rev>" }` and includes an `X-Offline-Date` header when offline_date is configured
+
+**Given** an authenticated GET to `/api/case/{id}/rev`
+**When** the document does not exist
+**Then** the response is `404`
+
+**Given** an unauthenticated GET to `/api/case/{id}/rev`
+**When** the request is received
+**Then** the response is `401` — auth is required
+
+**Given** the response includes `X-Offline-Date`
+**When** the client reads it
+**Then** the value is the `offline_date` from the current system offline config in ISO 8601 format
+
+### Story 12.5: Stale Tab UX
+
+As a case coordinator with a stale browser tab,
+I want to be proactively notified when a case has been updated since I opened it, and to receive a clear recovery message if I attempt to save stale data,
+So that I never lose work silently or see a confusing technical error.
+
+**Acceptance Criteria:**
+
+**Given** a case is open for editing and its `_rev` changes on the server
+**When** the 45-second poll detects the mismatch
+**Then** a dismissable banner appears: "This case has been updated. Reload to see the latest version." with [Reload] and [Dismiss] actions
+
+**Given** a user attempts to save and the server returns 409
+**When** the case save error handler processes the response
+**Then** a non-dismissable modal appears: "This case was updated elsewhere. Reload to get the latest version before saving." with a single [Reload Case] button
+**And** the generic error handler does not fire for the 409 case
+
+**Given** the `X-Offline-Date` response header is present and `Date.now() > X-Offline-Date`
+**When** the poll interval is evaluated
+**Then** the poll interval is reduced to 10 seconds
+
+**Given** the current user has read-only access to the case
+**When** the case loads
+**Then** no polling is started
