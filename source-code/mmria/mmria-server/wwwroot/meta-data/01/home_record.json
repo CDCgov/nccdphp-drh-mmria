@@ -287005,24 +287005,28 @@
             },
             {
               "prompt": "If Mother Not Married, has Paternity Acknowledgement been Signed in the Hospital?",
-              "name": "If_mother_not_married_has_paternity_acknowledgement_been_signed_in_the_hospital",
+              "name": "if_mother_not_married_has_paternity_acknowledgement_been_signed_in_the_hospital",
               "type": "list",
               "values": [
                 {
                   "description": "",
-                  "value": ""
+                  "value": "9999"
                 },
                 {
-                  "description": "",
-                  "value": "Yes"
+                  "description": "Yes",
+                  "value": "1"
                 },
                 {
-                  "description": "",
-                  "value": "No"
+                  "description": "No",
+                  "value": "0"
                 },
                 {
-                  "description": "",
-                  "value": "Not Specified"
+                  "description": "Unknown",
+                  "value": "7777"
+                },
+                {
+                  "description": "Not Applicable",
+                  "value": "2"
                 }
               ]
             },

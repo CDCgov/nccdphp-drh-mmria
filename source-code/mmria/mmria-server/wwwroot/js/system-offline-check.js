@@ -237,6 +237,197 @@ function startOfflineStatusPolling(intervalMs) {
     }, ms);
 }
 
+// ── Case Stale Detection (Story 12.4) ────────────────────────────────────────
+
+var _caseRevPollInterval = null;
+var _caseRevPollIntervalMs = 45000; // normal: 45 s
+var _caseRevFastIntervalMs = 10000; // migration window: 10 s
+
+/**
+ * Reloads the open case's data in-place via get_specific_case.
+ * Falls back to a full page reload if the case page hook is not available.
+ */
+function mmria_do_case_reload() {
+    if (typeof window.mmria_reload_case_data === 'function') {
+        window.mmria_reload_case_data();
+    } else {
+        window.location.reload();
+    }
+}
+
+/**
+ * Shows the non-dismissable stale-case modal.
+ * Dynamically injected following the same Bootstrap fade/show pattern as
+ * mmria_vitals_show_print_gate_modal in chart.js.
+ * Called when a case save returns a 409 conflict (case updated elsewhere).
+ */
+function showStaleCaseModal() {
+    var existingModal = document.getElementById('mmria-stale-case-modal');
+    if (existingModal && existingModal.parentNode) existingModal.parentNode.removeChild(existingModal);
+    var existingBackdrop = document.getElementById('mmria-stale-case-modal-backdrop');
+    if (existingBackdrop && existingBackdrop.parentNode) existingBackdrop.parentNode.removeChild(existingBackdrop);
+
+    var html =
+        '<div id="mmria-stale-case-modal" class="modal fade" tabindex="-1" role="alertdialog" aria-modal="true"' +
+        '     aria-labelledby="mmria-stale-case-modal-title" aria-describedby="mmria-stale-case-modal-msg"' +
+        '     style="z-index:1050;">' +
+        '  <div class="modal-dialog" role="document">' +
+        '    <div class="modal-content">' +
+        '      <div class="modal-header" style="background-color:#7b2d8e; color:white; padding:7px;">' +
+        '        <h4 id="mmria-stale-case-modal-title" class="modal-title"' +
+        '            style="margin:0; font-weight:600; font-size:17px;">This case was updated</h4>' +
+        '      </div>' +
+        '      <div class="modal-body" style="padding:20px;">' +
+        '        <p id="mmria-stale-case-modal-msg" style="font-size:16px; color:#333; margin:0;">' +
+        '          This case was updated elsewhere. Reload to get the latest version before saving.' +
+        '        </p>' +
+        '      </div>' +
+        '      <div class="modal-footer" style="padding:15px 20px; text-align:right;">' +
+        '        <button type="button" id="mmria-stale-case-reload-btn" class="btn btn-primary"' +
+        '                style="background-color:#7b2d8e; border-color:#7b2d8e; padding:8px 20px;">Reload Case</button>' +
+        '      </div>' +
+        '    </div>' +
+        '  </div>' +
+        '</div>' +
+        '<div id="mmria-stale-case-modal-backdrop" class="modal-backdrop fade" style="z-index:1040;"></div>';
+
+    document.body.insertAdjacentHTML('beforeend', html);
+
+    var modal = document.getElementById('mmria-stale-case-modal');
+    var backdrop = document.getElementById('mmria-stale-case-modal-backdrop');
+
+    setTimeout(function () {
+        if (modal) { modal.classList.add('show'); modal.style.display = 'block'; }
+        if (backdrop) { backdrop.classList.add('show'); }
+        var btn = document.getElementById('mmria-stale-case-reload-btn');
+        if (btn) btn.focus();
+    }, 10);
+
+    var reloadBtn = document.getElementById('mmria-stale-case-reload-btn');
+    if (reloadBtn) {
+        reloadBtn.addEventListener('click', function () {
+            if (modal && modal.parentNode) modal.parentNode.removeChild(modal);
+            if (backdrop && backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+            mmria_do_case_reload();
+        });
+    }
+}
+
+/**
+ * Shows a stale-case modal (Bootstrap fade pattern) when _rev polling detects the case
+ * has been updated server-side. Has only a Reload button — autosave is paused until reload.
+ */
+function showStaleCaseBanner() {
+    // Only one instance at a time
+    if (document.getElementById('mmria-stale-case-banner')) return;
+
+    // Notify case/index.js to pause autosave
+    if (typeof window.mmria_mark_case_stale === 'function') window.mmria_mark_case_stale();
+
+    var html =
+        '<div id="mmria-stale-case-banner" class="modal fade" tabindex="-1" role="alertdialog" aria-modal="true"' +
+        '     aria-labelledby="mmria-stale-case-banner-title" aria-describedby="mmria-stale-case-banner-msg"' +
+        '     style="z-index:1050;">' +
+        '  <div class="modal-dialog" role="document">' +
+        '    <div class="modal-content">' +
+        '      <div class="modal-header" style="background-color:#7b2d8e; color:white; padding:7px;">' +
+        '        <h4 id="mmria-stale-case-banner-title" class="modal-title"' +
+        '            style="margin:0; font-weight:600; font-size:17px;">This case was updated</h4>' +
+        '      </div>' +
+        '      <div class="modal-body" style="padding:20px;">' +
+        '        <p id="mmria-stale-case-banner-msg" style="font-size:16px; color:#333; margin:0;">' +
+        '          This case has been updated. Reload to see the latest version.' +
+        '        </p>' +
+        '      </div>' +
+        '      <div class="modal-footer" style="padding:15px 20px; text-align:right;">' +
+        '        <button type="button" id="mmria-stale-case-banner-reload" class="btn btn-primary"' +
+        '                style="background-color:#7b2d8e; border-color:#7b2d8e; padding:8px 20px;">Reload</button>' +
+        '      </div>' +
+        '    </div>' +
+        '  </div>' +
+        '</div>' +
+        '<div id="mmria-stale-case-banner-backdrop" class="modal-backdrop fade" style="z-index:1040;"></div>';
+
+    document.body.insertAdjacentHTML('beforeend', html);
+
+    var modal = document.getElementById('mmria-stale-case-banner');
+    var backdrop = document.getElementById('mmria-stale-case-banner-backdrop');
+
+    function closeModal() {
+        if (modal && modal.parentNode) modal.parentNode.removeChild(modal);
+        if (backdrop && backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+    }
+
+    setTimeout(function () {
+        if (modal) { modal.classList.add('show'); modal.style.display = 'block'; }
+        if (backdrop) { backdrop.classList.add('show'); }
+        var reloadBtn = document.getElementById('mmria-stale-case-banner-reload');
+        if (reloadBtn) reloadBtn.focus();
+    }, 10);
+
+    var reloadBtn = document.getElementById('mmria-stale-case-banner-reload');
+    if (reloadBtn) {
+        reloadBtn.addEventListener('click', function () {
+            closeModal();
+            mmria_do_case_reload();
+        });
+    }
+}
+
+/**
+ * Stops the case _rev polling interval.
+ */
+function stopCaseRevPolling() {
+    if (_caseRevPollInterval !== null) {
+        clearInterval(_caseRevPollInterval);
+        _caseRevPollInterval = null;
+    }
+}
+
+/**
+ * Starts polling /api/case/{caseId}/rev every _caseRevPollIntervalMs milliseconds.
+ * If the returned _rev differs from loadedRev, shows a dismissable stale banner.
+ * Reduces poll interval to 10 s when the X-Offline-Date header signals a migration window.
+ *
+ * @param {string} caseId    - The CouchDB document ID of the open case.
+ * @param {string} loadedRev - The _rev captured at case load time (or last successful save).
+ */
+function startCaseRevPolling(caseId, loadedRev) {
+    if (!caseId || !loadedRev) return;
+    stopCaseRevPolling();
+
+    function poll() {
+        fetch('/api/case/' + encodeURIComponent(caseId) + '/rev', { credentials: 'same-origin' })
+            .then(function (response) {
+                // Check X-Offline-Date to accelerate polling during migration window (AC-3)
+                var offlineDateHeader = response.headers.get('X-Offline-Date');
+                if (offlineDateHeader) {
+                    var offlineMs = new Date(offlineDateHeader).getTime();
+                    if (!isNaN(offlineMs) && Date.now() > offlineMs) {
+                        if (_caseRevPollIntervalMs !== _caseRevFastIntervalMs) {
+                            _caseRevPollIntervalMs = _caseRevFastIntervalMs;
+                            stopCaseRevPolling();
+                            _caseRevPollInterval = setInterval(poll, _caseRevPollIntervalMs);
+                        }
+                    }
+                }
+                if (!response.ok) return null;
+                return response.json();
+            })
+            .then(function (data) {
+                if (!data) return;
+                if (data._rev && data._rev !== loadedRev) {
+                    showStaleCaseBanner();
+                }
+            })
+            .catch(function (err) {
+                console.warn('[CaseRevPoll] poll failed:', err);
+            });
+    }
+
+    _caseRevPollInterval = setInterval(poll, _caseRevPollIntervalMs);
+}
+
 // Expose all public functions on window for external callers.
 window.checkOfflineStatus = checkOfflineStatus;
 window.handleOfflineState = handleOfflineState;
@@ -246,3 +437,7 @@ window.showOfflineModal = showOfflineModal;
 window.clearAutoLogoutTimer = clearAutoLogoutTimer;
 window.mmria_offline_modal_ok_handler = mmria_offline_modal_ok_handler;
 window.startOfflineStatusPolling = startOfflineStatusPolling;
+window.showStaleCaseModal = showStaleCaseModal;
+window.showStaleCaseBanner = showStaleCaseBanner;
+window.stopCaseRevPolling = stopCaseRevPolling;
+window.startCaseRevPolling = startCaseRevPolling;

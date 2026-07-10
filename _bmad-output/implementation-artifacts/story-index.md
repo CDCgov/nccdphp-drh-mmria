@@ -326,6 +326,123 @@ dev this story _bmad-output/implementation-artifacts/10-5-config-driven-cvs-retr
 
 ---
 
+## Epic 11 — Vitals Import Integer Type Fix
+
+| Story | File | Status |
+|-------|------|--------|
+| 11.1 — Vitals Import: Store Integer-Coded Fields as JSON Numbers | [11-1-vitals-import-integer-type-fix.md](11-1-vitals-import-integer-type-fix.md) | verification |
+
+**Sequencing:** Independent — can be worked immediately.
+
+**Dev prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/11-1-vitals-import-integer-type-fix.md
+```
+
+---
+
+## Epic 12 — Data Migration Tool Modernization
+
+| Story | File | Status |
+|-------|------|--------|
+| 12.1 — Data Migration Environment Configuration Parity | [12-1-data-migration-environment-config.md](12-1-data-migration-environment-config.md) | done |
+| 12.1.1 — Fix Data Migration Project Reference _(build blocker)_ | [12-1-1-fix-data-migration-project-reference.md](12-1-1-fix-data-migration-project-reference.md) | done |
+| 12.2 — Vitals Retrospective Type Correction Migration | [12-2-vitals-type-correction-migration.md](12-2-vitals-type-correction-migration.md) | done |
+| 12.2 (Hardening) — Migration Tool Hardening | [12-2-migration-tool-hardening.md](12-2-migration-tool-hardening.md) | done |
+| 12.3 — Case Rev Endpoint | [12-3-case-rev-endpoint.md](12-3-case-rev-endpoint.md) | done |
+| 12.4 — Stale Tab UX | [12-4-stale-tab-ux.md](12-4-stale-tab-ux.md) | not-started |
+
+**Sequencing:** 12.1 → 12.1.1 → 12.2. Stories 12.2-Hardening, 12.3, and 12.4 follow from the party mode safety analysis (2026-07-08).
+
+> ⚠️ **12.1.1 is a build blocker.** Story 12.1's `Program.cs` refactor left a pre-existing broken `ProjectReference` in `migrate.csproj` uncorrected. This causes 401 cascading compile errors. Story 12.1.1 is a single-line csproj fix that unblocks all downstream work.
+
+> ⚠️ **12.2-Hardening must complete before running the migration in production.** It adds retry-on-409, `SaveResult` enum, pre-flight offline check, and hard-abort on unrecoverable errors. The "cannot skip a case" constraint makes this a gate.
+
+> ℹ️ **12.3 and 12.4 are a vertical slice** — implement together. 12.3 (server rev endpoint) provides the `_rev` and `X-Offline-Date` data that 12.4 (client polling) consumes. 12.4 depends on 12.3 being deployed first.
+
+**Dev prompts:**
+
+```
+dev this story _bmad-output/implementation-artifacts/12-1-data-migration-environment-config.md
+```
+
+```
+dev this story _bmad-output/implementation-artifacts/12-1-1-fix-data-migration-project-reference.md
+```
+
+```
+dev this story _bmad-output/implementation-artifacts/12-2-vitals-type-correction-migration.md
+```
+
+```
+dev this story _bmad-output/implementation-artifacts/12-2-migration-tool-hardening.md
+```
+
+```
+dev this story _bmad-output/implementation-artifacts/12-3-case-rev-endpoint.md
+```
+
+```
+dev this story _bmad-output/implementation-artifacts/12-4-stale-tab-ux.md
+```
+
+---
+
+## Epic 13 — HTTP Client Modernization: data-migration _(2026-07-08)_
+
+| Story | File | Status |
+|-------|------|--------|
+| 13.1 — Replace cURL with CouchDbHttpClient in data-migration | [13-1-data-migration-curl-to-couchdbhttpclient.md](13-1-data-migration-curl-to-couchdbhttpclient.md) | not-started |
+
+**Sequencing:** Independent. Can be worked in parallel with Epic 14.
+
+> ℹ️ `data-migration` already references `mmria.common`. The main work is adding DI packages, wiring `ServiceProvider` in `Program.cs`, threading `CouchDbHttpClient` through all migration class constructors, and replacing every `new cURL(...)` call site. One sync `execute()` call in `SaveRecord.cs` must be made async.
+
+**Dev prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/13-1-data-migration-curl-to-couchdbhttpclient.md
+```
+
+---
+
+## Epic 14 — HTTP Client Modernization: Replication _(2026-07-08)_
+
+| Story | File | Status |
+|-------|------|--------|
+| 14.1 — Replace cURL with CouchDbHttpClient in Replication | [14-1-replication-curl-to-couchdbhttpclient.md](14-1-replication-curl-to-couchdbhttpclient.md) | not-started |
+
+**Sequencing:** Independent. Can be worked in parallel with Epic 13.
+
+> ℹ️ `Replication` does **not** yet reference `mmria.common` — adding the project reference is the first step. Both CouchDB-credentialed calls and unauthenticated external API calls (image tags, redeploy, trivy, scale ops) are migrated to `CouchDbHttpClient.ExecuteAsync`. `Program.cs` is large (~2900+ lines) — work top-to-bottom by `new cURL` occurrences.
+
+**Dev prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/14-1-replication-curl-to-couchdbhttpclient.md
+```
+
+---
+
+## Epic 15 — Admin Monitoring Enhancements _(2026-07-09)_
+
+| Story | File | Status |
+|-------|------|--------|
+| 15.1 — Tenant Database Counts: Open Cases Column | [15-1-tenant-database-counts-open-cases.md](15-1-tenant-database-counts-open-cases.md) | not-started |
+
+**Sequencing:** Independent. No dependencies on other epics.
+
+> ℹ️ Adds a Mango `_find` query per tenant to count cases with `checked_out_by_tab_id` present, classified as active (≤10 min) or possibly stale (>10 min). Changes span `mmria.common` (model, DAL, manager) and `mmria-server` (controller, view). The `mmria-tenant-database-counts` utility inherits model changes automatically with no code changes of its own.
+
+**Dev prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/15-1-tenant-database-counts-open-cases.md
+```
+
+---
+
 ## Open Items — Resolve Before Affected Story
 
 | OI       | Affects               | What to resolve                                                                                                                                                                                                                                                                                                                                                                                        |

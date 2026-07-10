@@ -4,7 +4,7 @@ using System.Dynamic;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
-using mmria.case_version.v260120;
+using mmria.case_version.v260615;
 using mmria.common.couchdb;
 using mmria.common.getset;
 using mmria.common.model.couchdb;
@@ -1126,6 +1126,18 @@ public class CaseManager
             caseData.last_updated_by = userName;
             caseData.date_last_updated = DateTime.Now;
 
+            // Detect rev conflict: reject the save when the client's revision is stale (Story 12.4).
+            // Both must be valid CouchDB revisions and they must differ for this to be a conflict.
+            if (CouchDbRevisionHelper.IsValidRevision(caseData._rev) &&
+                CouchDbRevisionHelper.IsValidRevision(existingRevision) &&
+                !string.Equals(caseData._rev.Trim(), existingRevision.Trim(), StringComparison.Ordinal))
+            {
+                response.ok = false;
+                response.error_description = "(409) Conflict - case has been updated since you last loaded it.";
+                result.Response = response;
+                return result;
+            }
+
             var caseRevisionHandling = DescribeRevisionHandling(caseData._rev, existingRevision);
             caseData._rev = CouchDbRevisionHelper.ResolveServerOwnedRevision(caseData._rev, existingRevision);
             var changeStackRevisionHandling = DescribeIncomingRevisionHandling(changeStack._rev);
@@ -1150,8 +1162,8 @@ public class CaseManager
 
             // Sliding edit lock: if the incoming payload still indicates the case is checked out,
             // refresh the checkout timestamp to extend the lock window.
-            // If the client is clearing the lock, strip the tab id before persisting so the
-            // saved document is fully unlocked after the owner-tab validation above succeeds.
+            // If the client is clearing the lock, strip all three checkout fields before persisting
+            // so the saved document is fully unlocked after the owner-tab validation above succeeds.
             if (caseData.date_last_checked_out.HasValue)
             {
                 caseData.date_last_checked_out = DateTime.UtcNow;
@@ -1159,6 +1171,20 @@ public class CaseManager
             else
             {
                 caseData.checked_out_by_tab_id = null;
+                caseData.last_checked_out_by = null;
+            }
+
+            // Normalize empty strings to null so NullValueHandling.Ignore removes the fields
+            // from the stored document. An empty string is not a valid tab id or user name and
+            // must not be persisted, otherwise the open-case Mango query produces false positives.
+            if (string.IsNullOrEmpty(caseData.checked_out_by_tab_id))
+            {
+                caseData.checked_out_by_tab_id = null;
+            }
+
+            if (string.IsNullOrEmpty(caseData.last_checked_out_by))
+            {
+                caseData.last_checked_out_by = null;
             }
 
             var object_string = CaseJsonSerialization.SerializeMmriaCase(caseData);

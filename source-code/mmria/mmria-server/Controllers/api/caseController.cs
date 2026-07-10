@@ -55,7 +55,7 @@ public sealed class caseController: ControllerBase
     [HttpGet]
         [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     //public async Task<System.Dynamic.ExpandoObject> Get(string case_id) 
-    public async Task<mmria.case_version.v260120.mmria_case> Get(string case_id) 
+    public async Task<mmria.case_version.v260615.mmria_case> Get(string case_id) 
     { 
         try
         {
@@ -73,11 +73,54 @@ public sealed class caseController: ControllerBase
     } 
 
 
+    [Authorize(Roles = "abstractor, data_analyst")]
+    [HttpGet("{case_id}/rev")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<IActionResult> GetRev(string case_id)
+    {
+        try
+        {
+            var sanitizedId = SanitizeSingleLineText(case_id, 256);
+            if (string.IsNullOrWhiteSpace(sanitizedId))
+                return BadRequest();
+
+            string url = $"{db_config.url}/{db_config.prefix}mmrds/{Uri.EscapeDataString(sanitizedId)}";
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+                "GET", url, null, db_config.user_name, db_config.user_value);
+
+            if (string.IsNullOrWhiteSpace(responseFromServer) || responseFromServer.Contains("\"not_found\""))
+                return NotFound();
+
+            var doc = Newtonsoft.Json.Linq.JObject.Parse(responseFromServer);
+            var id = doc["_id"]?.ToString();
+            var rev = doc["_rev"]?.ToString();
+
+            if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(rev))
+                return NotFound();
+
+            var result = new { _id = id, _rev = rev };
+
+            var offlineDate = await GetOfflineDateAsync();
+            if (!string.IsNullOrWhiteSpace(offlineDate))
+                Response.Headers["X-Offline-Date"] = offlineDate;
+
+            Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0";
+            Response.Headers["Pragma"] = "no-cache";
+
+            return mmria.server.util.EscapedJsonResultFactory.Create(result);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+            return StatusCode(500);
+        }
+    }
+
     public sealed class Save_Case_Request
     {
         public mmria.common.model.couchdb.Change_Stack Change_Stack {get;set;} = new();
 
-        public mmria.case_version.v260120.mmria_case Case_Data {get;set;}
+        public mmria.case_version.v260615.mmria_case Case_Data {get;set;}
         public Save_Case_Request()
         {
 
@@ -422,8 +465,8 @@ public sealed class caseController: ControllerBase
         };
     }
 
-    private static mmria.case_version.v260120.mmria_case CreateSanitizedCase(
-        mmria.case_version.v260120.mmria_case request,
+    private static mmria.case_version.v260615.mmria_case CreateSanitizedCase(
+        mmria.case_version.v260615.mmria_case request,
         string currentUserName)
     {
         if (request == null || string.IsNullOrWhiteSpace(request._id))
@@ -431,7 +474,7 @@ public sealed class caseController: ControllerBase
             return null;
         }
 
-        mmria.case_version.v260120.mmria_case sanitizedCase;
+        mmria.case_version.v260615.mmria_case sanitizedCase;
         try
         {
             sanitizedCase = CaseJsonSerialization.DeserializeMmriaCase(CaseJsonSerialization.SerializeMmriaCase(request));
@@ -617,6 +660,31 @@ public sealed class caseController: ControllerBase
         }
 
         return string.Empty;
+    }
+
+    private async Task<string> GetOfflineDateAsync()
+    {
+        try
+        {
+            var vitalsUrl = configuration.GetString("vitals_url", host_prefix)
+                ?.Replace("/api/Message/IJESet", string.Empty);
+            if (string.IsNullOrWhiteSpace(vitalsUrl))
+                return null;
+
+            var getUrl = $"{vitalsUrl}/api/systemOffline/GetSystemOfflineConfig";
+            var requestOptions = new mmria.common.getset.CouchDbRequestOptions
+            {
+                VitalServiceKey = configuration.GetString("vital_service_key", host_prefix)
+            };
+            var responseBody = await _couchDbHttpClient.ExecuteAsync(
+                "GET", getUrl, null, "application/json", requestOptions);
+            var config = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.SystemOfflineConfig>(responseBody);
+            return config?.offline_date;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static string SanitizeSingleLineText(string value, int maxLength = 512)

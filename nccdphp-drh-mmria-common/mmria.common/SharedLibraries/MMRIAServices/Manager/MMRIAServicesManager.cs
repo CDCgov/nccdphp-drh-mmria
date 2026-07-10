@@ -180,6 +180,8 @@ public sealed class MMRIAServicesManager
         response.ok_entry_count = response.entries.Count(item => string.Equals(item.status, "ok", StringComparison.OrdinalIgnoreCase));
         response.partial_error_entry_count = response.entries.Count(item => string.Equals(item.status, "partial_error", StringComparison.OrdinalIgnoreCase));
         response.error_entry_count = response.entries.Count(item => string.Equals(item.status, "error", StringComparison.OrdinalIgnoreCase));
+        response.total_open_case_count_active = response.entries.Sum(item => item.open_case_count_active ?? 0);
+        response.total_open_case_count_stale = response.entries.Sum(item => item.open_case_count_stale ?? 0);
 
         return response;
     }
@@ -1202,8 +1204,9 @@ public sealed class MMRIAServicesManager
         var mmrdsDesignDocCountTask = TryGetDesignDocumentCountAsync(dbInfo.Get_Prefix_DB_Url("mmrds"), dbInfo, "MMRDS", perDatabaseTimeoutSeconds);
         var deIdDesignDocCountTask = TryGetDesignDocumentCountAsync(dbInfo.Get_Prefix_DB_Url("de_id"), dbInfo, "De-ID", perDatabaseTimeoutSeconds);
         var reportDesignDocCountTask = TryGetDesignDocumentCountAsync(dbInfo.Get_Prefix_DB_Url("report"), dbInfo, "Report", perDatabaseTimeoutSeconds);
+        var openCaseTask = TryGetOpenCaseCountsAsync(dbInfo.Get_Prefix_DB_Url("mmrds"), dbInfo, perDatabaseTimeoutSeconds);
 
-        await Task.WhenAll(mmrdsTask, deIdTask, reportTask, mmrdsDesignDocCountTask, deIdDesignDocCountTask, reportDesignDocCountTask);
+        await Task.WhenAll(mmrdsTask, deIdTask, reportTask, mmrdsDesignDocCountTask, deIdDesignDocCountTask, reportDesignDocCountTask, openCaseTask);
 
         var mmrdsResult = await mmrdsTask;
         var deIdResult = await deIdTask;
@@ -1211,6 +1214,7 @@ public sealed class MMRIAServicesManager
         var mmrdsDesignDocCountResult = await mmrdsDesignDocCountTask;
         var deIdDesignDocCountResult = await deIdDesignDocCountTask;
         var reportDesignDocCountResult = await reportDesignDocCountTask;
+        var (openActive, openStale, openError) = await openCaseTask;
 
         entry.mmrds_doc_count = mmrdsResult.doc_count;
         entry.de_id_doc_count = deIdResult.doc_count;
@@ -1259,7 +1263,46 @@ public sealed class MMRIAServicesManager
             _ => "partial_error"
         };
 
+        entry.open_case_count_active = openActive;
+        entry.open_case_count_stale = openStale;
+        entry.open_case_error = openError;
+
         return entry;
+    }
+
+    private const int OpenCaseActiveThresholdMinutes = 30;
+
+    private async Task<(int? active, int? stale, string error)> TryGetOpenCaseCountsAsync(
+        string databaseUrl,
+        mmria.common.couchdb.DBConfigurationDetail dbInfo,
+        int timeoutSeconds)
+    {
+        try
+        {
+            var stubs = await _mmriaServicesDal.GetOpenCaseStubsAsync(
+                databaseUrl,
+                dbInfo.user_name,
+                dbInfo.user_value,
+                timeoutSeconds);
+
+            var cutoff = DateTime.UtcNow.AddMinutes(-OpenCaseActiveThresholdMinutes);
+            int active = 0;
+            int stale = 0;
+
+            foreach (var (_, dateLastCheckedOut) in stubs)
+            {
+                if (dateLastCheckedOut.HasValue && dateLastCheckedOut.Value >= cutoff)
+                    active++;
+                else
+                    stale++;
+            }
+
+            return (active, stale, null);
+        }
+        catch (Exception ex)
+        {
+            return (null, null, $"Open case query failed: {ex.Message}");
+        }
     }
 
     private async Task<(int? doc_count, string error)> TryGetDesignDocumentCountAsync(

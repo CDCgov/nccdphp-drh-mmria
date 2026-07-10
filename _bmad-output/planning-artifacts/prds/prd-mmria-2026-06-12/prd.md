@@ -2,7 +2,7 @@
 title: "PRD: MMRIA V4.1"
 status: final
 created: 2026-06-12
-updated: 2026-07-06 (FR-11 added — CVS PDF Export Tool Reliability; FR-11.3 updated — retry constants are config-driven)
+updated: 2026-07-08 (FR-12 added — Vitals Import NAT/FET Numeric Field Type Normalization; FR-13 added — Data Migration Project Environment Configuration; FR-14 added — Vitals Import Retrospective Data Correction Migration; FR-15 added — data-migration cURL to CouchDbHttpClient Migration; FR-16 added — Replication cURL to CouchDbHttpClient Migration; FR-17 added — VitalsTypeCorrectionMigration Hardening; FR-18 added — Case Rev Endpoint; FR-19 added — Stale Tab UX)
 ---
 
 # PRD: MMRIA V4.1
@@ -362,6 +362,242 @@ The CVS page and the parent case page maintain consistent, user-visible status:
 - The server logs a structured telemetry entry on each completed request: `"CVS dashboard request completed. status={Status} duration_ms={DurationMs}"`.
 
 ---
+
+### FR-12 — Vitals Import NAT/FET Numeric Field Type Normalization
+
+Source: Bug 117351 (VA-reported, 2/6/2026). Cases created via vitals import display "Select Value" in dropdown fields instead of the coded label. Root cause: `mmria.services` `BatchItemProcessingService` writes certain NAT/FET fields to CouchDB as JSON strings (e.g., `"mother_married": "0"`) while mmria-server writes the same fields as JSON numbers (`"mother_married": 0`). The front-end dropdown renderer expects integer values and silently falls back to "Select Value" when it finds a string. The Rule methods (`MARN_Rule`, `ACKN_Rule`, etc.) correctly map IJE characters to numeric string codes but those codes are stored as JSON strings because `C_Get_Set_Value.set_value` always writes `string` to the document. The fix requires that integer-coded fields are stored as integers in the JSON document.
+
+**FR-12.1 — Integer storage for coded dropdown fields at `set_value` call sites**
+For `MARN` (`birth_fetal_death_certificate_parent/demographic_of_mother/mother_married`) and `ACKN` (`birth_fetal_death_certificate_parent/demographic_of_mother/If_mother_not_married_has_paternity_acknowledgement_been_signed_in_the_hospital`), and all other NAT/FET fields whose MMRIA metadata type is `number` and whose values are always numeric strings, the call to `gs.set_value()` in `BatchItemProcessingService` stores the value as a JSON integer in the CouchDB document — not as a JSON string. The implementation approach (adding an object overload to `C_Get_Set_Value`, modifying the existing method, or directly setting the dictionary key) is developer discretion, subject to: no regressions on string-typed fields, and matching the type that mmria-server produces for the same fields.
+
+**FR-12.2 — Post-fix verification**
+After FR-12.1, a newly imported NAT record with a Y/N value for `MARN` or `ACKN` results in a JSON integer stored in CouchDB (e.g., `"mother_married": 0`). The front-end dropdown for both affected fields displays the correct coded label. The developer audits adjacent non-wrapped fields (MEDUC, FEDUC, ATTEND, TRAN, PAY, WIC) and applies the same integer storage fix to any that the front-end expects as integers.
+
+---
+
+### FR-13 — Data Migration Project Environment Configuration
+
+The `data-migration` project requires source-code edits to target a different environment — CouchDB URL, credentials, and the jurisdiction prefix list are all hardcoded in `Program.cs` and `appsettings.json`. The `Replication` project solved this problem with a layered `appsettings.json`/`appsettings.local.json` pattern backed by typed configuration classes (`EnvironmentSettings`, `CouchDBSettings.DatabaseUrlTemplates`, per-environment `Credentials`, per-environment `JurisdictionLists`). `data-migration` must adopt the same pattern.
+
+**FR-13.1 — Layered appsettings pattern**
+`data-migration/appsettings.json` is restructured to define the full configuration schema with blank/safe defaults. `appsettings.local.json` (gitignored, documented in `HTTPS-SETUP-INSTRUCTIONS.md` or an equivalent README section) holds local credentials and active run settings. `Program.cs` loads both files via `ConfigurationBuilder.AddJsonFile("appsettings.local.json", optional: true, reloadOnChange: true)`.
+
+**FR-13.2 — Typed configuration model**
+A `Configuration.cs` class is added to `data-migration` defining a root `DataMigrationAppConfiguration` with the following sections — modeled directly on the Replication project's `Configuration.cs`:
+- `MigrationSettings`: `RunType` (string), `IsReportOnlyMode` (bool, default `true`), `DatabaseName` (string, default `"mmrds"`)
+- `EnvironmentSettings`: `ConfigEnvironment` (string), `IntOrProd` (string) — identical shape to Replication
+- `CouchDBSettings`: `DatabaseUrlTemplates` with properties `Localhost`, `Development`, `QA`, `Integration`, `Production`
+- `Credentials`: `Dictionary<string, CredentialConfig>` keyed by environment name, each with `Username` and `Password`
+- `JurisdictionLists`: `Dictionary<string, List<string>>` with keys `Localhost`, `Development`, `QA`, `Integration`, `Production`, `Alternate`, `Filtered`
+
+**FR-13.3 — Hardcoded list removal**
+`run_list`, `test_list`, `prefix_list`, and the `is_test_list` boolean in `Program.cs` are removed. The active prefix list is selected at startup by reading `JurisdictionLists[ConfigEnvironment]`. The `has_been_done_set` skip mechanism is retained.
+
+**FR-13.4 — URL and credential construction**
+The active CouchDB URL per jurisdiction is constructed from `CouchDBSettings.DatabaseUrlTemplates[ConfigEnvironment]`, with `{prefix}` substituted. Credentials are sourced from `Credentials[ConfigEnvironment]`. The legacy flat keys `data_migration:couchdb_url`, `data_migration:timer_user_name`, and `data_migration:timer_value` are removed from `appsettings.json` and from `Program.cs`.
+
+---
+
+### FR-14 — Vitals Import Retrospective Data Correction Migration
+
+Cases processed by vitals import before the FR-12 fix are persisted in CouchDB with string values for fields that must be integers. The front-end cannot self-correct these — they remain broken until the underlying document is fixed. The `data-migration` project is the correct tool for this correction.
+
+**FR-14.1 — New migration run type**
+`VitalsTypeCorrection` is added to the `RunTypeEnum` in `data-migration/Program.cs`. When `MigrationSettings.RunType` is `VitalsTypeCorrection`, the program executes the string-to-integer field correction logic across all case documents in the configured jurisdiction databases.
+
+**FR-14.2 — Target field list**
+The initial set of CouchDB field paths subject to correction:
+- `birth_fetal_death_certificate_parent/demographic_of_mother/mother_married`
+- `birth_fetal_death_certificate_parent/demographic_of_mother/If_mother_not_married_has_paternity_acknowledgement_been_signed_in_the_hospital`
+
+Additional paths are appended as the developer confirms which other NAT/FET fields with MMRIA metadata type `number` were affected by the import defect.
+
+**FR-14.3 — Correction logic**
+For each case document retrieved from the target database: for each target field path, if the stored value is a JSON string whose trimmed content parses as a valid integer via `int.TryParse`, the stored value is replaced with the corresponding JSON number. Documents where the field already holds a JSON number, null, or is absent are skipped without modification.
+
+**FR-14.4 — Report-only mode**
+The migration uses `MigrationSettings.IsReportOnlyMode` (default `true`). In report-only mode, the document `_id`, the field path, and the current string value are written to the run output log but no CouchDB writes are issued. Setting `IsReportOnlyMode = false` applies corrections and persists the updated documents via existing CouchDB update infrastructure. This mirrors the behavior of existing migrations (`VitalsMigration01`).
+
+**FR-14.5 — Environment dependency**
+FR-14 depends on FR-13. The migration uses the `EnvironmentSettings`/`CouchDBSettings`/`Credentials` configuration added by FR-13 to connect to the target environment and iterate the configured jurisdiction list.
+
+---
+
+### FR-15 — data-migration cURL to CouchDbHttpClient Migration
+
+The `data-migration` project makes all CouchDB and external HTTP calls through a local `cURL` class. The `mmria.common` project exposes `mmria.common.getset.CouchDbHttpClient`, a tested, DI-backed HTTP wrapper with the same `ExecuteAsync(method, url, payload, userName, password)` surface, already consumed by `mmria-server` and `mmria-services`. This requirement replaces the `cURL` class in `data-migration` with `CouchDbHttpClient` at every call site.
+
+**FR-15.1 — Dependency injection wiring**
+`Microsoft.Extensions.DependencyInjection` and `Microsoft.Extensions.Http` are added to `migrate.csproj`. In `Program.cs`, a `ServiceCollection` is constructed, `AddHttpClient()` is registered, and a `ServiceProvider` is built before the main run logic executes. A `CouchDbHttpClient` instance is resolved from the provider and passed through to all classes that currently construct a `cURL` object.
+
+**FR-15.2 — CouchDB call-site replacement**
+Every `new cURL(...)` instantiation in the following files is replaced with an equivalent `await _couchDbHttpClient.ExecuteAsync(method, url, payload, userName, password)` call, preserving the existing method (GET / PUT / POST / DELETE), URL, payload, and credential arguments:
+
+- `SaveRecord.cs`
+- `db_backup/db_backup.cs`
+- `migration-set/committee_review_pregnancy_relatedness.cs`
+- `migration-set/editable_list.cs`
+- `migration-set/Fix_American_Indian_Recode.cs`
+- `migration-set/GA-One-Time.cs`
+- `migration-set/Manual-Migration.cs`
+- `migration-set/MMRDS_CS_Narrative_Migration.cs`
+- `migration-set/Process_Migrate_Charactor_to_Numeric.cs`
+- `migration-set/SubstanceMigration.cs`
+- `migration-set/v2.10-Migration.cs`
+- `migration-set/CVS_Migration.cs` (CouchDB calls only — see FR-15.3)
+- `common/CVS.cs` (CouchDB calls only — see FR-15.3)
+- `mmrds-importer/mmria_server_api_client.cs`
+
+After all call sites are replaced, `cURL.cs` is deleted from the project.
+
+**FR-15.3 — External service calls (CVS service)**
+`cURL` instantiations in `CVS_Migration.cs` and `CVS.cs` that target the CVS external service (non-CouchDB endpoints, typically unauthenticated POST calls to the CVS base URL) are migrated to use `CouchDbHttpClient.ExecuteAsync` with null credentials, consistent with the existing pattern for unauthenticated calls. No separate HTTP client is introduced.
+
+**FR-15.4 — No behavior change**
+FR-15 is a mechanical refactor. No migration logic, URL construction, credential sourcing, or JSON serialization is modified beyond the call-site substitution. The `has_been_done_set` skip mechanism, report-only mode, and all other runtime behaviors are unchanged.
+
+---
+
+### FR-16 — Replication cURL to CouchDbHttpClient Migration
+
+The `Replication` project makes all CouchDB and external HTTP calls through the same local `cURL` class pattern. Unlike `data-migration`, `Replication` does not yet reference `mmria.common`. This requirement adds the reference and replaces the `cURL` class with `CouchDbHttpClient` at all CouchDB call sites.
+
+**FR-16.1 — mmria.common project reference and DI wiring**
+A `ProjectReference` to `mmria.common.csproj` is added to `replicate.csproj`. `Microsoft.Extensions.DependencyInjection` and `Microsoft.Extensions.Http` packages are added. In `Program.cs`, a `ServiceCollection` is constructed, `AddHttpClient()` is registered, and a `ServiceProvider` is built before the main run logic. A `CouchDbHttpClient` instance is resolved from the provider and threaded through to all call sites — including the `OverridableConfiguration`, `utils.cs`, and `Role_Replication.cs` classes that currently accept the `IConfiguration` object to source credentials.
+
+**FR-16.2 — CouchDB call-site replacement**
+Every `new cURL(...)` instantiation that targets a CouchDB endpoint (identifiable by the presence of `config_timer_user_name`, `config_timer_value`, `env_username`, `env_password`, or similar credential arguments) in the following files is replaced with `await _couchDbHttpClient.ExecuteAsync(method, url, payload, userName, password)`:
+
+- `OverridableConfiguration.cs`
+- `utils.cs`
+- `Role_Replication.cs`
+- `Program.cs` — all CouchDB-credentialed `cURL` calls (replication POSTs, user GET/PUT, config GET/PUT, design document PUT, index POST, delete operations, clear history, etc.)
+
+**FR-16.3 — External API calls (non-CouchDB)**
+`cURL` instantiations in `Program.cs` that call external, unauthenticated endpoints — including image tag lookups, redeploy URLs, resume/pause rollout URLs, trivy scan URL, scale-to-zero/scale-to-one URLs, twistlock scan URL, and environment update URLs (all with null credentials) — are migrated to use `CouchDbHttpClient.ExecuteAsync` with null credentials. These calls do not require a separate HTTP client.
+
+After all call sites are replaced, `cURL.cs` is deleted from the project.
+
+**FR-16.4 — No behavior change**
+FR-16 is a mechanical refactor. No replication logic, jurisdiction list processing, user synchronization, or design document seeding behavior is modified beyond the call-site substitution.
+
+---
+
+### FR-17 — VitalsTypeCorrectionMigration Hardening
+
+The `VitalsTypeCorrectionMigration` CLI tool (in `data-migration/migration-set/VitalsTypeCorrectionMigration.cs`) currently returns a `bool` from `SaveRecord.save_case()` and silently skips any case document that encounters a CouchDB 409 conflict. Because every case must be successfully migrated — a skipped case is a data integrity incident — the tool must be hardened with conflict retry, explicit error surfacing, a pre-flight offline gate, and a summary report.
+
+**FR-17.1 — `SaveResult` enum replaces `bool` return in `SaveRecord`**
+`data-migration/SaveRecord.save_case()` is changed to return a `SaveResult` enum with three members: `Success` (HTTP 2xx), `Conflict` (HTTP 409), and `Error` (all other non-success codes). No `bool` return path remains. All callers are updated. This change makes 409 distinguishable from other failures so the migration loop can apply the correct retry strategy.
+
+**FR-17.2 — Retry-on-conflict with fresh `_rev` fetch**
+`VitalsTypeCorrectionMigration` implements a per-document retry loop with a maximum of 3 attempts. On `SaveResult.Conflict`: (1) fetch the current document snapshot via `GET /{db}/{id}`, (2) re-apply `ApplyVitalsTypeCorrection()` to the fresh snapshot, (3) retry the save. On retry exhaustion, the failure is recorded in a `failed_count` counter and the loop continues to the next document — all cases must be attempted. `Environment.Exit(3)` is called at the end of the run if `failed_count > 0`.
+
+**FR-17.3 — Pure, re-applicable transform method**
+The field correction logic is extracted into a static method `ApplyVitalsTypeCorrection(doc)` that is side-effect-free and idempotent — calling it on a document where fields are already integers produces no change. This method is unit-testable independently of HTTP calls and is the single implementation called on both the initial snapshot and any retry snapshot.
+
+**FR-17.4 — Hard stop on non-conflict error**
+On `SaveResult.Error` (network failure, auth failure, unexpected server error): log the case `_id`, the HTTP status code, and the response body to stderr, then call `Environment.Exit(1)` immediately. Non-conflict errors are not retryable and require operator investigation before the migration proceeds.
+
+**FR-17.5 — Pre-flight offline date check**
+Before processing any documents, the migration reads `offline_date` from configuration and verifies `DateTime.UtcNow >= offline_date`. If the condition is not met, the migration writes `"PRE-FLIGHT FAIL: system is not offline. Aborting."` to stderr and calls `Environment.Exit(2)`. This prevents accidental execution against a live system.
+
+**FR-17.6 — Run summary output**
+On normal completion, the migration emits a final summary to stdout: `Processed: N | Already migrated: N | Failed (retries exhausted): N`. Exit code 0 is reserved for runs where `failed_count == 0`. Exit code 3 indicates one or more documents could not be saved after all retries.
+
+---
+
+### FR-18 — Case Rev Endpoint
+
+To enable client-side staleness detection (FR-19), the mmria-server must expose a lightweight, authenticated endpoint that returns only the current `_rev` of a case document. This avoids returning the full case payload on every poll cycle.
+
+**FR-18.1 — `GET /api/case/{id}/rev` endpoint**
+A new action is added to the existing case controller in `source-code/mmria/mmria-server/`. The route is `GET /api/case/{id}/rev`. The endpoint:
+- Requires authentication (same cookie-based auth as existing case GET endpoints).
+- Returns `200 { "_id": "<id>", "_rev": "<current_rev>" }` when the document exists in CouchDB.
+- Returns `404` when the document does not exist.
+- Does not return the full document body.
+
+**FR-18.2 — `X-Offline-Date` response header**
+The response includes an `X-Offline-Date` header containing the current `offline_date` value (ISO 8601) sourced from the in-memory `system-offline-config` cache (established by Story 8.1). If no offline date is configured, the header is omitted. The client uses this value to adjust poll frequency during the migration window (FR-19.3).
+
+**FR-18.3 — Performance**
+The endpoint proxies a CouchDB HEAD or minimal GET to retrieve `_rev` only. Response latency target is under 200 ms on the local network.
+
+---
+
+### FR-19 — Stale Tab UX
+
+A browser tab that was backgrounded or frozen before `offline_date` and foregrounded after a data migration has run will hold a stale in-memory case snapshot with a stale CouchDB `_rev`. If the user attempts to save, they will receive a CouchDB 409 conflict. Two mechanisms address this: a proactive `_rev` poll that detects staleness before a save attempt, and a reactive 409 intercept that surfaces a clear recovery path if the save is attempted anyway.
+
+**FR-19.1 — 409 intercept on case save (reactive)**
+The existing case save error handler in the client is updated to intercept HTTP 409 responses specifically. On 409, a non-dismissable modal is displayed with the following message: *"This case was updated elsewhere. Reload to get the latest version before saving."* The modal contains a single **[Reload Case]** button that navigates to `window.location.reload()`. The generic error handler does not fire for 409 — this branch takes over exclusively. No server-side change is required for this sub-feature.
+
+**FR-19.2 — `_rev` polling while a case is open (proactive)**
+After a case loads for editing, the client starts a `setInterval` polling `GET /api/case/{id}/rev` (FR-18) every 45 seconds. On each response, the returned `_rev` is compared to the `_rev` captured at case load time. If the values differ, a dismissable banner is displayed: *"This case has been updated. Reload to see the latest version."* with **[Reload]** and **[Dismiss]** actions. The Save button is not automatically disabled — the 409 intercept (FR-19.1) serves as the last-resort gate. Polling stops when the user navigates away from the case.
+
+**FR-19.3 — Accelerated poll during migration window**
+If the `GET /api/case/{id}/rev` response includes an `X-Offline-Date` header (FR-18.2) and `Date.now() > X-Offline-Date`, the poll interval is reduced to 10 seconds for the duration of the session. This shortens the staleness detection window during an active migration.
+
+**FR-19.4 — Poll scope**
+Polling is only active when the current user has write access to the open case. Read-only viewers do not poll.
+
+**FR-19.5 — Section 508**
+The stale-case banner (FR-19.2) and the 409 modal (FR-19.1) meet Section 508 accessibility requirements consistent with NFR-2. The 409 modal is announced to screen readers when it appears.
+
+---
+
+### FR-20 — Tenant Database Counts: Open Cases Visibility
+
+The `/tenant-database-counts` page is an installation-admin tool for monitoring database health across all tenants. Adding open-case visibility gives administrators a real-time signal of active checkout lock activity and orphaned checkout states without requiring a separate query or tool.
+
+A case document in the MMRDS database is considered **open for editing** when the field `checked_out_by_tab_id` is present and non-null in the CouchDB document. The presence of this field is the existing checkout mechanism used by the case edit lock system.
+
+**FR-20.1 — Active vs. possibly-stale classification**
+Open cases are classified at query time using a fixed 10-minute boundary applied to `date_last_updated` (UTC):
+
+- **Active**: `checked_out_by_tab_id` is present AND `date_last_updated` is within the past 10 minutes. This indicates a user is actively editing the case or has edited it very recently.
+- **Possibly stale**: `checked_out_by_tab_id` is present AND `date_last_updated` is more than 10 minutes in the past. These cases likely represent orphaned checkouts — browser crashes, session expiry, or tab closes that did not trigger a clean unlock. They are informational signals, not errors.
+
+The 10-minute threshold is a fixed constant and is not read from the CouchDB configuration document.
+
+**FR-20.2 — Per-tenant open case query**
+For each tenant entry, the system issues a CouchDB Mango query (`POST /{mmrds_db}/_find`) against the tenant's MMRDS database:
+
+```json
+{
+  "selector": { "checked_out_by_tab_id": { "$exists": true } },
+  "fields": ["_id", "date_last_updated"],
+  "limit": 1000
+}
+```
+
+No pre-built index is required. Because `/tenant-database-counts` is an on-demand, installation-admin-only page (not a polling loop), a full collection scan is acceptable at current data volumes. The query runs in parallel with the existing mmrds/de_id/report count queries already issued per tenant.
+
+The server-side C# layer partitions the returned document stubs into active and possibly-stale counts using the 10-minute threshold.
+
+**FR-20.3 — Summary tile**
+A fifth summary tile is added to the page header row alongside the existing Entries, MMRDS Threshold, and De-ID Mismatch tiles. The tile is labeled **Open Cases** and displays system-wide totals:
+
+- `{N} active` — sum of active open cases across all tenant entries.
+- `{N} possibly stale` — sum of possibly-stale open cases across all tenant entries, displayed in amber text when non-zero.
+
+When both counts are zero, the tile displays a single `0` with no further classification.
+
+**FR-20.4 — Table column**
+A new **Open Cases** column is added to the Counts by Entry table. For each tenant row:
+
+- When the query succeeds and both counts are zero: display `0`.
+- When active count is non-zero and stale is zero: display the active count (e.g. `2`).
+- When both counts are non-zero: display active count with stale count in amber parentheses (e.g. `2 (1)`).
+- When only stale cases exist: display `0 (1)` with the stale count in amber.
+- When the query fails (timeout, network error, permission error): display `-`, consistent with the `-` convention used in other error-state cells in the table.
+
+**FR-20.5 — Error handling and status isolation**
+An open-case query failure for a single tenant does not affect that tenant's `status` field — `status` remains computed solely from the existing mmrds/de_id/report error logic. The open-case error is captured in a separate `open_case_error` field on the per-entry response model and surfaced only as `-` in the table cell. It does not contribute to the EntriesWithErrors summary count.
+
+---
+
 
 **NFR-1 — Browser support**
 All changes must function correctly in Microsoft Edge and Google Chrome. No other browsers are in scope.

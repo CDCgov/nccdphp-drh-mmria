@@ -820,3 +820,185 @@ So that these values can be tuned per environment without a code deployment.
 **Given** `cvs/index.js` loads
 **When** module-level constants are evaluated
 **Then** `const CVS_MAX_ATTEMPTS = window.CVS_MAX_ATTEMPTS ?? 10` and `const CVS_RETRY_DELAY_SECONDS = window.CVS_RETRY_DELAY_SECONDS ?? 60` are used
+
+---
+
+## Epic 11 — Vitals Import Integer Type Fix
+
+**Source requirements:** FR-12.1, FR-12.2
+**Status:** not-started
+
+### Summary
+Dropdown fields written during NAT/FET vitals import (MARN, ACKN, and adjacent coded fields) are stored as JSON strings instead of JSON integers. The front-end dropdown resolver expects integers, causing imported cases to display "Select Value" for fields that were successfully imported.
+
+The defect is in `C_Get_Set_Value.set_value(string, string, ...)` in `mmria.common` — it always assigns a .NET `string`, which Newtonsoft.Json serializes as a JSON string. mmria-server stores the same fields as .NET `int`, which serializes as a JSON number.
+
+### Story 11.1: Vitals Import Integer Type Fix
+
+As a case reviewer,
+When a case is created via vitals import (NAT or FET file),
+I want coded dropdown fields (such as Mother Married and Paternity Acknowledgement) to display their correct label values,
+So that the case form does not show "Select Value" for fields that were successfully imported.
+
+**Acceptance Criteria:**
+
+**Given** a NAT file with `MARN = "Y"` is imported
+**When** the vitals import processes the record
+**Then** `mother_married` is stored as JSON number `1`, not string `"1"`, and the front-end displays "Yes"
+
+**Given** a NAT file with `ACKN = "N"` is imported
+**When** the vitals import processes the record
+**Then** the paternity acknowledgement field is stored as JSON number `0`, not string `"0"`, and the front-end displays the correct label
+
+**Given** a FET file with `MARN = "U"` is imported
+**When** the vitals import processes the record
+**Then** `mother_married` is stored as JSON number `7777`
+
+**Given** the developer has audited MEDUC, FEDUC, ATTEND, TRAN, PAY, WIC at their `set_value` call sites
+**When** any of those fields are expected as integers by the front-end
+**Then** the same integer storage fix is applied to those call sites
+
+**Given** free-text string fields such as MOMFNAME, MOMLNAME, ZIPCODE
+**When** the import processes those fields
+**Then** they continue to be stored as JSON strings with no regression
+
+---
+
+## Epic 12 — Data Migration Tool Modernization
+
+**Source requirements:** FR-13.1–13.4, FR-14.1–14.5
+**Status:** not-started
+
+### Summary
+The `data-migration` project has hardcoded jurisdiction lists, flat config with no credential separation, and no environment-switching mechanism. Story 12.1 refactors it to use a layered appsettings pattern matching the Replication project. Story 12.2 adds a `VitalsTypeCorrection` migration that retroactively fixes the integer type defect on historical case data.
+
+Story 12.2 depends on Story 12.1.
+
+### Story 12.1: Data Migration Environment Configuration Parity
+
+As a developer running a data migration,
+When I need to target a specific environment,
+I want to set the environment in `appsettings.local.json` rather than editing source code,
+So that I can switch environments and credentials without touching `Program.cs` or committing secrets.
+
+**Acceptance Criteria:**
+
+**Given** `appsettings.local.json` has `ConfigEnvironment = "QA"`
+**When** the migration runs
+**Then** it connects to the QA CouchDB URL, uses QA credentials, and iterates the QA jurisdiction prefix list
+
+**Given** the developer clones the repo
+**When** they open `data-migration/appsettings.json`
+**Then** all `Username` and `Password` fields are empty strings and no secrets are committed
+
+**Given** `data-migration/Configuration.cs` exists
+**When** the developer reads it
+**Then** it contains `DataMigrationAppConfiguration` with `MigrationSettings`, `EnvironmentSettings`, `CouchDBSettings`, `Credentials` (dict), and `JurisdictionLists` (dict)
+
+**Given** the refactored `Program.cs`
+**When** it executes
+**Then** there is no static `run_list`, `test_list`, or `prefix_list` field
+And `ConfigurationSet` (CouchDB-fetched config) is no longer loaded
+
+### Story 12.2: Vitals Retrospective Type Correction Migration
+
+As a database administrator,
+After the vitals import integer type fix has been deployed (Story 11.1),
+I want to run a targeted migration that converts previously imported string values to integers for the affected dropdown fields,
+So that cases imported before the fix display the correct dropdown labels.
+
+**Acceptance Criteria:**
+
+**Given** `MigrationSettings.RunType = "VitalsTypeCorrection"` in appsettings.local.json
+**When** the migration runs
+**Then** `Program.cs` dispatches to `VitalsTypeCorrectionMigration`
+
+**Given** a case document where `mother_married` is stored as `"0"` (JSON string)
+**When** the migration processes it
+**Then** `mother_married` is updated to `0` (JSON number) and the change is logged
+
+**Given** `MigrationSettings.IsReportOnlyMode = true`
+**When** the migration runs
+**Then** no writes are issued to CouchDB and the log shows what would have changed
+
+**Given** a case document where `mother_married` is already `0` (JSON number)
+**When** the migration processes it
+**Then** no write is performed (idempotent)
+
+### Story 12.3: Migration Tool Hardening
+
+As a database administrator running a data migration,
+I want the migration tool to retry on CouchDB 409 conflicts and halt on unrecoverable errors,
+So that every case document is guaranteed to be processed and no case is silently skipped.
+
+**Acceptance Criteria:**
+
+**Given** a CouchDB PUT returns 409 (conflict)
+**When** the migration processes that document
+**Then** the migration fetches the fresh document, re-applies the transform, and retries up to 3 times
+**And** on retry exhaustion the failure is counted and the loop continues to the next document
+
+**Given** any retry has exhausted all 3 attempts for a document
+**When** the run finishes
+**Then** exit code is 3 and the final summary includes `Failed (retries exhausted): N`
+
+**Given** a CouchDB PUT returns a non-409 error (network, auth, 500)
+**When** the migration encounters it
+**Then** the migration logs the `_id`, HTTP status, and response body to stderr and calls `Environment.Exit(1)` immediately
+
+**Given** `DateTime.UtcNow < offline_date`
+**When** the migration starts
+**Then** it writes `"PRE-FLIGHT FAIL: system is not offline. Aborting."` to stderr and calls `Environment.Exit(2)`
+
+**Given** the migration completes normally
+**When** `failed_count == 0`
+**Then** exit code is 0 and stdout shows `Processed: N | Already migrated: N | Failed (retries exhausted): 0`
+
+### Story 12.4: Case Rev Endpoint
+
+As the client-side case polling module,
+I want a lightweight endpoint that returns only the current `_rev` of a case document,
+So that I can detect whether the open case has been modified without fetching the full document.
+
+**Acceptance Criteria:**
+
+**Given** an authenticated GET to `/api/case/{id}/rev`
+**When** the document exists in CouchDB
+**Then** the response is `200 { "_id": "<id>", "_rev": "<rev>" }` and includes an `X-Offline-Date` header when offline_date is configured
+
+**Given** an authenticated GET to `/api/case/{id}/rev`
+**When** the document does not exist
+**Then** the response is `404`
+
+**Given** an unauthenticated GET to `/api/case/{id}/rev`
+**When** the request is received
+**Then** the response is `401` — auth is required
+
+**Given** the response includes `X-Offline-Date`
+**When** the client reads it
+**Then** the value is the `offline_date` from the current system offline config in ISO 8601 format
+
+### Story 12.5: Stale Tab UX
+
+As a case coordinator with a stale browser tab,
+I want to be proactively notified when a case has been updated since I opened it, and to receive a clear recovery message if I attempt to save stale data,
+So that I never lose work silently or see a confusing technical error.
+
+**Acceptance Criteria:**
+
+**Given** a case is open for editing and its `_rev` changes on the server
+**When** the 45-second poll detects the mismatch
+**Then** a dismissable banner appears: "This case has been updated. Reload to see the latest version." with [Reload] and [Dismiss] actions
+
+**Given** a user attempts to save and the server returns 409
+**When** the case save error handler processes the response
+**Then** a non-dismissable modal appears: "This case was updated elsewhere. Reload to get the latest version before saving." with a single [Reload Case] button
+**And** the generic error handler does not fire for the 409 case
+
+**Given** the `X-Offline-Date` response header is present and `Date.now() > X-Offline-Date`
+**When** the poll interval is evaluated
+**Then** the poll interval is reduced to 10 seconds
+
+**Given** the current user has read-only access to the case
+**When** the case loads
+**Then** no polling is started
