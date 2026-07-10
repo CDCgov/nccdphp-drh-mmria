@@ -2,10 +2,10 @@
 
 **Epic:** 12 — Data Migration Tool Modernization
 **Story ID:** 12.4
-**Status:** in-progress — defect 12.4-D1 and follow-up requirements 12.4-R1 / 12.4-R2 added 2026-07-10
+**Status:** review — defect 12.4-D1 and follow-up requirements 12.4-R1 / 12.4-R2 implemented 2026-07-10
 **Date added:** 2026-07-08
-**Depends on:** Story 12.3 (Case Rev Endpoint — needed for the `_rev` polling and `X-Offline-Date` header)
-**Source requirements:** FR-19.1–FR-19.5
+**Depends on:** Story 12.3 (Case Rev Endpoint — needed for `_rev` polling)
+**Source requirements:** FR-19.1–FR-19.4
 
 ---
 
@@ -24,7 +24,8 @@ Given a user clicks Save on a case
 When the server returns HTTP 409
 Then a non-dismissable modal appears with the text:
 `"This case was updated elsewhere. Reload to get the latest version before saving."`
-And the modal contains a single **[Reload Case]** button that calls `window.location.reload()`
+And the modal contains a single **[Reload Case]** button that invokes the case reload helper
+And the helper reloads the open case in-place when the case page hook is available, falling back to `window.location.reload()`
 And the generic save error handler does NOT also fire for this 409
 
 **AC-2 — `_rev` polling detects staleness while case is open**
@@ -32,17 +33,19 @@ Given a case has been loaded for editing
 When 45 seconds have elapsed since the last poll
 Then the client calls `GET /api/case/{id}/rev`
 And if the returned `_rev` differs from the `_rev` captured at case load time
-Then a dismissable banner appears with the text:
+Then a stale-case modal appears with the text:
 `"This case has been updated. Reload to see the latest version."`
-And the banner contains **[Reload]** and **[Dismiss]** actions
-And the poll continues regardless of whether the banner was dismissed
+And the modal contains a single **[Reload]** button and no dismiss action
+And the **[Reload]** button invokes the case reload helper
+And autosave is paused until the case reloads
+And the poll continues while the modal is open without creating duplicate modal instances
 
-**AC-3 — Poll interval accelerates during migration window**
-Given the `GET /api/case/{id}/rev` response includes the `X-Offline-Date` header
-When `Date.now() > new Date(X-Offline-Date).getTime()`
-Then the poll interval is reduced to 10 seconds for the remainder of the page session
-When `Date.now() <= new Date(X-Offline-Date).getTime()` or the header is absent
-Then the poll interval remains at 45 seconds
+**AC-3 — Poll interval remains lightweight and fixed**
+Given `_rev` polling is active
+When the poll is scheduled
+Then the client polls `GET /api/case/{id}/rev` every 45 seconds
+And the client does not depend on an `X-Offline-Date` header from the rev endpoint
+And offline-window detection remains owned by `/api/system-offline/status`
 
 **AC-4 — Polling only starts for users with write access**
 Given the current user does NOT have write access to the case (read-only view)
@@ -57,9 +60,9 @@ Then the polling interval is cleared
 And no further `GET /api/case/{id}/rev` calls are made
 
 **AC-6 — Section 508 compliance**
-Given the stale-case banner (AC-2) or 409 modal (AC-1) appears
+Given the stale-case polling modal (AC-2) or 409 modal (AC-1) appears
 When a screen reader user is on the page
-Then the notification is announced to the screen reader via an appropriate ARIA role (`role="alert"` or `aria-live="assertive"`)
+Then the notification is announced to the screen reader via alert-dialog semantics
 And all buttons are keyboard-accessible
 
 ---
@@ -165,12 +168,10 @@ Add the following functions at the bottom of the file (before any closing IIFE i
 
 var _caseRevPollInterval = null;
 var _caseRevPollIntervalMs = 45000; // normal: 45s
-var _caseRevFastIntervalMs = 10000; // migration window: 10s
 
 /**
  * Starts polling /api/case/{caseId}/rev every _caseRevPollIntervalMs milliseconds.
- * If the returned _rev differs from loadedRev, shows a dismissable stale banner.
- * Adjusts poll interval to 10s when X-Offline-Date header indicates migration is active.
+ * If the returned _rev differs from loadedRev, shows a stale-case modal.
  *
  * @param {string} caseId    - The CouchDB document ID of the open case.
  * @param {string} loadedRev - The _rev captured when the case was loaded.
@@ -182,20 +183,6 @@ function startCaseRevPolling(caseId, loadedRev) {
     function poll() {
         fetch('/api/case/' + encodeURIComponent(caseId) + '/rev', { credentials: 'same-origin' })
             .then(function (response) {
-                // Check X-Offline-Date for migration window
-                var offlineDateHeader = response.headers.get('X-Offline-Date');
-                if (offlineDateHeader) {
-                    var offlineMs = new Date(offlineDateHeader).getTime();
-                    if (!isNaN(offlineMs) && Date.now() > offlineMs) {
-                        // Switch to fast polling if not already
-                        if (_caseRevPollIntervalMs !== _caseRevFastIntervalMs) {
-                            _caseRevPollIntervalMs = _caseRevFastIntervalMs;
-                            stopCaseRevPolling();
-                            _caseRevPollInterval = setInterval(poll, _caseRevPollIntervalMs);
-                        }
-                    }
-                }
-
                 if (!response.ok) return; // 404 or other error — do nothing
                 return response.json();
             })
@@ -224,43 +211,18 @@ function stopCaseRevPolling() {
 }
 
 /**
- * Shows a dismissable stale-case banner at the top of the page.
- * Called when _rev polling detects the case has been updated server-side.
+ * Shows a stale-case modal when _rev polling detects the case has been
+ * updated server-side. The legacy function name is retained for callers.
  */
 function showStaleCaseBanner() {
-    var bannerId = 'mmria-stale-case-banner';
-    if (document.getElementById(bannerId)) return; // Already shown
+    if (document.getElementById('mmria-stale-case-banner')) return; // Already shown
 
-    var banner = document.createElement('div');
-    banner.id = bannerId;
-    banner.setAttribute('role', 'alert');
-    banner.setAttribute('aria-live', 'assertive');
-    banner.style.cssText = 'position:fixed;top:0;left:0;width:100%;background:#fffbcc;color:#333;' +
-        'padding:10px 16px;z-index:9999;display:flex;align-items:center;justify-content:space-between;' +
-        'border-bottom:2px solid #e6c200;box-sizing:border-box;';
+    if (typeof window.mmria_mark_case_stale === 'function') window.mmria_mark_case_stale();
 
-    var msg = document.createElement('span');
-    msg.textContent = 'This case has been updated. Reload to see the latest version.';
-
-    var btnWrap = document.createElement('span');
-
-    var reloadBtn = document.createElement('button');
-    reloadBtn.textContent = 'Reload';
-    reloadBtn.style.marginRight = '8px';
-    reloadBtn.addEventListener('click', function () { window.location.reload(); });
-
-    var dismissBtn = document.createElement('button');
-    dismissBtn.textContent = 'Dismiss';
-    dismissBtn.addEventListener('click', function () {
-        var el = document.getElementById(bannerId);
-        if (el) el.parentNode.removeChild(el);
-    });
-
-    btnWrap.appendChild(reloadBtn);
-    btnWrap.appendChild(dismissBtn);
-    banner.appendChild(msg);
-    banner.appendChild(btnWrap);
-    document.body.insertBefore(banner, document.body.firstChild);
+    // Create a Bootstrap-style modal/backdrop with a single Reload button.
+    // Reload invokes mmria_do_case_reload(), which reloads the open case
+    // in-place when the case page hook is available and falls back to a
+    // full page reload otherwise.
 }
 ```
 
@@ -313,7 +275,7 @@ After a successful save, the `_rev` of the document changes server-side. The sto
 - Update `loadedRev` with the new `_rev` returned in the save response, **and** restart polling with the new rev, OR
 - Stop polling after save and restart with the fresh rev
 
-This prevents false-positive stale banners after the user's own save.
+This prevents false-positive stale modals after the user's own save.
 
 ---
 
@@ -363,11 +325,11 @@ If using the pre-existing modal container approach, simplify `showStaleCaseModal
 
 Two E2E tests (add to `e2e/tests/` in `nccdphp-drh-mmria-utilities`):
 
-1. **Stale banner within 50s of remote save:**
+1. **Stale modal within 50s of remote save:**
    - Open case in tab A
    - In tab B (or via direct API), PUT an updated version of the same case
    - Wait up to 50s in tab A
-   - Assert stale banner appears
+   - Assert stale modal appears with the single **Reload** button
 
 2. **409 modal on stale save attempt:**
    - Open case in tab A, capture current `_rev`
@@ -381,8 +343,8 @@ Two E2E tests (add to `e2e/tests/` in `nccdphp-drh-mmria-utilities`):
 
 - `system-offline-check.js` is the correct home for the polling functions — it is already loaded on authenticated pages and has the pattern for `startOfflineStatusPolling()` from Story 8.4.
 - The case edit view is a complex SPA-like page. The JS entry point for case loading may be in a Razor `@section Scripts` block in `Views/Case/Index.cshtml` or in a bundled JS file. Trace carefully before modifying.
-- Do not disable the Save button when the stale banner is shown (AC-2) — the 409 intercept (AC-1) is the last-resort gate. Disabling the button would prevent saving after a legitimate concurrent update from a different user.
-- After a successful save, the `_rev` changes. Update the polling reference rev to avoid a false-positive stale banner on the next poll cycle.
+- Do not disable the Save button when the stale modal is shown (AC-2) — the 409 intercept (AC-1) is the last-resort gate. Autosave is paused until reload.
+- After a successful save, the `_rev` changes. Update the polling reference rev to avoid a false-positive stale modal on the next poll cycle.
 
 ---
 
@@ -394,15 +356,35 @@ _To be completed by dev agent after implementation._
 
 Implemented following the existing `mmria-offline-modal` pattern exactly:
 
-- **Modal markup** added to `_LayoutBase.cshtml` adjacent to the going-offline modal, using the same Bootstrap `.modal-dialog`/`.modal-content` structure and the same purple header (`background-color:#7b2d8e`). Non-dismissable (no close button), single **Reload Case** button calls `window.location.reload()`.
-- **Banner** created dynamically via `showStaleCaseBanner()` – appended as `position:fixed` at the top of the page with `role="alert"` and `aria-live="assertive"`. Contains **Reload** and **Dismiss** buttons.
-- **Polling** (`startCaseRevPolling` / `stopCaseRevPolling`) added to `system-offline-check.js` following the `startOfflineStatusPolling` pattern. Poll interval: 45 s normal, 10 s when `X-Offline-Date` header indicates migration window is active.
+- **409 modal** created dynamically via `showStaleCaseModal()` using the Bootstrap `.modal-dialog`/`.modal-content` structure and the same purple header (`background-color:#7b2d8e`). Non-dismissable (no close button), single **Reload Case** button invokes the case reload helper.
+- **Proactive stale modal** created dynamically via `showStaleCaseBanner()` using the same Bootstrap modal/backdrop pattern. Contains a single **Reload** button and no dismiss action; autosave is paused until reload.
+- **Polling** (`startCaseRevPolling` / `stopCaseRevPolling`) added to `system-offline-check.js` following the `startOfflineStatusPolling` pattern. Poll interval: fixed 45 s; offline-window behavior remains owned by `/api/system-offline/status`.
 - **Write-access gate**: polling starts only when `g_is_data_analyst_mode == null` (abstracter/write role). Data analyst (`/analyst-case` route sets `g_is_data_analyst_mode = 'da'`) gets no polling.
 - **409 intercept**: replaced existing `$mmria.save_error_500_dialog_show()` call for `(409) Conflict` with `window.showStaleCaseModal()`. Does not fall through to generic error handler.
-- **Poll restart on save**: after successful save, `startCaseRevPolling` is called with the updated `_rev` from `case_response.rev` to avoid false-positive stale banners.
+- **Poll restart on save**: after successful save, `startCaseRevPolling` is called with the updated `_rev` from `case_response.rev` to avoid false-positive stale modals.
 - **Stop on unload**: `stopCaseRevPolling()` called at the top of `navigation_away()` (the `window.onbeforeunload` handler).
 
-AC-6 (508): stale modal uses `role="alertdialog"`, `aria-modal="true"`, `aria-labelledby`/`aria-describedby`; focus moves to **Reload Case** button. Banner uses `role="alert"` and `aria-live="assertive"`. All buttons are keyboard-accessible.
+AC-6 (508): both stale modals use `role="alertdialog"`, `aria-modal="true"`, `aria-labelledby`/`aria-describedby`; focus moves to the reload button. All buttons are keyboard-accessible.
+
+Follow-up implementation completed 2026-07-10:
+
+- **12.4-D1**: Confirmed all successful save queue paths, including autosave, restart `_rev` polling with the returned `case_response.rev`; clarified the code comment so the autosave coverage is explicit.
+- **12.4-R1**: Moved the system offline checker from `wwwroot/js/system-offline-check.js` to `wwwroot/js/scripts/system-offline-check.js` and updated the shared layout include.
+- **12.4-R2**: Extracted case stale-tab polling and recovery UI into `wwwroot/scripts/case/case-rev-check.js`; `system-offline-check.js` now retains only system offline/warn behavior.
+- Extracted the prior proactive stale notification as an actual Bootstrap-style modal with a single **Reload** action and no dismiss action; retained the 409 recovery modal as non-dismissable.
+- Restored reload button behavior to use `mmria_do_case_reload()`, which reloads the case in-place through `window.mmria_reload_case_data()` when available and falls back to `window.location.reload()`.
+- Loaded `case-rev-check.js` before `index.js` on `Views/Case/Index.cshtml` and `Views/abstractorDeidentifiedCase/Index.cshtml`.
+- Validation: `node --check` passed for `wwwroot/js/scripts/system-offline-check.js`, `wwwroot/scripts/case/case-rev-check.js`, and `wwwroot/scripts/case/index.js`; reference scans confirmed the old script path is gone and the case globals are exported only by `case-rev-check.js`; `dotnet build source-code\mmria\mmria-server\mmria-server.csproj -o c:\repos\nccdphp-drh-mmria\artifacts\round4-build-check` passed with pre-existing warnings.
+
+### File List
+
+- `source-code/mmria/mmria-server/Views/Case/Index.cshtml`
+- `source-code/mmria/mmria-server/Views/Shared/_LayoutBase.cshtml`
+- `source-code/mmria/mmria-server/Views/abstractorDeidentifiedCase/Index.cshtml`
+- `source-code/mmria/mmria-server/wwwroot/js/scripts/system-offline-check.js`
+- `source-code/mmria/mmria-server/wwwroot/js/system-offline-check.js` (removed)
+- `source-code/mmria/mmria-server/wwwroot/scripts/case/case-rev-check.js`
+- `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js`
 
 ### Change Log
 
@@ -411,6 +393,15 @@ AC-6 (508): stale modal uses `role="alertdialog"`, `aria-modal="true"`, `aria-la
 | `source-code/mmria/mmria-server/Views/Shared/_LayoutBase.cshtml` | Added stale-case modal `<div>` markup adjacent to existing offline modals |
 | `source-code/mmria/mmria-server/wwwroot/js/system-offline-check.js` | Added `showStaleCaseModal`, `showStaleCaseBanner`, `stopCaseRevPolling`, `startCaseRevPolling`; exposed all four on `window` |
 | `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js` | (1) Replaced 409 conflict error handler with `showStaleCaseModal()`. (2) Start `startCaseRevPolling` after online case load, gated on write-access. (3) Restart polling with new `_rev` after successful save. (4) Call `stopCaseRevPolling()` in `navigation_away`. |
+| `source-code/mmria/mmria-server/Views/Shared/_LayoutBase.cshtml` | Updated moved system offline checker include to `/js/scripts/system-offline-check.js` |
+| `source-code/mmria/mmria-server/Views/Case/Index.cshtml` | Added `/scripts/case/case-rev-check.js` before `/scripts/case/index.js` |
+| `source-code/mmria/mmria-server/Views/abstractorDeidentifiedCase/Index.cshtml` | Added `/scripts/case/case-rev-check.js` before `/scripts/case/index.js` |
+| `source-code/mmria/mmria-server/wwwroot/js/system-offline-check.js` | Removed old flat-path copy after relocation |
+| `source-code/mmria/mmria-server/wwwroot/js/scripts/system-offline-check.js` | Retained only system offline/warn functions and window exports |
+| `source-code/mmria/mmria-server/wwwroot/scripts/case/case-rev-check.js` | Added extracted case stale-tab polling, 409 modal, proactive stale modal, reload helper, and window exports |
+| `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js` | Clarified that successful manual and autosave writes restart `_rev` polling with the returned revision |
+| `source-code/mmria/mmria-server/wwwroot/scripts/case/case-rev-check.js` | Restored pre-extraction modal/backdrop UX for proactive staleness and restored reload helper button behavior |
+| `_bmad-output/planning-artifacts/prds/prd-mmria-2026-06-12/prd.md` | Clarified FR-19 modal UX, single reload action, autosave pause, and reload helper fallback behavior |
 
 ---
 
@@ -420,12 +411,12 @@ AC-6 (508): stale modal uses `role="alertdialog"`, `aria-modal="true"`, `aria-la
 
 ---
 
-### Defect 12.4-D1 — Rev polling fires stale banner after autosave increments `_rev`
+### Defect 12.4-D1 — Rev polling fires stale modal after autosave increments `_rev`
 
-**Severity:** High — functional regression; stale banner fires every autosave cycle even though the user is the one who caused the `_rev` change.
+**Severity:** High — functional regression; stale modal fires every autosave cycle even though the user is the one who caused the `_rev` change.
 
 **Root cause:**  
-`startCaseRevPolling` captures `loadedRev` at case-load time (or after a manual save). The autosave path in `wwwroot/scripts/case/index.js` also calls `PUT /api/case/{id}`, which increments `_rev` server-side. Because the polling loop still compares against the original `loadedRev`, every successful autosave causes a mismatch, triggering `showStaleCaseBanner()`.
+`startCaseRevPolling` captures `loadedRev` at case-load time (or after a manual save). The autosave path in `wwwroot/scripts/case/index.js` also calls `PUT /api/case/{id}`, which increments `_rev` server-side. Because the polling loop still compares against the original `loadedRev`, every successful autosave causes a mismatch, triggering the proactive stale modal through `showStaleCaseBanner()`.
 
 **Required fix — Autosave must update the polling reference rev:**
 
@@ -435,12 +426,12 @@ After every successful autosave, call `startCaseRevPolling(caseId, newRev)` with
 
 - **AC-D1-1** — Given the autosave timer fires and the autosave PUT succeeds  
   When the `/api/case/{id}/rev` poll next fires  
-  Then the stale banner does NOT appear (the polled `_rev` matches the reference rev updated by autosave)
+  Then the stale modal does NOT appear (the polled `_rev` matches the reference rev updated by autosave)
 
 - **AC-D1-2** — Given autosave completes successfully  
   When a _different_ browser session subsequently saves the same case  
   And the `/api/case/{id}/rev` poll fires  
-  Then the stale banner DOES appear (staleness from another session is still detected)
+  Then the stale modal DOES appear (staleness from another session is still detected)
 
 - **AC-D1-3** — The autosave code path must call `startCaseRevPolling(caseId, updatedRev)` with the new `_rev` from the autosave response — the same pattern already implemented for manual saves.
 
@@ -488,7 +479,6 @@ Extract from `wwwroot/js/system-offline-check.js` (after it has been moved per R
 
 - `_caseRevPollInterval`
 - `_caseRevPollIntervalMs`
-- `_caseRevFastIntervalMs`
 - `startCaseRevPolling()`
 - `stopCaseRevPolling()`
 - `showStaleCaseBanner()`

@@ -2607,7 +2607,7 @@ async function load_and_set_data()
         }
     };
 
-    // Allow system-offline-check.js to mark the case stale (pauses autosave)
+    // Allow case-rev-check.js to mark the case stale (pauses autosave)
     window.mmria_mark_case_stale = function () {
         g_is_case_stale = true;
     };
@@ -3891,7 +3891,7 @@ async function process_save_case()
         g_data._rev = case_response.rev;
       }
 
-      // Restart _rev polling with the updated rev to prevent false-positive stale banners (Story 12.4)
+      // Restart _rev polling after manual and autosave writes so this tab's own saves do not look stale (Story 12.4-D1)
       if (g_is_data_analyst_mode == null && g_data._id && g_data._rev) {
         if (typeof window.startCaseRevPolling === 'function') {
           window.startCaseRevPolling(g_data._id, g_data._rev);

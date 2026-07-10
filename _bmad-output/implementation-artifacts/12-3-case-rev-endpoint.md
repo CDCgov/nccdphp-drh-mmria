@@ -4,8 +4,8 @@
 **Story ID:** 12.3
 **Status:** done
 **Date added:** 2026-07-08
-**Depends on:** Story 8.1 (system-offline-config and `/api/system-offline/status` — needed for `X-Offline-Date` header)
-**Source requirements:** FR-18.1–FR-18.3
+**Depends on:** None (consumed by Story 12.4 stale-tab UX)
+**Source requirements:** FR-18.1–FR-18.2
 
 ---
 
@@ -37,17 +37,7 @@ When the request is received
 Then the response status is `401`
 And no CouchDB call is made
 
-**AC-4 — `X-Offline-Date` header included when offline_date is configured**
-Given the system offline config has a non-empty `offline_date`
-When `GET /api/case/{id}/rev` returns 200
-Then the response includes header `X-Offline-Date: <offline_date value as-stored (ISO 8601)>`
-
-**AC-5 — `X-Offline-Date` header is absent when offline_date is not configured**
-Given the system offline config has a null or empty `offline_date`
-When `GET /api/case/{id}/rev` returns 200
-Then the response does NOT include the `X-Offline-Date` header
-
-**AC-6 — Response latency**
+**AC-4 — Response latency**
 Given a request to `GET /api/case/{id}/rev` on a local network
 When the endpoint proxies to CouchDB and returns
 Then the round-trip latency is under 200 ms
@@ -73,10 +63,34 @@ public async Task<IActionResult> GetRev(string case_id)
 {
     try
     {
-        // Fetch only enough to get _id and _rev — use a fields-limited GET or HEAD+GET
-        // CouchDB does not support HEAD with _rev in the body, so do a GET
-        // but only return _id and _rev to the client
         string url = $"{db_config.url}/{Uri.EscapeDataString(case_id)}";
+        var headResponse = await _couchDbHttpClient.ExecuteForResponseAsync(
+            "HEAD",
+            url,
+            null,
+            "application/json",
+            new mmria.common.getset.CouchDbRequestOptions
+            {
+                UserName = db_config.user_name,
+                Password = db_config.user_value,
+                SuppressErrorLogging = true
+            });
+
+        if (headResponse.StatusCode == 404)
+            return NotFound();
+
+        var headRev = NormalizeCouchDbRevisionHeader(headResponse.GetFirstHeaderValue("ETag"));
+        if (headResponse.StatusCode >= 200 && headResponse.StatusCode < 300 && !string.IsNullOrWhiteSpace(headRev))
+        {
+            var headResult = new { _id = case_id, _rev = headRev };
+
+            Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0";
+            Response.Headers["Pragma"] = "no-cache";
+
+            return EscapedJsonResultFactory.Create(headResult);
+        }
+
+        // Fallback to GET only when CouchDB does not provide an ETag revision.
         string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
             "GET", url, null, db_config.user_name, db_config.user_value);
 
@@ -93,11 +107,6 @@ public async Task<IActionResult> GetRev(string case_id)
 
         var result = new { _id = doc["_id"]?.ToString(), _rev = doc["_rev"]?.ToString() };
 
-        // Attach X-Offline-Date header if offline_date is configured
-        var offlineDate = await GetOfflineDateAsync();
-        if (!string.IsNullOrWhiteSpace(offlineDate))
-            Response.Headers["X-Offline-Date"] = offlineDate;
-
         Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0";
         Response.Headers["Pragma"] = "no-cache";
 
@@ -111,37 +120,9 @@ public async Task<IActionResult> GetRev(string case_id)
 }
 ```
 
-**Add `GetOfflineDateAsync()` private helper:**
+`NormalizeCouchDbRevisionHeader()` trims the surrounding quotes from CouchDB's `ETag` value.
 
-```csharp
-private async Task<string> GetOfflineDateAsync()
-{
-    try
-    {
-        // Read offline_date from mmria-services — same pattern used by system_offlineController.LoadConfigFromServicesAsync()
-        // Check system_offlineController.cs for the vitals_url pattern:
-        // string vitals_url = configuration.GetString("vitals_url", host_prefix);
-        // string vital_service_key = configuration.GetString("vital_service_key", host_prefix);
-        // GET {vitals_url}/api/systemOffline/GetSystemOfflineConfig
-        var vitals_url = configuration.GetString("vitals_url", host_prefix);
-        var vital_service_key = configuration.GetString("vital_service_key", host_prefix);
-        if (string.IsNullOrWhiteSpace(vitals_url)) return null;
-
-        string url = $"{vitals_url}/api/systemOffline/GetSystemOfflineConfig";
-        string response = await _couchDbHttpClient.ExecuteAsync("GET", url, null, "services", vital_service_key);
-        var config = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.SystemOfflineConfig>(response);
-        return config?.offline_date;
-    }
-    catch
-    {
-        return null; // header is optional — never fail the main request for it
-    }
-}
-```
-
-**Study `system_offlineController.cs` before implementing** — specifically `LoadConfigFromServicesAsync()` (around line 148) to copy the exact vitals_url / vital_service_key access pattern. The `configuration.GetString()` calls and credential format must match.
-
-**Alternative for `X-Offline-Date`:** If the system offline config is already cached in-memory on the server (check if there is a singleton or IMemoryCache storing it), read from cache instead of making a services call on every rev request. The performance target is <200 ms so a services round-trip on every 45s poll is acceptable, but cache is preferable.
+Do not attach offline-status headers or call mmria-services from this endpoint. Offline timing remains owned by `/api/system-offline/status` so the case rev check stays lightweight.
 
 ### Route collision check
 
@@ -155,14 +136,14 @@ This factory is already used throughout the controller (`source-code/mmria/mmria
 
 | File | Change |
 |------|--------|
-| `source-code/mmria/mmria-server/Controllers/api/caseController.cs` | Add `GetRev(string case_id)` action with `[HttpGet("{case_id}/rev")]`; add `GetOfflineDateAsync()` private helper |
+| `source-code/mmria/mmria-server/Controllers/api/caseController.cs` | Add `GetRev(string case_id)` action with `[HttpGet("{case_id}/rev")]` returning only `{ "_id": "...", "_rev": "..." }` |
 
 ### Testing
 
 **Integration test approach:** The project uses test files under `nccdphp-drh-mmria-utilities/mmria-server.tests/`. Look for existing tests that call API endpoints with an HTTP client. If the pattern uses `WebApplicationFactory<Program>` or similar, add:
 - `GET /api/case/{known_id}/rev` returns 200 with `_id` and `_rev` matching the document
 - `GET /api/case/nonexistent-id/rev` returns 404
-- `GET /api/case/{id}/rev` with `X-Offline-Date` present when offline config has a date
+- `GET /api/case/{id}/rev` response contains only `_id` and `_rev`, with no offline-status header dependency
 
 If integration tests are not practical, document the manual verification steps in the completion notes.
 
@@ -170,7 +151,7 @@ If integration tests are not practical, document the manual verification steps i
 
 - The CouchDB GET on a non-existent document returns `{"error":"not_found","reason":"missing"}` — do not assume a specific HTTP status code from `CouchDbHttpClient.ExecuteAsync`; check the response body.
 - `Uri.EscapeDataString(case_id)` is used defensively — case IDs in MMRIA should be UUID-format and safe, but escaping prevents path injection.
-- The `X-Offline-Date` header is a hint to the client, not enforced by this endpoint. If the services call fails, the header is omitted and the main response proceeds normally.
+- `/api/system-offline/status` owns offline-date polling. Do not add a services call to `/api/case/{id}/rev`.
 
 ---
 
@@ -181,10 +162,10 @@ _To be completed by dev agent after implementation._
 ### Completion Notes
 
 - Added `GetRev(string case_id)` action at `[HttpGet("{case_id}/rev")]` in `caseController.cs`. No route collision with the existing parameterless `[HttpGet]`.
-- Uses `JObject.Parse` to extract only `_id` and `_rev` from the full CouchDB document, returning `{ "_id": "...", "_rev": "..." }` via `mmria.server.util.EscapedJsonResultFactory.Create`.
-- `GetOfflineDateAsync()` private helper follows the exact pattern from `AccountController.LoadSystemOfflineConfigAsync` — strips `/api/Message/IJESet` from `vitals_url`, uses `CouchDbRequestOptions.VitalServiceKey`, and swallows exceptions so the header is always optional.
+- Uses CouchDB `HEAD` and the `ETag` revision for the normal lightweight path, with a GET/JObject fallback only if the revision header is unavailable. The response remains `{ "_id": "...", "_rev": "..." }` via `mmria.server.util.EscapedJsonResultFactory.Create`.
+- Follow-up 2026-07-10: removed the `X-Offline-Date` services call from the rev endpoint so it returns only `{ "_id": "...", "_rev": "..." }` and meets the lightweight latency target.
 - `EscapedJsonResultFactory` is referenced with its full namespace (`mmria.server.util.EscapedJsonResultFactory`) since `caseController.cs` does not have a `using mmria.server.util;` directive.
-- Build verified: zero C# compile errors. One MSB3021 file-lock warning is expected (running server holds the DLL) and does not affect correctness.
+- Build verified: zero C# compile errors. Current build passes with pre-existing warnings unrelated to the rev endpoint change.
 
 ### Manual Verification Steps
 
@@ -192,10 +173,10 @@ _To be completed by dev agent after implementation._
 2. `GET /api/case/{known-case-id}/rev` → expect `200` with `{ "_id": "...", "_rev": "..." }` only.
 3. `GET /api/case/nonexistent-id/rev` → expect `404`.
 4. Unauthenticated `GET /api/case/{id}/rev` → expect `401`.
-5. With `offline_date` set in system config, verify `X-Offline-Date` header appears; without it, verify header is absent.
+5. Verify the response does not include `X-Offline-Date`; offline status is provided by `/api/system-offline/status`.
 
 ### Change Log
 
 | File | Change |
 |------|--------|
-| `source-code/mmria/mmria-server/Controllers/api/caseController.cs` | Added `GetRev` action (`[HttpGet("{case_id}/rev")]`) and `GetOfflineDateAsync()` private helper |
+| `source-code/mmria/mmria-server/Controllers/api/caseController.cs` | Added `GetRev` action (`[HttpGet("{case_id}/rev")]`) returning only `_id` and `_rev`; removed the offline-date helper from this endpoint |

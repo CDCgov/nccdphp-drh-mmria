@@ -964,7 +964,7 @@ So that I can detect whether the open case has been modified without fetching th
 
 **Given** an authenticated GET to `/api/case/{id}/rev`
 **When** the document exists in CouchDB
-**Then** the response is `200 { "_id": "<id>", "_rev": "<rev>" }` and includes an `X-Offline-Date` header when offline_date is configured
+**Then** the response is `200 { "_id": "<id>", "_rev": "<rev>" }` only
 
 **Given** an authenticated GET to `/api/case/{id}/rev`
 **When** the document does not exist
@@ -973,10 +973,6 @@ So that I can detect whether the open case has been modified without fetching th
 **Given** an unauthenticated GET to `/api/case/{id}/rev`
 **When** the request is received
 **Then** the response is `401` — auth is required
-
-**Given** the response includes `X-Offline-Date`
-**When** the client reads it
-**Then** the value is the `offline_date` from the current system offline config in ISO 8601 format
 
 ### Story 12.5: Stale Tab UX
 
@@ -995,9 +991,9 @@ So that I never lose work silently or see a confusing technical error.
 **Then** a non-dismissable modal appears: "This case was updated elsewhere. Reload to get the latest version before saving." with a single [Reload Case] button
 **And** the generic error handler does not fire for the 409 case
 
-**Given** the `X-Offline-Date` response header is present and `Date.now() > X-Offline-Date`
+**Given** `_rev` polling is active
 **When** the poll interval is evaluated
-**Then** the poll interval is reduced to 10 seconds
+**Then** the poll interval remains 45 seconds and does not depend on offline-status headers
 
 **Given** the current user has read-only access to the case
 **When** the case loads

@@ -2,7 +2,7 @@
 title: "PRD: MMRIA V4.1"
 status: final
 created: 2026-06-12
-updated: 2026-07-08 (FR-12 added — Vitals Import NAT/FET Numeric Field Type Normalization; FR-13 added — Data Migration Project Environment Configuration; FR-14 added — Vitals Import Retrospective Data Correction Migration; FR-15 added — data-migration cURL to CouchDbHttpClient Migration; FR-16 added — Replication cURL to CouchDbHttpClient Migration; FR-17 added — VitalsTypeCorrectionMigration Hardening; FR-18 added — Case Rev Endpoint; FR-19 added — Stale Tab UX)
+updated: 2026-07-10 (FR-12 added — Vitals Import NAT/FET Numeric Field Type Normalization; FR-13 added — Data Migration Project Environment Configuration; FR-14 added — Vitals Import Retrospective Data Correction Migration; FR-15 added — data-migration cURL to CouchDbHttpClient Migration; FR-16 added — Replication cURL to CouchDbHttpClient Migration; FR-17 added — VitalsTypeCorrectionMigration Hardening; FR-18 added — Case Rev Endpoint; FR-19 added and clarified — Stale Tab UX modal reload behavior)
 ---
 
 # PRD: MMRIA V4.1
@@ -518,11 +518,8 @@ A new action is added to the existing case controller in `source-code/mmria/mmri
 - Returns `404` when the document does not exist.
 - Does not return the full document body.
 
-**FR-18.2 — `X-Offline-Date` response header**
-The response includes an `X-Offline-Date` header containing the current `offline_date` value (ISO 8601) sourced from the in-memory `system-offline-config` cache (established by Story 8.1). If no offline date is configured, the header is omitted. The client uses this value to adjust poll frequency during the migration window (FR-19.3).
-
-**FR-18.3 — Performance**
-The endpoint proxies a CouchDB HEAD or minimal GET to retrieve `_rev` only. Response latency target is under 200 ms on the local network.
+**FR-18.2 — Performance**
+The endpoint returns only `{ "_id": "<id>", "_rev": "<current_rev>" }` and must not call the system-offline services path or attach offline-status headers. Offline timing remains owned by `/api/system-offline/status`. Response latency target is under 200 ms on the local network.
 
 ---
 
@@ -531,19 +528,16 @@ The endpoint proxies a CouchDB HEAD or minimal GET to retrieve `_rev` only. Resp
 A browser tab that was backgrounded or frozen before `offline_date` and foregrounded after a data migration has run will hold a stale in-memory case snapshot with a stale CouchDB `_rev`. If the user attempts to save, they will receive a CouchDB 409 conflict. Two mechanisms address this: a proactive `_rev` poll that detects staleness before a save attempt, and a reactive 409 intercept that surfaces a clear recovery path if the save is attempted anyway.
 
 **FR-19.1 — 409 intercept on case save (reactive)**
-The existing case save error handler in the client is updated to intercept HTTP 409 responses specifically. On 409, a non-dismissable modal is displayed with the following message: *"This case was updated elsewhere. Reload to get the latest version before saving."* The modal contains a single **[Reload Case]** button that navigates to `window.location.reload()`. The generic error handler does not fire for 409 — this branch takes over exclusively. No server-side change is required for this sub-feature.
+The existing case save error handler in the client is updated to intercept HTTP 409 responses specifically. On 409, a non-dismissable Bootstrap-style modal is displayed with the following message: *"This case was updated elsewhere. Reload to get the latest version before saving."* The modal contains a single **[Reload Case]** button. The button invokes the case reload helper, which reloads the open case in-place when the case page hook is available and falls back to `window.location.reload()` otherwise. The generic error handler does not fire for 409 — this branch takes over exclusively. No server-side change is required for this sub-feature.
 
 **FR-19.2 — `_rev` polling while a case is open (proactive)**
-After a case loads for editing, the client starts a `setInterval` polling `GET /api/case/{id}/rev` (FR-18) every 45 seconds. On each response, the returned `_rev` is compared to the `_rev` captured at case load time. If the values differ, a dismissable banner is displayed: *"This case has been updated. Reload to see the latest version."* with **[Reload]** and **[Dismiss]** actions. The Save button is not automatically disabled — the 409 intercept (FR-19.1) serves as the last-resort gate. Polling stops when the user navigates away from the case.
+After a case loads for editing, the client starts a `setInterval` polling `GET /api/case/{id}/rev` (FR-18) every 45 seconds. On each response, the returned `_rev` is compared to the `_rev` captured at case load time or the latest successful save. If the values differ, a Bootstrap-style stale-case modal is displayed with the message: *"This case has been updated. Reload to see the latest version."* The modal has a single **[Reload]** button and no dismiss action. The button invokes the case reload helper, which reloads the open case in-place when possible and falls back to `window.location.reload()` otherwise. Autosave is paused while this stale state is active and resumes only after the case reloads. Polling stops when the user navigates away from the case.
 
-**FR-19.3 — Accelerated poll during migration window**
-If the `GET /api/case/{id}/rev` response includes an `X-Offline-Date` header (FR-18.2) and `Date.now() > X-Offline-Date`, the poll interval is reduced to 10 seconds for the duration of the session. This shortens the staleness detection window during an active migration.
-
-**FR-19.4 — Poll scope**
+**FR-19.3 — Poll scope**
 Polling is only active when the current user has write access to the open case. Read-only viewers do not poll.
 
-**FR-19.5 — Section 508**
-The stale-case banner (FR-19.2) and the 409 modal (FR-19.1) meet Section 508 accessibility requirements consistent with NFR-2. The 409 modal is announced to screen readers when it appears.
+**FR-19.4 — Section 508**
+The proactive stale-case modal (FR-19.2) and the 409 recovery modal (FR-19.1) meet Section 508 accessibility requirements consistent with NFR-2. Each modal is announced to screen readers when it appears, uses alert-dialog semantics, and moves focus to its reload button.
 
 ---
 
