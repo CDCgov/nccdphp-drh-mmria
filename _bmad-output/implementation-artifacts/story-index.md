@@ -359,7 +359,7 @@ dev this story _bmad-output/implementation-artifacts/11-1-vitals-import-integer-
 
 > ⚠️ **12.2-Hardening must complete before running the migration in production.** It adds retry-on-409, `SaveResult` enum, pre-flight offline check, and hard-abort on unrecoverable errors. The "cannot skip a case" constraint makes this a gate.
 
-> ℹ️ **12.3 and 12.4 are a vertical slice** — implement together. 12.3 (server rev endpoint) provides the `_rev` and `X-Offline-Date` data that 12.4 (client polling) consumes. 12.4 depends on 12.3 being deployed first.
+> ℹ️ **12.3 and 12.4 are a vertical slice** — implement together. 12.3 (server rev endpoint) provides the lightweight `_rev` data that 12.4 (client polling) consumes. Offline timing remains owned by `/api/system-offline/status`.
 
 **Dev prompts:**
 

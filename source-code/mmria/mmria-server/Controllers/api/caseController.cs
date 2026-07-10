@@ -85,6 +85,32 @@ public sealed class caseController: ControllerBase
                 return BadRequest();
 
             string url = $"{db_config.url}/{db_config.prefix}mmrds/{Uri.EscapeDataString(sanitizedId)}";
+            var headResponse = await _couchDbHttpClient.ExecuteForResponseAsync(
+                "HEAD",
+                url,
+                null,
+                "application/json",
+                new mmria.common.getset.CouchDbRequestOptions
+                {
+                    UserName = db_config.user_name,
+                    Password = db_config.user_value,
+                    SuppressErrorLogging = true
+                });
+
+            if (headResponse.StatusCode == 404)
+                return NotFound();
+
+            var headRev = NormalizeCouchDbRevisionHeader(headResponse.GetFirstHeaderValue("ETag"));
+            if (headResponse.StatusCode >= 200 && headResponse.StatusCode < 300 && !string.IsNullOrWhiteSpace(headRev))
+            {
+                var headResult = new { _id = sanitizedId, _rev = headRev };
+
+                Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0";
+                Response.Headers["Pragma"] = "no-cache";
+
+                return mmria.server.util.EscapedJsonResultFactory.Create(headResult);
+            }
+
             string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
                 "GET", url, null, db_config.user_name, db_config.user_value);
 
@@ -99,10 +125,6 @@ public sealed class caseController: ControllerBase
                 return NotFound();
 
             var result = new { _id = id, _rev = rev };
-
-            var offlineDate = await GetOfflineDateAsync();
-            if (!string.IsNullOrWhiteSpace(offlineDate))
-                Response.Headers["X-Offline-Date"] = offlineDate;
 
             Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0";
             Response.Headers["Pragma"] = "no-cache";
@@ -662,31 +684,6 @@ public sealed class caseController: ControllerBase
         return string.Empty;
     }
 
-    private async Task<string> GetOfflineDateAsync()
-    {
-        try
-        {
-            var vitalsUrl = configuration.GetString("vitals_url", host_prefix)
-                ?.Replace("/api/Message/IJESet", string.Empty);
-            if (string.IsNullOrWhiteSpace(vitalsUrl))
-                return null;
-
-            var getUrl = $"{vitalsUrl}/api/systemOffline/GetSystemOfflineConfig";
-            var requestOptions = new mmria.common.getset.CouchDbRequestOptions
-            {
-                VitalServiceKey = configuration.GetString("vital_service_key", host_prefix)
-            };
-            var responseBody = await _couchDbHttpClient.ExecuteAsync(
-                "GET", getUrl, null, "application/json", requestOptions);
-            var config = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.SystemOfflineConfig>(responseBody);
-            return config?.offline_date;
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
     private static string SanitizeSingleLineText(string value, int maxLength = 512)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -698,6 +695,16 @@ public sealed class caseController: ControllerBase
         return sanitized.Length > maxLength
             ? sanitized[..maxLength]
             : sanitized;
+    }
+
+    private static string NormalizeCouchDbRevisionHeader(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return value.Trim().Trim('"');
     }
 
     private static string SanitizeMultilineText(string value, int maxLength = 2048)
