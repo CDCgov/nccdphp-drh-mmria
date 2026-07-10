@@ -55,7 +55,7 @@ public sealed class caseController: ControllerBase
     [HttpGet]
         [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     //public async Task<System.Dynamic.ExpandoObject> Get(string case_id) 
-    public async Task<mmria.case_version.v260120.mmria_case> Get(string case_id) 
+    public async Task<mmria.case_version.v260615.mmria_case> Get(string case_id) 
     { 
         try
         {
@@ -120,7 +120,7 @@ public sealed class caseController: ControllerBase
     {
         public mmria.common.model.couchdb.Change_Stack Change_Stack {get;set;} = new();
 
-        public mmria.case_version.v260120.mmria_case Case_Data {get;set;}
+        public mmria.case_version.v260615.mmria_case Case_Data {get;set;}
         public Save_Case_Request()
         {
 
@@ -465,8 +465,8 @@ public sealed class caseController: ControllerBase
         };
     }
 
-    private static mmria.case_version.v260120.mmria_case CreateSanitizedCase(
-        mmria.case_version.v260120.mmria_case request,
+    private static mmria.case_version.v260615.mmria_case CreateSanitizedCase(
+        mmria.case_version.v260615.mmria_case request,
         string currentUserName)
     {
         if (request == null || string.IsNullOrWhiteSpace(request._id))
@@ -474,7 +474,7 @@ public sealed class caseController: ControllerBase
             return null;
         }
 
-        mmria.case_version.v260120.mmria_case sanitizedCase;
+        mmria.case_version.v260615.mmria_case sanitizedCase;
         try
         {
             sanitizedCase = CaseJsonSerialization.DeserializeMmriaCase(CaseJsonSerialization.SerializeMmriaCase(request));

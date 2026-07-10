@@ -16,7 +16,7 @@ public static bool is_authorized_to_handle_jurisdiction_id
         mmria.common.couchdb.DBConfigurationDetail db_config,
         System.Security.Claims.ClaimsPrincipal p_claims_principal, 
         mmria.common.SharedLibraries.Other.ResourceRightEnum p_resoure_right_enum,
-        mmria.case_version.v260120.mmria_case p_mmria_case
+        mmria.case_version.v260615.mmria_case p_mmria_case
     )
     {
         return is_authorized_to_handle_jurisdiction_id(
@@ -32,7 +32,7 @@ public static bool is_authorized_to_handle_jurisdiction_id
         mmria.common.couchdb.DBConfigurationDetail db_config,
         System.Security.Claims.ClaimsPrincipal p_claims_principal, 
         mmria.common.SharedLibraries.Other.ResourceRightEnum p_resoure_right_enum,
-        mmria.case_version.v260120.mmria_case p_mmria_case,
+        mmria.case_version.v260615.mmria_case p_mmria_case,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
