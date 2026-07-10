@@ -4,7 +4,7 @@
 - Scope: Repo-wide rules, current architecture notes, and document routing for AI-assisted work in this repository.
 - When to use: Read this file first before planning or making changes, then jump to the feature-specific doc that matches the task.
 - Last verified: 2026-04-27
-- Related docs: [Refactor Risk Review Context](./local/refactor_risk_review_context.md), [Authentication, Session, and Timeout Context](./authentication_session_timeout.md), [Offline Mode Documentation](./offline_mode.md), [Case Summary Rendering Context](./case_summary_rendering_context.md), [Case View/Edit Playwright Testing Context](./case_view_edit_playwright_testing_context.md), [Controller to SharedLibraries Migration Matrix](./controller_sharedlibraries_migration_matrix.md), [Security Scan Remediation Tracker](./local/security_scan_remediation_tracker.md), [Security Scan Sensitive Data Heap Guidance](./local/security_scan_sensitive_data_heap_guidance.md), [Historical Notes](./local/archive/)
+- Related docs: [Refactor Risk Review Context](./local/refactor_risk_review_context.md), [Authentication, Session, and Timeout Context](./authentication_session_timeout.md), [Offline Mode Documentation](./offline_mode.md), [Case Summary Rendering Context](./case_summary_rendering_context.md), [Case View/Edit Playwright Testing Context](./case_view_edit_playwright_testing_context.md), [Controller to SharedLibraries Migration Matrix](./controller_sharedlibraries_migration_matrix.md), [Security Scan Remediation Tracker](./local/security_scan_remediation_tracker.md), [Security Scan Sensitive Data Heap Guidance](./local/security_scan_sensitive_data_heap_guidance.md), [Validator.js Management](./validator_js_management.md), [Historical Notes](./local/archive/)
 
 ## How to use this pack
 
@@ -33,6 +33,7 @@
 | TAMU geocoding integration | [TAMU Geocoding Service Integration](./TAMU_Geocoding_Context.md) | Includes the current API controller location. |
 | CVS integration | [CVS Community Vital Signs Context](./CVS_Community_Vital_Signs_Context.md) | External data enrichment guidance. |
 | Strongly typed case model generation and tooling-repo generators | [Strongly Typed Case Generator Workflow](./strongly_typed_case_generator.md) | Covers the external utilities repo boundary, including `strongly-typed-case`, `mmria-case-generator`, `mmria-ije-generator`, and `mmria-tools`. |
+| `validator.js` update, crash from missing `path_to_int_map` entry, or casing bug on `if_mother_not_married...` | [Validator.js Management](./validator_js_management.md) | Covers CouchDB attachment layout, correct download method, casing fix, push procedure, and version-manager propagation. |
 | Sensitive-data scan guidance | [Security Scan Sensitive Data Heap Guidance](./local/security_scan_sensitive_data_heap_guidance.md) | Local investigation note for heap or sensitive-data findings. |
 | Security scan tracker | [Security Scan Remediation Tracker](./local/security_scan_remediation_tracker.md) | Local working tracker for current remediation batches and rescan notes. |
 

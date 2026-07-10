@@ -70,6 +70,11 @@
             color: #8a5a00;
         }
 
+        .tenant-counts-open-stale {
+            color: #8a5a00;
+            font-weight: 600;
+        }
+
         .tenant-counts-table td,
         .tenant-counts-table th {
             vertical-align: top;
@@ -141,6 +146,24 @@ else
                 </div>
             </div>
         </div>
+        <div class="col-md-3 mb-3">
+            <div class="card-container-light col-md-12 tenant-counts-summary-card">
+                <div class="header">
+                    <h2 class="h3 mb-0">Open Cases</h2>
+                </div>
+                <div class="card-content">
+                    <span class="metric-value">@Model.TotalOpenCaseCountActive active</span>
+                    @if (Model.TotalOpenCaseCountStale > 0)
+                    {
+                        <span class="metric-label tenant-counts-open-stale">@Model.TotalOpenCaseCountStale possibly stale</span>
+                    }
+                    else if (Model.TotalOpenCaseCountActive == 0)
+                    {
+                        <span class="metric-label">none currently open</span>
+                    }
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="card-container-light col-md-12 mb-4">
@@ -160,6 +183,7 @@ else
                             <th scope="col">Report/MMRDS Ratio</th>
                             <th scope="col">At Threshold</th>
                             <th scope="col">Status</th>
+                            <th scope="col">Open Cases</th>
                             <th scope="col">Error Details</th>
                         </tr>
                     </thead>
@@ -194,6 +218,24 @@ else
                                     }
                                 </td>
                                 <td><span class="@statusClass">@entry.status</span></td>
+                                <td>
+                                    @{
+                                        var openActive = entry.open_case_count_active;
+                                        var openStale = entry.open_case_count_stale;
+                                    }
+                                    @if (openActive == null && openStale == null)
+                                    {
+                                        <span>-</span>
+                                    }
+                                    else
+                                    {
+                                        <span>@(openActive ?? 0)</span>
+                                        @if ((openStale ?? 0) > 0)
+                                        {
+                                            <span class="tenant-counts-open-stale"> (@openStale)</span>
+                                        }
+                                    }
+                                </td>
                                 <td>@GetErrorDetail(entry)</td>
                             </tr>
                         }

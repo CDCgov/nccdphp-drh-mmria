@@ -76,7 +76,7 @@ internal static class JsonRequestBodyReader
 
         type = Nullable.GetUnderlyingType(type) ?? type;
 
-        if (type == typeof(mmria.case_version.v260120.mmria_case))
+        if (type == typeof(mmria.case_version.v260615.mmria_case))
         {
             return true;
         }

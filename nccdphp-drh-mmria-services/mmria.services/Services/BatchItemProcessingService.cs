@@ -247,7 +247,7 @@ public sealed class BatchItemProcessingService
         {"FDOB_YR","birth_fetal_death_certificate_parent/demographic_of_father/date_of_birth/year"},
         {"FDOB_MO","birth_fetal_death_certificate_parent/demographic_of_father/date_of_birth/month"},
         {"MARN","birth_fetal_death_certificate_parent/demographic_of_mother/mother_married"},
-        {"ACKN","birth_fetal_death_certificate_parent/demographic_of_mother/If_mother_not_married_has_paternity_acknowledgement_been_signed_in_the_hospital"},
+        {"ACKN","birth_fetal_death_certificate_parent/demographic_of_mother/if_mother_not_married_has_paternity_acknowledgement_been_signed_in_the_hospital"},
         {"MEDUC","birth_fetal_death_certificate_parent/demographic_of_mother/education_level"},
         {"FEDUC","birth_fetal_death_certificate_parent/demographic_of_father/education_level"},
         {"ATTEND","birth_fetal_death_certificate_parent/facility_of_delivery_demographics/attendant_type"},
@@ -1474,8 +1474,14 @@ public sealed class BatchItemProcessingService
                     gs.set_value(Parent_NAT_IJE_to_MMRIA_Path["MDOB_DY"], TryPaseToIntOr_DefaultBlank(field_set["MDOB_DY"]), new_case);
                     gs.set_value(Parent_NAT_IJE_to_MMRIA_Path["FDOB_YR"], field_set["FDOB_YR"], new_case);
                     gs.set_value(Parent_NAT_IJE_to_MMRIA_Path["FDOB_MO"], TryPaseToIntOr_DefaultBlank(field_set["FDOB_MO"]), new_case);
-                    gs.set_value(Parent_NAT_IJE_to_MMRIA_Path["MARN"], field_set["MARN"], new_case);
-                    gs.set_value(Parent_NAT_IJE_to_MMRIA_Path["ACKN"], field_set["ACKN"], new_case);
+                    if (int.TryParse(field_set["MARN"], out int nat_marn_val) && field_set["MARN"] != "9999")
+                        gs.set_objectvalue(Parent_NAT_IJE_to_MMRIA_Path["MARN"], nat_marn_val, new_case);
+                    else
+                        gs.set_value(Parent_NAT_IJE_to_MMRIA_Path["MARN"], field_set["MARN"], new_case);
+                    if (int.TryParse(field_set["ACKN"], out int nat_ackn_val) && field_set["ACKN"] != "9999")
+                        gs.set_objectvalue(Parent_NAT_IJE_to_MMRIA_Path["ACKN"], nat_ackn_val, new_case);
+                    else
+                        gs.set_value(Parent_NAT_IJE_to_MMRIA_Path["ACKN"], field_set["ACKN"], new_case);
                     gs.set_value(Parent_NAT_IJE_to_MMRIA_Path["MEDUC"], field_set["MEDUC"], new_case);
                     gs.set_value(Parent_NAT_IJE_to_MMRIA_Path["FEDUC"], FEDUC_Rule(field_set["FEDUC"]), new_case);
                     gs.set_value(Parent_NAT_IJE_to_MMRIA_Path["ATTEND"], field_set["ATTEND"], new_case);
@@ -1791,7 +1797,10 @@ public sealed class BatchItemProcessingService
                     gs.set_value(Parent_FET_IJE_to_MMRIA_Path["MDOB_DY"], TryPaseToIntOr_DefaultBlank(field_set["MDOB_DY"]), new_case);
                     gs.set_value(Parent_FET_IJE_to_MMRIA_Path["FDOB_YR"], field_set["FDOB_YR"], new_case);
                     gs.set_value(Parent_FET_IJE_to_MMRIA_Path["FDOB_MO"], TryPaseToIntOr_DefaultBlank(field_set["FDOB_MO"]), new_case);
-                    gs.set_value(Parent_FET_IJE_to_MMRIA_Path["MARN"], field_set["MARN"], new_case);
+                    if (int.TryParse(field_set["MARN"], out int fet_marn_val) && field_set["MARN"] != "9999")
+                        gs.set_objectvalue(Parent_FET_IJE_to_MMRIA_Path["MARN"], fet_marn_val, new_case);
+                    else
+                        gs.set_value(Parent_FET_IJE_to_MMRIA_Path["MARN"], field_set["MARN"], new_case);
                     gs.set_value(Parent_FET_IJE_to_MMRIA_Path["MEDUC"], field_set["MEDUC"], new_case);
                     gs.set_value(Parent_FET_IJE_to_MMRIA_Path["ATTEND"], field_set["ATTEND"], new_case);
                     gs.set_value(Parent_FET_IJE_to_MMRIA_Path["TRAN"], field_set["TRAN"], new_case);
