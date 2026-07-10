@@ -2,7 +2,7 @@
 
 **Epic:** 12 — Data Migration Tool Modernization
 **Story ID:** 12.4
-**Status:** done
+**Status:** in-progress — defect 12.4-D1 and follow-up requirements 12.4-R1 / 12.4-R2 added 2026-07-10
 **Date added:** 2026-07-08
 **Depends on:** Story 12.3 (Case Rev Endpoint — needed for the `_rev` polling and `X-Offline-Date` header)
 **Source requirements:** FR-19.1–FR-19.5
@@ -411,3 +411,108 @@ AC-6 (508): stale modal uses `role="alertdialog"`, `aria-modal="true"`, `aria-la
 | `source-code/mmria/mmria-server/Views/Shared/_LayoutBase.cshtml` | Added stale-case modal `<div>` markup adjacent to existing offline modals |
 | `source-code/mmria/mmria-server/wwwroot/js/system-offline-check.js` | Added `showStaleCaseModal`, `showStaleCaseBanner`, `stopCaseRevPolling`, `startCaseRevPolling`; exposed all four on `window` |
 | `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js` | (1) Replaced 409 conflict error handler with `showStaleCaseModal()`. (2) Start `startCaseRevPolling` after online case load, gated on write-access. (3) Restart polling with new `_rev` after successful save. (4) Call `stopCaseRevPolling()` in `navigation_away`. |
+
+---
+
+## Post-Implementation Defects & Follow-Up Requirements
+
+**Status:** Identified after Story 12.4 was marked done. Added 2026-07-10.
+
+---
+
+### Defect 12.4-D1 — Rev polling fires stale banner after autosave increments `_rev`
+
+**Severity:** High — functional regression; stale banner fires every autosave cycle even though the user is the one who caused the `_rev` change.
+
+**Root cause:**  
+`startCaseRevPolling` captures `loadedRev` at case-load time (or after a manual save). The autosave path in `wwwroot/scripts/case/index.js` also calls `PUT /api/case/{id}`, which increments `_rev` server-side. Because the polling loop still compares against the original `loadedRev`, every successful autosave causes a mismatch, triggering `showStaleCaseBanner()`.
+
+**Required fix — Autosave must update the polling reference rev:**
+
+After every successful autosave, call `startCaseRevPolling(caseId, newRev)` with the `_rev` returned in the autosave response — the same restart-with-new-rev pattern already used for manual saves (see Change Log entry for `scripts/case/index.js` item 3). The polling reference must stay in sync with any write the current tab performs, whether triggered manually or automatically.
+
+**Acceptance criteria:**
+
+- **AC-D1-1** — Given the autosave timer fires and the autosave PUT succeeds  
+  When the `/api/case/{id}/rev` poll next fires  
+  Then the stale banner does NOT appear (the polled `_rev` matches the reference rev updated by autosave)
+
+- **AC-D1-2** — Given autosave completes successfully  
+  When a _different_ browser session subsequently saves the same case  
+  And the `/api/case/{id}/rev` poll fires  
+  Then the stale banner DOES appear (staleness from another session is still detected)
+
+- **AC-D1-3** — The autosave code path must call `startCaseRevPolling(caseId, updatedRev)` with the new `_rev` from the autosave response — the same pattern already implemented for manual saves.
+
+---
+
+### Requirement 12.4-R1 — Move `system-offline-check.js` into a `scripts/` subfolder under `/js/`
+
+**Rationale:** As JS responsibilities grow, co-locating all scripts at the root of `/js/` creates a flat, hard-to-navigate structure. Offline-check concerns belong in an organized folder hierarchy.
+
+**Required change — File relocation:**
+
+Move:
+```
+wwwroot/js/system-offline-check.js
+→
+wwwroot/js/scripts/system-offline-check.js
+```
+
+**Required downstream changes:**
+
+- Any `<script src="...">` references in Razor layouts or views that reference the old path must be updated.
+- Any bundle definitions (e.g. `bundleconfig.json`, webpack config, or `_Layout.cshtml` script include blocks) must be updated to the new path.
+- Search for all references before moving:
+  ```powershell
+  Select-String -Path "c:\repos\nccdphp-drh-mmria\source-code\mmria\mmria-server\**\*" `
+      -Pattern "system-offline-check" -Recurse | Select-Object Path, LineNumber, Line
+  ```
+
+**Acceptance criteria:**
+
+- **AC-R1-1** — The file `wwwroot/js/system-offline-check.js` no longer exists at the old path.
+- **AC-R1-2** — The file exists at `wwwroot/js/scripts/system-offline-check.js`.
+- **AC-R1-3** — All Razor views and layout files reference the new path and the script loads without a 404 in the browser.
+- **AC-R1-4** — No other JS behavior changes; all existing offline-check and polling functionality works identically after the move.
+
+---
+
+### Requirement 12.4-R2 — Extract case `_rev` polling into its own file `wwwroot/scripts/case/case-rev-check.js`
+
+**Rationale:** `system-offline-check.js` is responsible for system-wide offline/warn status. Case `_rev` staleness detection is a case-level concern and should not live in a system-level file. Decoupling these responsibilities improves maintainability and makes each file's single purpose clear.
+
+**Required change — Extract and move:**
+
+Extract from `wwwroot/js/system-offline-check.js` (after it has been moved per R1):
+
+- `_caseRevPollInterval`
+- `_caseRevPollIntervalMs`
+- `_caseRevFastIntervalMs`
+- `startCaseRevPolling()`
+- `stopCaseRevPolling()`
+- `showStaleCaseBanner()`
+- `showStaleCaseModal()`
+- `mmria_do_case_reload()`
+- All `window.*` exposure lines for these symbols
+
+Place them in a new file:
+```
+wwwroot/scripts/case/case-rev-check.js
+```
+
+Remove the extracted code from `system-offline-check.js`. Confirm that `system-offline-check.js` retains only offline/warn status functions: `checkOfflineStatus`, `handleOfflineState`, `showWarnModal`, `closeWarnModal`, `showOfflineModal`, `clearAutoLogoutTimer`, `mmria_offline_modal_ok_handler`, `startOfflineStatusPolling`.
+
+**Required downstream changes:**
+
+- Add a `<script src="~/scripts/case/case-rev-check.js">` include to the Razor layout or view that serves the case edit page — it must be loaded on case edit pages only (or all authenticated pages, consistent with how `system-offline-check.js` is included).
+- `wwwroot/scripts/case/index.js` calls `startCaseRevPolling`, `stopCaseRevPolling`, and `showStaleCaseModal` via `window.*` — those bindings must remain in `case-rev-check.js`.
+- If the project uses bundling, update `bundleconfig.json` (or equivalent) to include the new file.
+
+**Acceptance criteria:**
+
+- **AC-R2-1** — `case-rev-check.js` exists at `wwwroot/scripts/case/case-rev-check.js`.
+- **AC-R2-2** — `system-offline-check.js` no longer contains `startCaseRevPolling`, `stopCaseRevPolling`, `showStaleCaseBanner`, `showStaleCaseModal`, `mmria_do_case_reload`, or their `window.*` exposure lines.
+- **AC-R2-3** — `case-rev-check.js` exposes `window.startCaseRevPolling`, `window.stopCaseRevPolling`, `window.showStaleCaseBanner`, `window.showStaleCaseModal`, and `window.mmria_do_case_reload`.
+- **AC-R2-4** — The case edit page loads `case-rev-check.js` (verified via browser DevTools Network tab — no 404, script is present in DOM).
+- **AC-R2-5** — All existing AC-1 through AC-6 from the original story still pass after the file extraction.

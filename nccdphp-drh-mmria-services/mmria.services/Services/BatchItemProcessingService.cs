@@ -247,7 +247,7 @@ public sealed class BatchItemProcessingService
         {"FDOB_YR","birth_fetal_death_certificate_parent/demographic_of_father/date_of_birth/year"},
         {"FDOB_MO","birth_fetal_death_certificate_parent/demographic_of_father/date_of_birth/month"},
         {"MARN","birth_fetal_death_certificate_parent/demographic_of_mother/mother_married"},
-        {"ACKN","birth_fetal_death_certificate_parent/demographic_of_mother/If_mother_not_married_has_paternity_acknowledgement_been_signed_in_the_hospital"},
+        {"ACKN","birth_fetal_death_certificate_parent/demographic_of_mother/if_mother_not_married_has_paternity_acknowledgement_been_signed_in_the_hospital"},
         {"MEDUC","birth_fetal_death_certificate_parent/demographic_of_mother/education_level"},
         {"FEDUC","birth_fetal_death_certificate_parent/demographic_of_father/education_level"},
         {"ATTEND","birth_fetal_death_certificate_parent/facility_of_delivery_demographics/attendant_type"},
