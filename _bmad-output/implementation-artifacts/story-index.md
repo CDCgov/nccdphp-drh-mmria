@@ -34,14 +34,14 @@ dev this story _bmad-output/implementation-artifacts/1-3-update-case-narrative-i
 
 ## Epic 2: Vitals Field Validation
 
-| Story                                                    | File                                                    | Status       |
-| -------------------------------------------------------- | ------------------------------------------------------- | ------------ |
-| 2.1 Add Vitals Range Config — CouchDB and Server Loading | `2-1-vitals-range-config-couchdb-and-server-loading.md` | verification |
-| 2.2 On-Blur Vitals Validation and Invalid Entry Modal    | `2-2-on-blur-vitals-validation-and-modal.md`            | verification |
-| 2.3 Display-Time Exclusion — Print, PDF, Date Fix        | `2-3-display-time-exclusion-print-pdf-date-fix.md`      | verification |
-| 2.4 Display-Time Exclusion — Graph and Table Views       | `2-4-display-time-exclusion-graph-and-table.md`         | verification |
-| 2.5 Historical Data Detection and Record Indicators      | `2-5-historical-data-detection-and-indicators.md`       | verification |
-| 2.6 Vitals Validation Bug Fixes — Data Retention and Prenatal Coverage | `2-6-vitals-validation-bug-fixes.md` | draft |
+| Story                                                                  | File                                                    | Status       |
+| ---------------------------------------------------------------------- | ------------------------------------------------------- | ------------ |
+| 2.1 Add Vitals Range Config — CouchDB and Server Loading               | `2-1-vitals-range-config-couchdb-and-server-loading.md` | verification |
+| 2.2 On-Blur Vitals Validation and Invalid Entry Modal                  | `2-2-on-blur-vitals-validation-and-modal.md`            | verification |
+| 2.3 Display-Time Exclusion — Print, PDF, Date Fix                      | `2-3-display-time-exclusion-print-pdf-date-fix.md`      | verification |
+| 2.4 Display-Time Exclusion — Graph and Table Views                     | `2-4-display-time-exclusion-graph-and-table.md`         | verification |
+| 2.5 Historical Data Detection and Record Indicators                    | `2-5-historical-data-detection-and-indicators.md`       | verification |
+| 2.6 Vitals Validation Bug Fixes — Data Retention and Prenatal Coverage | `2-6-vitals-validation-bug-fixes.md`                    | draft        |
 
 > ⚠️ **Epic 2 sequencing:** Story 2.1 must be completed before 2.2–2.5. Stories 2.2–2.5 can be worked in any order after 2.1. Story 2.6 depends on 2.2 and 2.4 being complete.
 
@@ -265,6 +265,7 @@ dev this story _bmad-output/implementation-artifacts/8-4-periodic-status-check.m
 | ------------------------------------------------------- | ------------------------------------------------ | ------------- |
 | 9.1 Fix Data Summary Checks Field Filter for ALL Toggle | `9-1-fix-data-summary-checks-field-filter.md`    | done          |
 | 9.2 Fix Manage Users Export Ignores Active Filter       | `9-2-fix-manage-users-export-respects-filter.md` | ready-for-dev |
+| 9.3 Fix Manage Users Role Filter False-Positive Match   | `9-3-fix-manage-users-role-filter-endswith.md`   | done          |
 
 **Story 9.1 prompt:**
 
@@ -278,17 +279,23 @@ dev this story _bmad-output/implementation-artifacts/9-1-fix-data-summary-checks
 dev this story _bmad-output/implementation-artifacts/9-2-fix-manage-users-export-respects-filter.md
 ```
 
+**Story 9.3 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/9-3-fix-manage-users-role-filter-endswith.md
+```
+
 ---
 
 ## Epic 10: CVS PDF Export Tool Reliability _(2026-07-06)_
 
-| Story                                                         | File                                                   | Status |
-| ------------------------------------------------------------- | ------------------------------------------------------ | ------ |
-| 10.1 Fix BatchSupervisor Busy-Wait CPU Spin                   | `10-1-fix-cvs-batch-supervisor-busy-wait.md`           | done   |
-| 10.2 Server-Side CVS Error Hardening                          | `10-2-server-side-cvs-error-hardening.md`              | review |
-| 10.3 Client-Side CVS Retry Mechanism with Countdown           | `10-3-client-side-cvs-retry-mechanism.md`              | review |
-| 10.4 CVS Parent-Page Button State via BroadcastChannel        | `10-4-cvs-parent-page-broadcast-channel-status.md`     | review |
-| 10.5 Config-Driven CVS Retry Constants                        | `10-5-config-driven-cvs-retry-constants.md`            | done        |
+| Story                                                  | File                                               | Status |
+| ------------------------------------------------------ | -------------------------------------------------- | ------ |
+| 10.1 Fix BatchSupervisor Busy-Wait CPU Spin            | `10-1-fix-cvs-batch-supervisor-busy-wait.md`       | done   |
+| 10.2 Server-Side CVS Error Hardening                   | `10-2-server-side-cvs-error-hardening.md`          | review |
+| 10.3 Client-Side CVS Retry Mechanism with Countdown    | `10-3-client-side-cvs-retry-mechanism.md`          | review |
+| 10.4 CVS Parent-Page Button State via BroadcastChannel | `10-4-cvs-parent-page-broadcast-channel-status.md` | review |
+| 10.5 Config-Driven CVS Retry Constants                 | `10-5-config-driven-cvs-retry-constants.md`        | done   |
 
 > ℹ️ Stories 10.1 and 10.2 are independent of each other and of 10.3/10.4.
 > ⚠️ Story 10.4 depends on Story 10.3 — `post_cvs_status` and the BroadcastChannel message schema are defined in 10.3.
@@ -333,7 +340,7 @@ dev this story _bmad-output/implementation-artifacts/10-5-config-driven-cvs-retr
 | OI-3     | Story 1.1             | **Resolved** — Implementation complete; going to formal verification.                                                                                                                                                                                                                                                                                                                                  |
 | OI-4     | Story 2.2             | **Resolved** — Vitals input `name` attributes confirmed during Story 2.2 implementation.                                                                                                                                                                                                                                                                                                               |
 | OI-5     | Stories 3.1, 3.2      | **Resolved** — Controller actions confirmed during Story 3.1/3.2 implementation.                                                                                                                                                                                                                                                                                                                       |
-| OI-5-CVS | Stories 10.3, 10.5    | **Resolved** — Constants are config-driven via `integer_keys.shared` in the CouchDB config document (Story 10.5). Defaults: 10 attempts, 60-second delay (changed from 30s branch value per FR-11.3).                                                                                                                                                                             |
+| OI-5-CVS | Stories 10.3, 10.5    | **Resolved** — Constants are config-driven via `integer_keys.shared` in the CouchDB config document (Story 10.5). Defaults: 10 attempts, 60-second delay (changed from 30s branch value per FR-11.3).                                                                                                                                                                                                  |
 | OI-dev-B | Story 2.5             | **Resolved** — Edit-mode hook confirmed during Story 2.5 implementation.                                                                                                                                                                                                                                                                                                                               |
 | OI-dev-C | Story 2.5             | **Resolved** — Chart.js DOM target confirmed during Story 2.5 implementation.                                                                                                                                                                                                                                                                                                                          |
 | OI-PRD-4 | Stories 4.0, 4.1, 5.1 | **Resolved** — Dedicated version-scoped `case-validation-rules` CouchDB document; `severity: hard` for active-input blur; `severity: warning` for historical load-time scan; soft-acknowledgment print gate (UI-only, no persist); POC `CaseValidationManager` field_rules path ported in Story 4.0 (vitals-scoped). FR-2.1, FR-2.3, FR-2.6, FR-6 updated in PRD. Stories 4.0, 4.1, and 5.1 unblocked. |
