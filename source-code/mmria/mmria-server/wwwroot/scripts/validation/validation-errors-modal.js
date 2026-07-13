@@ -20,6 +20,9 @@
 
         if (errorCount === 0 && warningCount === 0 && infoCount === 0) { return; }
 
+        // Capture triggering element so focus can be restored on close (AC #B4)
+        var triggerEl = document.activeElement;
+
         var headerLabel = window.mmria_validation_state.buildButtonLabel(errorCount, warningCount, infoCount);
 
         var errorsHtml = renderErrorsSection(state.errors);
@@ -40,7 +43,7 @@
             warningsHtml +
             '</div>' +
             '<div class="modal-footer" style="padding:10px 15px;text-align:right;">' +
-            '<button type="button" id="validation-errors-modal-close" class="btn btn-default" style="padding:6px 18px;">Close</button>' +
+            '<button type="button" id="validation-errors-modal-close" class="validation-errors-close-btn">Close</button>' +
             '</div>' +
             '</div>' +
             '</div>' +
@@ -57,6 +60,7 @@
             if (backdrop) { backdrop.classList.add('show'); }
             var closeBtn = document.getElementById('validation-errors-modal-close');
             if (closeBtn) { closeBtn.focus(); }
+            trapFocus(modal);
         }, 10);
 
         function closeModal() {
@@ -65,6 +69,8 @@
             setTimeout(function () {
                 if (modal && modal.parentNode) { modal.parentNode.removeChild(modal); }
                 if (backdrop && backdrop.parentNode) { backdrop.parentNode.removeChild(backdrop); }
+                // Restore focus to the element that triggered the modal (AC #B4)
+                if (triggerEl && typeof triggerEl.focus === 'function') { triggerEl.focus(); }
             }, 150);
         }
 
@@ -79,6 +85,29 @@
 
         // Attach field navigation links
         attachFieldNavLinks(modal, closeModal);
+    }
+
+    // Trap keyboard focus within the modal so Tab/Shift+Tab cannot reach background elements (AC #B3).
+    function trapFocus(modal) {
+        if (!modal) { return; }
+        var focusableSelectors = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+        function getFocusable() {
+            return Array.prototype.slice.call(modal.querySelectorAll(focusableSelectors)).filter(function (el) {
+                return !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
+            });
+        }
+        modal.addEventListener('keydown', function (e) {
+            if (e.key !== 'Tab') { return; }
+            var focusable = getFocusable();
+            if (focusable.length === 0) { e.preventDefault(); return; }
+            var first = focusable[0];
+            var last = focusable[focusable.length - 1];
+            if (e.shiftKey) {
+                if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+            } else {
+                if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+            }
+        });
     }
 
     function renderErrorsSection(errors) {
