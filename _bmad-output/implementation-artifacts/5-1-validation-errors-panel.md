@@ -522,9 +522,9 @@ Three issues were found after initial implementation of Story 5.1. The feature w
 
 **Required:** Update to amber/warning palette:
 - Background: `#FFF7F1`
-- Text color: `#BA9000`
+- Text color: `#8A6000` (contrast-corrected from `#BA9000` which failed 4.5:1 ratio)
 - Border: `2px solid #FBA818`
-- Hover/focus: darker amber (e.g., `#FDF0E0` background, `#7a5600` text)
+- Hover/focus: darker amber (e.g., `#FDF0E0` background, `#5a3e00` text)
 
 **File:** `wwwroot/css/validation-errors-panel.css`
 
@@ -559,7 +559,7 @@ Three issues were found after initial implementation of Story 5.1. The feature w
 
 **AC #B1 — Warning button uses amber styling**
 When the Validation Errors button is rendered in the case header,
-Then it uses background `#FFF7F1`, text color `#BA9000`, and border `2px solid #FBA818` — not the purple brand color.
+Then it uses background `#FFF7F1`, text color `#8A6000`, and border `2px solid #FBA818` — not the purple brand color.
 
 **AC #B2 — Close button uses neutral styling**
 When the Validation Errors modal is open,
@@ -581,8 +581,8 @@ Then keyboard focus returns to the Validation Errors button that originally open
 ### Tasks / Subtasks (Post-QA Corrections)
 
 - [x] Bug A — Update `.validation-errors-button` CSS styling
-  - [x] In `validation-errors-panel.css`, update `.validation-errors-button`: `background: #FFF7F1; color: #BA9000; border: 2px solid #FBA818;`
-  - [x] Update `.validation-errors-button:hover, .validation-errors-button:focus`: `background: #FDF0E0; color: #7a5600; outline-color: #FBA818;`
+  - [x] In `validation-errors-panel.css`, update `.validation-errors-button`: `background: #FFF7F1; color: #8A6000; border: 2px solid #FBA818;` (contrast-corrected from original `#BA9000` which failed 4.5:1)
+  - [x] Update `.validation-errors-button:hover, .validation-errors-button:focus`: `background: #FDF0E0; color: #5a3e00; outline-color: #FBA818;`
 
 - [x] Bug B — Update modal Close button styling
   - [x] In `validation-errors-modal.js`, replace inline style on Close button with class `validation-errors-close-btn`

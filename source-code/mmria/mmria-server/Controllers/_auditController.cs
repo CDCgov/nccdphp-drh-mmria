@@ -428,7 +428,7 @@ public sealed class _auditController : Controller
             var subitem = value.items[subitem_index];
 
 
-            if (subitem.metadata_type.ToUpper() == "DATETIME")
+            if (string.Equals(subitem.metadata_type, "DATETIME", StringComparison.OrdinalIgnoreCase))
             {
                 if (subitem.dictionary_path == found_path)
                 {
