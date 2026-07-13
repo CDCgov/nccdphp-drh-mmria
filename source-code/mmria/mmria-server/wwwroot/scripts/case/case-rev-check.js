@@ -6,6 +6,17 @@
 var _caseRevPollInterval = null;
 var _caseRevPollIntervalMs = 45000; // normal: 45 s
 
+function isCaseRevPollingAllowed() {
+    if (typeof window.mmria_is_case_rev_polling_allowed !== 'function') return true;
+
+    try {
+        return window.mmria_is_case_rev_polling_allowed() === true;
+    } catch (err) {
+        console.warn('[CaseRevPoll] eligibility check failed:', err);
+        return false;
+    }
+}
+
 /**
  * Reloads the open case's data in-place via get_specific_case.
  * Falls back to a full page reload if the case page hook is not available.
@@ -154,8 +165,14 @@ function stopCaseRevPolling() {
 function startCaseRevPolling(caseId, loadedRev) {
     if (!caseId || !loadedRev) return;
     stopCaseRevPolling();
+    if (!isCaseRevPollingAllowed()) return;
 
     function poll() {
+        if (!isCaseRevPollingAllowed()) {
+            stopCaseRevPolling();
+            return;
+        }
+
         fetch('/api/case/' + encodeURIComponent(caseId) + '/rev', { credentials: 'same-origin' })
             .then(function (response) {
                 if (!response.ok) return null;
@@ -164,6 +181,10 @@ function startCaseRevPolling(caseId, loadedRev) {
             .then(function (data) {
                 if (!data) return;
                 if (data._rev && data._rev !== loadedRev) {
+                    if (!isCaseRevPollingAllowed()) {
+                        stopCaseRevPolling();
+                        return;
+                    }
                     showStaleCaseBanner();
                 }
             })

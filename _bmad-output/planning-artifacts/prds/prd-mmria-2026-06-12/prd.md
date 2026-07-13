@@ -2,7 +2,7 @@
 title: "PRD: MMRIA V4.1"
 status: final
 created: 2026-06-12
-updated: 2026-07-10 (FR-12 added — Vitals Import NAT/FET Numeric Field Type Normalization; FR-13 added — Data Migration Project Environment Configuration; FR-14 added — Vitals Import Retrospective Data Correction Migration; FR-15 added — data-migration cURL to CouchDbHttpClient Migration; FR-16 added — Replication cURL to CouchDbHttpClient Migration; FR-17 added — VitalsTypeCorrectionMigration Hardening; FR-18 added — Case Rev Endpoint; FR-19 added and clarified — Stale Tab UX modal reload behavior)
+updated: 2026-07-13 (FR-12 added — Vitals Import NAT/FET Numeric Field Type Normalization; FR-13 added — Data Migration Project Environment Configuration; FR-14 added — Vitals Import Retrospective Data Correction Migration; FR-15 added — data-migration cURL to CouchDbHttpClient Migration; FR-16 added — Replication cURL to CouchDbHttpClient Migration; FR-17 added — VitalsTypeCorrectionMigration Hardening; FR-18 added — Case Rev Endpoint; FR-19 added and clarified — Stale Tab UX modal reload behavior; FR-20 added — Tenant Database Counts Open Cases Visibility; FR-21 added — Case Narrative Instructions Panel Reformatting)
 ---
 
 # PRD: MMRIA V4.1
@@ -531,10 +531,25 @@ A browser tab that was backgrounded or frozen before `offline_date` and foregrou
 The existing case save error handler in the client is updated to intercept HTTP 409 responses specifically. On 409, a non-dismissable Bootstrap-style modal is displayed with the following message: *"This case was updated elsewhere. Reload to get the latest version before saving."* The modal contains a single **[Reload Case]** button. The button invokes the case reload helper, which reloads the open case in-place when the case page hook is available and falls back to `window.location.reload()` otherwise. The generic error handler does not fire for 409 — this branch takes over exclusively. No server-side change is required for this sub-feature.
 
 **FR-19.2 — `_rev` polling while a case is open (proactive)**
-After a case loads for editing, the client starts a `setInterval` polling `GET /api/case/{id}/rev` (FR-18) every 45 seconds. On each response, the returned `_rev` is compared to the `_rev` captured at case load time or the latest successful save. If the values differ, a Bootstrap-style stale-case modal is displayed with the message: *"This case has been updated. Reload to see the latest version."* The modal has a single **[Reload]** button and no dismiss action. The button invokes the case reload helper, which reloads the open case in-place when possible and falls back to `window.location.reload()` otherwise. Autosave is paused while this stale state is active and resumes only after the case reloads. Polling stops when the user navigates away from the case.
+After a case loads for editing and the current tab owns the active checkout, the client starts a `setInterval` polling `GET /api/case/{id}/rev` (FR-18) every 45 seconds. On each response, the returned `_rev` is compared to the `_rev` captured at case load time or the latest successful save. If the values differ, a Bootstrap-style stale-case modal is displayed with the message: *"This case has been updated. Reload to see the latest version."* The modal has a single **[Reload]** button and no dismiss action. The button invokes the case reload helper, which reloads the open case in-place when possible and falls back to `window.location.reload()` otherwise. Autosave is paused while this stale state is active and resumes only after the case reloads. Polling stops when the user leaves edit mode, releases the checkout through Save & Close, or navigates away from the case.
 
 **FR-19.3 — Poll scope**
-Polling is only active when the current user has write access to the open case. Read-only viewers do not poll.
+Polling is only active while the current tab owns the open case's active edit checkout. Users with write access who are viewing the case read-only, including immediately after Save & Close, do not poll and do not receive proactive `_rev` warnings for changes made by another user.
+
+The client polls only when all of the following are true:
+
+- The page is in the case-editing flow for a write-capable abstractor user.
+- The current tab owns the active, non-expired checkout lock for the case.
+- The loaded case has both `_id` and `_rev`.
+
+The client does not poll for `_rev` when any of the following are true:
+
+- The user is on a data analyst or other read-only case route.
+- The user has write access but is only viewing the case, including the read-only state after Save & Close.
+- Checkout has not yet been acquired, checkout acquisition failed, or a checkout conflict keeps the tab in view mode.
+- The case is in offline-processing mode, failed to load, hit an auth failure, or the user navigated away/unloaded the page.
+
+After a successful save while edit mode remains active, the polling reference `_rev` is updated to the save response revision and polling continues. After Save & Close or another successful lock release, polling stops.
 
 **FR-19.4 — Section 508**
 The proactive stale-case modal (FR-19.2) and the 409 recovery modal (FR-19.1) meet Section 508 accessibility requirements consistent with NFR-2. Each modal is announced to screen readers when it appears, uses alert-dialog semantics, and moves focus to its reload button.
@@ -589,6 +604,49 @@ A new **Open Cases** column is added to the Counts by Entry table. For each tena
 
 **FR-20.5 — Error handling and status isolation**
 An open-case query failure for a single tenant does not affect that tenant's `status` field — `status` remains computed solely from the existing mmrds/de_id/report error logic. The open-case error is captured in a separate `open_case_error` field on the per-entry response model and surfaced only as `-` in the table cell. It does not contribute to the EntriesWithErrors summary count.
+
+---
+
+### FR-21 — Case Narrative Instructions Panel Reformatting
+
+The Case Narrative form displays a guidelines/instructions panel with usage guidance for reviewers. The content of this panel is updated with text corrections and formatting changes only. No behavior, configuration, data, or structural changes are required.
+
+**FR-21.1 — Title change**
+The panel title `"Case Narrative Template Guidelines:"` is replaced with `"Case Narrative"`. The colon and the words "Template Guidelines" are removed. Bold heading formatting is retained.
+
+**FR-21.2 — List format: bullet points replaced with dash prefix**
+All eight list items in the panel — the three introductory items and the five "Remember to:" items — are reformatted from bullet point (•) style to plain-text dash (`-`) prefix. No `<ul>`/`<li>` list wrapper is used.
+
+**FR-21.3 — Text correction: lowercase "into"**
+In the second introductory item, `"or Into an external document"` is corrected to `"or into an external document"` (lowercase `i`).
+
+**FR-21.4 — "Remember to:" formatting change**
+The `"Remember to:"` label is changed from bold to plain text.
+
+**FR-21.5 — Text correction: lowercase "inclusive"**
+In the third "Remember to:" item, `"Use Inclusive and non-stigmatizing language"` is corrected to `"Use inclusive and non-stigmatizing language"` (lowercase `i`).
+
+**FR-21.6 — Trailing periods removed from "Remember to:" items**
+The trailing period is removed from each of the five "Remember to:" list items. The three introductory list items retain their trailing periods.
+
+The complete final panel content after all changes:
+
+```
+Case Narrative
+
+-You may use this template as a guide, deleting any portions that are not applicable.
+-Alternatively, you may copy the reviewer's notes sections below into the final case narrative field or into an external document. You may also use your own template.
+-Ensure any narrative you want to copy and paste into the final case narrative field is in plain text without formatting (ctrl+shift+v).
+
+Remember to:
+-Focus on the most relative information to the cause of death (see Cause of Death Modules)
+-Humanize the story using a story-telling approach
+-Use inclusive and non-stigmatizing language
+-Spell out acronyms or explain in plain text clinical terminology
+-Incorporate interview(s) and CVS throughout (as applicable)
+```
+
+No other content, behavior, or data changes are in scope for this requirement.
 
 ---
 

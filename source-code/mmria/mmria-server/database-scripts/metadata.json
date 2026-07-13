@@ -9733,7 +9733,7 @@
             },
             {
               "prompt": "If No, has Paternity Acknowledgement been Signed in the Hospital?",
-              "name": "If_mother_not_married_has_paternity_acknowledgement_been_signed_in_the_hospital",
+              "name": "if_mother_not_married_has_paternity_acknowledgement_been_signed_in_the_hospital",
               "type": "list",
               "data_type": "number",
               "values": [],

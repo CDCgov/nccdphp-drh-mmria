@@ -5,6 +5,39 @@ var g_user_name = null;
 var g_is_data_analyst_mode = null;
 var g_data_is_checked_out = false;
 var g_data = null;
+
+function mmria_is_case_rev_polling_allowed()
+{
+  return (
+    g_is_data_analyst_mode == null &&
+    g_data_is_checked_out === true &&
+    g_data != null &&
+    g_data._id != null &&
+    g_data._id !== '' &&
+    g_data._rev != null &&
+    g_data._rev !== ''
+  );
+}
+
+function mmria_sync_case_rev_polling()
+{
+  if(mmria_is_case_rev_polling_allowed())
+  {
+    if(typeof window.startCaseRevPolling === 'function')
+    {
+      window.startCaseRevPolling(g_data._id, g_data._rev);
+    }
+    return;
+  }
+
+  if(typeof window.stopCaseRevPolling === 'function')
+  {
+    window.stopCaseRevPolling();
+  }
+}
+
+window.mmria_is_case_rev_polling_allowed = mmria_is_case_rev_polling_allowed;
+
 var g_source_db = null;
 var g_jurisdiction_list = [];
 var g_user_role_jurisdiction_list = [];
@@ -656,6 +689,7 @@ function mmria_handle_case_save_auth_expired(p_err, p_item)
   }
 
   g_data_is_checked_out = false;
+  mmria_sync_case_rev_polling();
   mmria_abort_case_save_queue_items(p_err, case_id);
   mmria_redirect_case_page_to_autologin_summary();
 }
@@ -3185,6 +3219,7 @@ async function window_on_hash_change(e)
             g_data.last_checked_out_by = null;
             g_data.checked_out_by_tab_id = release_tab_id;
             g_data_is_checked_out = false;
+            mmria_sync_case_rev_polling();
 
             g_apply_sort(g_metadata, g_data, "","", "");
 
@@ -3210,6 +3245,7 @@ async function window_on_hash_change(e)
                 g_data.checked_out_by_tab_id = old_checked_out_by_tab_id;
                 g_data_is_checked_out = true;
                 sync_edit_mode_auto_timers();
+                mmria_sync_case_rev_polling();
                 restore_case_hash_after_failed_save(previous_url);
             }
         }
@@ -3385,6 +3421,7 @@ async function get_specific_case(p_id)
       g_data_is_checked_out = false; // Not checked out in processing mode
       
       stop_edit_mode_auto_timers();
+      mmria_sync_case_rev_polling();
       
       if (!g_is_pmss_enhanced) {
         g_case_narrative_original_value = offlineCase.case_narrative?.case_opening_overview;
@@ -3440,12 +3477,8 @@ async function get_specific_case(p_id)
         g_data = case_response;
         g_data_is_checked_out = is_case_checked_out(g_data);
 
-        // Start _rev polling for write-access users only (AC-2–AC-5, Story 12.4)
-        if (g_is_data_analyst_mode == null && g_data._id && g_data._rev) {
-            if (typeof window.startCaseRevPolling === 'function') {
-                window.startCaseRevPolling(g_data._id, g_data._rev);
-            }
-        }
+        // Sync _rev polling with active edit-lock ownership.
+        mmria_sync_case_rev_polling();
 
         if (g_autosave_interval != null && g_data_is_checked_out == false) 
         {
@@ -3464,6 +3497,7 @@ async function get_specific_case(p_id)
     console.log('get_specific_case:', e);
     g_data = null;
     g_data_is_checked_out = false;
+    mmria_sync_case_rev_polling();
     alert('Unable to load this case. Please return to the summary list and try again.');
     window.location.hash = '#/summary';
     return;
@@ -3891,15 +3925,9 @@ async function process_save_case()
         g_data._rev = case_response.rev;
       }
 
-      // Restart _rev polling after manual and autosave writes so this tab's own saves do not look stale (Story 12.4-D1)
-      if (g_is_data_analyst_mode == null && g_data._id && g_data._rev) {
-        if (typeof window.startCaseRevPolling === 'function') {
-          window.startCaseRevPolling(g_data._id, g_data._rev);
-        }
-      }
-
       g_data.last_updated_by = g_user_name;
       g_data_is_checked_out = is_case_checked_out(g_data);
+      mmria_sync_case_rev_polling();
 
       if (g_data_is_checked_out)
       {
@@ -4583,6 +4611,7 @@ async function enable_edit_click()
       }
       g_data_is_checked_out = false;
       stop_edit_mode_auto_timers();
+      mmria_sync_case_rev_polling();
       g_render();
       return;
     }
@@ -4616,6 +4645,7 @@ async function enable_edit_click()
       // Ensure we remain in view mode in this tab.
       g_data_is_checked_out = false;
       stop_edit_mode_auto_timers();
+      mmria_sync_case_rev_polling();
       g_render();
       return;
     }
@@ -4668,12 +4698,14 @@ async function enable_edit_click()
       }
 
       stop_edit_mode_auto_timers();
+      mmria_sync_case_rev_polling();
 
       g_render();
       return;
     }
 
     g_data_is_checked_out = true;
+    mmria_sync_case_rev_polling();
     g_render();
 
     if ($global.case_document_begin_edit != null) 
@@ -4714,6 +4746,7 @@ async function save_and_finish_click()
   current_data.last_checked_out_by = null;
   current_data.checked_out_by_tab_id = release_tab_id;
   g_data_is_checked_out = false;
+  mmria_sync_case_rev_polling();
   g_apply_sort(g_metadata, current_data, "", "", "");
   
   // Mark for cleanup before saving
@@ -4728,6 +4761,7 @@ async function save_and_finish_click()
       clear_case_from_local_storage(case_id);
       g_case_cleanup_pending.delete(case_id);
       stop_edit_mode_auto_timers();
+      mmria_sync_case_rev_polling();
       create_save_message();
       g_render();
     });
@@ -4741,6 +4775,7 @@ async function save_and_finish_click()
     current_data.checked_out_by_tab_id = old_checked_out_by_tab_id;
     g_data_is_checked_out = true;
     sync_edit_mode_auto_timers();
+    mmria_sync_case_rev_polling();
     g_render();
   }
 }
@@ -4855,6 +4890,7 @@ async function save_case_before_full_navigation(target_url)
       g_case_cleanup_pending.add(case_id);
       g_apply_sort(g_metadata, current_data, '', '', '');
       stop_edit_mode_auto_timers();
+      mmria_sync_case_rev_polling();
 
       await save_case_and_wait(current_data, null, 'leave_case_navigation');
 
@@ -4872,6 +4908,7 @@ async function save_case_before_full_navigation(target_url)
     current_data.checked_out_by_tab_id = old_checked_out_by_tab_id;
     g_data_is_checked_out = true;
     sync_edit_mode_auto_timers();
+    mmria_sync_case_rev_polling();
     g_render();
     g_case_navigation_save_in_progress = false;
   }

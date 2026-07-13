@@ -2,7 +2,7 @@
 
 **Epic:** 12 — Data Migration Tool Modernization
 **Story ID:** 12.4
-**Status:** review — defect 12.4-D1 and follow-up requirements 12.4-R1 / 12.4-R2 implemented 2026-07-10
+**Status:** review — defect 12.4-D1, follow-up requirements 12.4-R1 / 12.4-R2, and edit-mode polling scope update implemented
 **Date added:** 2026-07-08
 **Depends on:** Story 12.3 (Case Rev Endpoint — needed for `_rev` polling)
 **Source requirements:** FR-19.1–FR-19.4
@@ -28,8 +28,9 @@ And the modal contains a single **[Reload Case]** button that invokes the case r
 And the helper reloads the open case in-place when the case page hook is available, falling back to `window.location.reload()`
 And the generic save error handler does NOT also fire for this 409
 
-**AC-2 — `_rev` polling detects staleness while case is open**
+**AC-2 — `_rev` polling detects staleness while the current tab is editing**
 Given a case has been loaded for editing
+And the current tab owns the active edit checkout
 When 45 seconds have elapsed since the last poll
 Then the client calls `GET /api/case/{id}/rev`
 And if the returned `_rev` differs from the `_rev` captured at case load time
@@ -47,11 +48,21 @@ Then the client polls `GET /api/case/{id}/rev` every 45 seconds
 And the client does not depend on an `X-Offline-Date` header from the rev endpoint
 And offline-window detection remains owned by `/api/system-offline/status`
 
-**AC-4 — Polling only starts for users with write access**
-Given the current user does NOT have write access to the case (read-only view)
-When the case loads
+**AC-4 — Polling scope is active edit-lock ownership**
+Given the current tab owns the active edit checkout for the case
+And the loaded case has `_id` and `_rev`
+When the case is loaded, checkout is acquired, or an edit-mode save succeeds with a new `_rev`
+Then `_rev` polling is active and uses the latest known `_rev` as its comparison value
+
+Given the current tab does NOT own the active edit checkout for the case
+When the case loads or the user is viewing the case in read-only mode
 Then no polling interval is started
 And no `GET /api/case/{id}/rev` calls are made
+
+Given `_rev` polling is active
+When the user leaves edit mode through Save & Close, lock-release navigation, checkout conflict, offline-processing mode, auth failure, load failure, or page unload
+Then any active `_rev` polling interval is stopped
+And the read-only tab does not show proactive `_rev` warnings for changes made by another user
 
 **AC-5 — Poll stops on navigation**
 Given the `_rev` poll is active
@@ -228,7 +239,7 @@ function showStaleCaseBanner() {
 
 **Wiring `startCaseRevPolling()` from the case edit page:**
 
-The case edit view (`Views/Case/Index.cshtml`) must call `startCaseRevPolling(caseId, loadedRev)` after the case loads and only when the user has write access.
+The case edit view (`Views/Case/Index.cshtml`) must call `startCaseRevPolling(caseId, loadedRev)` only while the current tab owns the active edit checkout.
 
 In `Views/Case/Index.cshtml` (or the co-located JS), after the case document is fetched and available:
 
@@ -237,11 +248,10 @@ In `Views/Case/Index.cshtml` (or the co-located JS), after the case document is 
 var caseId = /* the case ID from the URL or loaded doc */;
 var loadedRev = caseDoc._rev; // _rev is part of every CouchDB document response
 
-// Only start polling if user has write access
-// Check: is the form in edit mode? Is the user an abstractor/data_analyst?
-// Use whatever flag the view already has for edit vs. read-only mode.
-// Example: if (window.IS_CASE_EDITABLE) { ... }
-if (IS_CASE_EDITABLE) { // replace with actual read-only gate
+// Only start polling if this tab owns the active edit checkout.
+// In the current implementation this is centralized through
+// mmria_sync_case_rev_polling(), which gates on g_data_is_checked_out.
+if (g_data_is_checked_out === true) {
     startCaseRevPolling(caseId, loadedRev);
 }
 
@@ -251,12 +261,12 @@ window.addEventListener('beforeunload', function () {
 });
 ```
 
-**Finding the write-access gate:**
+**Finding the edit-mode gate:**
 
-The `CaseController.cs` (non-api, `Controllers/CaseController.cs`) is role-restricted to `"abstractor,data_analyst"`. There may be a view-level flag for read-only mode. Search:
+The case page uses `g_data_is_checked_out` and `is_case_checked_out(g_data)` to determine whether the current tab owns the active edit checkout. Search:
 ```powershell
 Select-String -Path "c:\repos\nccdphp-drh-mmria\source-code\mmria\mmria-server\Views\Case\Index.cshtml" `
-    -Pattern "read.only|IS_EDITABLE|canEdit|ViewBag\." | Select-Object LineNumber, Line | Select-Object -First 10
+    -Pattern "g_data_is_checked_out|is_case_checked_out|startCaseRevPolling" | Select-Object LineNumber, Line | Select-Object -First 10
 ```
 
 **Finding where `_rev` is available in the client:**
@@ -359,9 +369,10 @@ Implemented following the existing `mmria-offline-modal` pattern exactly:
 - **409 modal** created dynamically via `showStaleCaseModal()` using the Bootstrap `.modal-dialog`/`.modal-content` structure and the same purple header (`background-color:#7b2d8e`). Non-dismissable (no close button), single **Reload Case** button invokes the case reload helper.
 - **Proactive stale modal** created dynamically via `showStaleCaseBanner()` using the same Bootstrap modal/backdrop pattern. Contains a single **Reload** button and no dismiss action; autosave is paused until reload.
 - **Polling** (`startCaseRevPolling` / `stopCaseRevPolling`) added to `system-offline-check.js` following the `startOfflineStatusPolling` pattern. Poll interval: fixed 45 s; offline-window behavior remains owned by `/api/system-offline/status`.
-- **Write-access gate**: polling starts only when `g_is_data_analyst_mode == null` (abstracter/write role). Data analyst (`/analyst-case` route sets `g_is_data_analyst_mode = 'da'`) gets no polling.
+- **Edit-mode gate**: polling starts only when `g_is_data_analyst_mode == null` and the current tab owns the active checkout lock (`g_data_is_checked_out === true`). Data analyst (`/analyst-case` route sets `g_is_data_analyst_mode = 'da'`) and read-only case views get no polling.
 - **409 intercept**: replaced existing `$mmria.save_error_500_dialog_show()` call for `(409) Conflict` with `window.showStaleCaseModal()`. Does not fall through to generic error handler.
-- **Poll restart on save**: after successful save, `startCaseRevPolling` is called with the updated `_rev` from `case_response.rev` to avoid false-positive stale modals.
+- **Poll sync on save**: after successful edit-mode saves, polling is restarted with the updated `_rev` from `case_response.rev`; Save & Close and other lock-release saves stop polling.
+- **Explicit non-polling states**: no `_rev` polling occurs for data analyst/read-only routes, write-capable users who are only viewing the case, the read-only state after Save & Close, checkout conflicts, offline-processing mode, auth failure, load failure, or after navigation/page unload.
 - **Stop on unload**: `stopCaseRevPolling()` called at the top of `navigation_away()` (the `window.onbeforeunload` handler).
 
 AC-6 (508): both stale modals use `role="alertdialog"`, `aria-modal="true"`, `aria-labelledby`/`aria-describedby`; focus moves to the reload button. All buttons are keyboard-accessible.
@@ -374,6 +385,8 @@ Follow-up implementation completed 2026-07-10:
 - Extracted the prior proactive stale notification as an actual Bootstrap-style modal with a single **Reload** action and no dismiss action; retained the 409 recovery modal as non-dismissable.
 - Restored reload button behavior to use `mmria_do_case_reload()`, which reloads the case in-place through `window.mmria_reload_case_data()` when available and falls back to `window.location.reload()`.
 - Loaded `case-rev-check.js` before `index.js` on `Views/Case/Index.cshtml` and `Views/abstractorDeidentifiedCase/Index.cshtml`.
+- Follow-up scope update completed 2026-07-13: `_rev` polling now syncs to active edit-lock ownership. Save & Close, lock-release navigation, checkout conflicts, offline processing, auth failure, and load failure stop polling; successful checkout or restored checkout after failed release resumes polling.
+- 2026-07-13 validation: `node --check` passed for `wwwroot/scripts/case/case-rev-check.js` and `wwwroot/scripts/case/index.js`; `dotnet build source-code\mmria\mmria-server\mmria-server.csproj -o c:\repos\nccdphp-drh-mmria\artifacts\round4-build-check` passed with existing warnings and 0 errors.
 - Validation: `node --check` passed for `wwwroot/js/scripts/system-offline-check.js`, `wwwroot/scripts/case/case-rev-check.js`, and `wwwroot/scripts/case/index.js`; reference scans confirmed the old script path is gone and the case globals are exported only by `case-rev-check.js`; `dotnet build source-code\mmria\mmria-server\mmria-server.csproj -o c:\repos\nccdphp-drh-mmria\artifacts\round4-build-check` passed with pre-existing warnings.
 
 ### File List
@@ -392,7 +405,7 @@ Follow-up implementation completed 2026-07-10:
 |------|--------|
 | `source-code/mmria/mmria-server/Views/Shared/_LayoutBase.cshtml` | Added stale-case modal `<div>` markup adjacent to existing offline modals |
 | `source-code/mmria/mmria-server/wwwroot/js/system-offline-check.js` | Added `showStaleCaseModal`, `showStaleCaseBanner`, `stopCaseRevPolling`, `startCaseRevPolling`; exposed all four on `window` |
-| `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js` | (1) Replaced 409 conflict error handler with `showStaleCaseModal()`. (2) Start `startCaseRevPolling` after online case load, gated on write-access. (3) Restart polling with new `_rev` after successful save. (4) Call `stopCaseRevPolling()` in `navigation_away`. |
+| `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js` | (1) Replaced 409 conflict error handler with `showStaleCaseModal()`. (2) Sync `_rev` polling after online case load, gated on active edit-lock ownership. (3) Restart polling with new `_rev` after successful edit-mode saves. (4) Call `stopCaseRevPolling()` in `navigation_away`. |
 | `source-code/mmria/mmria-server/Views/Shared/_LayoutBase.cshtml` | Updated moved system offline checker include to `/js/scripts/system-offline-check.js` |
 | `source-code/mmria/mmria-server/Views/Case/Index.cshtml` | Added `/scripts/case/case-rev-check.js` before `/scripts/case/index.js` |
 | `source-code/mmria/mmria-server/Views/abstractorDeidentifiedCase/Index.cshtml` | Added `/scripts/case/case-rev-check.js` before `/scripts/case/index.js` |
@@ -402,6 +415,11 @@ Follow-up implementation completed 2026-07-10:
 | `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js` | Clarified that successful manual and autosave writes restart `_rev` polling with the returned revision |
 | `source-code/mmria/mmria-server/wwwroot/scripts/case/case-rev-check.js` | Restored pre-extraction modal/backdrop UX for proactive staleness and restored reload helper button behavior |
 | `_bmad-output/planning-artifacts/prds/prd-mmria-2026-06-12/prd.md` | Clarified FR-19 modal UX, single reload action, autosave pause, and reload helper fallback behavior |
+| `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js` | Centralized `_rev` polling eligibility on active edit-lock ownership and synced polling when edit mode starts or stops |
+| `source-code/mmria/mmria-server/wwwroot/scripts/case/case-rev-check.js` | Added a defensive eligibility guard before polling or showing a stale modal |
+| `_bmad-output/implementation-artifacts/12-4-stale-tab-ux.md` | Clarified AC-4 and completion notes so polling scope is active edit mode, not role-only eligibility |
+| `_bmad-output/planning-artifacts/prds/prd-mmria-2026-06-12/prd.md` | Updated FR-19.3 poll scope to active edit-lock ownership |
+| `_bmad-output/planning-artifacts/epics.md` | Updated stale-tab epic acceptance criteria to active edit-lock polling scope |
 
 ---
 
