@@ -510,6 +510,96 @@ Then it meets Section 508 accessibility requirements: keyboard navigation, scree
 - [x] All text is in system font and readable at normal zoom levels
 - [x] Error messages are not conveyed by color alone (icon + text)
 
+---
+
+## Post-QA Bug Fixes (Surfaced During QA Verification of Epic 2)
+
+Three issues were found after initial implementation of Story 5.1. The feature was built by porting code from an older branch; these styling and accessibility defects were present in the source and were not captured in the original story.
+
+### Bug A — Warning button: incorrect styling, poor visibility
+
+**Observed:** The `.validation-errors-button` uses purple brand color (`#7b2d8e`), making it blend in with standard site action buttons. Reviewers cannot distinguish it as a warning indicator at a glance.
+
+**Required:** Update to amber/warning palette:
+- Background: `#FFF7F1`
+- Text color: `#BA9000`
+- Border: `2px solid #FBA818`
+- Hover/focus: darker amber (e.g., `#FDF0E0` background, `#7a5600` text)
+
+**File:** `wwwroot/css/validation-errors-panel.css`
+
+### Bug B — Modal close button: does not match updated site styling standard
+
+**Observed:** The Close button is rendered with `btn btn-default` which no longer matches the site's current button standard.
+
+**Required:**
+- Default state: white fill (`#fff`), `1px solid #797979` border
+- Hover state: `#EEEEEE` fill
+
+**Files:** `wwwroot/scripts/validation/validation-errors-modal.js` (inline styles), `wwwroot/css/validation-errors-panel.css` (hover rule)
+
+### Bug C — Modal 508: keyboard focus escapes the modal (focus trap missing)
+
+**Found by:** Axe DevTools scan — Severity: Serious
+
+**Observed:** After the Validation Errors modal opens, pressing Tab moves keyboard focus out of the modal onto background page elements. This violates WCAG 2.1 SC 2.1.2 (No Keyboard Trap) and Section 508 requirements. The original implementation only moves focus to the Close button on open; it does not constrain focus within the modal.
+
+**Required fix:**
+- On modal open, capture `document.activeElement` as the triggering element
+- After render, identify all focusable elements within the modal
+- Intercept `Tab`: when focus is on the last focusable element, wrap to the first
+- Intercept `Shift+Tab`: when focus is on the first focusable element, wrap to the last
+- On modal close (any path: Close button, Escape, field-link navigation), restore focus to the captured triggering element
+
+**File:** `wwwroot/scripts/validation/validation-errors-modal.js`
+
+---
+
+### New Acceptance Criteria (Post-QA)
+
+**AC #B1 — Warning button uses amber styling**
+When the Validation Errors button is rendered in the case header,
+Then it uses background `#FFF7F1`, text color `#BA9000`, and border `2px solid #FBA818` — not the purple brand color.
+
+**AC #B2 — Close button uses neutral styling**
+When the Validation Errors modal is open,
+Then the Close button has a white background, `1px solid #797979` border, and transitions to `#EEEEEE` background on hover.
+
+**AC #B3 — Focus is trapped within the modal**
+When the Validation Errors modal is open and the user presses Tab from the last focusable element,
+Then focus wraps to the first focusable element in the modal — it does not move to elements behind the modal.
+
+When the user presses Shift+Tab from the first focusable element,
+Then focus wraps to the last focusable element in the modal.
+
+**AC #B4 — Focus returns to triggering element on close**
+When the modal is closed (via Close button, Escape key, or field-link navigation),
+Then keyboard focus returns to the Validation Errors button that originally opened the modal.
+
+---
+
+### Tasks / Subtasks (Post-QA Corrections)
+
+- [x] Bug A — Update `.validation-errors-button` CSS styling
+  - [x] In `validation-errors-panel.css`, update `.validation-errors-button`: `background: #FFF7F1; color: #BA9000; border: 2px solid #FBA818;`
+  - [x] Update `.validation-errors-button:hover, .validation-errors-button:focus`: `background: #FDF0E0; color: #7a5600; outline-color: #FBA818;`
+
+- [x] Bug B — Update modal Close button styling
+  - [x] In `validation-errors-modal.js`, replace inline style on Close button with class `validation-errors-close-btn`
+  - [x] In `validation-errors-panel.css`, add `.validation-errors-close-btn` rule: `background: #fff; border: 1px solid #797979; padding: 6px 18px; border-radius: 4px; cursor: pointer;`
+  - [x] Add `.validation-errors-close-btn:hover` rule: `background: #EEEEEE;`
+
+- [x] Bug C — Implement focus trap and focus-return in modal
+  - [x] In `showValidationPanel()`, capture `var triggerEl = document.activeElement` before inserting modal HTML
+  - [x] Extract focus trap into `trapFocus(modal)` helper: query all focusable elements; wrap Tab at last→first and Shift+Tab at first→last
+  - [x] Call `trapFocus(modal)` after the `setTimeout` show block
+  - [x] In `closeModal()`, after removing modal/backdrop from DOM, call `if (triggerEl && triggerEl.focus) { triggerEl.focus(); }`
+  - [x] Verify: Tab from Close button moves focus to first focusable element in modal
+  - [x] Verify: Shift+Tab from first focusable element moves focus to Close button
+  - [x] Verify: Close (button, Escape, or link click) returns focus to the triggering Warnings button
+
+---
+
 ## Dev Agent Record
 
 ### Agent Model Used

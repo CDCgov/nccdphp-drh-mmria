@@ -9,9 +9,9 @@
     padding: 5px 12px;
     font-size: 13px;
     font-weight: 600;
-    color: #7b2d8e;
-    background: #fff;
-    border: 2px solid #7b2d8e;
+    color: #BA9000;
+    background: #FFF7F1;
+    border: 2px solid #FBA818;
     border-radius: 4px;
     cursor: pointer;
     text-decoration: none;
@@ -20,9 +20,9 @@
 
 .validation-errors-button:hover,
 .validation-errors-button:focus {
-    background: #7b2d8e;
-    color: #fff;
-    outline: 2px solid #5a1f6e;
+    background: #FDF0E0;
+    color: #7a5600;
+    outline: 2px solid #FBA818;
     outline-offset: 2px;
 }
 
@@ -76,5 +76,26 @@
     color: #003d80;
     text-decoration: underline;
     outline: 2px solid #0056b3;
+    outline-offset: 2px;
+}
+
+/* Modal close button — neutral styling */
+.validation-errors-close-btn {
+    background: #fff;
+    color: #333;
+    border: 1px solid #797979;
+    border-radius: 4px;
+    padding: 6px 18px;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.validation-errors-close-btn:hover {
+    background: #EEEEEE;
+}
+
+.validation-errors-close-btn:focus {
+    background: #EEEEEE;
+    outline: 2px solid #797979;
     outline-offset: 2px;
 }
