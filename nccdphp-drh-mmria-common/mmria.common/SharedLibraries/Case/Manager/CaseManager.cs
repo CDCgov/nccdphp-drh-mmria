@@ -462,7 +462,7 @@ public class CaseManager
                     var certificate_identification = death_certificate["certificate_identification"] as IDictionary<string, object>;
                     if (certificate_identification != null)
                     {
-                        var oldMaidenName = certificate_identification["dmaiden"]?.ToString() ?? "";
+                        var oldMaidenName = certificate_identification.TryGetValue("dmaiden", out var dMaidenValue) ? dMaidenValue?.ToString() ?? "" : "";
                         dictionary["last_updated_by"] = userName;
                         dictionary["date_last_updated"] = DateTime.Now;
                         certificate_identification["dmaiden"] = maidenNameReplacement;
@@ -517,8 +517,12 @@ public class CaseManager
                                     new Change_Stack_Item
                                     {
                                         user_name = userName,
+                                        date_created = DateTime.UtcNow,
                                         prompt = "Maiden Name",
-                                        object_path = "/death_certificate/certificate_identification/dmaiden",
+                                        object_path = "g_data.death_certificate.certificate_identification.dmaiden",
+                                        metadata_path = "/death_certificate/certificate_identification/dmaiden",
+                                        dictionary_path = "/death_certificate/certificate_identification/dmaiden",
+                                        metadata_type = "string",
                                         old_value = oldMaidenName,
                                         new_value = maidenNameReplacement,
                                         doc_type = "Change_Stack_Item"
