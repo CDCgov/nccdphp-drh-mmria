@@ -982,9 +982,9 @@ So that I never lose work silently or see a confusing technical error.
 
 **Acceptance Criteria:**
 
-**Given** a case is open for editing and its `_rev` changes on the server
+**Given** a case is open for editing, the current tab owns the active checkout, and its `_rev` changes on the server
 **When** the 45-second poll detects the mismatch
-**Then** a dismissable banner appears: "This case has been updated. Reload to see the latest version." with [Reload] and [Dismiss] actions
+**Then** a non-dismissable modal appears: "This case has been updated. Reload to see the latest version." with a single [Reload] action
 
 **Given** a user attempts to save and the server returns 409
 **When** the case save error handler processes the response
@@ -995,6 +995,8 @@ So that I never lose work silently or see a confusing technical error.
 **When** the poll interval is evaluated
 **Then** the poll interval remains 45 seconds and does not depend on offline-status headers
 
-**Given** the current user has read-only access to the case
+**Given** the current tab does not own the active edit checkout for the case
 **When** the case loads
 **Then** no polling is started
+**And** if the user leaves edit mode through Save & Close or another lock-release path
+**Then** any active `_rev` polling interval is stopped

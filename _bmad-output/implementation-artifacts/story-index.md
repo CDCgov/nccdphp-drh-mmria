@@ -6,11 +6,12 @@ Start a new chat thread for each story. Use the prompt shown to invoke the dev a
 
 ## Epic 1: Case Narrative Editor Fidelity
 
-| Story                                      | File                                            | Status       |
-| ------------------------------------------ | ----------------------------------------------- | ------------ |
-| 1.1 Fix Save-Path HTML Stripping           | `1-1-fix-save-path-html-stripping.md`           | verification |
-| 1.2 Fix Paste Handler Cursor Integrity     | `1-2-fix-paste-handler-cursor-integrity.md`     | verification |
-| 1.3 Update Case Narrative Instruction Text | `1-3-update-case-narrative-instruction-text.md` | verification |
+| Story                                               | File                                                  | Status        |
+| --------------------------------------------------- | ----------------------------------------------------- | ------------- |
+| 1.1 Fix Save-Path HTML Stripping                    | `1-1-fix-save-path-html-stripping.md`                 | verification  |
+| 1.2 Fix Paste Handler Cursor Integrity              | `1-2-fix-paste-handler-cursor-integrity.md`           | verification  |
+| 1.3 Update Case Narrative Instruction Text          | `1-3-update-case-narrative-instruction-text.md`       | verification  |
+| 1.4 Update Case Narrative Guidelines Panel          | `1-4-update-case-narrative-guidelines-panel.md`       | ready-for-dev |
 
 **Story 1.1 prompt:**
 
@@ -28,6 +29,12 @@ dev this story _bmad-output/implementation-artifacts/1-2-fix-paste-handler-curso
 
 ```
 dev this story _bmad-output/implementation-artifacts/1-3-update-case-narrative-instruction-text.md
+```
+
+**Story 1.4 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/1-4-update-case-narrative-guidelines-panel.md
 ```
 
 ---
