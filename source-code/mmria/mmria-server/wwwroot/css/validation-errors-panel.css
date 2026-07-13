@@ -9,7 +9,7 @@
     padding: 5px 12px;
     font-size: 13px;
     font-weight: 600;
-    color: #BA9000;
+    color: #8A6000;
     background: #FFF7F1;
     border: 2px solid #FBA818;
     border-radius: 4px;
@@ -21,7 +21,7 @@
 .validation-errors-button:hover,
 .validation-errors-button:focus {
     background: #FDF0E0;
-    color: #7a5600;
+    color: #5a3e00;
     outline: 2px solid #FBA818;
     outline-offset: 2px;
 }
