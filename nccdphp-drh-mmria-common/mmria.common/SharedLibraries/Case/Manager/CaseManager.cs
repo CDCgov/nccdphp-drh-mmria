@@ -744,16 +744,21 @@ public class CaseManager
     {
         DBConfigurationDetail db_info = null;
 
-        if (role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase))
+        if (dbConfigSet?.detail_list != null &&
+            !string.IsNullOrWhiteSpace(stateDatabase) &&
+            dbConfigSet.detail_list.TryGetValue(stateDatabase, out var resolved_db_info))
         {
-            db_info = dbConfigSet.detail_list[stateDatabase];
-        }
-        else if (role.Equals("jurisdiction_admin", StringComparison.OrdinalIgnoreCase))
-        {
-            db_info = dbConfigSet.detail_list[stateDatabase];
+            db_info = resolved_db_info;
         }
 
-        var array = recordId.Split('-');
+        var array = recordId?.Split('-') ?? Array.Empty<string>();
+        if (array.Length < 3)
+        {
+            // Record ID does not follow the expected STATE-YEAR-NUMBER pattern;
+            // return it unchanged rather than crashing.
+            return recordId ?? string.Empty;
+        }
+
         string new_record_id = $"{array[0]}-{yearOfDeathReplacement}-{array[2]}";
 
         // Per-candidate existence check rather than loading every record_id in the
@@ -1347,6 +1352,9 @@ public class CaseManager
             return result;
         }
 
+        // Capture the lock holder before clearing for the audit record.
+        var previousLockedBy = doc.Value<string>("last_checked_out_by") ?? "";
+
         // Admin operation: always clear lock fields regardless of current owner or tab.
         doc.Remove("date_last_checked_out");
         doc.Remove("last_checked_out_by");
@@ -1372,6 +1380,50 @@ public class CaseManager
                 result.Message = "Lock force-released.";
                 result.CaseId = caseId;
                 result.SerializedCase = updatedJson;
+
+                var changeStack = new Change_Stack
+                {
+                    _id = Guid.NewGuid().ToString(),
+                    case_id = caseId,
+                    user_name = userName,
+                    note = "admin change, case lock force-released",
+                    date_created = DateTime.UtcNow,
+                    doc_type = "Change_Stack",
+                    items = new List<Change_Stack_Item>
+                    {
+                        new Change_Stack_Item
+                        {
+                            user_name = userName,
+                            date_created = DateTime.UtcNow,
+                            prompt = "Case Lock",
+                            object_path = "g_data.last_checked_out_by",
+                            metadata_path = "/last_checked_out_by",
+                            dictionary_path = "/last_checked_out_by",
+                            metadata_type = "string",
+                            old_value = previousLockedBy,
+                            new_value = "",
+                            doc_type = "Change_Stack_Item"
+                        }
+                    }
+                };
+                JsonSerializerSettings auditSettings = new JsonSerializerSettings();
+                auditSettings.NullValueHandling = NullValueHandling.Ignore;
+                var auditJson = JsonConvert.SerializeObject(changeStack, auditSettings);
+                string auditUrl = dbConfig.Get_Prefix_DB_Url($"audit/{changeStack._id}");
+                try
+                {
+                    string auditResponse = await _couchDbHttpClient.ExecuteAsync(
+                        "PUT", auditUrl, auditJson,
+                        dbConfig.user_name, dbConfig.user_value);
+                    var auditResult = JsonConvert.DeserializeObject<document_put_response>(auditResponse);
+                    if (auditResult == null || !auditResult.ok)
+                        Console.WriteLine($"Audit save failed for case {caseId}, audit {changeStack._id}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Audit save threw for case {caseId}, audit {changeStack._id}: {ex.Message}");
+                }
+
                 return result;
             }
 
@@ -1781,6 +1833,10 @@ public class CaseManager
             return result;
         }
 
+        // Capture the offline owner before clearing for the audit record.
+        var previousOfflineBy = caseDocument.GetValueOrDefault("offline_by")?.ToString() ?? "";
+        var previousLockedBy = caseDocument.GetValueOrDefault("last_checked_out_by")?.ToString() ?? "";
+
         caseDocument["is_offline"] = false;
         caseDocument.Remove("offline_date");
         caseDocument.Remove("offline_by");
@@ -1817,6 +1873,71 @@ public class CaseManager
         result.Message = "Offline and case locks removed.";
         result.CaseId = caseId;
         result.SerializedCase = jsonString;
+
+        var auditItems = new List<Change_Stack_Item>();
+        if (currentOfflineState)
+        {
+            auditItems.Add(new Change_Stack_Item
+            {
+                user_name = userName,
+                date_created = DateTime.UtcNow,
+                prompt = "Offline Lock",
+                object_path = "g_data.is_offline",
+                metadata_path = "/is_offline",
+                dictionary_path = "/is_offline",
+                metadata_type = "string",
+                old_value = previousOfflineBy,
+                new_value = "",
+                doc_type = "Change_Stack_Item"
+            });
+        }
+        if (!string.IsNullOrWhiteSpace(previousLockedBy))
+        {
+            auditItems.Add(new Change_Stack_Item
+            {
+                user_name = userName,
+                date_created = DateTime.UtcNow,
+                prompt = "Case Lock",
+                object_path = "g_data.last_checked_out_by",
+                metadata_path = "/last_checked_out_by",
+                dictionary_path = "/last_checked_out_by",
+                metadata_type = "string",
+                old_value = previousLockedBy,
+                new_value = "",
+                doc_type = "Change_Stack_Item"
+            });
+        }
+        if (auditItems.Count > 0)
+        {
+            var changeStack = new Change_Stack
+            {
+                _id = Guid.NewGuid().ToString(),
+                case_id = caseId,
+                user_name = userName,
+                note = "admin change, offline and case locks removed",
+                date_created = DateTime.UtcNow,
+                doc_type = "Change_Stack",
+                items = auditItems
+            };
+            JsonSerializerSettings auditSettings = new JsonSerializerSettings();
+            auditSettings.NullValueHandling = NullValueHandling.Ignore;
+            var auditJson = JsonConvert.SerializeObject(changeStack, auditSettings);
+            string auditUrl = dbConfig.Get_Prefix_DB_Url($"audit/{changeStack._id}");
+            try
+            {
+                string auditResponse = await _couchDbHttpClient.ExecuteAsync(
+                    "PUT", auditUrl, auditJson,
+                    dbConfig.user_name, dbConfig.user_value);
+                var auditResult = JsonConvert.DeserializeObject<document_put_response>(auditResponse);
+                if (auditResult == null || !auditResult.ok)
+                    Console.WriteLine($"Audit save failed for case {caseId}, audit {changeStack._id}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Audit save threw for case {caseId}, audit {changeStack._id}: {ex.Message}");
+            }
+        }
+
         return result;
     }
 

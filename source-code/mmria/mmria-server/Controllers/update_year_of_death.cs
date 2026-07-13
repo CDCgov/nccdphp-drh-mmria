@@ -140,14 +140,21 @@ public sealed class update_year_of_deathController : Controller
     model.Role = effectiveRole;
     model.StateDatabase = effectiveStateDatabase;
 
-    var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient);
-    model.RecordIdReplacement = await caseManager.GetRecordIdReplacementForYearOfDeathAsync(
-      effectiveRole,
-      effectiveStateDatabase,
-      model.RecordId,
-      model.YearOfDeathReplacement,
-      _dbConfigSet
-    );
+    try
+    {
+      var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient);
+      model.RecordIdReplacement = await caseManager.GetRecordIdReplacementForYearOfDeathAsync(
+        effectiveRole,
+        effectiveStateDatabase,
+        model.RecordId,
+        model.YearOfDeathReplacement,
+        _dbConfigSet
+      );
+    }
+    catch (Exception ex)
+    {
+      model.StatusText = ex.ToString();
+    }
 
     return View(model);
   }
