@@ -1384,7 +1384,7 @@ function form_multi_render
                 }
 
     
-                p_result.push(`<h3 class="font-weight-bold mb-2">MMRIA Form Status</h3>
+                p_result.push(`<h2 class="font-weight-bold mb-2">MMRIA Form Status</h2>
                 <ul>
                     <li>Death Certificate - ${get_progress_label(g_data.home_record.case_progress_report.death_certificate)}</li>
                     <li>Birth/Fetal Death Certificate- Parent Section - ${get_progress_label(g_data.home_record.case_progress_report.birth_certificate_parent_section)}</li>
@@ -1413,7 +1413,7 @@ function form_multi_render
                         notes = g_data[key];
     
                         p_result.push(
-                            `<h3 class="font-weight-bold mb-2">${noteTitle}</h3>
+                            `<h2 class="font-weight-bold mb-2">${noteTitle}</h2>
                             <p class="mb-2 font-weight-bold">Reviewer's Notes from <a href="${noteUrl}#content">Case Form</a></p>
                             <p>
                                 ${
@@ -1430,7 +1430,7 @@ function form_multi_render
                         notes = g_data[key];
     
                         p_result.push(
-                            `<h3 class="font-weight-bold mb-2">${noteTitle}</h3>
+                            `<h2 class="font-weight-bold mb-2">${noteTitle}</h2>
                             <p class="mb-2 font-weight-bold">Reviewer's Notes from <a href="${noteUrl}#content">Case Form</a></p>
                             <p>
                                 ${
@@ -1448,7 +1448,7 @@ function form_multi_render
                         notes = g_data[key];
     
                         p_result.push(
-                            `<h3 class="font-weight-bold mb-2">${noteTitle}</h3>
+                            `<h2 class="font-weight-bold mb-2">${noteTitle}</h2>
                             <ul class="list-unstyled">`
                         );
                         if (notes)
@@ -1486,7 +1486,7 @@ function form_multi_render
                         notes = g_data[key];
     
                         p_result.push(
-                            `<h3 class="font-weight-bold mb-2">${noteTitle}</h3>
+                            `<h2 class="font-weight-bold mb-2">${noteTitle}</h2>
                             <p class="mb-2 font-weight-bold">Reviewer's Notes from <a href="${noteUrl}#content">Case Form</a></p>
                             <p>
                                 ${
@@ -1504,7 +1504,7 @@ function form_multi_render
                         notes = g_data[key];
     
                         p_result.push(
-                            `<h3 class="font-weight-bold mb-2">${noteTitle}</h3>
+                            `<h2 class="font-weight-bold mb-2">${noteTitle}</h2>
                             <p class="mb-2 font-weight-bold">Reviewer's Notes from <a href="${noteUrl}#content">Case Form</a></p>
                             <p>${notes == null || (notes.reviewer_note != null && notes.reviewer_note.length < 1) ? "<em>No data entered</em>" : textarea_control_replace_return_with_br(notes.reviewer_note)}</p>`
                         );
@@ -1518,7 +1518,7 @@ function form_multi_render
                         notes = g_data[key];
     
                         p_result.push(
-                            `<h3 class="font-weight-bold mb-2">${noteTitle}</h3>
+                            `<h2 class="font-weight-bold mb-2">${noteTitle}</h2>
                             <ul class="list-unstyled">`
                         );
                         if (notes)
@@ -1591,7 +1591,7 @@ function form_multi_render
                         notes = g_data[key];
     
                         p_result.push(
-                            `<h3 class="font-weight-bold mb-2">${noteTitle}</h3>
+                            `<h2 class="font-weight-bold mb-2">${noteTitle}</h2>
                             <ul class="list-unstyled">`
                         );
                         if (notes) {
@@ -1670,7 +1670,7 @@ function form_multi_render
                         notes = g_data[key];
     
                         p_result.push(
-                            `<h3 class="font-weight-bold mb-2">${noteTitle}</h3>
+                            `<h2 class="font-weight-bold mb-2">${noteTitle}</h2>
                             <ul class="list-unstyled">`
                         );
                         if (notes)
@@ -1727,7 +1727,7 @@ function form_multi_render
                         notes = g_data[key];
     
                         p_result.push(
-                            `<h3 class="font-weight-bold mb-2">${noteTitle}</h3>
+                            `<h2 class="font-weight-bold mb-2">${noteTitle}</h2>
                             <p class="mb-2 font-weight-bold">Reviewer's Notes from <a href="${noteUrl}#content">Case Form</a></p>
                             <p>
                                 ${
@@ -1747,7 +1747,7 @@ function form_multi_render
                         notes = g_data[key];
     
                         p_result.push(
-                            `<h3 class="font-weight-bold mb-2">${noteTitle}</h3>
+                            `<h2 class="font-weight-bold mb-2">${noteTitle}</h2>
                             <p class="mb-2 font-weight-bold">Reviewer's Notes from <a href="${noteUrl}#content">Case Form</a></p>
                             <p>
                                 ${
@@ -1768,7 +1768,7 @@ function form_multi_render
                         noteUrl = window.location.hash.replace(p_metadata.name, key);
     
                         p_result.push(
-                            `<h3 class="font-weight-bold mb-2">${noteTitle}</h3>
+                            `<h2 class="font-weight-bold mb-2">${noteTitle}</h2>
                             <p class="mb-2 font-weight-bold">Reviewer's Notes from <a href="${noteUrl}#content">Case Form</a></p>
                             <p>
                                 ${
@@ -1789,7 +1789,7 @@ function form_multi_render
                         notes = g_data[key]; // array of forms
     
                         p_result.push(
-                            `<h3 class="font-weight-bold mb-2">${noteTitle}</h3>
+                            `<h2 class="font-weight-bold mb-2">${noteTitle}</h2>
                             <ul class="list-unstyled">`
                         );
                         if (notes)
