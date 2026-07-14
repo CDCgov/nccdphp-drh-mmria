@@ -155,8 +155,8 @@ development_status:
 
   # ── Epic 17: mmrds CRUD Consolidation (SQL Migration Foundation) ──────────
   epic-17: in-progress
-  17-1-mmrds-operation-catalog: ready-for-dev
-  17-2-icase-repository-caseDAL-canonicalize: ready-for-dev
+  17-1-mmrds-operation-catalog: done
+  17-2-icase-repository-caseDAL-canonicalize: done
   17-3-casemanager-direct-calls: ready-for-dev
   17-4-caseworkflowadmindal-duplicates: ready-for-dev
   17-5-auditrecovery-cvs-vitalimport-attachment: ready-for-dev
