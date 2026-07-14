@@ -148,7 +148,15 @@ public static class ContainedPathHelper
         var safePath = ResolveContainedDirectoryPath(normalizedRoot, safeDirectoryName);
         ThrowIfExistingPathOrAncestorIsReparsePoint(safePath, nameof(childDirectoryName));
         var createdDirectory = new DirectoryInfo(normalizedRoot).CreateSubdirectory(safeDirectoryName);
-        return createdDirectory.FullName;
+        var createdPath = Path.GetFullPath(createdDirectory.FullName);
+        EnsureContainedPath(normalizedRoot, createdPath, nameof(childDirectoryName));
+        ThrowIfExistingPathOrAncestorIsReparsePoint(createdPath, nameof(childDirectoryName));
+        if (!string.Equals(createdPath, safePath, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException("Created directory path did not match the validated path.", nameof(childDirectoryName));
+        }
+
+        return createdPath;
     }
 
     public static FileStream OpenContainedWriteStream(string trustedBaseDirectory, string fileName)
