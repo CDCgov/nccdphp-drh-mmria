@@ -787,6 +787,256 @@ So that I cannot accidentally open duplicate CVS windows and I know when the rep
 **Acceptance Criteria:**
 
 **Given** the user clicks a CVS report button
+
+---
+
+## Epic 17: mmrds CRUD Consolidation (SQL Migration Foundation)
+
+All case-document reads and writes against the `{prefix}mmrds` CouchDB database are consolidated behind a single `CaseDAL` surface, backed by an `ICaseRepository` interface. Duplicated URL construction and scattered direct HTTP calls are eliminated across `mmria-server`, `mmria.common`, and `mmria.services`. After this epic, swapping CouchDB for SQL requires changing `CaseDAL` only — no Manager, controller, or services actor code changes are required.
+
+**Architecture rule:** project-context.md §2.2 SharedLibraries pattern + SQL migration readiness.
+
+**Scope summary (verified 2026-07-14):**
+
+Duplicate mmrds operations were found across 16 files in three projects:
+
+- `mmria.common/SharedLibraries`: `CaseDAL`, `CaseManager`, `CaseWorkflowAdminDAL`, `AuditRecoveryDAL`, `CVSDAL`, `VitalImportDAL`, `AttachmentDAL`, `OfflineCaseManager`, `MMRIAServicesDAL`
+- `mmria-server/model/actor`: `JurisdictionSummary`, `VROSummary`, `c_db_setup`, `c_document_sync_all`, `c_document_sync_all_legacy`
+- `mmria.services`: `BatchProcessor`, `BatchItemProcessingService`, `PagedCaseIdLoader`, `core_element_exporter`, `exporter`, `mmrds_exporter`, `c_document_sync_all`
+
+Three URL construction patterns are in active simultaneous use:
+
+- **Pattern A** (wrong — leaks prefix logic): `$"{dbConfig.url}/{dbConfig.prefix}mmrds/{id}"`
+- **Pattern B** (correct): `dbConfig.Get_Prefix_DB_Url($"mmrds/{id}")`
+- **Pattern C** (CDC special-case, inconsistent separator): `$"{dbInfo.url}/{dbInfo.prefix}_mmrds"` — used only in `MMRIAServicesDAL`
+
+---
+
+### Story 17.1: mmrds Operation Catalog
+
+As a developer,
+I want a definitive catalog of every operation against the `mmrds` database across all three projects,
+So that Stories 17.2–17.7 have an agreed-upon, complete operation set before any code changes begin.
+
+**Acceptance Criteria:**
+
+**Given** all `.cs` files in `mmria-server`, `mmria.common`, and `mmria.services`
+**When** the developer completes the catalog
+**Then** `docs/ai/mmrds_operation_catalog.md` exists and contains a table of every distinct operation grouped into: Case CRUD (GET/PUT/DELETE by ID), versioned reads (GET at revision, GET all revisions), view queries (`by_date_created`, `by_date_last_updated`, `by_jurisdiction_id`, `by_last_name`, `by_pmss_number`, `record_id_list`), Mango `_find` queries, bulk operations (`_bulk_docs`, `_all_docs`), and admin/infra operations (`_security`, `_design/*`, `_changes`)
+
+**Given** each catalog entry
+**When** the catalog is complete
+**Then** each entry records: operation name, calling file(s), the URL pattern in use (A, B, or C), and the response type expected
+
+**Given** admin/infra operations (`_security`, `_design/*`, `_changes`, sync `_all_docs`)
+**When** the catalog is written
+**Then** they are listed but marked **out of scope** for Stories 17.2–17.7 — these operations are infrastructure-only and do not belong behind `ICaseRepository`
+
+---
+
+### Story 17.2: Canonicalize CaseDAL and Extract ICaseRepository
+
+As a developer,
+I want a single `ICaseRepository` interface over all mmrds CRUD operations,
+So that every caller in mmria-server and mmria.services can depend on the interface and a SQL migration requires changing only the `CaseDAL` implementation.
+
+**Acceptance Criteria:**
+
+**Given** the existing `CaseDAL` in `mmria.common/SharedLibraries/Case/DAL/CaseDAL.cs`
+**When** this story is complete
+**Then** all existing methods in `CaseDAL` use `dbConfig.Get_Prefix_DB_Url(...)` uniformly — no Pattern A strings remain
+
+**Given** the operation catalog from Story 17.1
+**When** the developer adds missing operations to `CaseDAL`
+**Then** `CaseDAL` contains methods for every in-scope operation: `GetCaseAsync`, `GetCaseDocumentJsonAsync`, `UpdateCaseAsync`, `PutCaseDocumentJsonAsync`, `DeleteCaseAsync`, `GetCaseAtRevisionAsync`, `GetCaseRevisionsAsync`, all required view query methods, and the `_find` overloads needed by other stories
+
+**Given** the full operation set is in `CaseDAL`
+**When** the interface is extracted
+**Then** `ICaseRepository` is defined in `mmria.common/SharedLibraries/Case/` with async method signatures matching every `CaseDAL` method; `CaseDAL` implements `ICaseRepository`
+
+**Given** `ICaseRepository` is defined
+**When** DI registration is updated in `mmria-server`
+**Then** `ICaseRepository` is registered as `CaseDAL` in the server's service collection; all existing callers of the concrete `CaseDAL` compile without changes
+
+**Given** no callers are changed in this story
+**When** the build runs after this story
+**Then** `mmria-server` and `mmria.common` build with zero errors
+
+---
+
+### Story 17.3: Route CaseManager Direct mmrds Calls Through CaseDAL
+
+As a developer,
+I want `CaseManager` to stop calling `CouchDbHttpClient.ExecuteAsync` with mmrds URLs directly,
+So that all case document access in the manager layer routes through `ICaseRepository`.
+
+**Acceptance Criteria:**
+
+**Given** the following direct mmrds HTTP calls in `CaseManager.cs` (approximately lines 900, 1025, 1205, 1330, 1369, 1519, 1723, 2098, 2280, 2294, 2392)
+**When** this story is complete
+**Then** each call is replaced with the corresponding `ICaseRepository` method from Story 17.2; no `$"{dbConfig...}mmrds/..."` strings remain in `CaseManager.cs`
+
+**Given** each replacement
+**When** the developer implements it
+**Then** the HTTP verb, URL path, request body, response deserialization type, and error handling are identical to the original — this is a mechanical substitution only
+
+**Given** the build after all substitutions
+**When** verified
+**Then** `mmria-server`, `mmria.common`, and `mmria.services` all build with zero errors
+
+**Given** no controller action signatures or response shapes change
+**When** verified
+**Then** no changes are made outside of `CaseManager.cs` in this story
+
+---
+
+### Story 17.4: Eliminate Duplicate mmrds CRUD in CaseWorkflowAdminDAL
+
+As a developer,
+I want `CaseWorkflowAdminDAL` to delegate case document operations to `ICaseRepository` instead of reimplementing them,
+So that the five duplicate mmrds methods in this DAL are removed.
+
+**Acceptance Criteria:**
+
+**Given** the following methods in `CaseWorkflowAdminDAL` that duplicate `CaseDAL` operations:
+`GetCaseDocumentAsync`, `UpdateCaseDocumentAsync`, `GetCaseRevisionsRawAsync`, `GetCaseAtRevisionAsync`, `RestoreCaseDocumentAsync`
+**When** this story is complete
+**Then** `ICaseRepository` is injected into `CaseWorkflowAdminDAL` and each of the five methods delegates to the corresponding repository method; the duplicate implementations are removed
+
+**Given** the audit write methods in `CaseWorkflowAdminDAL` (operations against the `audit` database)
+**When** this story is complete
+**Then** they are unchanged — audit writes are not mmrds operations and are out of scope
+
+**Given** `CaseWorkflowAdminManager` calls the above DAL methods
+**When** the DAL signatures are preserved
+**Then** `CaseWorkflowAdminManager` and all controllers that use it compile without changes
+
+---
+
+### Story 17.5: Eliminate Duplicate mmrds Calls in AuditRecoveryDAL, CVSDAL, VitalImportDAL, and AttachmentDAL
+
+As a developer,
+I want the remaining SharedLibraries DAL files that independently call mmrds URLs to delegate to `ICaseRepository`,
+So that mmrds access is fully consolidated within the common library layer.
+
+**Acceptance Criteria:**
+
+**Given** the following direct mmrds calls:
+- `AuditRecoveryDAL.cs` lines 24, 75 — case view `by_id` query and case GET at revision
+- `CVSDAL.cs` lines 73, 84 — `by_date_last_updated` view and case GET by ID
+- `VitalImportDAL.cs` lines 26, 33 — case GET by ID ×2
+- `AttachmentDAL.cs` line 21 — mmrds `by_pmss_number` view query
+**When** this story is complete
+**Then** each is replaced with the corresponding `ICaseRepository` method; `ICaseRepository` is injected into each DAL via constructor injection
+
+**Given** each DAL's existing constructor and DI registration
+**When** `ICaseRepository` is added as a constructor parameter
+**Then** the DI registration in `mmria-server` is updated to satisfy the new dependency; no other registration changes are made
+
+**Given** the build after all changes
+**When** verified
+**Then** all three projects build with zero errors and no manager or controller code changes are required
+
+---
+
+### Story 17.5b: Route mmria-services Case Reads Through ICaseRepository
+
+As a developer,
+I want the background-job and exporter code in `mmria.services` to stop constructing mmrds URLs directly,
+So that the services project is covered by the same `ICaseRepository` contract as the server.
+
+**Acceptance Criteria:**
+
+**Given** the following direct mmrds URL constructions in `mmria.services`:
+- `BatchProcessor.cs` — `_all_docs` and case GET at revision
+- `BatchItemProcessingService.cs` — case GET by ID
+- `PagedCaseIdLoader.cs` — `by_date_created` view
+- `core_element_exporter.cs` — case GET by ID
+- `exporter.cs` — `_all_docs` and case GET by ID
+- `mmrds_exporter.cs` — case GET by ID
+**When** this story is complete
+**Then** each is replaced with the corresponding `ICaseRepository` method; since `mmria.services` already references `mmria.common`, no new project reference is needed
+
+**Given** the `_all_docs` usages in `BatchProcessor` and `exporter`
+**When** the developer evaluates them
+**Then** if a corresponding `ICaseRepository` method does not exist, it is added to `CaseDAL` and `ICaseRepository` as part of this story (following the same rules as Story 17.2)
+
+**Given** `c_document_sync_all.cs` in `mmria.services` (bulk sync `_all_docs`)
+**When** evaluated
+**Then** it is treated as an infrastructure/sync operation — documented in the catalog as out of scope and left unchanged in this story
+
+**Given** the build after all changes
+**When** verified
+**Then** `mmria.services`, `mmria.common`, and `mmria-server` all build with zero errors
+
+---
+
+### Story 17.6: Eliminate Direct mmrds Calls in OfflineCaseManager
+
+As a developer,
+I want `OfflineCaseManager` to stop issuing raw HTTP requests to mmrds URLs,
+So that the offline case path follows the same Manager → DAL boundary as every other feature.
+
+**Acceptance Criteria:**
+
+**Given** the three direct mmrds HTTP calls in `OfflineCaseManager.cs` (lines 104, 298, 398) that assemble URLs as `$"{dbConfig.url}/{dbConfig.prefix}mmrds/{caseId}"`
+**When** this story is complete
+**Then** each is replaced with the corresponding `ICaseRepository` method; `ICaseRepository` is injected into `OfflineCaseManager` via constructor injection
+
+**Given** the `OfflineCase` feature in `SharedLibraries` already has an `OfflineCaseDAL`
+**When** the developer evaluates whether to route through `OfflineCaseDAL` or inject `ICaseRepository` directly into the manager
+**Then** `ICaseRepository` is injected directly into the manager — `OfflineCaseDAL` owns offline-specific document types, not generic case CRUD
+
+**Given** the DI registration for `OfflineCaseManager`
+**When** `ICaseRepository` is added as a constructor parameter
+**Then** the registration is updated in `mmria-server` to satisfy the new dependency
+
+**Given** the build and existing offline sync tests (if any)
+**When** verified
+**Then** all three projects build with zero errors and offline case behavior is unchanged
+
+---
+
+### Story 17.7: MMRIAServicesDAL and Sync Boundary Decision
+
+As a developer,
+I want a written architecture decision on whether the CDC populate path and bulk sync operations in `MMRIAServicesDAL` and `c_document_sync_all` should be unified with `ICaseRepository` or formally declared as separate infrastructure concerns,
+So that the boundary is explicit and future contributors do not try to merge them incorrectly.
+
+**Acceptance Criteria:**
+
+**Given** `MMRIAServicesDAL` has its own `GetMmrdsDatabaseUrl()` helper (lines 553–557) that uses a different prefix separator convention from `Get_Prefix_DB_Url`
+**When** the developer evaluates the CDC populate path
+**Then** a decision is recorded in `docs/ai/mmrds_operation_catalog.md` under a "Boundary Decisions" section: either (a) unify prefix logic and route through `ICaseRepository` or (b) formally declare the CDC bulk path as a separate infrastructure concern that `ICaseRepository` does not cover
+
+**Given** `c_document_sync_all` in both `mmria-server` and `mmria.services` uses bulk `_all_docs` for change-feed synchronization
+**When** the developer evaluates it
+**Then** the same decision document records whether sync bulk reads belong behind `ICaseRepository` or remain as infrastructure-only operations; recommendation is **out of scope** given the change-feed architecture
+
+**Given** the decision document is complete
+**When** it recommends unification (option a)
+**Then** the prefix inconsistency in `MMRIAServicesDAL` is fixed in this story and a follow-on story is created if full interface adoption is needed
+
+**Given** the decision document is complete
+**When** it recommends keeping as separate concerns (option b)
+**Then** no code changes are made to `MMRIAServicesDAL` or `c_document_sync_all` in this epic; the catalog marks them explicitly as out-of-scope infrastructure
+
+---
+
+## Epic 17 — Story Sequencing
+
+| Wave | Story | Risk | Dependencies |
+|---|---|---|---|
+| 17 | 17.1 — mmrds Operation Catalog | None | None — discovery only |
+| 17 | 17.7 — Boundary Decision | None | Can run in parallel with 17.1 |
+| 17 | 17.2 — ICaseRepository + CaseDAL | Low | 17.1 |
+| 17 | 17.3 — CaseManager direct calls | Medium | 17.2 |
+| 17 | 17.4 — CaseWorkflowAdminDAL | Low | 17.2 |
+| 17 | 17.5 — AuditRecovery / CVS / VitalImport / Attachment | Low | 17.2 |
+| 17 | 17.5b — mmria.services | Medium | 17.2 |
+| 17 | 17.6 — OfflineCaseManager | Medium | 17.2 |
+
+17.3, 17.4, 17.5, 17.5b, and 17.6 can proceed in parallel once 17.2 is complete. 17.7 can run alongside 17.1.
 **When** `beginCvsReportRequest(record_id, p_control)` is called
 **Then** the button is disabled, `aria-busy="true"` is set, and the label changes to indicate in-progress state
 
@@ -1102,4 +1352,522 @@ So that these controllers follow the SharedLibraries pattern and the audit-write
 **Given** the refactor is complete
 **When** `dotnet build source-code/mmria/mmria-server/mmria-server.csproj` runs
 **Then** the build succeeds with exit code 0
+
+---
+
+## Epic 18: `_users` and `configuration` Consolidation (SQL Migration Foundation)
+
+All CouchDB reads and writes against the `_users` and `configuration` databases are consolidated behind `IUserRepository` and `IConfigurationRepository` interfaces in `mmria.common`. Scattered direct HTTP calls in controllers and manager files are replaced with repository method calls. After this epic, migrating these two databases to SQL requires changing only the two DAL implementations — no controller or manager changes are needed.
+
+**Architecture rule:** project-context.md §2.2 SharedLibraries pattern + SQL migration readiness.
+
+**Scope summary (verified 2026-07-14):**
+
+| Database | Files with direct calls | Total hits | Already in DAL/Manager | Out-of-DAL leakage | Infra/out-of-scope |
+|---|---|---|---|---|---|
+| `_users` | 9 | 14 | `AccountDAL`, `AccountManager`, `ManageUsersDAL` | `AccountController.OIDC.cs`, `passwordChangeController.cs`, `JurisdictionSummary.cs`, `VROSummary.cs` | `c_db_setup.cs`, `Check_DB_Install.cs` |
+| `configuration` | 3 | 12 | none | `_config.cs`, `MMRIAServicesDAL.cs` | `MultiTenantConfigurationLoader.cs` (startup) |
+
+**SQL migration note:** `_users` is CouchDB's built-in authentication database. The `IUserRepository` interface established here is the seam for a future migration to ASP.NET Identity or an IAM system. `IConfigurationRepository` is the seam for a future SQL configuration table.
+
+---
+
+### Story 18.1: `_users` Operation Catalog
+
+As a developer,
+I want a definitive catalog of every operation against the `_users` database across all three projects,
+So that Story 18.2 has an agreed-upon, complete operation set before any code changes begin.
+
+**Acceptance Criteria:**
+
+**Given** all `.cs` files in `mmria-server`, `mmria.common`, and `mmria.services`
+**When** the developer completes the catalog
+**Then** `docs/ai/mmrds_operation_catalog.md` gains a `_users` section listing every distinct operation grouped into: user GET by ID or name, user PUT/POST (create or update), user DELETE, user list queries, password-related queries, and role/group reads
+
+**Given** each catalog entry
+**When** the catalog is complete
+**Then** each entry records: operation name, calling file(s), URL pattern in use, and response type expected
+
+**Given** `c_db_setup.cs` and `Check_DB_Install.cs` references to `_users`
+**When** they are evaluated
+**Then** they are listed but marked **out of scope** — these are one-time setup and health-check operations, not application CRUD
+
+---
+
+### Story 18.2: Define `IUserRepository` and Canonicalize `AccountDAL`
+
+As a developer,
+I want a single `IUserRepository` interface over all `_users` CRUD operations,
+So that every application-layer caller depends on the interface and not on CouchDB-specific URL construction.
+
+**Acceptance Criteria:**
+
+**Given** the existing `AccountDAL` in `mmria.common/SharedLibraries/Account/`
+**When** this story is complete
+**Then** `AccountDAL` contains all in-scope `_users` operations identified in Story 18.1, using consistent URL construction throughout — no manual URL string assembly remains
+
+**Given** the full operation set is in `AccountDAL`
+**When** the interface is extracted
+**Then** `IUserRepository` is defined in `mmria.common/SharedLibraries/Account/` with async method signatures matching every `AccountDAL` method; `AccountDAL` implements `IUserRepository`
+
+**Given** `ManageUsersDAL` also contains `_users` operations (5 hits)
+**When** the developer evaluates them
+**Then** operations that are generic user CRUD are moved to `AccountDAL` / `IUserRepository`; operations specific to the manage-users workflow that require `ManageUsers` feature context remain in `ManageUsersDAL` — the split is documented in the catalog
+
+**Given** `IUserRepository` is defined
+**When** DI registration is updated in `mmria-server`
+**Then** `IUserRepository` is registered as `AccountDAL` in the server's service collection; all existing callers of the concrete `AccountDAL` compile without changes
+
+---
+
+### Story 18.3: Route Leaking `_users` Calls Through `IUserRepository`
+
+As a developer,
+I want all out-of-DAL `_users` calls in controllers and actor files to delegate to `IUserRepository`,
+So that no file outside `AccountDAL` or `ManageUsersDAL` constructs a `_users` URL directly.
+
+**Acceptance Criteria:**
+
+**Given** the following direct `_users` HTTP calls outside of DAL files:
+- `AccountController.OIDC.cs` — 2 hits (OIDC user lookup/provision during SAMS login)
+- `passwordChangeController.cs` — 1 hit (user document GET/PUT for password change)
+- `JurisdictionSummary.cs` — 1 hit (actor-side user lookup for jurisdiction summary)
+- `VROSummary.cs` — 1 hit (actor-side user lookup for VRO summary)
+**When** this story is complete
+**Then** each is replaced with the corresponding `IUserRepository` method; `IUserRepository` is injected via constructor injection where needed
+
+**Given** `AccountController.OIDC.cs` OIDC-specific user provisioning logic
+**When** replaced
+**Then** only the CouchDB URL construction is moved to `AccountDAL`; OIDC token handling, cookie management, and claims extraction remain in the controller
+
+**Given** `JurisdictionSummary.cs` and `VROSummary.cs` (actor classes in `mmria-server/model/actor/`)
+**When** they require `IUserRepository`
+**Then** it is injected via the Akka.NET actor constructor or props factory — no `new AccountDAL(...)` instantiation inside the actor
+
+**Given** the build after all changes
+**When** verified
+**Then** `mmria-server`, `mmria.common`, and `mmria.services` all build with zero errors
+
+---
+
+### Story 18.4: Define `IConfigurationRepository` and Create `SystemConfigDAL`
+
+As a developer,
+I want a single `IConfigurationRepository` interface over all `configuration` database CRUD,
+So that the files currently accessing the configuration database directly can be replaced with interface calls.
+
+**Acceptance Criteria:**
+
+**Given** no existing SharedLibraries `SystemConfig` feature exists
+**When** this story creates one
+**Then** `mmria.common/SharedLibraries/SystemConfig/DAL/SystemConfigDAL.cs` is created containing all in-scope `configuration` database operations from the catalog; `IConfigurationRepository` is defined in the same feature directory; `SystemConfigDAL` implements `IConfigurationRepository`
+
+**Given** the following direct `configuration` database accesses:
+- `_config.cs` — 3 hits (admin configuration document GET/PUT)
+- `MMRIAServicesDAL.cs` — 3 hits (configuration reads for service orchestration)
+**When** this story is complete
+**Then** each is replaced with the corresponding `IConfigurationRepository` method; `IConfigurationRepository` is injected via constructor injection
+
+**Given** `MultiTenantConfigurationLoader.cs` (6 hits) reads the `configuration` database at startup to build the in-memory tenant map
+**When** evaluated
+**Then** it is marked **out of scope** — startup infrastructure loaders are not application CRUD and must not be behind an application repository interface; this is documented in the catalog
+
+**Given** `IConfigurationRepository` is defined
+**When** DI registration is updated in `mmria-server`
+**Then** `IConfigurationRepository` is registered as `SystemConfigDAL` in the server's service collection
+
+**Given** the build after all changes
+**When** verified
+**Then** all three projects build with zero errors
+
+---
+
+### Story 18.5: Extract `IConfigurationBootstrapLoader` over `MultiTenantConfigurationLoader`
+
+As a developer,
+I want `MultiTenantConfigurationLoader` to be registered behind an interface in DI,
+So that the startup tenant-registry and shared-config loading path can be swapped for a SQL implementation without editing `Program.cs`.
+
+**Acceptance Criteria:**
+
+**Given** `MultiTenantConfigurationLoader` is currently a concrete class instantiated directly in `Program.cs` with no interface
+**When** this story is complete
+**Then** `IConfigurationBootstrapLoader` is defined in `mmria.common/couchdb/configuration/` with async method signatures covering the public surface of `MultiTenantConfigurationLoader` used by `Program.cs`:
+- `LoadRequiredConfigurationSetsAsync(...)`
+- `LoadRequiredOverridableConfigurationsAsync(...)`
+- `LoadTenantOverridableConfigurationAsync(...)`
+- `LoadTenantConfigurationSetAsync(...)`
+- Any other public methods called from `Program.cs` or startup paths
+
+**Given** `IConfigurationBootstrapLoader` is defined
+**When** `MultiTenantConfigurationLoader` is updated
+**Then** it implements `IConfigurationBootstrapLoader`; no public method signatures change; all existing callers (`Program.cs`, `TestConfigurationLoader`, tests) compile without changes
+
+**Given** `Program.cs` currently calls `new MultiTenantConfigurationLoader(appSettingsConfig)` directly
+**When** this story is complete
+**Then** `IConfigurationBootstrapLoader` is registered in the DI service collection as `MultiTenantConfigurationLoader`; `Program.cs` resolves it through the interface
+
+**Given** `TestConfigurationLoader` in the utilities repo also instantiates `MultiTenantConfigurationLoader` concretely
+**When** evaluated
+**Then** it is updated to use `IConfigurationBootstrapLoader` if the DI context is available; if `TestConfigurationLoader` instantiates directly for test isolation, that is acceptable and documented — test helpers are not required to go through DI
+
+**Given** the internal CouchDB URL construction inside `MultiTenantConfigurationLoader` (`$"{couchDbUrl}/configuration/{configId}"`)
+**When** this story is complete
+**Then** it remains in the concrete class — the interface exposes the public loading contract, not the URL construction mechanism; the SQL migration implementation will replace the concrete class, not the URL strings
+
+**Given** the build after all changes
+**When** verified
+**Then** `mmria-server`, `mmria.common`, and `mmria.services` all build with zero errors; existing `MultiTenantConfigurationLoaderTests` pass without modification
+
+---
+
+## Epic 18 — Story Sequencing
+
+| Wave | Story | Risk | Dependencies |
+|---|---|---|---|
+| 18 | 18.1 — `_users` Operation Catalog | None | None — discovery only |
+| 18 | 18.2 — `IUserRepository` + `AccountDAL` | Low | 18.1 |
+| 18 | 18.3 — Route leaking `_users` calls | Low–Medium | 18.2 |
+| 18 | 18.4 — `IConfigurationRepository` + `SystemConfigDAL` | Low | 18.1 |
+| 18 | 18.5 — `IConfigurationBootstrapLoader` over `MultiTenantConfigurationLoader` | Low | None — independent of all other stories |
+
+18.3 and 18.4 can proceed in parallel once 18.2 is complete. 18.4 and 18.5 have no dependency on 18.2 and can be done at any time.
+
+---
+
+## Epic 19: `jurisdiction` Consolidation (SQL Migration Foundation)
+
+All CouchDB reads and writes against the `jurisdiction` database are consolidated behind two distinct interfaces: `IJurisdictionRepository` for application CRUD, and `IJurisdictionAuthorizationReader` for the per-request authorization query. After this epic, migrating the jurisdiction database to SQL requires changing only the two DAL implementations.
+
+**Architecture rule:** project-context.md §2.2 SharedLibraries pattern + SQL migration readiness.
+
+**Scope summary (verified 2026-07-14):**
+
+| Category | Files | Hits | Notes |
+|---|---|---|---|
+| Already in a DAL/Manager | `ManageUsersDAL`, `ManageUsersManager`, `SessionDAL` | 13 | Partial coverage — DAL methods exist but no interface |
+| Application CRUD (out-of-DAL) | `jurisdiction_treeController`, `vitalsController`, `_usersController`, `CaseViewManager`, `CaseViewSearch.pmss`, `JurisdictionSummary`, `VROSummary` | 15 | Mix of controllers, managers, and actors |
+| Auth middleware (hot path) | `authorization.cs`, `authorization_case.cs`, `authorization_user.cs`, `authorization.pmss.cs`, `authorization_case.pmss.cs`, `authorization_user.pmss.cs`, `AuthorizationRoleCache.cs`, `JurisdictionAuthorizationRequirement.cs` | 11 | **Special concern** — runs on every authorized request |
+| Infra/out-of-scope | `c_db_setup.cs` | 5 | DB setup only |
+
+**Two-interface design:** The auth middleware files all query a single read-only view (`jurisdiction/_design/sortable/_view/by_user_id`). This is architecturally different from application CRUD — it is a high-frequency, read-only authorization lookup. Mixing it with general CRUD behind one interface would create unacceptable coupling between the auth pipeline and the data layer. Two interfaces are required:
+
+- **`IJurisdictionRepository`** — full CRUD for application features (manage users, session, jurisdiction tree, case view, vitals)
+- **`IJurisdictionAuthorizationReader`** — single read method (`GetRolesByUserIdAsync`) used exclusively by auth middleware; intentionally narrow
+
+---
+
+### Story 19.1: `jurisdiction` Operation Catalog
+
+As a developer,
+I want a definitive catalog of every operation against the `jurisdiction` database,
+So that Stories 19.2–19.4 have an agreed-upon, complete operation set before any code changes begin.
+
+**Acceptance Criteria:**
+
+**Given** all `.cs` files in `mmria-server`, `mmria.common`, and `mmria.services`
+**When** the developer completes the catalog
+**Then** `docs/ai/mmrds_operation_catalog.md` gains a `jurisdiction` section listing every distinct operation grouped into: user-role-jurisdiction document CRUD, jurisdiction tree document CRUD, vitals-related jurisdiction reads, session-related jurisdiction reads, authorization view queries, and bulk/admin operations
+
+**Given** each catalog entry
+**When** the catalog is complete
+**Then** each entry records: operation name, calling file(s), URL pattern in use, response type, and whether it belongs to `IJurisdictionRepository` or `IJurisdictionAuthorizationReader`
+
+**Given** `c_db_setup.cs` references to `jurisdiction`
+**When** evaluated
+**Then** they are listed but marked **out of scope**
+
+---
+
+### Story 19.2: Define `IJurisdictionRepository` and Create `JurisdictionDAL`
+
+As a developer,
+I want a single `IJurisdictionRepository` interface over all application-layer `jurisdiction` CRUD operations,
+So that every feature manager depends on the interface and not on CouchDB URL construction.
+
+**Acceptance Criteria:**
+
+**Given** `ManageUsersDAL` currently owns `jurisdiction` CRUD (8 hits)
+**When** this story is complete
+**Then** a new `mmria.common/SharedLibraries/Jurisdiction/DAL/JurisdictionDAL.cs` is created containing all in-scope jurisdiction CRUD operations; `IJurisdictionRepository` is defined in the same `Jurisdiction` feature directory; `JurisdictionDAL` implements `IJurisdictionRepository`
+
+**Given** `ManageUsersDAL` currently duplicates jurisdiction operations
+**When** `JurisdictionDAL` is created
+**Then** `ManageUsersDAL` is refactored to inject `IJurisdictionRepository` and delegate — it does not duplicate the implementation
+
+**Given** jurisdiction operations belonging to other features (session, case view, jurisdiction tree)
+**When** the interface is scoped
+**Then** `IJurisdictionRepository` covers all jurisdiction document types — user-role-jurisdiction docs, jurisdiction tree, vitals-related reads — so that a single interface is the SQL migration seam for the whole database
+
+**Given** `IJurisdictionRepository` is defined
+**When** DI registration is updated in `mmria-server`
+**Then** `IJurisdictionRepository` is registered as `JurisdictionDAL` in the server's service collection
+
+---
+
+### Story 19.3: Define `IJurisdictionAuthorizationReader` and Route Auth Middleware
+
+As a developer,
+I want the per-request authorization view query against `jurisdiction` to be behind a dedicated read-only interface,
+So that the auth middleware does not construct CouchDB URLs directly and the query can be swapped for a SQL implementation without touching authorization handler code.
+
+**Acceptance Criteria:**
+
+**Given** all six `authorization*.cs` files and `AuthorizationRoleCache.cs` query the same view: `jurisdiction/_design/sortable/_view/by_user_id`
+**When** this story is complete
+**Then** `IJurisdictionAuthorizationReader` is defined in `mmria.common/SharedLibraries/Jurisdiction/` with a single method: `Task<IReadOnlyList<JurisdictionRoleEntry>> GetRolesByUserIdAsync(string userId, DBConfigurationDetail dbConfig)` and a separate `JurisdictionAuthorizationDAL` implements it
+
+**Given** `JurisdictionAuthorizationDAL` is created
+**When** it is implemented
+**Then** it is a separate class from `JurisdictionDAL` — the auth read path is not mixed with application CRUD
+
+**Given** the six `authorization*.cs` handler files currently construct the URL directly
+**When** this story is complete
+**Then** each injects `IJurisdictionAuthorizationReader` and calls `GetRolesByUserIdAsync`; URL construction is removed from all six files
+
+**Given** `AuthorizationRoleCache.cs` wraps the query with in-memory caching
+**When** this story is complete
+**Then** `AuthorizationRoleCache` injects `IJurisdictionAuthorizationReader`; cache management remains in `AuthorizationRoleCache` — not in the DAL
+
+**Given** the PMSS split files (`authorization.pmss.cs`, `authorization_case.pmss.cs`, `authorization_user.pmss.cs`)
+**When** they are updated
+**Then** they follow the same pattern as their non-PMSS counterparts; no PMSS-specific divergence is introduced
+
+**Given** this is the hot path for every authorized request
+**When** the implementation is reviewed
+**Then** `JurisdictionAuthorizationDAL.GetRolesByUserIdAsync` is a thin, non-caching HTTP wrapper — no business logic, no side effects
+
+**Given** `IJurisdictionAuthorizationReader` is registered in DI
+**When** the server's service collection is updated
+**Then** it is registered as `JurisdictionAuthorizationDAL` and is scoped appropriately for the authorization pipeline
+
+---
+
+### Story 19.4: Route Out-of-DAL Application CRUD Through `IJurisdictionRepository`
+
+As a developer,
+I want all application-layer files that directly construct `jurisdiction` URLs outside of a DAL to delegate to `IJurisdictionRepository`,
+So that the interface established in Story 19.2 is the only path for application jurisdiction CRUD.
+
+**Acceptance Criteria:**
+
+**Given** the following direct `jurisdiction` HTTP calls outside of DAL files:
+- `jurisdiction_treeController.cs` — 5 hits (tree document GET/PUT — Wave 8 planned migration target)
+- `vitalsController.cs` — 4 hits (jurisdiction reads for vitals context)
+- `_usersController.cs` — 2 hits (user-role-jurisdiction reads)
+- `CaseViewManager.cs` — 5 hits (jurisdiction reads for case view filtering)
+- `CaseViewSearch.pmss.cs` — 1 hit (PMSS variant of case view search)
+- `JurisdictionSummary.cs` — 1 hit (actor-side jurisdiction read)
+- `VROSummary.cs` — 1 hit (actor-side jurisdiction read)
+- `SessionDAL.cs` — 1 hit (session-related jurisdiction read)
+- `ManageUsersManager.cs` — 4 hits (any remaining direct construction after Story 19.2)
+**When** this story is complete
+**Then** each is replaced with the corresponding `IJurisdictionRepository` method; `IJurisdictionRepository` is injected via constructor injection in each class
+
+**Given** `jurisdiction_treeController.cs` is also a Wave 8 migration target (planned move to `JurisdictionTree` SharedLibrary)
+**When** this story touches it
+**Then** only the URL construction is replaced — the Wave 8 SharedLibraries extraction is deferred; this story does not restructure the controller's business logic
+
+**Given** the build after all changes
+**When** verified
+**Then** all three projects build with zero errors and no route, action signature, or response shape changes are made
+
+---
+
+## Epic 19 — Story Sequencing
+
+| Wave | Story | Risk | Dependencies |
+|---|---|---|---|
+| 19 | 19.1 — `jurisdiction` Operation Catalog | None | None — discovery only |
+| 19 | 19.2 — `IJurisdictionRepository` + `JurisdictionDAL` | Low–Medium | 19.1 |
+| 19 | 19.3 — `IJurisdictionAuthorizationReader` (auth middleware) | Medium | 19.1 |
+| 19 | 19.4 — Route out-of-DAL application CRUD | Low–Medium | 19.2 |
+
+19.2 and 19.3 can proceed in parallel after 19.1. 19.4 depends on 19.2. Story 19.3 is independent of 19.2 — the auth reader DAL and the CRUD DAL are separate classes.
+
+---
+
+## Epic 20: `metadata` Consolidation (SQL Migration Foundation)
+
+All CouchDB reads and writes against the `metadata` database are consolidated behind an `IMetadataRepository` interface in `mmria.common`. The existing `MetadataVersionDAL` is the canonical implementation; the 25 files that currently bypass it are routed through the interface. After this epic, migrating the metadata database to SQL requires changing only `MetadataVersionDAL`.
+
+**Architecture rule:** project-context.md §2.2 SharedLibraries pattern + SQL migration readiness.
+
+**Scope summary (verified 2026-07-14):**
+
+| Category | Files | Hits | Notes |
+|---|---|---|---|
+| `MetadataVersionManager` (already DAL-backed) | `MetadataVersionManager.cs` | 22 | Canonical owner — but builds URLs directly in manager, not all through DAL |
+| Controllers bypassing DAL | `broadcast_messageController`, `de_identified_listController`, `export_list_managerController`, `substance_mappingController`, `abstractorDeidentifiedCaseController`, `CaseController`, `versionController`, `record_idController`, `systemOfflineController` | ~14 | Mix of planned and unplanned Wave targets |
+| SharedLibraries bypassing DAL | `AuditRecoveryDAL`, `CaseValidationDAL`, `MMRIAServicesDAL` | ~8 | Within common — still bypass the canonical DAL |
+| Services actors/exporters | `c_convert_to_report_object`, `c_convert_to_opioid_report_object`, `c_convert_to_dqr_detail`, `c_de_identifier`, `c_cdc_de_identifier`, `c_document_sync_all`, `c_document_sync_all_legacy`, `c_generate_frequency_summary_report`, `c_sync_document`, `BatchItemProcessingService`, `core_element_exporter`, `exporter`, `mmrds_exporter`, `export_all_generate_name_map`, `PopulateCDCInstanceSupervisor` | ~39 | Mostly read-only: `GET version_specification-{v}/metadata` and `GET de-identified-list` |
+| Infra/out-of-scope | `c_db_setup.cs`, `Process_Migrate_*` | ~15 | DB setup and one-time migration scripts |
+
+**Key observation:** The services layer makes two operations overwhelmingly — `GET metadata/version_specification-{version}/metadata` and `GET metadata/de-identified-list` — accounting for the majority of the 39 services hits and all read-only.
+
+---
+
+### Story 20.1: `metadata` Operation Catalog
+
+As a developer,
+I want a definitive catalog of every operation against the `metadata` database,
+So that Stories 20.2–20.6 have an agreed-upon, complete operation set before any code changes begin.
+
+**Acceptance Criteria:**
+
+**Given** all `.cs` files in `mmria-server`, `mmria.common`, and `mmria.services`
+**When** the developer completes the catalog
+**Then** `docs/ai/mmrds_operation_catalog.md` gains a `metadata` section listing every distinct operation grouped into: version specification CRUD, de-identification list reads, metadata document GET/PUT (by ID), UI specification CRUD, attachment reads/writes, broadcast/offline/populate-CDC config document CRUD, export list and substance mapping CRUD, and bulk reads (`_all_docs`)
+
+**Given** each catalog entry
+**When** the catalog is complete
+**Then** each entry records: operation name, calling file(s), URL pattern in use, and response type expected
+
+**Given** `c_db_setup.cs` and `Process_Migrate_*` references
+**When** evaluated
+**Then** they are listed but marked **out of scope** — DB setup and one-time migration scripts are not application CRUD
+
+---
+
+### Story 20.2: Define `IMetadataRepository` and Canonicalize `MetadataVersionDAL`
+
+As a developer,
+I want a single `IMetadataRepository` interface over all `metadata` database operations,
+So that every caller depends on the interface and not on CouchDB URL construction.
+
+**Acceptance Criteria:**
+
+**Given** the existing `MetadataVersionDAL` in `mmria.common/SharedLibraries/MetadataVersion/`
+**When** this story is complete
+**Then** `MetadataVersionDAL` contains all in-scope `metadata` operations from the catalog using consistent URL construction throughout — no Pattern A strings remain
+
+**Given** `MetadataVersionManager.cs` currently builds 22 `metadata` URLs directly instead of routing all through `MetadataVersionDAL`
+**When** this story is complete
+**Then** every `metadata` URL in `MetadataVersionManager` is replaced with a `MetadataVersionDAL` method call; the manager does not construct CouchDB URLs directly
+
+**Given** the full operation set is in `MetadataVersionDAL`
+**When** the interface is extracted
+**Then** `IMetadataRepository` is defined in `mmria.common/SharedLibraries/MetadataVersion/` with async method signatures matching every `MetadataVersionDAL` method; `MetadataVersionDAL` implements `IMetadataRepository`
+
+**Given** `IMetadataRepository` is defined
+**When** DI registration is updated in `mmria-server`
+**Then** `IMetadataRepository` is registered as `MetadataVersionDAL`; all existing callers of the concrete `MetadataVersionDAL` compile without changes
+
+---
+
+### Story 20.3: Route SharedLibraries DAL Files Through `IMetadataRepository`
+
+As a developer,
+I want the SharedLibraries DAL files that directly access the `metadata` database to delegate to `IMetadataRepository`,
+So that no DAL file outside of `MetadataVersionDAL` constructs a `metadata` URL.
+
+**Acceptance Criteria:**
+
+**Given** the following direct `metadata` HTTP calls in SharedLibraries DAL files:
+- `AuditRecoveryDAL.cs` — 1 hit (`GET metadata/version_specification-{v}/metadata`)
+- `CaseValidationDAL.cs` — 2 hits (metadata document GET/PUT for case validation)
+- `MMRIAServicesDAL.cs` — 3 hits (de-id export list and populate-CDC config reads)
+**When** this story is complete
+**Then** each is replaced with the corresponding `IMetadataRepository` method; `IMetadataRepository` is injected into each DAL via constructor injection
+
+**Given** `MMRIAServicesDAL` handles cross-tenant and CDC-scoped metadata reads
+**When** these are replaced
+**Then** the tenant/CDC connection context (`DBConfigurationDetail`) is passed through to the repository method — no implicit global state is introduced
+
+**Given** the build after all changes
+**When** verified
+**Then** all three projects build with zero errors
+
+---
+
+### Story 20.4: Route Controller Direct `metadata` Calls Through `IMetadataRepository`
+
+As a developer,
+I want controllers that directly access the `metadata` database to delegate to `IMetadataRepository` or the existing `MetadataVersionManager`,
+So that controllers contain no `metadata` URL construction.
+
+**Acceptance Criteria:**
+
+**Given** the following controllers with direct `metadata` URL construction:
+- `broadcast_messageController.cs` — 3 hits (broadcast-message-list GET/PUT — Wave 9 planned migration target)
+- `de_identified_listController.cs` — 2 hits (de-id and de-id-export list GET/PUT — Wave 8 planned target)
+- `export_list_managerController.cs` — 2 hits (export-standard-list GET/PUT)
+- `substance_mappingController.cs` — 2 hits (substance-mapping GET/PUT)
+- `abstractorDeidentifiedCaseController.cs` — 1 hit (duplicate-multiform-list GET)
+- `CaseController.cs` — 1 hit (duplicate-multiform-list GET)
+- `versionController.cs` — 1 hit (metadata document GET by ID)
+- `record_idController.cs` — 1 hit (record ID document GET)
+- `systemOfflineController.cs` — 1 hit (system-offline-config URL builder)
+**When** this story is complete
+**Then** each is replaced with the corresponding `IMetadataRepository` or `MetadataVersionManager` method call; `IMetadataRepository` is injected where no manager intermediary already exists
+
+**Given** `broadcast_messageController` and `de_identified_listController` are also Wave 8/9 SharedLibraries migration targets
+**When** this story touches them
+**Then** only the URL construction is replaced; the Wave 8/9 manager extraction is deferred — this story does not restructure controller business logic
+
+**Given** the build after all changes
+**When** verified
+**Then** all three projects build with zero errors and no route, action signature, or response shape changes are made
+
+---
+
+### Story 20.5: Route `mmria.services` Read-Only `metadata` Calls Through `IMetadataRepository`
+
+As a developer,
+I want the background-job and exporter code in `mmria.services` that reads `metadata` documents to delegate to `IMetadataRepository`,
+So that the services project is covered by the same interface contract as the server.
+
+**Acceptance Criteria:**
+
+**Given** the two dominant read operations in `mmria.services`:
+- `GET metadata/version_specification-{version}/metadata` — in `c_convert_to_report_object`, `c_convert_to_opioid_report_object`, `c_convert_to_dqr_detail`, `c_de_identifier`, `c_cdc_de_identifier`, `c_document_sync_all`, `c_document_sync_all_legacy`, `c_generate_frequency_summary_report`, `c_sync_document`, `BatchItemProcessingService`, `core_element_exporter`, `exporter`, `mmrds_exporter`, `export_all_generate_name_map`
+- `GET metadata/de-identified-list` and `GET metadata/de-identified-export-list` — in `c_de_identifier`, `c_cdc_de_identifier`, `c_document_sync_all`, `c_document_sync_all_legacy`, `c_sync_document`, `core_element_exporter`
+**When** this story is complete
+**Then** each is replaced with the corresponding `IMetadataRepository` method; since `mmria.services` already references `mmria.common`, no new project reference is needed
+
+**Given** the remaining services files with direct `metadata` access:
+- `PopulateCDCInstanceSupervisor.cs` — 2 hits (populate-CDC-instance config document)
+**When** evaluated
+**Then** these are replaced using the same `IMetadataRepository` method as `MMRIAServicesDAL`
+
+**Given** `c_document_sync_all` and `c_document_sync_all_legacy` use `metadata` reads as part of sync orchestration
+**When** replaced
+**Then** only the URL construction is replaced — sync orchestration logic remains in the actor classes
+
+**Given** the build after all changes
+**When** verified
+**Then** `mmria.services`, `mmria.common`, and `mmria-server` all build with zero errors
+
+---
+
+### Story 20.6: `metadata` Boundary Decision — Bulk `_all_docs` and Sync
+
+As a developer,
+I want a written architecture decision on whether bulk `metadata/_all_docs` reads and sync-driven metadata access belong behind `IMetadataRepository` or are separate infrastructure concerns,
+So that the boundary is explicit and consistent with the decision made for `mmrds` in Story 17.7.
+
+**Acceptance Criteria:**
+
+**Given** `MetadataVersionManager` uses `GET metadata/_all_docs?include_docs=true` in two places for loading the full version list
+**When** the developer evaluates these
+**Then** a decision is recorded in `docs/ai/mmrds_operation_catalog.md` under the `metadata` Boundary Decisions section: either (a) add `GetAllMetadataDocumentsAsync` to `IMetadataRepository` or (b) keep these as manager-level reads not in the interface
+
+**Given** the recommendation from Story 17.7 treated sync `_all_docs` as out-of-scope infrastructure
+**When** the same question is evaluated for `metadata`
+**Then** the decision is consistent with Story 17.7 — bulk reads for version list enumeration are part of the application interface (`IMetadataRepository`) since `MetadataVersionManager` already owns them; sync-driven reads in `c_document_sync_all` remain infrastructure
+
+---
+
+## Epic 20 — Story Sequencing
+
+| Wave | Story | Risk | Dependencies |
+|---|---|---|---|
+| 20 | 20.1 — `metadata` Operation Catalog | None | None — discovery only |
+| 20 | 20.6 — Boundary Decision | None | Can run in parallel with 20.1 |
+| 20 | 20.2 — `IMetadataRepository` + `MetadataVersionDAL` | Low–Medium | 20.1 |
+| 20 | 20.3 — SharedLibraries DAL files | Low | 20.2 |
+| 20 | 20.4 — Controller direct calls | Low–Medium | 20.2 |
+| 20 | 20.5 — `mmria.services` read-only calls | Medium | 20.2 |
+
+20.3, 20.4, 20.5, and 20.6 can proceed in parallel once 20.2 is complete.
 
