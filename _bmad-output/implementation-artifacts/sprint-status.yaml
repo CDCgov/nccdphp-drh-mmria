@@ -152,3 +152,42 @@ development_status:
   16-1-systemoffline-sharedlibraries-feature: done
   16-2-caseworkflowadmin-wave9-refactor: done
   epic-16-retrospective: optional
+
+  # ── Epic 17: mmrds CRUD Consolidation (SQL Migration Foundation) ──────────
+  epic-17: backlog
+  17-1-mmrds-operation-catalog: backlog
+  17-2-icase-repository-caseDAL-canonicalize: backlog
+  17-3-casemanager-direct-calls: backlog
+  17-4-caseworkflowadmindal-duplicates: backlog
+  17-5-auditrecovery-cvs-vitalimport-attachment: backlog
+  17-5b-mmria-services-case-reads: backlog
+  17-6-offlinecasemanager-direct-calls: backlog
+  17-7-mmriaservicesdal-sync-boundary-decision: backlog
+  epic-17-retrospective: optional
+
+  # ── Epic 18: _users and configuration Consolidation ───────────────────────
+  epic-18: backlog
+  18-1-users-operation-catalog: backlog
+  18-2-iuser-repository-accountdal: backlog
+  18-3-route-leaking-users-calls: backlog
+  18-4-iconfiguration-repository-systemconfigdal: backlog
+  18-5-iconfiguration-bootstrap-loader: backlog
+  epic-18-retrospective: optional
+
+  # ── Epic 19: jurisdiction Consolidation ───────────────────────────────────
+  epic-19: backlog
+  19-1-jurisdiction-operation-catalog: backlog
+  19-2-ijurisdiction-repository-jurisdictiondal: backlog
+  19-3-ijurisdiction-authorization-reader: backlog
+  19-4-route-out-of-dal-jurisdiction-crud: backlog
+  epic-19-retrospective: optional
+
+  # ── Epic 20: metadata Consolidation ───────────────────────────────────────
+  epic-20: backlog
+  20-1-metadata-operation-catalog: backlog
+  20-2-imetadata-repository-metadataversiondal: backlog
+  20-3-sharedlibraries-dal-metadata-calls: backlog
+  20-4-controller-metadata-calls: backlog
+  20-5-mmria-services-metadata-reads: backlog
+  20-6-metadata-boundary-decision: backlog
+  epic-20-retrospective: optional
