@@ -147,8 +147,8 @@ public static class ContainedPathHelper
         var safeDirectoryName = ValidateContainedName(childDirectoryName, nameof(childDirectoryName));
         var safePath = ResolveContainedDirectoryPath(normalizedRoot, safeDirectoryName);
         ThrowIfExistingPathOrAncestorIsReparsePoint(safePath, nameof(childDirectoryName));
-        new DirectoryInfo(normalizedRoot).CreateSubdirectory(safeDirectoryName);
-        return safePath;
+        var createdDirectory = new DirectoryInfo(normalizedRoot).CreateSubdirectory(safeDirectoryName);
+        return createdDirectory.FullName;
     }
 
     public static FileStream OpenContainedWriteStream(string trustedBaseDirectory, string fileName)
