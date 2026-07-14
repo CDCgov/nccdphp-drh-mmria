@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.IO;
+using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 
@@ -16,13 +17,8 @@ public static class EscapedJsonResultFactory
         TypeNameHandling = TypeNameHandling.None
     };
 
-    public static ContentResult Create(object value) =>
-        new()
-        {
-            Content = Serialize(value),
-            ContentType = JsonContentType,
-            StatusCode = 200
-        };
+    public static FileContentResult Create(object value) =>
+        new(Encoding.UTF8.GetBytes(Serialize(value)), JsonContentType);
 
     public static string Serialize(object value)
     {

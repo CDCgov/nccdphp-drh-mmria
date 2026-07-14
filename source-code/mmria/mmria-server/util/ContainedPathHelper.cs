@@ -143,9 +143,11 @@ public static class ContainedPathHelper
 
     public static string EnsureContainedDirectoryExists(string trustedBaseDirectory, string childDirectoryName)
     {
-        var safePath = ResolveContainedDirectoryPath(trustedBaseDirectory, childDirectoryName);
+        var normalizedRoot = NormalizeTrustedDirectoryRoot(trustedBaseDirectory, nameof(trustedBaseDirectory));
+        var safeDirectoryName = ValidateContainedName(childDirectoryName, nameof(childDirectoryName));
+        var safePath = ResolveContainedDirectoryPath(normalizedRoot, safeDirectoryName);
         ThrowIfExistingPathOrAncestorIsReparsePoint(safePath, nameof(childDirectoryName));
-        Directory.CreateDirectory(safePath);
+        new DirectoryInfo(normalizedRoot).CreateSubdirectory(safeDirectoryName);
         return safePath;
     }
 
