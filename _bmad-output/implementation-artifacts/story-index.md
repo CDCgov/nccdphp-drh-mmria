@@ -481,7 +481,7 @@ dev this story _bmad-output/implementation-artifacts/15-1-tenant-database-counts
 | 17.5 — Eliminate Duplicate mmrds Calls in AuditRecoveryDAL, CVSDAL, VitalImportDAL, AttachmentDAL | [17-5-auditrecovery-cvs-vitalimport-attachment.md](17-5-auditrecovery-cvs-vitalimport-attachment.md) | done |
 | 17.5b — Route mmria.services Case Reads Through ICaseRepository | [17-5b-mmria-services-case-reads.md](17-5b-mmria-services-case-reads.md) | done |
 | 17.6 — Eliminate Direct mmrds Calls in OfflineCaseManager | [17-6-offlinecasemanager-direct-calls.md](17-6-offlinecasemanager-direct-calls.md) | done |
-| 17.7 — MMRIAServicesDAL and Sync Boundary Decision | [17-7-mmriaservicesdal-sync-boundary-decision.md](17-7-mmriaservicesdal-sync-boundary-decision.md) | ready-for-dev |
+| 17.7 — MMRIAServicesDAL and Sync Boundary Decision | [17-7-mmriaservicesdal-sync-boundary-decision.md](17-7-mmriaservicesdal-sync-boundary-decision.md) | done |
 
 **Sequencing:** 17.1 and 17.7 can run in parallel (both are discovery/documentation). 17.2 depends on 17.1. Stories 17.3, 17.4, 17.5, 17.5b, and 17.6 all depend on 17.2 and can be run in parallel once 17.2 is complete.
 

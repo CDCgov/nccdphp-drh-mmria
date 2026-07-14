@@ -304,7 +304,7 @@ public sealed class MMRIAServicesDAL
     {
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        string requestString = $"{GetMmrdsDatabaseUrl(dbInfo)}/_design/sortable/_view/by_date_created?skip=0&take=250000";
+        string requestString = dbInfo.Get_Prefix_DB_Url("mmrds/_design/sortable/_view/by_date_created?skip=0&take=250000");
 
         string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", requestString, null, dbInfo.user_name, dbInfo.user_value);
         var caseViewResponse = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(responseFromServer);
@@ -332,7 +332,7 @@ public sealed class MMRIAServicesDAL
             return null;
         }
 
-        string url = $"{GetMmrdsDatabaseUrl(dbInfo)}/{caseId}";
+        string url = dbInfo.Get_Prefix_DB_Url($"mmrds/{caseId}");
 
         string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", url, null, dbInfo.user_name, dbInfo.user_value);
         return Newtonsoft.Json.JsonConvert.DeserializeObject<ExpandoObject>(responseFromServer);
@@ -356,7 +356,7 @@ public sealed class MMRIAServicesDAL
             return result;
         }
 
-        string requestString = $"{GetMmrdsDatabaseUrl(dbInfo)}/_all_docs?include_docs=true";
+        string requestString = dbInfo.Get_Prefix_DB_Url("mmrds/_all_docs?include_docs=true");
         string requestBody = Newtonsoft.Json.JsonConvert.SerializeObject(new { keys = idList });
         string responseFromServer = await _couchDbHttpClient.ExecuteAsync("POST", requestString, requestBody, dbInfo.user_name, dbInfo.user_value);
         var allDocsResponse = Newtonsoft.Json.JsonConvert.DeserializeObject<PopulateCdcAllDocsResponse>(responseFromServer);
@@ -548,13 +548,6 @@ public sealed class MMRIAServicesDAL
                 VitalServiceKey = vital_service_key
             });
         return Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.Populate_CDC_Instance>(response);
-    }
-
-    private static string GetMmrdsDatabaseUrl(DBConfigurationDetail dbInfo)
-    {
-        return string.IsNullOrWhiteSpace(dbInfo?.prefix)
-            ? $"{dbInfo?.url}/mmrds"
-            : $"{dbInfo.url}/{dbInfo.prefix}_mmrds";
     }
 
     public async Task<JObject> GetDatabaseMetadataAsync(

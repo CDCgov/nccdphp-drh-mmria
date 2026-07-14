@@ -14,9 +14,9 @@ This catalog records every distinct operation against the `{prefix}mmrds` CouchD
 |-------|---------|---------|
 | **A** | Hand-assembled with string interpolation — **wrong** | `$"{dbConfig.url}/{dbConfig.prefix}mmrds/{id}"` |
 | **B** | Uses `Get_Prefix_DB_Url` helper — **correct** | `dbConfig.Get_Prefix_DB_Url($"mmrds/{id}")` |
-| **C** | CDC special-case — underscore separator or no prefix | `$"{dbInfo.url}/{dbInfo.prefix}_mmrds"` or `$"{cdcConnection.url}/mmrds/..."` |
+| **C** | CDC write — no prefix, different CouchDB instance (CDC system) | `$"{cdcConnection.url}/mmrds/_bulk_docs"` |
 
-> **Note on Pattern C:** `MMRIAServicesDAL` uses a private `GetMmrdsDatabaseUrl(dbInfo)` helper (lines 553–557) that returns `{url}/mmrds` (no prefix) when `dbInfo.prefix` is empty, or `{url}/{prefix}_mmrds` (underscore separator) otherwise. This is intentional for CDC connections, which use a different database naming convention from standard tenant mmrds.
+> **Note on Pattern C:** Pattern C applies only to `BulkSavePopulateCdcDocumentsAsync`, which writes to the CDC system's own CouchDB instance (`cdcConnection`) — a completely different server from the tenant database. No prefix applies because the CDC system uses a flat `mmrds` database. The private `GetMmrdsDatabaseUrl(dbInfo)` helper (formerly lines 553–557, deleted in Story 17.7) produced `{url}/{prefix}_mmrds` (underscore separator) for non-empty prefixes — this was a **bug**, not intentional design. All three methods that used it (`GetCaseIdsByDateCreated`, `GetCaseDocumentForPopulateCDC`, `GetCaseDocumentsForPopulateCDC`) read from the tenant's `{prefix}mmrds` database and now correctly use Pattern B (`dbInfo.Get_Prefix_DB_Url("mmrds")`).
 
 ---
 
@@ -43,7 +43,7 @@ This catalog records every distinct operation against the `{prefix}mmrds` CouchD
 | `RecoverSoftLocksAsync` (read before update — loop) | `mmria.common/SharedLibraries/OfflineCase/Manager/OfflineCaseManager.cs` | 398 | A | `JObject` |
 | `GetCaseAsync` | `mmria.common/SharedLibraries/VitalImport/DAL/VitalImportDAL.cs` | 26 | A | `ExpandoObject` |
 | `GetCaseById` (single case branch) | `mmria.common/SharedLibraries/MMRIAServices/DAL/MMRIAServicesDAL.cs` | 83 | A | `ExpandoObject` |
-| `GetCaseDocumentForPopulateCDC` | `mmria.common/SharedLibraries/MMRIAServices/DAL/MMRIAServicesDAL.cs` | 335 | C | `ExpandoObject` |
+| `GetCaseDocumentForPopulateCDC` | `mmria.common/SharedLibraries/MMRIAServices/DAL/MMRIAServicesDAL.cs` | 335 | B | `ExpandoObject` |
 | `GetCaseAsync` | `mmria.common/SharedLibraries/CVS/DAL/CVSDAL.cs` | 84 | B | `ExpandoObject` |
 | `GetRev` (HEAD — returns ETag rev only) | `mmria-server/Controllers/api/caseController.cs` | 87 | A | `ETag` header (rev string) |
 | `Get(case_id)` (PMSS) | `mmria-server/Controllers/api/caseController.pmss.cs` | 63 | B | `mmria_case` (PMSS schema) |
@@ -126,7 +126,7 @@ This catalog records every distinct operation against the `{prefix}mmrds` CouchD
 | `GetPagedViewAsync` | `mmria.common/SharedLibraries/CaseView/CaseViewManager.cs` | 1385 | B | `case_view_response` |
 | `GetCaseViewAsync` (keyed search mode) | `mmria.common/SharedLibraries/CaseView/CaseViewManager.cs` | 1489 | A | `case_view_response` |
 | `GetExistingRecordIds` | `mmria.common/SharedLibraries/MMRIAServices/DAL/MMRIAServicesDAL.cs` | 189 | A | `case_view_response` |
-| `GetCaseIdsByDateCreated` | `mmria.common/SharedLibraries/MMRIAServices/DAL/MMRIAServicesDAL.cs` | 307 | C | `HashSet<string>` |
+| `GetCaseIdsByDateCreated` | `mmria.common/SharedLibraries/MMRIAServices/DAL/MMRIAServicesDAL.cs` | 307 | B | `HashSet<string>` |
 | `Execute` (export — enumerate all case IDs) | `mmria.services/Utilities/Exporter/core_element_exporter.cs` | 240 | A | `case_view_response` |
 | `GetCaseIdsAsync` (paged streaming) | `mmria.services/Utilities/PagedCaseIdLoader.cs` | 36 | A | `IAsyncEnumerable<string>` |
 | `Get` (PMSS — all cases) | `mmria-server/Controllers/api/case_viewController.pmss.cs` | 111 | A | `case_view_response` |
@@ -191,7 +191,7 @@ This catalog records every distinct operation against the `{prefix}mmrds` CouchD
 |-----------|----------------|---------|-------------|---------------|-------|
 | `Get(case_id=null)` fallback (PMSS — all docs) | `mmria-server/Controllers/api/caseController.pmss.cs` | 59 | B | (never returned — overridden by id check) | Dead branch; `case_id` is always provided |
 | `GetCaseById(case_id=null)` fallback | `mmria.common/SharedLibraries/MMRIAServices/DAL/MMRIAServicesDAL.cs` | 79 | A | `ExpandoObject` (all docs) | Dead branch; `case_id` is always provided in practice |
-| `GetCaseDocumentsForPopulateCDC` (POST `_all_docs` with `keys` body) | `mmria.common/SharedLibraries/MMRIAServices/DAL/MMRIAServicesDAL.cs` | 359 | C | `List<ExpandoObject>` | CDC populate: bulk fetch by IDs |
+| `GetCaseDocumentsForPopulateCDC` (POST `_all_docs` with `keys` body) | `mmria.common/SharedLibraries/MMRIAServices/DAL/MMRIAServicesDAL.cs` | 359 | B | `List<ExpandoObject>` | CDC populate: bulk fetch by IDs |
 | `GetCaseCountAll` (VRO stats) | `mmria-server/util/VROSummary.cs` | 544 | A | `c_all_docs_response` | Counts all mmrds docs |
 | `Execute` (batch rejection — `_all_docs` initial value, never sent) | `mmria.services/Actors/BatchProcessor.cs` | 498 | A | (dead — `request_string` overridden before use) | Artifact: line 498 sets `_all_docs` URL but it is reassigned before the HTTP call at line 512 |
 | `Execute` (export — enumerate all cases) | `mmria.services/Utilities/Exporter/exporter.cs` | 154 | A | allDocs response | Full case export |
@@ -232,7 +232,8 @@ These operations are not targeted by Stories 17.2–17.7. They operate on mmrds 
 | GET `mmrds/_changes` (sync feed) | `mmria-server/model/actor/quartz/Synchronize_Deleted_Case_Records.cs` | 150, 154 | Change-feed sync job |
 | GET `mmrds` (database existence check) | `mmria-server/Controllers/api/healthzController.cs` | 40 | Health endpoint probe |
 | GET `mmrds/_all_docs` (ID set for sync) | `mmria-server/model/actor/quartz/Process_DB_Synchronization_Set.cs` | 170 | Sync job — ID reconciliation |
-| GET `mmrds/_all_docs` (paged sync) | `mmria-server/model/actor/c_document_sync_all.cs` | 201, 264, 277, 938 | Full sync job |
+| GET `mmrds/_all_docs` (paged sync) | `mmria-server/model/actor/c_document_sync_all.cs` | 938 | Full sync job |
+| GET `mmrds/_all_docs` (paged CDC sync, mmria.services) | `mmria.services/Actors/populate-cdc-instance/c_document_sync_all.cs` | 202, 266, 280 | CDC populate sync job |
 | GET `mmrds/_all_docs` (paged sync, PMSS) | `mmria-server/model/actor/c_document_sync_all.pmss.cs` | 241 | PMSS sync job |
 | GET `mmrds/{document_id}` (per-doc fetch inside sync) | `mmria-server/model/actor/c_document_sync_all.pmss.cs` | 257 | PMSS sync job |
 | GET `mmrds/_all_docs` (legacy sync) | `mmria-server/model/actor/c_document_sync_all_legacy.cs` | 167, 198 | Legacy sync job |
@@ -247,7 +248,50 @@ These operations are not targeted by Stories 17.2–17.7. They operate on mmrds 
 
 ## Boundary Decisions
 
-_To be completed in Story 17.7._
+**Story 17.7 — Decision recorded 2026-07-14**
+
+---
+
+### Decision 1: `GetMmrdsDatabaseUrl` prefix bug — Option (a) Unify (fix the bug)
+
+**Finding:** The private `GetMmrdsDatabaseUrl(DBConfigurationDetail dbInfo)` helper in `MMRIAServicesDAL` (formerly lines 553–557) produced `{url}/{prefix}_mmrds` when `prefix` is non-empty. This is a **bug**:
+
+- Every other URL construction in the entire codebase — including both `c_document_sync_all.cs` files, all `CaseDAL` operations, and the other three Pattern A methods in `MMRIAServicesDAL` itself — uses `{prefix}mmrds` (no separator).
+- The three methods that called this helper (`GetCaseIdsByDateCreated`, `GetCaseDocumentForPopulateCDC`, `GetCaseDocumentsForPopulateCDC`) are CDC populate **reads** — they read case documents FROM the tenant's `{prefix}mmrds` database (the same one as regular application CRUD). In a multi-tenant deployment where `prefix` is non-empty, they were silently targeting a non-existent `{prefix}_mmrds` database.
+- The Story 17.1 catalog note claiming this was "intentional for CDC connections" was incorrect — no CouchDB database named `{prefix}_mmrds` exists or is created anywhere in the system.
+
+**Resolution:** `GetMmrdsDatabaseUrl` deleted. The three call sites updated to `dbInfo.Get_Prefix_DB_Url("mmrds")` (Pattern B). Catalog pattern column for these rows updated from C to B.
+
+---
+
+### Decision 2: `c_document_sync_all` bulk reads — Option (b) Separate concerns (infrastructure-only)
+
+**Finding:** Both `c_document_sync_all.cs` implementations perform bulk `_all_docs` enumeration of the entire `{prefix}mmrds` database to drive sync orchestration:
+
+- `mmria.services/Actors/populate-cdc-instance/c_document_sync_all.cs` lines 202, 266, 280 — CDC populate sync
+- `mmria-server/util/c_document_sync_all.cs` line 938 — tenant rebuild sync
+
+Both already use the correct `{prefix}mmrds` URL (no underscore bug). These are full-database streaming operations, not individual case CRUD. They operate at the infrastructure level: enumerating all documents to drive replication, not servicing application requests.
+
+**Resolution:** `c_document_sync_all` bulk reads are **not** routed through `ICaseRepository`. They remain as direct infrastructure calls. Future SQL migration does not require changing these files — they are not part of the `CaseDAL`/`ICaseRepository` boundary.
+
+---
+
+### Decision 3: `BulkSavePopulateCdcDocumentsAsync` CDC write — Option (b) Separate concerns (infrastructure-only)
+
+**Finding:** `BulkSavePopulateCdcDocumentsAsync` (line 468) writes to `{cdcConnection.url}/mmrds/_bulk_docs` — a completely different CouchDB instance (the CDC system, not the tenant database). The `cdcConnection` parameter is a separate `DBConfigurationDetail` pointing to the CDC server. No prefix applies because the CDC system uses a flat unprefixed `mmrds` database.
+
+**Resolution:** This is CDC populate infrastructure — it writes to the CDC system, not the tenant application database. It is **not** routed through `ICaseRepository`. Future SQL migration targets the tenant `{prefix}mmrds` database only; the CDC write path is independent.
+
+---
+
+### Scope summary for Epic 17
+
+| Concern | Decision | `ICaseRepository` scope? |
+|---------|----------|--------------------------|
+| CDC populate reads (`GetCaseIdsByDateCreated`, `GetCaseDocumentForPopulateCDC`, `GetCaseDocumentsForPopulateCDC`) | Prefix bug fixed (option a) — but remain in `MMRIAServicesDAL`; not promoted to `ICaseRepository` | No — CDC-specific bulk reads; out of scope |
+| `c_document_sync_all` bulk `_all_docs` reads | Infrastructure-only (option b) | No — sync infrastructure |
+| `BulkSavePopulateCdcDocumentsAsync` CDC write | Infrastructure-only (option b) | No — writes to CDC system, not tenant DB |
 
 | Actor | Decision | Status |
 |-------|----------|--------|

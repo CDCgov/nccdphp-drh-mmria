@@ -2,7 +2,7 @@
 
 **Epic:** 17 — mmrds CRUD Consolidation (SQL Migration Foundation)
 **Story ID:** 17.7
-**Status:** ready-for-dev
+**Status:** done
 **Date added:** 2026-07-14
 **Depends on:** 17.1 (mmrds catalog — can also run in parallel with 17.1)
 **Source requirements:** epics.md §Epic 17 Story 17.7; project-context.md §2.2
