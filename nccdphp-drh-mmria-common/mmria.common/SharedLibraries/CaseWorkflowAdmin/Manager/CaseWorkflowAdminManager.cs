@@ -71,7 +71,20 @@ public sealed class CaseWorkflowAdminManager
             old_value = oldCaseStatus,
             new_value = "",
             date_created = DateTime.UtcNow,
-            doc_type = "Change_Stack"
+            doc_type = "Change_Stack",
+            items = new List<Change_Stack_Item>
+            {
+                new Change_Stack_Item
+                {
+                    user_name = userName,
+                    prompt = "Case Status",
+                    object_path = "/home_record/case_status/overall_case_status",
+                    dictionary_path = "/home_record/case_status/overall_case_status",
+                    old_value = oldCaseStatus,
+                    new_value = "9999",
+                    doc_type = "Change_Stack_Item"
+                }
+            }
         };
         try
         {
@@ -136,7 +149,20 @@ public sealed class CaseWorkflowAdminManager
             user_name = userName,
             note = "admin change, case recovered",
             date_created = DateTime.UtcNow,
-            doc_type = "Change_Stack"
+            doc_type = "Change_Stack",
+            items = new List<Change_Stack_Item>
+            {
+                new Change_Stack_Item
+                {
+                    user_name = userName,
+                    prompt = "Case Recovered",
+                    object_path = "/case_id",
+                    dictionary_path = "/case_id",
+                    old_value = "deleted",
+                    new_value = "recovered",
+                    doc_type = "Change_Stack_Item"
+                }
+            }
         };
         try
         {

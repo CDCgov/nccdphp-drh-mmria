@@ -461,7 +461,7 @@ dev this story _bmad-output/implementation-artifacts/15-1-tenant-database-counts
 
 | Story | File | Status |
 |-------|------|--------|
-| 16.1 — Establish SystemOffline SharedLibraries Feature | [16-1-systemoffline-sharedlibraries-feature.md](16-1-systemoffline-sharedlibraries-feature.md) | ready-for-dev |
+| 16.1 — Establish SystemOffline SharedLibraries Feature | [16-1-systemoffline-sharedlibraries-feature.md](16-1-systemoffline-sharedlibraries-feature.md) | done   |
 | 16.2 — CaseWorkflowAdmin Wave 9 Refactor | [16-2-caseworkflowadmin-wave9-refactor.md](16-2-caseworkflowadmin-wave9-refactor.md) | done   |
 
 **Sequencing:** Independent. No dependencies on other epics. Story 16.1 and 16.2 can be done in either order.
