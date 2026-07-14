@@ -2,7 +2,7 @@
 
 **Epic:** 12 — Data Migration Tool Modernization
 **Story ID:** 12.4
-**Status:** review — defect 12.4-D1, follow-up requirements 12.4-R1 / 12.4-R2, and edit-mode polling scope update implemented
+**Status:** done
 **Date added:** 2026-07-08
 **Depends on:** Story 12.3 (Case Rev Endpoint — needed for `_rev` polling)
 **Source requirements:** FR-19.1–FR-19.4

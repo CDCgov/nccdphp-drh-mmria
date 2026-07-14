@@ -1,4 +1,4 @@
----
+﻿---
 stepsCompleted: [1, 2, 3, 4]
 inputDocuments:
   - _bmad-output/planning-artifacts/prds/prd-mmria-2026-06-12/prd.md
@@ -19,8 +19,8 @@ FR-1.1: When a reviewer saves and reopens a case narrative, all explicit line br
 FR-1.2: Underline, horizontal rule, and font size formatting applied in the editor are retained after save and reload, rendering consistently across editor view, print view, and PDF output.
 FR-1.3: Cut and paste operations insert content at the current cursor position within the current paragraph. Multiple sequential pastes each land at the cursor. No paste inserts at an unintended position.
 FR-2.1: When a reviewer leaves a vitals field (blur, tab-out, or paste) with a value outside the configured valid range, the field value is cleared.
-FR-2.2: When a vitals field value is rejected per FR-2.1, a modal is displayed: "The value entered for the [field label] field falls outside of the permitted range. Please enter a valid input between {min}–{max}." Focus returns to the cleared field on dismiss.
-FR-2.3: Valid ranges for all vitals fields are stored in a single CouchDB configuration document, loaded once at server startup. A developer can update ranges by editing the config document and running the production update script — no code deployment required.
+FR-2.2: When a vitals field value is rejected per FR-2.1, a modal is displayed: "The value entered for the [field label] field falls outside of the permitted range. Please enter a valid input between {min}â€“{max}." Focus returns to the cleared field on dismiss.
+FR-2.3: Valid ranges for all vitals fields are stored in a single CouchDB configuration document, loaded once at server startup. A developer can update ranges by editing the config document and running the production update script â€” no code deployment required.
 FR-2.4: Out-of-range vitals values are displayed as empty string in print view and PDF view. Stored value is not affected.
 FR-2.5: Out-of-range vitals values are excluded from graph and table views within the case form. They are not plotted and not shown in the table. The case form input field continues to display the stored value.
 FR-2.6: On entering edit mode and on form selector navigation while in edit mode, the system re-validates all vitals values. If any out-of-range values are found: (1) a modal is shown, (2) a red text indicator is applied at the top of each affected vitals record.
@@ -36,30 +36,30 @@ FR-7.2: When an admin updates the maiden name for a case, an audit entry is writ
 FR-7.3: When an admin unlocks a case and clears its status, an audit entry is written with Update Action `admin change, case unlocked, case status cleared`, recording old status as Old Value and empty string as New Value.
 FR-7.4: When an admin recovers a deleted case, an audit entry is written with Update Action `admin change, case recovered`. Field prompt, field path, old value, and new value are blank.
 FR-7.5: When an admin deletes a case, an audit entry is written with Update Action `case deleted`. Field prompt, field path, old value, and new value are blank.
-FR-8.1: A `system-offline-config` document in the CDC instance `metadata` CouchDB database stores: `warn_date`, `warn_message`, `offline_date`, `offline_modal_message`, `offline_page_message`. Saved and fetched via mmria-server controller → mmria-services. Config is global across all tenants.
+FR-8.1: A `system-offline-config` document in the CDC instance `metadata` CouchDB database stores: `warn_date`, `warn_message`, `offline_date`, `offline_modal_message`, `offline_page_message`. Saved and fetched via mmria-server controller â†’ mmria-services. Config is global across all tenants.
 FR-8.2: At or after `warn_date`, logged-in users see a warning modal (displaying `warn_message`) once per browser session. Triggered on login and by the periodic check. Gated by `sessionStorage` flag.
 FR-8.3: At or after `offline_date`, logged-in users see a going-offline modal (displaying `offline_modal_message`) with a single OK button. OK invokes best-effort save if a case is in edit mode, then signs the user out. Shown only once, gated by `localStorage` flag.
 FR-8.4: At or after `offline_date`, the login page hides the login form fields and displays `offline_page_message` in white text in place of the login form area.
 FR-8.5: While logged in, the client polls mmria-server every 2 minutes for current offline config and evaluates thresholds to trigger FR-8.2 or FR-8.3 as applicable.
 FR-8.6: When a user navigates to the login page, the server checks the offline config and renders the page in offline state (FR-8.4) if `now >= offline_date`.
-FR-8.7: An installation-admin-only admin page (modeled on `/broadcast-message`, linked from installation admin nav) allows editing and saving all five offline config fields. Saves via mmria-server → mmria-services → CDC instance `metadata` DB.
+FR-8.7: An installation-admin-only admin page (modeled on `/broadcast-message`, linked from installation admin nav) allows editing and saving all five offline config fields. Saves via mmria-server â†’ mmria-services â†’ CDC instance `metadata` DB.
 FR-9.1: On the Data Summary Checks page, when a Form is selected and the user toggles "ALL" in the Field dropdown, only fields belonging to the selected Form are shown and enabled. The no-Form-selected default state (all fields shown) is preserved unchanged.
 FR-10.1: On the Manage Users page, clicking "Export User List" when a Role or Username filter is active exports only the currently displayed users. When no filter is active, all users are exported (existing default preserved).
 
 ### NonFunctional Requirements
 
 NFR-1: All changes must function correctly in Microsoft Edge and Google Chrome. No other browsers are in scope.
-NFR-2: The vitals validation modals (FR-2.2, FR-2.6) must meet Section 508 accessibility requirements — role, aria-modal, aria-labelledby, focus management, keyboard dismissal, and focus return.
+NFR-2: The vitals validation modals (FR-2.2, FR-2.6) must meet Section 508 accessibility requirements â€” role, aria-modal, aria-labelledby, focus management, keyboard dismissal, and focus return.
 NFR-3: Vitals range configuration is loaded once at server startup and held in memory. Field-level blur validation is synchronous against the in-memory config. No per-event network requests are introduced.
 
 ### Additional Requirements
 
 - FR-1: All fixes are JavaScript-only in `wwwroot/scripts/case/index.js`. No server-side changes for FR-1.
-- FR-1 (overriding constraint): The generated HTML structure must be identical to what the editor produces today. No new tags, no changed nesting, no reformatting. Stop stripping only — do not replace tags or modernize structure.
-- FR-1.3: Use the Range API (`window.getSelection().getRangeAt(0)`, `range.insertNode`) directly. Do not use `document.execCommand('insertHTML')`. Strip XSS vectors only (onclick, onerror, javascript: hrefs) — preserve all structural tags.
-- FR-2 scope: Apply validation and display-time exclusion to every vitals grid that renders the graph/table toggle control. Identify all such grids at implementation time — do not hardcode a form list.
+- FR-1 (overriding constraint): The generated HTML structure must be identical to what the editor produces today. No new tags, no changed nesting, no reformatting. Stop stripping only â€” do not replace tags or modernize structure.
+- FR-1.3: Use the Range API (`window.getSelection().getRangeAt(0)`, `range.insertNode`) directly. Do not use `document.execCommand('insertHTML')`. Strip XSS vectors only (onclick, onerror, javascript: hrefs) â€” preserve all structural tags.
+- FR-2 scope: Apply validation and display-time exclusion to every vitals grid that renders the graph/table toggle control. Identify all such grids at implementation time â€” do not hardcode a form list.
 - FR-2 server-side: `NestedStringDictionaryConverter` (custom `JsonConverter`) required to handle the nested `vital_sign_range` JSON object inside `string_keys.shared`. Applied via `[JsonConverter]` attribute on `OverridableConfiguration.string_keys`. `VitalSignRangeHelper` static class in `mmria-server/util/` deserializes the raw JSON string into a typed model with hardcoded defaults matching confirmed ranges.
-- FR-2 config key: `vital_sign_range` (nested under `string_keys.shared`). OI-4 (exact HTML `name` attributes for vitals inputs) remains open — developer confirms at implementation time.
+- FR-2 config key: `vital_sign_range` (nested under `string_keys.shared`). OI-4 (exact HTML `name` attributes for vitals inputs) remains open â€” developer confirms at implementation time.
 - FR-3: Inline `GetString ?? default` pattern in controller only. No helper class, no new service. Hardcoded defaults inline: `omb_expiration_date` = `"05/31/2026"`, `mmria_version` = `"MMRIA V 4.1"`.
 - FR-3.3: Developer also patches `omb_expiration_label.prompt` in `metadata.json` via the production update script when the OMB date changes. No client-side render-time substitution.
 - FR-4: Surgical deletions only. No new code. Before removing `de-identified/index.js` redirect guard (~line 933), grep to confirm it is `core-summary`-specific.
@@ -71,44 +71,44 @@ NFR-3: Vitals range configuration is loaded once at server startup and held in m
 
 ### UX Design Requirements
 
-N/A — no UX design document exists for this release. All UI patterns follow existing site conventions.
+N/A â€” no UX design document exists for this release. All UI patterns follow existing site conventions.
 
 ### FR Coverage Map
 
-FR-1.1: Epic 1 — Save-path line break stripping fix
-FR-1.2: Epic 1 — Save-path formatting stripping fix (underline, HR, font size)
-FR-1.3: Epic 1 — Paste handler cursor integrity (Range API rewrite)
-FR-2.1: Epic 2 — On-blur field-level hard block (clear + reject)
-FR-2.2: Epic 2 — Field-level invalid entry modal with range text
-FR-2.3: Epic 2 — Config-driven valid ranges in CouchDB + server-side loading
-FR-2.4: Epic 2 — Print/PDF display-time exclusion → empty string
-FR-2.5: Epic 2 — Graph/table display-time exclusion
-FR-2.6: Epic 2 — Historical data detection on edit-mode entry + form navigation
-FR-2.7: Epic 2 — PDF vitals date "/ /" fix → empty string
-FR-3.1: Epic 3 — OMB expiration date config-driven (controller + Razor + DB doc)
-FR-3.2: Epic 3 — MMRIA version config-driven (controller + Razor + DB doc)
-FR-3.3: Epic 3 — Developer update workflow (no admin UI, script-driven)
-FR-4.1: Epic 3 — Remove core-summary option from three print dropdowns
-FR-4.2: Epic 3 — Remove core-summary dead code from pdf-version/index.js
-FR-5.1: Epic 1 — Case Narrative instruction text replacement
-FR-7.1: Epic 7 — Audit log entry for Year of Death admin change
-FR-7.2: Epic 7 — Audit log entry for Maiden Name admin change
-FR-7.3: Epic 7 — Audit log entry for Unlock and Clear Case Status
-FR-7.4: Epic 7 — Audit log entry for Recover Deleted Case
-FR-7.5: Epic 7 — Audit log entry for Delete Case
-FR-8.1: Epic 8 — System offline config document, mmria-services, controller
-FR-8.2: Epic 8 — Warning modal (warn date, session-gated)
-FR-8.3: Epic 8 — Going offline modal (offline date, localStorage-gated, save + sign out)
-FR-8.4: Epic 8 — Login page offline state (hide form, show message)
-FR-8.5: Epic 8 — Periodic status check (2-minute client poll)
-FR-8.6: Epic 8 — Login page server-side offline check
-FR-8.7: Epic 8 — Installation admin page for offline config
-FR-9.1: Standalone Bug Fix — Data Summary Checks "ALL" toggle scoped to selected Form
-FR-10.1: Standalone Bug Fix — Manage Users Export scoped to active filter
-FR-11.1: Epic 10 — Fix BatchSupervisor busy-wait CPU spin (mmria-services)
-FR-11.2: Epic 10 — Server-side CVS structured error handling (CVSManager, CVSDAL, CVSModels, cvsAPIController)
-FR-11.3: Epic 10 — Client-side CVS retry loop with countdown and try-again button
-FR-11.4: Epic 10 — BroadcastChannel CVS status and parent-page button state (mmria.js)
+FR-1.1: Epic 1 â€” Save-path line break stripping fix
+FR-1.2: Epic 1 â€” Save-path formatting stripping fix (underline, HR, font size)
+FR-1.3: Epic 1 â€” Paste handler cursor integrity (Range API rewrite)
+FR-2.1: Epic 2 â€” On-blur field-level hard block (clear + reject)
+FR-2.2: Epic 2 â€” Field-level invalid entry modal with range text
+FR-2.3: Epic 2 â€” Config-driven valid ranges in CouchDB + server-side loading
+FR-2.4: Epic 2 â€” Print/PDF display-time exclusion â†’ empty string
+FR-2.5: Epic 2 â€” Graph/table display-time exclusion
+FR-2.6: Epic 2 â€” Historical data detection on edit-mode entry + form navigation
+FR-2.7: Epic 2 â€” PDF vitals date "/ /" fix â†’ empty string
+FR-3.1: Epic 3 â€” OMB expiration date config-driven (controller + Razor + DB doc)
+FR-3.2: Epic 3 â€” MMRIA version config-driven (controller + Razor + DB doc)
+FR-3.3: Epic 3 â€” Developer update workflow (no admin UI, script-driven)
+FR-4.1: Epic 3 â€” Remove core-summary option from three print dropdowns
+FR-4.2: Epic 3 â€” Remove core-summary dead code from pdf-version/index.js
+FR-5.1: Epic 1 â€” Case Narrative instruction text replacement
+FR-7.1: Epic 7 â€” Audit log entry for Year of Death admin change
+FR-7.2: Epic 7 â€” Audit log entry for Maiden Name admin change
+FR-7.3: Epic 7 â€” Audit log entry for Unlock and Clear Case Status
+FR-7.4: Epic 7 â€” Audit log entry for Recover Deleted Case
+FR-7.5: Epic 7 â€” Audit log entry for Delete Case
+FR-8.1: Epic 8 â€” System offline config document, mmria-services, controller
+FR-8.2: Epic 8 â€” Warning modal (warn date, session-gated)
+FR-8.3: Epic 8 â€” Going offline modal (offline date, localStorage-gated, save + sign out)
+FR-8.4: Epic 8 â€” Login page offline state (hide form, show message)
+FR-8.5: Epic 8 â€” Periodic status check (2-minute client poll)
+FR-8.6: Epic 8 â€” Login page server-side offline check
+FR-8.7: Epic 8 â€” Installation admin page for offline config
+FR-9.1: Standalone Bug Fix â€” Data Summary Checks "ALL" toggle scoped to selected Form
+FR-10.1: Standalone Bug Fix â€” Manage Users Export scoped to active filter
+FR-11.1: Epic 10 â€” Fix BatchSupervisor busy-wait CPU spin (mmria-services)
+FR-11.2: Epic 10 â€” Server-side CVS structured error handling (CVSManager, CVSDAL, CVSModels, cvsAPIController)
+FR-11.3: Epic 10 â€” Client-side CVS retry loop with countdown and try-again button
+FR-11.4: Epic 10 â€” BroadcastChannel CVS status and parent-page button state (mmria.js)
 
 ## Epic List
 
@@ -139,10 +139,15 @@ Installation administrators can schedule a planned system outage. Logged-in user
 
 ### Epic 10: CVS PDF Export Tool Reliability
 
-The Community Vital Signs PDF export tool is hardened against transient failures at every layer — services, server, and client. Users receive actionable status messages, automatic retries with visible countdown, and a "Try again" path instead of a browser refresh. The parent case page button reflects in-progress state via BroadcastChannel.
+The Community Vital Signs PDF export tool is hardened against transient failures at every layer â€” services, server, and client. Users receive actionable status messages, automatic retries with visible countdown, and a "Try again" path instead of a browser refresh. The parent case page button reflects in-progress state via BroadcastChannel.
 **FRs covered:** FR-11.1, FR-11.2, FR-11.3, FR-11.4
 
 - FR-10: Client-side only. In `export_user_list_click()` in `manage-users/index.js`, replace the join target from `g_ui.user_summary_list` to `g_filtered_user_list`. No server-side changes.
+
+### Epic 16: Controller Pattern Remediation
+
+Stories in Epics 7 and 8 were authored against an earlier version of `project-context.md`. This epic pays down the resulting SharedLibraries `{Feature}/Manager/DAL` debt for the two remaining controller surfaces that still do direct CouchDB calls: `system_offlineController` (Epic 8) and the Wave 9 `CaseWorkflowAdmin` pair (`clear_case_status`, `recover_deleted_case`).
+**Architecture rule:** project-context.md Â§2.2 SharedLibraries pattern
 
 ---
 
@@ -168,7 +173,7 @@ So that line breaks, underline, horizontal rules, and font sizes render consiste
 
 **Given** any sanitization still required on the save path (XSS vector removal)
 **When** the narrative is sanitized before save
-**Then** only executable attributes (`onclick`, `onerror`, `javascript:` hrefs) are removed — structural tags (`<br>`, `<u>`, `<hr>`, `<font>`) are preserved unchanged
+**Then** only executable attributes (`onclick`, `onerror`, `javascript:` hrefs) are removed â€” structural tags (`<br>`, `<u>`, `<hr>`, `<font>`) are preserved unchanged
 
 **Given** existing case data in CouchDB that was saved in the stripped form (pre-fix)
 **When** that case is opened
@@ -192,11 +197,11 @@ So that multiple sequential pastes from Word or other sources each land exactly 
 
 **Given** the paste handler in `page_render_create_onpaste_event()` in `case/index.js`
 **When** the developer rewrites it
-**Then** it uses the Range API (`window.getSelection().getRangeAt(0)`, `range.deleteContents()`, `range.insertNode()`) to capture selection state synchronously at the top of the handler — `document.execCommand('insertHTML')` is not used
+**Then** it uses the Range API (`window.getSelection().getRangeAt(0)`, `range.deleteContents()`, `range.insertNode()`) to capture selection state synchronously at the top of the handler â€” `document.execCommand('insertHTML')` is not used
 
 **Given** content pasted from an external source (Word, another application)
 **When** the paste is processed
-**Then** only executable XSS attributes (`onclick`, `onerror`, `javascript:` hrefs) are stripped — all structural HTML tags are preserved
+**Then** only executable XSS attributes (`onclick`, `onerror`, `javascript:` hrefs) are stripped â€” all structural HTML tags are preserved
 
 **Given** the fix is validated in Edge and Chrome (NFR-1)
 **When** tested in both browsers with multiple sequential pastes
@@ -219,7 +224,7 @@ So that I understand how to write an effective, compliant case narrative using t
 
 **Given** the surrounding markup and field structure for the instruction text
 **When** the replacement is made
-**Then** no surrounding markup or field structure is changed — text content only
+**Then** no surrounding markup or field structure is changed â€” text content only
 
 **Given** the text originates from a CouchDB document or `metadata.json`
 **When** the update is applied
@@ -231,7 +236,7 @@ So that I understand how to write an effective, compliant case narrative using t
 
 Reviewers entering vitals data are immediately alerted when values fall outside clinical ranges, preventing unreliable data from entering graphs, tables, print, and PDF views. Existing cases with out-of-range values are flagged at review time.
 
-### Story 2.1: Add Vitals Range Config — CouchDB Document and Server-Side Loading
+### Story 2.1: Add Vitals Range Config â€” CouchDB Document and Server-Side Loading
 
 As a developer,
 I want the valid ranges for all vitals fields stored in CouchDB and loaded into memory at server startup,
@@ -241,7 +246,7 @@ So that vitals validation and display-time exclusion can read ranges synchronous
 
 **Given** the CouchDB config document in `database-scripts/`
 **When** the developer updates it
-**Then** it contains a `vital_sign_range` nested object under `string_keys.shared` with the confirmed ranges: Temperature 0–110, Heart Rate 0–400, Respiration 0–60, Systolic BP 0–300, Diastolic BP 0–300, Oxygen Saturation 0–100 — each entry carrying `min`, `max`, and `label` keys
+**Then** it contains a `vital_sign_range` nested object under `string_keys.shared` with the confirmed ranges: Temperature 0â€“110, Heart Rate 0â€“400, Respiration 0â€“60, Systolic BP 0â€“300, Diastolic BP 0â€“300, Oxygen Saturation 0â€“100 â€” each entry carrying `min`, `max`, and `label` keys
 
 **Given** `OverridableConfiguration.string_keys` is typed as `Dictionary<string, Dictionary<string, string>>`
 **When** the config document is deserialized at server startup
@@ -253,7 +258,7 @@ So that vitals validation and display-time exclusion can read ranges synchronous
 
 **Given** `CaseController.Index()` calls `VitalSignRangeHelper.GetVitalSignRangeConfig()`
 **When** the Case page is served
-**Then** the serialized config is set as `TempData["vital_sign_range_config"]` and emitted into the `HeadScripts` block as `window.mmria_vital_sign_range = @Html.Raw(TempData["vital_sign_range_config"]);` — following the same pattern as `window.case_edit_inactivity_config`
+**Then** the serialized config is set as `TempData["vital_sign_range_config"]` and emitted into the `HeadScripts` block as `window.mmria_vital_sign_range = @Html.Raw(TempData["vital_sign_range_config"]);` â€” following the same pattern as `window.case_edit_inactivity_config`
 
 **Given** the config key is absent or the config document has not been updated yet
 **When** the page loads
@@ -273,7 +278,7 @@ So that out-of-range values never silently enter the form and I can correct them
 
 **Given** a vitals field value is cleared per the above
 **When** the field is cleared
-**Then** a modal is displayed with the message: "The value entered for the [field label] field falls outside of the permitted range. Please enter a valid input between {min}–{max}." using the existing site modal pattern (purple header, OK button)
+**Then** a modal is displayed with the message: "The value entered for the [field label] field falls outside of the permitted range. Please enter a valid input between {min}â€“{max}." using the existing site modal pattern (purple header, OK button)
 
 **Given** the modal is dismissed
 **When** the reviewer clicks OK or presses Escape/Enter
@@ -281,21 +286,21 @@ So that out-of-range values never silently enter the form and I can correct them
 
 **Given** `window.mmria_vital_sign_range` is `null`
 **When** blur fires on a vitals field
-**Then** no validation runs and no modal appears — silent skip
+**Then** no validation runs and no modal appears â€” silent skip
 
 **Given** the field value is empty or not a number
 **When** blur fires
-**Then** no validation runs — only non-empty parseable numeric values are validated
+**Then** no validation runs â€” only non-empty parseable numeric values are validated
 
 **Given** Save & Continue, Save & Finish, or autosave fires
 **When** a vitals field is in any state
-**Then** no validation runs at save time — whatever is in the field is saved as-is
+**Then** no validation runs at save time â€” whatever is in the field is saved as-is
 
 **Given** the validation function `mmria_vitals_validate_field(inputElement)` is implemented in `chart.js`
 **When** it is attached
-**Then** it attaches to blur, keydown (Tab key), and paste events on every vitals input in scope — identified by the presence of the graph/table toggle on the same grid, not by a hardcoded form list (OI-4: developer confirms exact `name` attributes at implementation time)
+**Then** it attaches to blur, keydown (Tab key), and paste events on every vitals input in scope â€” identified by the presence of the graph/table toggle on the same grid, not by a hardcoded form list (OI-4: developer confirms exact `name` attributes at implementation time)
 
-### Story 2.3: Display-Time Exclusion — Print, PDF, and Vitals Date Fix
+### Story 2.3: Display-Time Exclusion â€” Print, PDF, and Vitals Date Fix
 
 As a CDC analyst reviewing submitted case data,
 I want out-of-range vitals values to appear as blank in printed reports and PDFs,
@@ -305,21 +310,21 @@ So that printed output does not surface unreliable data.
 
 **Given** a vitals record with a value outside the configured range for that field
 **When** the case is rendered in print view
-**Then** that vitals field renders as empty string — the stored database value is not affected
+**Then** that vitals field renders as empty string â€” the stored database value is not affected
 
 **Given** the same out-of-range value
 **When** the case is rendered as a PDF
-**Then** that vitals field renders as empty string in the PDF output — stored value unchanged
+**Then** that vitals field renders as empty string in the PDF output â€” stored value unchanged
 
 **Given** the PDF rendering path for vitals date fields currently outputs `/ /` for empty or invalid dates
 **When** a vitals date field is empty or invalid
-**Then** the PDF renders an empty string instead of `/ /` — this fix is scoped to vitals date fields in the PDF rendering path only
+**Then** the PDF renders an empty string instead of `/ /` â€” this fix is scoped to vitals date fields in the PDF rendering path only
 
 **Given** all exclusion above
 **When** the reviewer views the same case in the case form editor
 **Then** the case form input field continues to display the stored value unchanged
 
-### Story 2.4: Display-Time Exclusion — Graph and Table Views
+### Story 2.4: Display-Time Exclusion â€” Graph and Table Views
 
 As a case reviewer,
 I want out-of-range vitals values excluded from graphs and tables in the case form,
@@ -329,19 +334,19 @@ So that visual trends and tabular summaries only reflect clinically plausible da
 
 **Given** a vitals record with a value outside the configured range
 **When** the graph view renders for that vitals grid
-**Then** the out-of-range data point is not plotted — no point, no line segment to/from it
+**Then** the out-of-range data point is not plotted â€” no point, no line segment to/from it
 
 **Given** the same out-of-range value
 **When** the table view renders for that vitals grid
-**Then** the cell for that field renders as empty — not the raw value
+**Then** the cell for that field renders as empty â€” not the raw value
 
 **Given** all exclusion above
 **When** the reviewer views the case form input field for that same record
-**Then** the input continues to display the stored value — exclusion is display-time only, not stored
+**Then** the input continues to display the stored value â€” exclusion is display-time only, not stored
 
 **Given** `window.mmria_vital_sign_range` is `null`
 **When** graph and table views render
-**Then** all values render normally — no exclusion applied
+**Then** all values render normally â€” no exclusion applied
 
 ### Story 2.5: Historical Data Detection and Record Indicators
 
@@ -369,7 +374,7 @@ So that I understand why those values are absent from graphs, tables, and printe
 
 **Given** the red text indicator is applied
 **When** the case form re-renders (e.g., on form navigation)
-**Then** the indicator is re-evaluated on each render — it is not a one-time write
+**Then** the indicator is re-evaluated on each render â€” it is not a one-time write
 
 **Given** `window.mmria_vital_sign_range` is `null`
 **When** edit mode is entered or form navigation occurs
@@ -385,7 +390,7 @@ Developers can update the OMB expiration date and MMRIA version number without a
 
 As a developer,
 I want the OMB expiration date read from the CouchDB configuration document at render time,
-So that the next date change can be applied by running the update script — no code deployment required.
+So that the next date change can be applied by running the update script â€” no code deployment required.
 
 **Acceptance Criteria:**
 
@@ -395,7 +400,7 @@ So that the next date change can be applied by running the update script — no 
 
 **Given** the relevant controller action(s) serving the Home page and Committee Decisions form (OI-5: developer identifies during implementation)
 **When** those actions execute
-**Then** they set a TempData or ViewBag entry for the OMB date using the pattern: `configuration.GetString("omb_expiration_date", host_prefix) ?? "05/31/2026"` — no helper class, no new service
+**Then** they set a TempData or ViewBag entry for the OMB date using the pattern: `configuration.GetString("omb_expiration_date", host_prefix) ?? "05/31/2026"` â€” no helper class, no new service
 
 **Given** `Views/Shared/_BurdenStatement.cshtml` currently contains the hardcoded string `Exp. Date 05/31/2026`
 **When** the partial renders
@@ -403,7 +408,7 @@ So that the next date change can be applied by running the update script — no 
 
 **Given** the `omb_expiration_label` field in `metadata.json` carries `"Exp. Date 05/31/2026"` as its `prompt` value
 **When** the OMB date is updated
-**Then** the developer also patches `omb_expiration_label.prompt` in the metadata document via the production update script — no client-side render-time substitution is required
+**Then** the developer also patches `omb_expiration_label.prompt` in the metadata document via the production update script â€” no client-side render-time substitution is required
 
 **Given** the `omb_expiration_date` key is absent from the config document
 **When** the controller reads it
@@ -413,7 +418,7 @@ So that the next date change can be applied by running the update script — no 
 
 As a developer,
 I want the MMRIA version number read from the CouchDB configuration document at render time,
-So that the next version change can be applied by running the update script — no code deployment required.
+So that the next version change can be applied by running the update script â€” no code deployment required.
 
 **Acceptance Criteria:**
 
@@ -423,11 +428,11 @@ So that the next version change can be applied by running the update script — 
 
 **Given** the relevant controller action(s) serving the application layout (OI-5: developer identifies during implementation)
 **When** those actions execute
-**Then** they set a TempData or ViewBag entry for the version using the pattern: `configuration.GetString("mmria_version", host_prefix) ?? "MMRIA V 4.1"` — no helper class, no new service
+**Then** they set a TempData or ViewBag entry for the version using the pattern: `configuration.GetString("mmria_version", host_prefix) ?? "MMRIA V 4.1"` â€” no helper class, no new service
 
 **Given** `Views/Shared/_Footer.cshtml` line 7 currently contains two occurrences of the hardcoded string `MMRIA V4.0.1` (in both the `aria-label` attribute and the visible text)
 **When** the footer renders
-**Then** both occurrences are replaced with the TempData/ViewBag value — no hardcoded version string remains
+**Then** both occurrences are replaced with the TempData/ViewBag value â€” no hardcoded version string remains
 
 **Given** the `mmria_version` key is absent from the config document
 **When** the controller reads it
@@ -451,7 +456,7 @@ So that users can no longer select an unauthorized print format.
 
 **Given** the same option in `de-identified/index.js` (~line 1131), plus a redirect guard (~line 933)
 **When** removed
-**Then** the option is absent and the redirect guard block is also removed if (and only if) it exclusively guards the `core-summary` case — if it guards other cases, only the `core-summary` branch is removed
+**Then** the option is absent and the redirect guard block is also removed if (and only if) it exclusively guards the `core-summary` case â€” if it guards other cases, only the `core-summary` branch is removed
 
 **Given** `wwwroot/scripts/pdf-version/index.js` contains dead code for `core-summary`
 **When** the developer removes it
@@ -489,7 +494,7 @@ So that there is a complete record of who changed these fields and what the valu
 
 **Given** the existing audit log pattern (Update Date/Time, Update By, Update Action, MMRIA Field Prompt, MMRIA Field Path, Old Value, New Value)
 **When** these entries are written
-**Then** they follow the identical pattern used by existing case-edit audit entries — no new fields, no schema changes
+**Then** they follow the identical pattern used by existing case-edit audit entries â€” no new fields, no schema changes
 
 **Given** the admin action fails (e.g., save error)
 **When** the failure occurs
@@ -517,7 +522,7 @@ So that there is a verifiable record of every case lifecycle change.
 
 **Given** the existing audit log pattern
 **When** these entries are written
-**Then** they follow the identical pattern used by existing case-edit audit entries — no new fields, no schema changes
+**Then** they follow the identical pattern used by existing case-edit audit entries â€” no new fields, no schema changes
 
 **Given** any of the above admin actions fails
 **When** the failure occurs
@@ -529,7 +534,7 @@ So that there is a verifiable record of every case lifecycle change.
 
 Installation administrators can schedule a planned system outage. Logged-in users receive advance warning, are guided to save their work and sign out before the system goes offline, and are prevented from logging in once the offline date is reached.
 
-### Story 8.1: System Offline Config — Document, mmria-services, Controller, and Admin Page
+### Story 8.1: System Offline Config â€” Document, mmria-services, Controller, and Admin Page
 
 As an installation administrator,
 I want a dedicated admin page where I can configure warn and offline dates and messages,
@@ -543,7 +548,7 @@ So that I can schedule a planned outage and control the messaging users see at e
 
 **Given** mmria-services
 **When** a get or save request arrives for the offline config
-**Then** mmria-services fetches from or writes to the `system-offline-config` document in the CDC instance `metadata` database — following the existing pattern for other metadata documents
+**Then** mmria-services fetches from or writes to the `system-offline-config` document in the CDC instance `metadata` database â€” following the existing pattern for other metadata documents
 
 **Given** a GET endpoint on the mmria-server controller
 **When** called
@@ -563,7 +568,7 @@ So that I can schedule a planned outage and control the messaging users see at e
 
 **Given** a non-installation-admin user attempts to access the page
 **When** the request is made
-**Then** the page returns 403 / unauthorized — same access control pattern as `/broadcast-message`
+**Then** the page returns 403 / unauthorized â€” same access control pattern as `/broadcast-message`
 
 **Given** a link to the new admin page is needed
 **When** the installation admin nav is rendered
@@ -581,13 +586,13 @@ So that I understand the system is unavailable and what to do.
 **When** the server renders the login page
 **Then** the login form fields (username input, password input, login button) are hidden; `offline_page_message` is displayed in white text in the area where the login form was
 
-**Given** the "please contact your jurisdiction admin…" text currently appears on the login page
+**Given** the "please contact your jurisdiction adminâ€¦" text currently appears on the login page
 **When** the login page renders in offline state
 **Then** that text is replaced by `offline_page_message`; no other login page elements are changed
 
 **Given** a user navigates to the login page and `now < offline_date` (or `offline_date` is null)
 **When** the server renders the login page
-**Then** the login page renders normally — no offline state applied
+**Then** the login page renders normally â€” no offline state applied
 
 **Given** the `system-offline-config` document is absent or `offline_date` is null/empty
 **When** the login page is requested
@@ -627,7 +632,7 @@ So that I can complete my work and sign out cleanly without losing data.
 
 **Given** the going-offline modal has been shown (OK was clicked and user signed out)
 **When** a `localStorage` flag is checked on the next session attempt
-**Then** the flag is set — the modal cannot reappear (login is also disabled by this point)
+**Then** the flag is set â€” the modal cannot reappear (login is also disabled by this point)
 
 **Given** `offline_date` is null/empty
 **When** the periodic check evaluates
@@ -655,7 +660,7 @@ So that I receive warning and going-offline notifications without needing to rel
 
 **Given** the poll request fails (network error, server unavailable)
 **When** the error is received
-**Then** the failure is silently swallowed — no error is surfaced to the user and polling continues on the next interval
+**Then** the failure is silently swallowed â€” no error is surfaced to the user and polling continues on the next interval
 
 ---
 
@@ -673,19 +678,19 @@ So that my data summary reflects the correct form-scoped fields and not all fiel
 
 **Given** no Form is selected on the Data Summary Checks page
 **When** the page loads or the Form selection is cleared
-**Then** the Field dropdown shows all fields across all forms (existing default behavior — preserved unchanged)
+**Then** the Field dropdown shows all fields across all forms (existing default behavior â€” preserved unchanged)
 
 **Given** a Form is selected and the user manually selects or deselects individual fields ("ALL" not toggled)
 **When** the Field dropdown is populated
-**Then** only fields belonging to the selected Form are shown (existing working behavior — preserved unchanged)
+**Then** only fields belonging to the selected Form are shown (existing working behavior â€” preserved unchanged)
 
 **Given** a Form is selected in the Form dropdown
 **When** the user toggles "ALL" ON in the Field dropdown
-**Then** the Field dropdown enables and displays only the fields belonging to the selected Form — not all fields globally
+**Then** the Field dropdown enables and displays only the fields belonging to the selected Form â€” not all fields globally
 
 **Given** the ALL-toggle event handler in the Data Summary Checks page JS
 **When** ALL is toggled ON while a Form is selected
-**Then** the handler re-populates the field list from the currently selected Form's fields only — not from the global field list; both the Form-select handler and the ALL-toggle handler enforce form-scoped field population when a Form is active
+**Then** the handler re-populates the field list from the currently selected Form's fields only â€” not from the global field list; both the Form-select handler and the ALL-toggle handler enforce form-scoped field population when a Form is active
 
 **Given** a Form is selected and "ALL" is toggled ON
 **When** the user then clears the Form selection
@@ -699,7 +704,7 @@ So that my data summary reflects the correct form-scoped fields and not all fiel
 
 ## Epic 10: CVS PDF Export Tool Reliability
 
-The Community Vital Signs PDF export tool is hardened against transient failures at every layer — services, server, and client. Users receive actionable status messages, automatic retries with visible countdown, and a "Try again" path instead of a browser refresh. The parent case page button reflects in-progress state via BroadcastChannel.
+The Community Vital Signs PDF export tool is hardened against transient failures at every layer â€” services, server, and client. Users receive actionable status messages, automatic retries with visible countdown, and a "Try again" path instead of a browser refresh. The parent case page button reflects in-progress state via BroadcastChannel.
 
 ### Story 10.1: Fix BatchSupervisor Busy-Wait CPU Spin
 
@@ -712,7 +717,7 @@ So that the server remains responsive while retrying the CVS ping.
 
 **Given** the CVS service ping returns a non-ready result
 **When** BatchSupervisor waits before the next retry
-**Then** the wait is `await Task.Delay(CvsServerRetryDelayMs)` — not a spin loop — and CPU utilization during the wait is negligible
+**Then** the wait is `await Task.Delay(CvsServerRetryDelayMs)` â€” not a spin loop â€” and CPU utilization during the wait is negligible
 
 **Given** `BatchSupervisor` previously called `GetBatchSet(...).Result` synchronously inside its constructor
 **When** the actor is created
@@ -724,7 +729,7 @@ So that the server remains responsive while retrying the CVS ping.
 
 **Given** `GetBatchSet` throws during initialization
 **When** the exception is caught
-**Then** the actor logs the error, transitions to `Ready`, and releases the stash — subsequent messages are handled normally
+**Then** the actor logs the error, transitions to `Ready`, and releases the stash â€” subsequent messages are handled normally
 
 ### Story 10.2: Server-Side CVS Error Hardening
 
@@ -737,7 +742,7 @@ So that the client can display a meaningful message and react appropriately.
 
 **Given** any failure condition (network error, non-2xx HTTP, empty body, JSON parse error, Base64 decode error)
 **When** `CVSManager.GetDashboardAsync` encounters it
-**Then** a `CVSFileStatusResult` is returned with appropriate `file_status` and human-readable `message` — no unhandled exception propagates
+**Then** a `CVSFileStatusResult` is returned with appropriate `file_status` and human-readable `message` â€” no unhandled exception propagates
 
 **Given** the `message` field is set on `CVSFileStatusResult`
 **When** `cvsAPIController` builds the response
@@ -758,7 +763,7 @@ So that I don't have to refresh the browser and I can see the system is actively
 
 **Given** the CVS page starts polling
 **When** `run_cvs_report_polling` executes
-**Then** polling is a bounded `for` loop up to `CVS_MAX_ATTEMPTS` — not a `while (!is_finished)` loop
+**Then** polling is a bounded `for` loop up to `CVS_MAX_ATTEMPTS` â€” not a `while (!is_finished)` loop
 
 **Given** the service returns `"generating"` or `"unavailable"` and more attempts remain
 **When** `wait_for_next_attempt` is called
@@ -795,7 +800,7 @@ So that I cannot accidentally open duplicate CVS windows and I know when the rep
 
 **Given** `window.open` returns `null` (popup blocked)
 **When** the null return is detected
-**Then** `endCvsReportRequest(id)` is called immediately — no orphaned in-progress state
+**Then** `endCvsReportRequest(id)` is called immediately â€” no orphaned in-progress state
 
 ### Story 10.5: Config-Driven CVS Retry Constants
 
@@ -811,7 +816,7 @@ So that these values can be tuned per environment without a code deployment.
 
 **Given** `CvsController.Index()` executes
 **When** the view is served
-**Then** `TempData["CVS_MAX_ATTEMPTS"]` and `TempData["CVS_RETRY_DELAY_SECONDS"]` are set using `configuration.GetInteger(key, host_prefix) ?? default` — no helper class
+**Then** `TempData["CVS_MAX_ATTEMPTS"]` and `TempData["CVS_RETRY_DELAY_SECONDS"]` are set using `configuration.GetInteger(key, host_prefix) ?? default` â€” no helper class
 
 **Given** `Views/cvs/Index.cshtml` renders
 **When** the `<head>` is emitted
@@ -823,7 +828,7 @@ So that these values can be tuned per environment without a code deployment.
 
 ---
 
-## Epic 11 — Vitals Import Integer Type Fix
+## Epic 11 â€” Vitals Import Integer Type Fix
 
 **Source requirements:** FR-12.1, FR-12.2
 **Status:** not-started
@@ -831,7 +836,7 @@ So that these values can be tuned per environment without a code deployment.
 ### Summary
 Dropdown fields written during NAT/FET vitals import (MARN, ACKN, and adjacent coded fields) are stored as JSON strings instead of JSON integers. The front-end dropdown resolver expects integers, causing imported cases to display "Select Value" for fields that were successfully imported.
 
-The defect is in `C_Get_Set_Value.set_value(string, string, ...)` in `mmria.common` — it always assigns a .NET `string`, which Newtonsoft.Json serializes as a JSON string. mmria-server stores the same fields as .NET `int`, which serializes as a JSON number.
+The defect is in `C_Get_Set_Value.set_value(string, string, ...)` in `mmria.common` â€” it always assigns a .NET `string`, which Newtonsoft.Json serializes as a JSON string. mmria-server stores the same fields as .NET `int`, which serializes as a JSON number.
 
 ### Story 11.1: Vitals Import Integer Type Fix
 
@@ -864,9 +869,9 @@ So that the case form does not show "Select Value" for fields that were successf
 
 ---
 
-## Epic 12 — Data Migration Tool Modernization
+## Epic 12 â€” Data Migration Tool Modernization
 
-**Source requirements:** FR-13.1–13.4, FR-14.1–14.5
+**Source requirements:** FR-13.1â€“13.4, FR-14.1â€“14.5
 **Status:** not-started
 
 ### Summary
@@ -972,7 +977,7 @@ So that I can detect whether the open case has been modified without fetching th
 
 **Given** an unauthenticated GET to `/api/case/{id}/rev`
 **When** the request is received
-**Then** the response is `401` — auth is required
+**Then** the response is `401` â€” auth is required
 
 ### Story 12.5: Stale Tab UX
 
@@ -1000,3 +1005,101 @@ So that I never lose work silently or see a confusing technical error.
 **Then** no polling is started
 **And** if the user leaves edit mode through Save & Close or another lock-release path
 **Then** any active `_rev` polling interval is stopped
+
+---
+
+## Epic 16 â€” Controller Pattern Remediation
+
+**Source requirements:** project-context.md Â§2.2 SharedLibraries pattern; controller_sharedlibraries_migration_matrix.md Wave 9
+**Status:** not-started
+**Depends on:** none
+
+### Summary
+
+Epics 7 and 8 were authored before `project-context.md` was updated. Two anti-patterns remain in shipping code:
+
+1. `system_offlineController` (Epic 8) calls `_couchDbHttpClient.ExecuteAsync(...)` directly and owns message-substitution logic that belongs in a Manager â€” no `SharedLibraries/SystemOffline/` feature exists.
+2. `clear_case_status.cs` and `recover_deleted_case.cs` (Wave 9, migration matrix) still own raw CouchDB calls. Epic 7 audit stories (7.1 and 7.2) were implemented on top of these controllers at `verification` status, compounding the debt.
+
+Two earlier remediation stories (VitalSignRangeHelper relocation and Case Rev endpoint) were superseded before this epic was finalized:
+- VitalSignRangeHelper is deleted by Story 4.0 (replaced by the validation engine).
+- Story 12.3 (Case Rev Endpoint) was implemented as `done`.
+
+The two stories in this epic are independent of each other.
+
+---
+
+### Story 16.1: Establish SystemOffline SharedLibraries Feature
+
+As a developer working on the system offline feature,
+I want the system offline business logic and CouchDB/service access to live in a SharedLibraries Manager and DAL,
+So that `system_offlineController` contains only routing, authorization, and response shaping â€” no direct service calls.
+
+**Acceptance Criteria:**
+
+**Given** the current `system_offlineController` calls `_couchDbHttpClient.ExecuteAsync(...)` directly in `SaveConfig()` and in the private `LoadConfigFromServicesAsync()` helper
+**When** this story is complete
+**Then** both of those calls have been moved into `SharedLibraries/SystemOffline/DAL/SystemOfflineDAL.cs`; the controller delegates through `SharedLibraries/SystemOffline/Manager/SystemOfflineManager.cs`
+
+**Given** `mmria.server.util.SystemOfflineMessageFormatter` currently lives in server-only utility code
+**When** this story is complete
+**Then** the message-substitution logic has been moved into `SystemOfflineManager`; the `mmria.server.util.SystemOfflineMessageFormatter` class is deleted
+
+**Given** `SystemOfflineManager` and `SystemOfflineDAL` are created
+**When** registered in the server DI container
+**Then** they follow the same registration pattern as other SharedLibraries features (e.g., `ManageUsersManager`, `CVSManager`)
+
+**Given** `system_offlineController`'s public actions (`Index`, `GetConfig`, `GetJurisdictions`, `GetStatus`, `SaveConfig`) and the `/api/system-offline/status` route
+**When** the refactor is complete
+**Then** route paths, action signatures, HTTP method attributes, auth attributes (`[Authorize(Roles = ...)]`), and response JSON shapes are byte-for-byte identical to pre-refactor â€” no client-side changes required
+
+**Given** the controller still needs tenant resolution (`host_prefix`, `configuration`, `ConfigDB`)
+**When** the story is implemented
+**Then** tenant resolution stays in the controller per project-context.md Â§2.2 first-pass rule â€” it is not moved into `SystemOfflineManager`
+
+**Given** `GetJurisdictions()` filters `ConfigDB.detail_list.Keys` in the controller
+**When** the refactor is complete
+**Then** that key-list filtering stays in the controller â€” it is lightweight config-reading, not CouchDB access, and moving it would violate the first-pass rule
+
+**Given** the refactor is complete
+**When** `dotnet build source-code/mmria/mmria-server/mmria-server.csproj` runs
+**Then** the build succeeds with exit code 0
+
+---
+
+### Story 16.2: CaseWorkflowAdmin Wave 9 â€” Refactor clear_case_status and recover_deleted_case
+
+As a developer maintaining the case administration workflow,
+I want `clear_case_status.cs` and `recover_deleted_case.cs` to delegate their CouchDB work through a `CaseWorkflowAdmin` Manager and DAL,
+So that these controllers follow the SharedLibraries pattern and the audit-write code added by Epic 7 is in the correct layer.
+
+**Acceptance Criteria:**
+
+**Given** `Controllers/clear_case_status.cs` calls `_couchDbHttpClient.ExecuteAsync(...)` directly at multiple points (case view query, case document GET, case document PUT) including the audit-write logic added by Story 7.2
+**When** this story is complete
+**Then** all CouchDB calls â€” including the audit-write â€” have been moved into `SharedLibraries/CaseWorkflowAdmin/DAL/CaseWorkflowAdminDAL.cs`; the controller delegates via `SharedLibraries/CaseWorkflowAdmin/Manager/CaseWorkflowAdminManager.cs`
+
+**Given** `Controllers/recover_deleted_case.cs` calls `_couchDbHttpClient.ExecuteAsync(...)` directly for deleted-case lookup, revision fetches, audit lookup, recovery PUT, audit cleanup DELETE, and the audit-write logic added by Story 7.2
+**When** this story is complete
+**Then** all CouchDB calls have been moved into `CaseWorkflowAdminDAL`; the controller delegates via `CaseWorkflowAdminManager`
+
+**Given** the migration matrix rates both controllers as Wave 9 `planned` with High risk
+**When** the refactor is implemented
+**Then** the project-context.md Â§2.2 first-pass rules are followed exactly: tenant resolution (`host_prefix`, `configuration`, `db_config`, authorized-state resolution via `ResolveAuthorizedStateDatabase`) stays in the controller; business logic and CouchDB calls move to Manager/DAL; no outer `try/catch` blocks are added in Manager or DAL methods
+
+**Given** `ConfigurationSet.detail_list` is accessed in the controllers
+**When** the Manager or DAL needs a database URL
+**Then** `db_info.Get_Prefix_DB_Url(path)` is used â€” never a hand-assembled URL; `detail_list` is always accessed via `TryGetValue` â€” never the direct indexer
+
+**Given** `Change_Stack` audit writes were added by Stories 7.1 and 7.2 directly into the controller body
+**When** this refactor is complete
+**Then** those audit writes have been moved into `CaseWorkflowAdminManager` alongside the rest of the business logic
+
+**Given** `clear_case_statusController` MVC view actions and `recover_deleted_caseController` MVC view actions
+**When** the refactor is complete
+**Then** route paths, action signatures, HTTP method attributes, view names, `ViewBag` keys, and response shapes are identical to pre-refactor
+
+**Given** the refactor is complete
+**When** `dotnet build source-code/mmria/mmria-server/mmria-server.csproj` runs
+**Then** the build succeeds with exit code 0
+

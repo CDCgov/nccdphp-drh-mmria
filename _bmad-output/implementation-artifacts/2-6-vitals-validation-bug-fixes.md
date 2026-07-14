@@ -4,7 +4,7 @@ baseline_commit: HEAD
 
 # Story 2.6: Vitals Validation Bug Fixes — Data Retention and Prenatal Coverage
 
-Status: review
+Status: done
 
 ## Story
 

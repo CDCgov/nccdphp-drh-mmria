@@ -6,7 +6,7 @@ baseline_commit: 0129ad031a42e33865dc964935d56357111cc7f4
 
 **Epic:** Standalone Bug Fixes
 **Story ID:** 9.2
-**Status:** review
+**Status:** done
 **Date added:** 2026-06-25
 
 ---

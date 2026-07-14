@@ -1,6 +1,6 @@
 # Story 4.3: OMB Block Right-Alignment — Home Page
 
-Status: not-started
+Status: done
 
 ## Story
 

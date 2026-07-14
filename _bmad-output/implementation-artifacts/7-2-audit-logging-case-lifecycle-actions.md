@@ -1,6 +1,6 @@
 # Story 7.2: Audit Logging for Case Status and Lifecycle Admin Actions
 
-Status: verification
+Status: done
 
 ## Story
 
