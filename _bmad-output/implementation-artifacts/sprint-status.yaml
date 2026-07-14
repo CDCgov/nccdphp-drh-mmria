@@ -154,15 +154,15 @@ development_status:
   epic-16-retrospective: optional
 
   # ── Epic 17: mmrds CRUD Consolidation (SQL Migration Foundation) ──────────
-  epic-17: backlog
-  17-1-mmrds-operation-catalog: backlog
-  17-2-icase-repository-caseDAL-canonicalize: backlog
-  17-3-casemanager-direct-calls: backlog
-  17-4-caseworkflowadmindal-duplicates: backlog
-  17-5-auditrecovery-cvs-vitalimport-attachment: backlog
-  17-5b-mmria-services-case-reads: backlog
-  17-6-offlinecasemanager-direct-calls: backlog
-  17-7-mmriaservicesdal-sync-boundary-decision: backlog
+  epic-17: in-progress
+  17-1-mmrds-operation-catalog: ready-for-dev
+  17-2-icase-repository-caseDAL-canonicalize: ready-for-dev
+  17-3-casemanager-direct-calls: ready-for-dev
+  17-4-caseworkflowadmindal-duplicates: ready-for-dev
+  17-5-auditrecovery-cvs-vitalimport-attachment: ready-for-dev
+  17-5b-mmria-services-case-reads: ready-for-dev
+  17-6-offlinecasemanager-direct-calls: ready-for-dev
+  17-7-mmriaservicesdal-sync-boundary-decision: ready-for-dev
   epic-17-retrospective: optional
 
   # ── Epic 18: _users and configuration Consolidation ───────────────────────
