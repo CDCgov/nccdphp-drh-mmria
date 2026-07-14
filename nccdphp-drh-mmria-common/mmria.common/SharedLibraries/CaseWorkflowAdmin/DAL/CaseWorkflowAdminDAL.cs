@@ -3,25 +3,27 @@ using mmria.common.couchdb;
 using mmria.common.getset;
 using mmria.common.model.couchdb;
 using mmria.common.model.couchdb.audit;
+using mmria.common.SharedLibraries.Case;
 
 namespace mmria.common.SharedLibraries.CaseWorkflowAdmin.DAL;
 
 public sealed class CaseWorkflowAdminDAL
 {
     private readonly CouchDbHttpClient _couchDbHttpClient;
+    private readonly ICaseRepository _caseRepository;
 
-    public CaseWorkflowAdminDAL(CouchDbHttpClient couchDbHttpClient)
+    public CaseWorkflowAdminDAL(CouchDbHttpClient couchDbHttpClient, ICaseRepository caseRepository)
     {
         _couchDbHttpClient = couchDbHttpClient;
+        _caseRepository = caseRepository;
     }
 
     // ── clear_case_status: FindRecord ────────────────────────────────────
 
     public async Task<case_view_response> GetCasesByDateAsync(DBConfigurationDetail dbConfig)
     {
-        var url = dbConfig.Get_Prefix_DB_Url("mmrds/_design/sortable/_view/by_date_last_updated?skip=0&limit=25000&descending=true");
-        var response = await _couchDbHttpClient.ExecuteAsync("GET", url, null, dbConfig.user_name, dbConfig.user_value);
-        return Newtonsoft.Json.JsonConvert.DeserializeObject<case_view_response>(response)
+        var json = await _caseRepository.GetCasesByDateLastUpdatedViewJsonAsync(dbConfig);
+        return Newtonsoft.Json.JsonConvert.DeserializeObject<case_view_response>(json)
             ?? new case_view_response();
     }
 
@@ -29,16 +31,14 @@ public sealed class CaseWorkflowAdminDAL
 
     public async Task<System.Dynamic.ExpandoObject> GetCaseDocumentAsync(DBConfigurationDetail dbConfig, string caseId)
     {
-        var url = dbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}");
-        var response = await _couchDbHttpClient.ExecuteAsync("GET", url, null, dbConfig.user_name, dbConfig.user_value);
-        return Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(response);
+        var json = await _caseRepository.GetCaseDocumentJsonAsync(caseId, dbConfig);
+        return Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(json);
     }
 
     public async Task<document_put_response> UpdateCaseDocumentAsync(DBConfigurationDetail dbConfig, string caseId, string caseJson)
     {
-        var url = dbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}");
-        var response = await _couchDbHttpClient.ExecuteAsync("PUT", url, caseJson, dbConfig.user_name, dbConfig.user_value);
-        return Newtonsoft.Json.JsonConvert.DeserializeObject<document_put_response>(response)
+        var json = await _caseRepository.PutCaseDocumentJsonAsync(caseId, caseJson, dbConfig);
+        return Newtonsoft.Json.JsonConvert.DeserializeObject<document_put_response>(json)
             ?? new document_put_response { ok = false };
     }
 
@@ -71,22 +71,19 @@ public sealed class CaseWorkflowAdminDAL
 
     public async Task<string> GetCaseRevisionsRawAsync(DBConfigurationDetail dbConfig, string caseId)
     {
-        var url = dbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}?revs=true&open_revs=all");
-        return await _couchDbHttpClient.ExecuteAsync("GET", url, null, dbConfig.user_name, dbConfig.user_value);
+        return await _caseRepository.GetCaseRevisionsRawAsync(caseId, dbConfig);
     }
 
     public async Task<System.Dynamic.ExpandoObject> GetCaseAtRevisionAsync(DBConfigurationDetail dbConfig, string caseId, string revision)
     {
-        var url = dbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}?rev={revision}");
-        var response = await _couchDbHttpClient.ExecuteAsync("GET", url, null, dbConfig.user_name, dbConfig.user_value);
-        return Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(response);
+        var json = await _caseRepository.GetCaseAtRevisionAsync(caseId, revision, dbConfig);
+        return Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(json);
     }
 
     public async Task<document_put_response> RestoreCaseDocumentAsync(DBConfigurationDetail dbConfig, string caseId, string caseJson)
     {
-        var url = dbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}");
-        var response = await _couchDbHttpClient.ExecuteAsync("PUT", url, caseJson, dbConfig.user_name, dbConfig.user_value);
-        return Newtonsoft.Json.JsonConvert.DeserializeObject<document_put_response>(response)
+        var json = await _caseRepository.PutCaseDocumentJsonAsync(caseId, caseJson, dbConfig);
+        return Newtonsoft.Json.JsonConvert.DeserializeObject<document_put_response>(json)
             ?? new document_put_response { ok = false };
     }
 
@@ -96,3 +93,4 @@ public sealed class CaseWorkflowAdminDAL
         await _couchDbHttpClient.ExecuteAsync("DELETE", url, null, dbConfig.user_name, dbConfig.user_value);
     }
 }
+

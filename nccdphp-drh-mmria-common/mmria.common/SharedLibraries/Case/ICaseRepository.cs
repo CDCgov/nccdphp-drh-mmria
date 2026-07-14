@@ -14,6 +14,7 @@ public interface ICaseRepository
     Task<string> DeleteCaseAsync(string caseId, string revision, DBConfigurationDetail dbConfig);
     Task<string> GetCaseAtRevisionAsync(string caseId, string revision, DBConfigurationDetail dbConfig);
     Task<string> GetCaseRevisionsAsync(string caseId, DBConfigurationDetail dbConfig);
+    Task<string> GetCaseRevisionsRawAsync(string caseId, DBConfigurationDetail dbConfig);
     Task<string> GetCasesByDateLastUpdatedViewJsonAsync(DBConfigurationDetail dbConfig);
     Task<string> GetCasesByDateCreatedViewJsonAsync(DBConfigurationDetail dbConfig);
     Task<string> GetCasesByJurisdictionIdViewJsonAsync(DBConfigurationDetail dbConfig);

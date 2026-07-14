@@ -104,6 +104,19 @@ public class CaseDAL : ICaseRepository
         );
     }
 
+    public async Task<string> GetCaseRevisionsRawAsync(string caseId, DBConfigurationDetail dbConfig)
+    {
+        string requestUrl = dbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}?revs=true&open_revs=all");
+
+        return await _couchDbHttpClient.ExecuteAsync(
+            "GET",
+            requestUrl,
+            null,
+            dbConfig.user_name,
+            dbConfig.user_value
+        );
+    }
+
     public async Task<string> GetCasesByDateLastUpdatedViewJsonAsync(DBConfigurationDetail dbConfig)
     {
         string requestUrl = dbConfig.Get_Prefix_DB_Url("mmrds/_design/sortable/_view/by_date_last_updated?skip=0&limit=25000&descending=true");
