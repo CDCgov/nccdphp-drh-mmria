@@ -150,5 +150,5 @@ development_status:
   # ── Epic 16: Controller Pattern Remediation ───────────────────────────────
   epic-16: in-progress
   16-1-systemoffline-sharedlibraries-feature: ready-for-dev
-  16-2-caseworkflowadmin-wave9-refactor: backlog
+  16-2-caseworkflowadmin-wave9-refactor: ready-for-dev
   epic-16-retrospective: optional

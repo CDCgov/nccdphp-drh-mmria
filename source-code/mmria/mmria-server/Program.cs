@@ -325,6 +325,8 @@ public sealed partial class Program
             builder.Services.AddScoped<mmria.common.SharedLibraries.CaseValidation.Manager.CaseValidationManager>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.SystemOffline.DAL.SystemOfflineDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.SystemOffline.Manager.SystemOfflineManager>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.CaseWorkflowAdmin.DAL.CaseWorkflowAdminDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.CaseWorkflowAdmin.Manager.CaseWorkflowAdminManager>();
 
             //var hosted_service_prefix = new HostedServicePrefix(host_prefix);
 
