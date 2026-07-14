@@ -198,6 +198,7 @@ public sealed class Report_PowerBI_Index_Struct
 
             query_parameters.Add($"limit={requested_row_count}");
 
+            // Out of scope per Epic 17 — infrastructure/CDC sync
             string url = this.couchdb_url + $"/{this.prefix}mmrds/_all_docs?{string.Join("&", query_parameters)}";
             string response = await _couchDbHttpClient.ExecuteAsync("GET", url, null, this.user_name, this.user_value);
 
@@ -261,6 +262,7 @@ public sealed class Report_PowerBI_Index_Struct
 
     private async Task<int> get_total_case_document_count_async()
     {
+        // Out of scope per Epic 17 — infrastructure/CDC sync
         string total_rows_url = this.couchdb_url + $"/{this.prefix}mmrds/_all_docs?limit=0";
         string total_rows_response = await _couchDbHttpClient.ExecuteAsync("GET", total_rows_url, null, this.user_name, this.user_value);
 
@@ -274,6 +276,7 @@ public sealed class Report_PowerBI_Index_Struct
 
         string design_start_key = Uri.EscapeDataString("\"_design/\"");
         string design_end_key = Uri.EscapeDataString("\"_design0\"");
+        // Out of scope per Epic 17 — infrastructure/CDC sync
         string design_rows_url = this.couchdb_url + $"/{this.prefix}mmrds/_all_docs?include_docs=false&startkey={design_start_key}&endkey={design_end_key}";
         string design_rows_response = await _couchDbHttpClient.ExecuteAsync("GET", design_rows_url, null, this.user_name, this.user_value);
 

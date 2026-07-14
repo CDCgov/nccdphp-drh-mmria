@@ -470,6 +470,73 @@ dev this story _bmad-output/implementation-artifacts/15-1-tenant-database-counts
 
 ---
 
+## Epic 17 — mmrds CRUD Consolidation (SQL Migration Foundation) _(2026-07-14)_
+
+| Story | File | Status |
+|-------|------|--------|
+| 17.1 — mmrds Operation Catalog | [17-1-mmrds-operation-catalog.md](17-1-mmrds-operation-catalog.md) | done |
+| 17.2 — Canonicalize CaseDAL and Extract ICaseRepository | [17-2-icase-repository-casedal-canonicalize.md](17-2-icase-repository-casedal-canonicalize.md) | done |
+| 17.3 — Route CaseManager Direct mmrds Calls Through CaseDAL | [17-3-casemanager-direct-calls.md](17-3-casemanager-direct-calls.md) | done |
+| 17.4 — Eliminate Duplicate mmrds CRUD in CaseWorkflowAdminDAL | [17-4-caseworkflowadmindal-duplicates.md](17-4-caseworkflowadmindal-duplicates.md) | done |
+| 17.5 — Eliminate Duplicate mmrds Calls in AuditRecoveryDAL, CVSDAL, VitalImportDAL, AttachmentDAL | [17-5-auditrecovery-cvs-vitalimport-attachment.md](17-5-auditrecovery-cvs-vitalimport-attachment.md) | done |
+| 17.5b — Route mmria.services Case Reads Through ICaseRepository | [17-5b-mmria-services-case-reads.md](17-5b-mmria-services-case-reads.md) | done |
+| 17.6 — Eliminate Direct mmrds Calls in OfflineCaseManager | [17-6-offlinecasemanager-direct-calls.md](17-6-offlinecasemanager-direct-calls.md) | done |
+| 17.7 — MMRIAServicesDAL and Sync Boundary Decision | [17-7-mmriaservicesdal-sync-boundary-decision.md](17-7-mmriaservicesdal-sync-boundary-decision.md) | done |
+
+**Sequencing:** 17.1 and 17.7 can run in parallel (both are discovery/documentation). 17.2 depends on 17.1. Stories 17.3, 17.4, 17.5, 17.5b, and 17.6 all depend on 17.2 and can be run in parallel once 17.2 is complete.
+
+> ℹ️ Goal: all case-document reads and writes against `{prefix}mmrds` are consolidated behind `ICaseRepository` / `CaseDAL`. After this epic, a SQL migration requires changing `CaseDAL` only — no Manager, controller, or services actor code changes are required.
+
+**Story 17.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/17-1-mmrds-operation-catalog.md
+```
+
+**Story 17.2 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/17-2-icase-repository-casedal-canonicalize.md
+```
+
+**Story 17.3 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/17-3-casemanager-direct-calls.md
+```
+
+**Story 17.4 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/17-4-caseworkflowadmindal-duplicates.md
+```
+
+**Story 17.5 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/17-5-auditrecovery-cvs-vitalimport-attachment.md
+```
+
+**Story 17.5b prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/17-5b-mmria-services-case-reads.md
+```
+
+**Story 17.6 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/17-6-offlinecasemanager-direct-calls.md
+```
+
+**Story 17.7 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/17-7-mmriaservicesdal-sync-boundary-decision.md
+```
+
+---
+
 ## Open Items — Resolve Before Affected Story
 
 | OI       | Affects               | What to resolve                                                                                                                                                                                                                                                                                                                                                                                        |

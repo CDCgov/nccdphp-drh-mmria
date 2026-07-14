@@ -5,6 +5,8 @@ using System.Net.Http.Headers;
 using System.Linq;
 using Microsoft.Extensions.Configuration;
 using mmria.common.getset;
+using mmria.common.SharedLibraries.Case;
+using mmria.common.SharedLibraries.Case.DAL;
 using mmria.services.Models;
 
 
@@ -55,6 +57,7 @@ public sealed class mmrds_exporter
 
     private ScheduleInfoMessage Configuration;
     private mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private ICaseRepository _caseRepository;
 
     public mmrds_exporter
     (
@@ -64,6 +67,7 @@ public sealed class mmrds_exporter
     {
         this.Configuration = configuration;
         _couchDbHttpClient = couchDbHttpClient;
+        _caseRepository = new CaseDAL(_couchDbHttpClient);
 
         db_config = new()
         {
@@ -266,7 +270,7 @@ public sealed class mmrds_exporter
                 yield break;
             }
 
-            await foreach (var caseId in PagedCaseIdLoader.GetCaseIdsAsync(db_config, _couchDbHttpClient))
+            await foreach (var caseId in PagedCaseIdLoader.GetCaseIdsAsync(db_config, _caseRepository))
             {
                 yield return caseId;
             }
@@ -274,8 +278,7 @@ public sealed class mmrds_exporter
 
         await foreach(string case_id in get_case_ids_to_process())
         {
-            string URL = $"{db_config.url}/{db_config.prefix}mmrds/{case_id}";
-            System.Dynamic.ExpandoObject case_row = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(await _couchDbHttpClient.ExecuteAsync("GET", URL, null, this.user_name, this.value_string));
+            System.Dynamic.ExpandoObject case_row = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(await _caseRepository.GetCaseDocumentJsonAsync(case_id, db_config));
 
             IDictionary<string, object> case_doc = case_row as IDictionary<string, object>;
 

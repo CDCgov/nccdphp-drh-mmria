@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using mmria.common.getset;
+using mmria.common.SharedLibraries.Case;
+using mmria.common.SharedLibraries.Case.DAL;
 using mmria.services.Models;
 
 namespace mmria.services.Utilities.Exporter;
@@ -61,11 +63,13 @@ private ScheduleInfoMessage Configuration;
 
 mmria.common.couchdb.DBConfigurationDetail db_config;
 private mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+private ICaseRepository _caseRepository;
 
 public exporter(ScheduleInfoMessage configuration, mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
 {
     this.Configuration = configuration;
     _couchDbHttpClient = couchDbHttpClient;
+    _caseRepository = new CaseDAL(_couchDbHttpClient);
 
     db_config = new()
     {
@@ -150,12 +154,6 @@ public async System.Threading.Tasks.Task<bool> Execute(export_queue_item queue_i
     this.qualitativeStreamWriter[2] = new System.IO.StreamWriter(System.IO.Path.Combine(export_directory, "informant-interview.txt"), true);
 
 
-/*
-    string URL = this.database_url + $"/{db_config.prefix}mmrds/_all_docs";
-    string urlParameters = "?include_docs=true";
-    cURL document_curl = new cURL("GET", null, URL + urlParameters, null, this.user_name, this.value_string);
-    object all_cases = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(document_curl.execute());
-*/
     string metadata_url = this.database_url + $"/metadata/version_specification-{this.Configuration.version_number}/metadata";
     mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, this.user_name, this.value_string));
     this.current_metadata = metadata;
@@ -404,7 +402,7 @@ if(multiform_field_list.Count > 0)
             yield break;
         }
 
-        await foreach (var caseId in PagedCaseIdLoader.GetCaseIdsAsync(db_config, _couchDbHttpClient))
+        await foreach (var caseId in PagedCaseIdLoader.GetCaseIdsAsync(db_config, _caseRepository))
         {
             yield return caseId;
         }
@@ -533,9 +531,7 @@ if(multiform_field_list.Count > 0)
 
     await foreach(string case_id in get_case_ids_to_process())
     {
-        string URL = $"{this.database_url}/{db_config.prefix}mmrds/{case_id}";
-
-        System.Dynamic.ExpandoObject case_row = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(await _couchDbHttpClient.ExecuteAsync("GET", URL, null, this.user_name, this.value_string));
+        System.Dynamic.ExpandoObject case_row = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(await _caseRepository.GetCaseDocumentJsonAsync(case_id, db_config));
 
         IDictionary<string, object> case_doc = case_row as IDictionary<string, object>;
 

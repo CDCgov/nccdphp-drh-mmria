@@ -5,6 +5,8 @@ using System.Net.Http.Headers;
 using System.Linq;
 using Microsoft.Extensions.Configuration;
 using mmria.common.getset;
+using mmria.common.SharedLibraries.Case;
+using mmria.common.SharedLibraries.Case.DAL;
 using mmria.services.Models;
 
 namespace mmria.services.Utilities.CoreElementExport;
@@ -47,11 +49,13 @@ public sealed class core_element_exporter
 
     mmria.common.couchdb.DBConfigurationDetail db_config;
     private mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private ICaseRepository _caseRepository;
     
     public core_element_exporter(ScheduleInfoMessage configuration, mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
         this.Configuration = configuration;
         _couchDbHttpClient = couchDbHttpClient;
+        _caseRepository = new CaseDAL(_couchDbHttpClient);
 
         db_config = new()
         {
@@ -234,7 +238,7 @@ public async System.Threading.Tasks.Task Execute(export_queue_item queue_item)
             yield break;
         }
 
-        await foreach (var caseId in PagedCaseIdLoader.GetCaseIdsAsync(db_config, _couchDbHttpClient))
+        await foreach (var caseId in PagedCaseIdLoader.GetCaseIdsAsync(db_config, _caseRepository))
         {
             yield return caseId;
         }
@@ -243,8 +247,7 @@ public async System.Threading.Tasks.Task Execute(export_queue_item queue_item)
     await foreach(string case_id in get_case_ids_to_process())
     {
 
-        string URL = $"{db_config.url}/{db_config.prefix}mmrds/{case_id}";
-        System.Dynamic.ExpandoObject case_row = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(await _couchDbHttpClient.ExecuteAsync("GET", URL, null, this.user_name, this.value_string));
+        System.Dynamic.ExpandoObject case_row = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(await _caseRepository.GetCaseDocumentJsonAsync(case_id, db_config));
 
         IDictionary<string, object> case_doc;
 

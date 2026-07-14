@@ -73,7 +73,7 @@ public sealed class update_year_of_deathController : Controller
       var isCdcAdmin = AuthorizedWorkflowScopeHelper.IsCdcAdmin(User);
       var effectiveRole = isCdcAdmin ? "cdc_admin" : "jurisdiction_admin";
       var effectiveStateDatabase = AuthorizedWorkflowScopeHelper.ResolveAuthorizedStateDatabase(User, Model.StateDatabase, host_prefix, _dbConfigSet);
-      var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient);
+      var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient, new mmria.common.SharedLibraries.Case.DAL.CaseDAL(_couchDbHttpClient));
 
       var items = await caseManager.FindYearOfDeathRecordsAsync(
       Model.RecordId,
@@ -142,7 +142,7 @@ public sealed class update_year_of_deathController : Controller
 
     try
     {
-      var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient);
+      var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient, new mmria.common.SharedLibraries.Case.DAL.CaseDAL(_couchDbHttpClient));
       model.RecordIdReplacement = await caseManager.GetRecordIdReplacementForYearOfDeathAsync(
         effectiveRole,
         effectiveStateDatabase,
@@ -185,7 +185,7 @@ public sealed class update_year_of_deathController : Controller
     model.StateDatabase = effectiveStateDatabase;
     try
     {
-      var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient);
+      var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient, new mmria.common.SharedLibraries.Case.DAL.CaseDAL(_couchDbHttpClient));
 
       // Best-effort: tab id is generated client-side per browser tab and posted
       // with the confirmation form. Used to enforce same-user/different-tab locks.
