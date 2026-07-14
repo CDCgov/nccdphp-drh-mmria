@@ -2,7 +2,7 @@
 
 **Epic:** 16 — Controller Pattern Remediation
 **Story ID:** 16.1
-**Status:** ready-for-dev
+**Status:** done
 **Date added:** 2026-07-14
 **Depends on:** none
 **Source requirements:** project-context.md §2.2; controller_sharedlibraries_migration_matrix.md Wave 9
@@ -440,10 +440,20 @@ Expected: exit code 0, no errors.
 
 ### Agent Model Used
 
-Claude Sonnet 4.5 (Winston — bmad-agent-architect)
+Claude Sonnet 4.6 (GitHub Copilot — bmad-agent-architect mode)
 
 ### Debug Log References
 
 ### Completion Notes List
 
+- Story spec assumed no references to `SystemOfflineMessageFormatter` outside `system_offlineController.cs`. `AccountController.cs` also called the static class (lines 112, 136) — injected `SystemOfflineManager` there as well and replaced static calls. This was the minimal scope expansion needed to satisfy AC-2 (file deleted) without breaking the build.
+- Debug DLL lock prevented `dotnet build` in Debug config (server was running under debug adapter); confirmed clean compile via Release config build (`Build succeeded`).
+
 ### File List
+
+- `nccdphp-drh-mmria-common/mmria.common/SharedLibraries/SystemOffline/DAL/SystemOfflineDAL.cs` — CREATED
+- `nccdphp-drh-mmria-common/mmria.common/SharedLibraries/SystemOffline/Manager/SystemOfflineManager.cs` — CREATED
+- `source-code/mmria/mmria-server/Controllers/system_offlineController.cs` — UPDATED
+- `source-code/mmria/mmria-server/Controllers/AccountController.cs` — UPDATED (inject SystemOfflineManager; replace two static Substitute calls)
+- `source-code/mmria/mmria-server/Program.cs` — UPDATED (added two AddScoped lines)
+- `source-code/mmria/mmria-server/util/SystemOfflineMessageFormatter.cs` — DELETED

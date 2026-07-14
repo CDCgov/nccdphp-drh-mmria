@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using mmria.common.SharedLibraries.SystemOffline.Manager;
 using mmria.server.util;
 
 namespace mmria.server.Controllers;
@@ -14,15 +15,15 @@ public sealed class system_offlineController : Controller
     private readonly mmria.common.couchdb.ConfigurationSet ConfigDB;
     private readonly mmria.common.couchdb.OverridableConfiguration configuration;
     private readonly string host_prefix;
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly SystemOfflineManager _manager;
 
     public system_offlineController(
         IHttpContextAccessor httpContextAccessor,
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+        SystemOfflineManager manager)
     {
         ConfigDB = tenantRuntime.RequireConfigurationSet();
-        _couchDbHttpClient = couchDbHttpClient;
+        _manager = manager;
         host_prefix = tenantRuntime.EffectiveHostPrefix;
         configuration = tenantRuntime.RequireConfiguration();
     }
@@ -79,25 +80,12 @@ public sealed class system_offlineController : Controller
                 auto_logout_minutes = request?.auto_logout_minutes ?? 5
             };
 
-            var servicesBaseUrl = GetServicesBaseUrl();
-            var postUrl = $"{servicesBaseUrl}/api/systemOffline/SaveSystemOfflineConfig";
-
-            var settings = new Newtonsoft.Json.JsonSerializerSettings
-            {
-                NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore
-            };
-            var json = Newtonsoft.Json.JsonConvert.SerializeObject(sanitized, settings);
-
             var requestOptions = new mmria.common.getset.CouchDbRequestOptions
             {
                 VitalServiceKey = ConfigDB.name_value["vital_service_key"]
             };
 
-            var responseBody = await _couchDbHttpClient.ExecuteAsync(
-                "POST", postUrl, json, "application/json", requestOptions);
-
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseBody)
-                ?? result;
+            result = await _manager.SaveConfigAsync(sanitized, GetServicesBaseUrl(), requestOptions);
         }
         catch (Exception ex)
         {
@@ -138,39 +126,28 @@ public sealed class system_offlineController : Controller
             config.warn_date,
             config.offline_date,
             config.auto_logout_minutes,
-            warn_message             = mmria.server.util.SystemOfflineMessageFormatter.Substitute(config.warn_message,            config.warn_date, config.offline_date, config.restoration_hours),
-            offline_modal_message    = mmria.server.util.SystemOfflineMessageFormatter.Substitute(config.offline_modal_message, config.warn_date, config.offline_date, config.restoration_hours),
-            offline_page_message     = mmria.server.util.SystemOfflineMessageFormatter.Substitute(config.offline_page_message,  config.warn_date, config.offline_date, config.restoration_hours)
+            warn_message          = _manager.SubstituteMessage(config.warn_message,          config.warn_date, config.offline_date, config.restoration_hours),
+            offline_modal_message = _manager.SubstituteMessage(config.offline_modal_message, config.warn_date, config.offline_date, config.restoration_hours),
+            offline_page_message  = _manager.SubstituteMessage(config.offline_page_message,  config.warn_date, config.offline_date, config.restoration_hours)
         };
         return EscapedJsonResultFactory.Create(status);
     }
 
     private async Task<mmria.common.metadata.SystemOfflineConfig> LoadConfigFromServicesAsync()
     {
-        var result = new mmria.common.metadata.SystemOfflineConfig();
-
         try
         {
-            var servicesBaseUrl = GetServicesBaseUrl();
-            var getUrl = $"{servicesBaseUrl}/api/systemOffline/GetSystemOfflineConfig";
-
             var requestOptions = new mmria.common.getset.CouchDbRequestOptions
             {
                 VitalServiceKey = ConfigDB.name_value["vital_service_key"]
             };
-
-            var responseBody = await _couchDbHttpClient.ExecuteAsync(
-                "GET", getUrl, null, "application/json", requestOptions);
-
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.SystemOfflineConfig>(responseBody)
-                ?? new mmria.common.metadata.SystemOfflineConfig();
+            return await _manager.LoadConfigAsync(GetServicesBaseUrl(), requestOptions);
         }
         catch (Exception ex)
         {
             Console.WriteLine($"system_offlineController.LoadConfigFromServicesAsync error: {ex}");
+            return new mmria.common.metadata.SystemOfflineConfig();
         }
-
-        return result;
     }
 
     private string GetServicesBaseUrl()
