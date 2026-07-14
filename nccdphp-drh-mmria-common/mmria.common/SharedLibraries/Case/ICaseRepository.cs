@@ -21,4 +21,6 @@ public interface ICaseRepository
     Task<string> GetCasesByPmssNumberViewJsonAsync(DBConfigurationDetail dbConfig);
     Task<string> GetCaseRecordIdListViewJsonAsync(DBConfigurationDetail dbConfig);
     Task<string> GetSoftLockedCaseIdForUserInAnotherTabAsync(string userName, string currentTabId, DBConfigurationDetail dbConfig);
+    Task<bool> RecordIdExistsAsync(string recordId, DBConfigurationDetail dbInfo);
+    Task<(int StatusCode, string Body)> GetCaseDocumentWithStatusAsync(string caseId, DBConfigurationDetail dbConfig);
 }

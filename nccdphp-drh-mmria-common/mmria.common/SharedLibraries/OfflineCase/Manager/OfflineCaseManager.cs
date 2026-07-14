@@ -660,7 +660,7 @@ public class OfflineCaseManager : IOfflineCaseManager
             note = $"Offline sync: Document modified offline and synced from session {request.OfflineSessionId}"
         };
 
-        var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient);
+        var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient, _caseDal);
         var saveResult = await caseManager.SaveCaseAsync(
             modifiedDocument,
             changeStack,
