@@ -2,7 +2,7 @@
 
 **Epic:** 14 — HTTP Client Modernization (Replication)
 **Story ID:** 14.1
-**Status:** not-started
+**Status:** done
 **Date added:** 2026-07-08
 **PRD ref:** FR-16
 

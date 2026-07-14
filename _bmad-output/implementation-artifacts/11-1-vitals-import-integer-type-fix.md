@@ -2,7 +2,7 @@
 
 **Epic:** 11 — Vitals Import Integer Type Fix
 **Story ID:** 11.1
-**Status:** verification
+**Status:** done
 **Date added:** 2026-07-07
 
 ---

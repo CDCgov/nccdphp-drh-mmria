@@ -4,7 +4,7 @@ baseline_commit: 1ebbb6482c05fbb7a9f2aacf61e1e30cf98174fe
 
 # Story 2.2: On-Blur Vitals Validation and Invalid Entry Modal
 
-Status: review
+Status: done
 
 ## Story
 

@@ -18,6 +18,7 @@ using mmria.common.SharedLibraries.Account.Manager;
 using mmria.common.SharedLibraries.Account.Model;
 using mmria.common.SharedLibraries.Session.Model;
 using mmria.common.SharedLibraries.Session.Manager;
+using mmria.common.SharedLibraries.SystemOffline.Manager;
 //https://github.com/blowdart/AspNetAuthorizationWorkshop
 //https://digitalmccullough.com/posts/aspnetcore-auth-system-demystified.html
 //https://gitlab.com/free-time-programmer/tutorials/demystify-aspnetcore-auth/tree/master
@@ -38,6 +39,7 @@ public sealed partial class AccountController : Controller
     mmria.common.couchdb.DBConfigurationDetail db_config;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly AccountManager _accountManager;
+    private readonly SystemOfflineManager _systemOfflineManager;
 
     string host_prefix = null;
     bool? use_sams = null;
@@ -48,7 +50,8 @@ public AccountController
     mmria.common.SharedLibraries.Session.Manager.SessionManager sessionManager,
     mmria.server.util.RequestTenantRuntime tenantRuntime,
     mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
-    AccountManager accountManager
+    AccountManager accountManager,
+    SystemOfflineManager systemOfflineManager
 )
 {
     _accessor = httpContextAccessor;
@@ -57,6 +60,7 @@ public AccountController
     db_config = tenantRuntime.RequireDbConfig();
     _couchDbHttpClient = couchDbHttpClient;
     _accountManager = accountManager;
+    _systemOfflineManager = systemOfflineManager;
 
     host_prefix = tenantRuntime.EffectiveHostPrefix;
 
@@ -109,7 +113,7 @@ public AccountController
         var offlineConfig = await LoadSystemOfflineConfigAsync();
         var offlineForThisTenant = IsJurisdictionAffected(offlineConfig, host_prefix) && IsSystemOffline(offlineConfig.offline_date);
         ViewData["IsOffline"] = offlineForThisTenant;
-        ViewData["OfflinePageMessage"] = mmria.server.util.SystemOfflineMessageFormatter.Substitute(
+        ViewData["OfflinePageMessage"] = _systemOfflineManager.SubstituteMessage(
             offlineConfig.offline_page_message, offlineConfig.warn_date, offlineConfig.offline_date, offlineConfig.restoration_hours);
 
         return View();
@@ -133,7 +137,7 @@ public AccountController
         if (IsJurisdictionAffected(postOfflineConfig, host_prefix) && IsSystemOffline(postOfflineConfig.offline_date))
         {
             ViewData["IsOffline"] = true;
-            ViewData["OfflinePageMessage"] = mmria.server.util.SystemOfflineMessageFormatter.Substitute(
+            ViewData["OfflinePageMessage"] = _systemOfflineManager.SubstituteMessage(
                 postOfflineConfig.offline_page_message, postOfflineConfig.warn_date, postOfflineConfig.offline_date, postOfflineConfig.restoration_hours);
             return View();
         }

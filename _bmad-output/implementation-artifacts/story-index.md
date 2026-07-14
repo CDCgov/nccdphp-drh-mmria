@@ -8,10 +8,10 @@ Start a new chat thread for each story. Use the prompt shown to invoke the dev a
 
 | Story                                               | File                                                  | Status        |
 | --------------------------------------------------- | ----------------------------------------------------- | ------------- |
-| 1.1 Fix Save-Path HTML Stripping                    | `1-1-fix-save-path-html-stripping.md`                 | verification  |
-| 1.2 Fix Paste Handler Cursor Integrity              | `1-2-fix-paste-handler-cursor-integrity.md`           | verification  |
-| 1.3 Update Case Narrative Instruction Text          | `1-3-update-case-narrative-instruction-text.md`       | verification  |
-| 1.4 Update Case Narrative Guidelines Panel          | `1-4-update-case-narrative-guidelines-panel.md`       | ready-for-dev |
+| 1.1 Fix Save-Path HTML Stripping                    | `1-1-fix-save-path-html-stripping.md`                 | done          |
+| 1.2 Fix Paste Handler Cursor Integrity              | `1-2-fix-paste-handler-cursor-integrity.md`           | done          |
+| 1.3 Update Case Narrative Instruction Text          | `1-3-update-case-narrative-instruction-text.md`       | done          |
+| 1.4 Update Case Narrative Guidelines Panel          | `1-4-update-case-narrative-guidelines-panel.md`       | done          |
 
 **Story 1.1 prompt:**
 
@@ -43,12 +43,12 @@ dev this story _bmad-output/implementation-artifacts/1-4-update-case-narrative-g
 
 | Story                                                                  | File                                                    | Status       |
 | ---------------------------------------------------------------------- | ------------------------------------------------------- | ------------ |
-| 2.1 Add Vitals Range Config — CouchDB and Server Loading               | `2-1-vitals-range-config-couchdb-and-server-loading.md` | verification |
-| 2.2 On-Blur Vitals Validation and Invalid Entry Modal                  | `2-2-on-blur-vitals-validation-and-modal.md`            | verification |
-| 2.3 Display-Time Exclusion — Print, PDF, Date Fix                      | `2-3-display-time-exclusion-print-pdf-date-fix.md`      | verification |
-| 2.4 Display-Time Exclusion — Graph and Table Views                     | `2-4-display-time-exclusion-graph-and-table.md`         | verification |
-| 2.5 Historical Data Detection and Record Indicators                    | `2-5-historical-data-detection-and-indicators.md`       | verification |
-| 2.6 Vitals Validation Bug Fixes — Data Retention and Prenatal Coverage | `2-6-vitals-validation-bug-fixes.md`                    | draft        |
+| 2.1 Add Vitals Range Config — CouchDB and Server Loading               | `2-1-vitals-range-config-couchdb-and-server-loading.md` | done         |
+| 2.2 On-Blur Vitals Validation and Invalid Entry Modal                  | `2-2-on-blur-vitals-validation-and-modal.md`            | done         |
+| 2.3 Display-Time Exclusion — Print, PDF, Date Fix                      | `2-3-display-time-exclusion-print-pdf-date-fix.md`      | done         |
+| 2.4 Display-Time Exclusion — Graph and Table Views                     | `2-4-display-time-exclusion-graph-and-table.md`         | done         |
+| 2.5 Historical Data Detection and Record Indicators                    | `2-5-historical-data-detection-and-indicators.md`       | done         |
+| 2.6 Vitals Validation Bug Fixes — Data Retention and Prenatal Coverage | `2-6-vitals-validation-bug-fixes.md`                    | done         |
 
 > ⚠️ **Epic 2 sequencing:** Story 2.1 must be completed before 2.2–2.5. Stories 2.2–2.5 can be worked in any order after 2.1. Story 2.6 depends on 2.2 and 2.4 being complete.
 
@@ -94,9 +94,9 @@ dev this story _bmad-output/implementation-artifacts/2-6-vitals-validation-bug-f
 
 | Story                                      | File                                       | Status       |
 | ------------------------------------------ | ------------------------------------------ | ------------ |
-| 3.1 Config-Driven OMB Expiration Date      | `3-1-config-driven-omb-expiration-date.md` | verification |
-| 3.2 Config-Driven MMRIA Version Number     | `3-2-config-driven-mmria-version.md`       | verification |
-| 3.3 Remove Core Elements Only Print Option | `3-3-remove-core-elements-print-option.md` | verification |
+| 3.1 Config-Driven OMB Expiration Date      | `3-1-config-driven-omb-expiration-date.md` | done         |
+| 3.2 Config-Driven MMRIA Version Number     | `3-2-config-driven-mmria-version.md`       | done         |
+| 3.3 Remove Core Elements Only Print Option | `3-3-remove-core-elements-print-option.md` | done         |
 
 > ℹ️ Stories 3.1, 3.2, and 3.3 are independent — any order.
 > ℹ️ Both 3.1 and 3.2 touch the same CouchDB config document in `database-scripts/`. If worked simultaneously, coordinate on that file.
@@ -125,10 +125,10 @@ dev this story _bmad-output/implementation-artifacts/3-3-remove-core-elements-pr
 
 | Story                                                             | File                                    | Status      |
 | ----------------------------------------------------------------- | --------------------------------------- | ----------- |
-| 4.0 Validation Engine Foundation — Port, Seed, Replace Callsites  | `4-0-validation-engine-foundation.md`   | not-started |
-| 4.1 Remove Prior FR-2.6 Behavior + Print/View/PDF Validation Gate | `4-1-print-view-pdf-validation-gate.md` | not-started |
-| 4.2 Print/PDF Out-of-Range Comment Appending                      | `4-2-print-pdf-comment-appending.md`    | not-started |
-| 4.3 OMB Block Right-Alignment — Home Page                         | `4-3-omb-block-right-alignment.md`      | not-started |
+| 4.0 Validation Engine Foundation — Port, Seed, Replace Callsites  | `4-0-validation-engine-foundation.md`   | done        |
+| 4.1 Remove Prior FR-2.6 Behavior + Print/View/PDF Validation Gate | `4-1-print-view-pdf-validation-gate.md` | done        |
+| 4.2 Print/PDF Out-of-Range Comment Appending                      | `4-2-print-pdf-comment-appending.md`    | done        |
+| 4.3 OMB Block Right-Alignment — Home Page                         | `4-3-omb-block-right-alignment.md`      | done        |
 
 > ⚠️ **Epic 4 sequencing:** Story 4.0 must be completed before 4.1 and 5.1. Story 2.5 must be verified before 4.1 ships (4.1 removes the behavior 2.5 implemented). Stories 4.2 and 4.3 are independent.
 
@@ -162,7 +162,7 @@ create story 4.3: Right-align the OMB block on the Home page per FR-3.4 in _bmad
 
 | Story                                                         | File                             | Status      |
 | ------------------------------------------------------------- | -------------------------------- | ----------- |
-| 5.1 Validation Errors Panel — Button, Modal, Field Navigation | `5-1-validation-errors-panel.md` | not-started |
+| 5.1 Validation Errors Panel — Button, Modal, Field Navigation | `5-1-validation-errors-panel.md` | done        |
 
 > ℹ️ **Story 5.1 — OI-PRD-4 resolved. Hold lifted. Depends on Story 4.0.** The validation architecture is finalized: dedicated version-scoped `case-validation-rules` CouchDB document; `severity: hard` for active-input blur validation; `severity: warning` for historical data surfaced at case load time. Engine and `window.mmria_validation_rules` are wired in Story 4.0 — this story builds the case-worker–facing panel on top. See FR-6 in the PRD for full panel spec including error/warning bifurcation and stored-value message format.
 
@@ -178,7 +178,7 @@ create story 5.1: Implement the Validation Errors panel — button visibility (e
 
 | Story                                                                  | File                                          | Status |
 | ---------------------------------------------------------------------- | --------------------------------------------- | ------ |
-| 6.1 Decouple Validation Rules Generation from Metadata Auto-Generation | `6-1-decouple-validation-rules-generation.md` | draft  |
+| 6.1 Decouple Validation Rules Generation from Metadata Auto-Generation | `6-1-decouple-validation-rules-generation.md` | done   |
 | 6.2 Port Case Validation Admin UI from Branch                          | `6-2-port-case-validation-admin-ui.md`        | done   |
 | 6.3 Add/Edit Rule Modal with Cascading Metadata Dropdowns              | `6-3-add-edit-rule-modal.md`                  | done   |
 
@@ -208,8 +208,8 @@ dev this story _bmad-output/implementation-artifacts/6-3-add-edit-rule-modal.md
 
 | Story                                             | File                                             | Status       |
 | ------------------------------------------------- | ------------------------------------------------ | ------------ |
-| 7.1 Audit Logging — Year of Death and Maiden Name | `7-1-audit-logging-year-of-death-maiden-name.md` | verification |
-| 7.2 Audit Logging — Case Lifecycle Actions        | `7-2-audit-logging-case-lifecycle-actions.md`    | verification |
+| 7.1 Audit Logging — Year of Death and Maiden Name | `7-1-audit-logging-year-of-death-maiden-name.md` | done         |
+| 7.2 Audit Logging — Case Lifecycle Actions        | `7-2-audit-logging-case-lifecycle-actions.md`    | done         |
 
 > ℹ️ Stories 7.1 and 7.2 are independent — can be worked in any order.
 
@@ -231,10 +231,10 @@ dev this story _bmad-output/implementation-artifacts/7-2-audit-logging-case-life
 
 | Story                                                                        | File                                               | Status       |
 | ---------------------------------------------------------------------------- | -------------------------------------------------- | ------------ |
-| 8.1 System Offline Config — Document, mmria-services, Controller, Admin Page | `8-1-system-offline-config-services-admin-page.md` | not-started  |
-| 8.2 Login Page Offline State                                                 | `8-2-login-page-offline-state.md`                  | verification |
-| 8.3 Warning and Going Offline Modals                                         | `8-3-warning-and-offline-modals.md`                | not-started  |
-| 8.4 Periodic Offline Status Check                                            | `8-4-periodic-status-check.md`                     | not-started  |
+| 8.1 System Offline Config — Document, mmria-services, Controller, Admin Page | `8-1-system-offline-config-services-admin-page.md` | done         |
+| 8.2 Login Page Offline State                                                 | `8-2-login-page-offline-state.md`                  | done         |
+| 8.3 Warning and Going Offline Modals                                         | `8-3-warning-and-offline-modals.md`                | done         |
+| 8.4 Periodic Offline Status Check                                            | `8-4-periodic-status-check.md`                     | done         |
 
 > ⚠️ **Epic 8 sequencing:** Story 8.1 must be completed before 8.2, 8.3, and 8.4. Stories 8.2, 8.3, and 8.4 can be worked in any order after 8.1. Story 8.4 depends on Story 8.3 (`system-offline-check.js` module and modal handlers must exist first).
 
@@ -271,7 +271,7 @@ dev this story _bmad-output/implementation-artifacts/8-4-periodic-status-check.m
 | Story                                                   | File                                             | Status        |
 | ------------------------------------------------------- | ------------------------------------------------ | ------------- |
 | 9.1 Fix Data Summary Checks Field Filter for ALL Toggle | `9-1-fix-data-summary-checks-field-filter.md`    | done          |
-| 9.2 Fix Manage Users Export Ignores Active Filter       | `9-2-fix-manage-users-export-respects-filter.md` | ready-for-dev |
+| 9.2 Fix Manage Users Export Ignores Active Filter       | `9-2-fix-manage-users-export-respects-filter.md` | done          |
 | 9.3 Fix Manage Users Role Filter False-Positive Match   | `9-3-fix-manage-users-role-filter-endswith.md`   | done          |
 
 **Story 9.1 prompt:**
@@ -299,9 +299,9 @@ dev this story _bmad-output/implementation-artifacts/9-3-fix-manage-users-role-f
 | Story                                                  | File                                               | Status |
 | ------------------------------------------------------ | -------------------------------------------------- | ------ |
 | 10.1 Fix BatchSupervisor Busy-Wait CPU Spin            | `10-1-fix-cvs-batch-supervisor-busy-wait.md`       | done   |
-| 10.2 Server-Side CVS Error Hardening                   | `10-2-server-side-cvs-error-hardening.md`          | review |
-| 10.3 Client-Side CVS Retry Mechanism with Countdown    | `10-3-client-side-cvs-retry-mechanism.md`          | review |
-| 10.4 CVS Parent-Page Button State via BroadcastChannel | `10-4-cvs-parent-page-broadcast-channel-status.md` | review |
+| 10.2 Server-Side CVS Error Hardening                   | `10-2-server-side-cvs-error-hardening.md`          | done   |
+| 10.3 Client-Side CVS Retry Mechanism with Countdown    | `10-3-client-side-cvs-retry-mechanism.md`          | done   |
+| 10.4 CVS Parent-Page Button State via BroadcastChannel | `10-4-cvs-parent-page-broadcast-channel-status.md` | done   |
 | 10.5 Config-Driven CVS Retry Constants                 | `10-5-config-driven-cvs-retry-constants.md`        | done   |
 
 > ℹ️ Stories 10.1 and 10.2 are independent of each other and of 10.3/10.4.
@@ -344,7 +344,7 @@ dev this story _bmad-output/implementation-artifacts/10-5-config-driven-cvs-retr
 
 | Story | File | Status |
 |-------|------|--------|
-| 11.1 — Vitals Import: Store Integer-Coded Fields as JSON Numbers | [11-1-vitals-import-integer-type-fix.md](11-1-vitals-import-integer-type-fix.md) | verification |
+| 11.1 — Vitals Import: Store Integer-Coded Fields as JSON Numbers | [11-1-vitals-import-integer-type-fix.md](11-1-vitals-import-integer-type-fix.md) | done         |
 
 **Sequencing:** Independent — can be worked immediately.
 
@@ -365,7 +365,7 @@ dev this story _bmad-output/implementation-artifacts/11-1-vitals-import-integer-
 | 12.2 — Vitals Retrospective Type Correction Migration | [12-2-vitals-type-correction-migration.md](12-2-vitals-type-correction-migration.md) | done |
 | 12.2 (Hardening) — Migration Tool Hardening | [12-2-migration-tool-hardening.md](12-2-migration-tool-hardening.md) | done |
 | 12.3 — Case Rev Endpoint | [12-3-case-rev-endpoint.md](12-3-case-rev-endpoint.md) | done |
-| 12.4 — Stale Tab UX | [12-4-stale-tab-ux.md](12-4-stale-tab-ux.md) | not-started |
+| 12.4 — Stale Tab UX | [12-4-stale-tab-ux.md](12-4-stale-tab-ux.md) | done        |
 
 **Sequencing:** 12.1 → 12.1.1 → 12.2. Stories 12.2-Hardening, 12.3, and 12.4 follow from the party mode safety analysis (2026-07-08).
 
@@ -407,7 +407,7 @@ dev this story _bmad-output/implementation-artifacts/12-4-stale-tab-ux.md
 
 | Story | File | Status |
 |-------|------|--------|
-| 13.1 — Replace cURL with CouchDbHttpClient in data-migration | [13-1-data-migration-curl-to-couchdbhttpclient.md](13-1-data-migration-curl-to-couchdbhttpclient.md) | not-started |
+| 13.1 — Replace cURL with CouchDbHttpClient in data-migration | [13-1-data-migration-curl-to-couchdbhttpclient.md](13-1-data-migration-curl-to-couchdbhttpclient.md) | done        |
 
 **Sequencing:** Independent. Can be worked in parallel with Epic 14.
 
@@ -425,7 +425,7 @@ dev this story _bmad-output/implementation-artifacts/13-1-data-migration-curl-to
 
 | Story | File | Status |
 |-------|------|--------|
-| 14.1 — Replace cURL with CouchDbHttpClient in Replication | [14-1-replication-curl-to-couchdbhttpclient.md](14-1-replication-curl-to-couchdbhttpclient.md) | not-started |
+| 14.1 — Replace cURL with CouchDbHttpClient in Replication | [14-1-replication-curl-to-couchdbhttpclient.md](14-1-replication-curl-to-couchdbhttpclient.md) | done        |
 
 **Sequencing:** Independent. Can be worked in parallel with Epic 13.
 
@@ -443,7 +443,7 @@ dev this story _bmad-output/implementation-artifacts/14-1-replication-curl-to-co
 
 | Story | File | Status |
 |-------|------|--------|
-| 15.1 — Tenant Database Counts: Open Cases Column | [15-1-tenant-database-counts-open-cases.md](15-1-tenant-database-counts-open-cases.md) | not-started |
+| 15.1 — Tenant Database Counts: Open Cases Column | [15-1-tenant-database-counts-open-cases.md](15-1-tenant-database-counts-open-cases.md) | done        |
 
 **Sequencing:** Independent. No dependencies on other epics.
 
@@ -454,6 +454,19 @@ dev this story _bmad-output/implementation-artifacts/14-1-replication-curl-to-co
 ```
 dev this story _bmad-output/implementation-artifacts/15-1-tenant-database-counts-open-cases.md
 ```
+
+---
+
+## Epic 16 — Controller Pattern Remediation _(2026-07-14)_
+
+| Story | File | Status |
+|-------|------|--------|
+| 16.1 — Establish SystemOffline SharedLibraries Feature | [16-1-systemoffline-sharedlibraries-feature.md](16-1-systemoffline-sharedlibraries-feature.md) | done   |
+| 16.2 — CaseWorkflowAdmin Wave 9 Refactor | [16-2-caseworkflowadmin-wave9-refactor.md](16-2-caseworkflowadmin-wave9-refactor.md) | done   |
+
+**Sequencing:** Independent. No dependencies on other epics. Story 16.1 and 16.2 can be done in either order.
+
+> ℹ️ Remediates controllers that violate the `SharedLibraries/{Feature}/Manager/DAL` pattern. Story 16.1 extracts direct `CouchDbHttpClient.ExecuteAsync` calls and `SystemOfflineMessageFormatter` out of `system_offlineController` into a new `SystemOffline` feature. Story 16.2 moves `clear_case_status.cs` and `recover_deleted_case.cs` (Wave 9) plus their Epic 7 audit-write logic into a new `CaseWorkflowAdmin` feature. Story files must be created via `create story` before dev prompts are available.
 
 ---
 

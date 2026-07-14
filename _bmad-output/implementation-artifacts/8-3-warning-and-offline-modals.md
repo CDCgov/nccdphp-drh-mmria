@@ -4,7 +4,7 @@ baseline_commit: 5628e689e9e63273b662f9b7037e8d17e269908f
 
 # Story 8.3: Warning Modal and Going Offline Modal
 
-Status: review
+Status: done
 
 ## Story
 

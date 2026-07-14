@@ -4,7 +4,7 @@ baseline_commit: f7738e50c18fc30bd40a595d128e20e6add4a854
 
 # Story 8.4: Periodic Offline Status Check
 
-Status: review
+Status: done
 
 ## Story
 
