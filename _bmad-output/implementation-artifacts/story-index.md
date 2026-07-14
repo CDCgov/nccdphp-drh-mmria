@@ -474,7 +474,7 @@ dev this story _bmad-output/implementation-artifacts/15-1-tenant-database-counts
 
 | Story | File | Status |
 |-------|------|--------|
-| 17.1 — mmrds Operation Catalog | [17-1-mmrds-operation-catalog.md](17-1-mmrds-operation-catalog.md) | ready-for-dev |
+| 17.1 — mmrds Operation Catalog | [17-1-mmrds-operation-catalog.md](17-1-mmrds-operation-catalog.md) | done |
 | 17.2 — Canonicalize CaseDAL and Extract ICaseRepository | [17-2-icase-repository-casedal-canonicalize.md](17-2-icase-repository-casedal-canonicalize.md) | ready-for-dev |
 | 17.3 — Route CaseManager Direct mmrds Calls Through CaseDAL | [17-3-casemanager-direct-calls.md](17-3-casemanager-direct-calls.md) | ready-for-dev |
 | 17.4 — Eliminate Duplicate mmrds CRUD in CaseWorkflowAdminDAL | [17-4-caseworkflowadmindal-duplicates.md](17-4-caseworkflowadmindal-duplicates.md) | ready-for-dev |
