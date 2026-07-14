@@ -26,4 +26,6 @@ public interface ICaseRepository
     Task<string> GetSoftLockedCaseIdForUserInAnotherTabAsync(string userName, string currentTabId, DBConfigurationDetail dbConfig);
     Task<bool> RecordIdExistsAsync(string recordId, DBConfigurationDetail dbInfo);
     Task<(int StatusCode, string Body)> GetCaseDocumentWithStatusAsync(string caseId, DBConfigurationDetail dbConfig);
+    Task<string> GetAllCaseDocsAsync(bool includeDocs, DBConfigurationDetail dbConfig);
+    Task<string> GetCasesByDateCreatedPagedAsync(int skip, int pageSize, DBConfigurationDetail dbConfig);
 }

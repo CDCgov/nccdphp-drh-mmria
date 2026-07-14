@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using mmria.common.couchdb;
-using mmria.common.getset;
+using mmria.common.SharedLibraries.Case;
 
 namespace mmria.services.Utilities;
 
@@ -11,14 +11,14 @@ public static class PagedCaseIdLoader
 
     public static async IAsyncEnumerable<string> GetCaseIdsAsync(
         DBConfigurationDetail dbConfig,
-        CouchDbHttpClient couchDbHttpClient,
+        ICaseRepository caseRepository,
         int pageSize = DefaultPageSize
     )
     {
         if
         (
             dbConfig == null ||
-            couchDbHttpClient == null
+            caseRepository == null
         )
         {
             yield break;
@@ -33,8 +33,7 @@ public static class PagedCaseIdLoader
 
         while (true)
         {
-            string requestString = $"{dbConfig.url}/{dbConfig.prefix}mmrds/_design/sortable/_view/by_date_created?skip={skip}&limit={pageSize}";
-            string responseFromServer = await couchDbHttpClient.ExecuteAsync("GET", requestString, null, dbConfig.user_name, dbConfig.user_value);
+            string responseFromServer = await caseRepository.GetCasesByDateCreatedPagedAsync(skip, pageSize, dbConfig);
             var caseViewResponse = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(responseFromServer);
 
             if

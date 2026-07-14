@@ -495,8 +495,6 @@ public sealed class BatchProcessor : ReceiveActor
 
                 try
                 {
-                    string request_string = $"{item_db_info.url}/{item_db_info.prefix}mmrds/_all_docs?include_docs=true";
-
                     var case_id = item.mmria_id;
 
                     var case_expando = await _mmriaServicesManager.GetCaseById(item_db_info, case_id);
@@ -509,7 +507,7 @@ public sealed class BatchProcessor : ReceiveActor
 
                     if (!string.IsNullOrWhiteSpace (case_id) && !string.IsNullOrWhiteSpace(rev)) 
                     {
-                        request_string = $"{item_db_info.url}/{item_db_info.prefix}mmrds/{case_id}?rev={rev}";
+                        string request_string = $"{item_db_info.url}/{item_db_info.prefix}mmrds/{case_id}?rev={rev}";
                         string responseFromServer = await _couchDbHttpClient.ExecuteAsync("DELETE", request_string, null, item_db_info.user_name, item_db_info.user_value);
 
                         // to do synchronize

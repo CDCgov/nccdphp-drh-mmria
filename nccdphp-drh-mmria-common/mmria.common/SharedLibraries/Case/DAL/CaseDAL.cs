@@ -332,4 +332,17 @@ public class CaseDAL : ICaseRepository
             dbConfig.user_value);
         return (response.StatusCode, response.Body);
     }
+
+    public async Task<string> GetAllCaseDocsAsync(bool includeDocs, DBConfigurationDetail dbConfig)
+    {
+        string query = includeDocs ? "?include_docs=true" : string.Empty;
+        string requestUrl = dbConfig.Get_Prefix_DB_Url($"mmrds/_all_docs{query}");
+        return await _couchDbHttpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value);
+    }
+
+    public async Task<string> GetCasesByDateCreatedPagedAsync(int skip, int pageSize, DBConfigurationDetail dbConfig)
+    {
+        string requestUrl = dbConfig.Get_Prefix_DB_Url($"mmrds/_design/sortable/_view/by_date_created?skip={skip}&limit={pageSize}");
+        return await _couchDbHttpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value);
+    }
 }

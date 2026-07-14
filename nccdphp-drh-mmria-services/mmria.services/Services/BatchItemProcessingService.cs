@@ -8,6 +8,8 @@ using mmria.common.SharedLibraries.MMRIAServices.Manager;
 using mmria.common.SharedLibraries.MMRIAServices.DAL;
 using mmria.common.SharedLibraries.MMRIAServices.Helper;
 using static mmria.common.SharedLibraries.MMRIAServices.Helper.MMRIAServicesHelper;
+using mmria.common.SharedLibraries.Case;
+using mmria.common.SharedLibraries.Case.DAL;
 
 namespace RecordsProcessor_Worker.Services;
 
@@ -756,10 +758,12 @@ public sealed class BatchItemProcessingService
     private mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private System.Net.Http.HttpClient _externalHttpClient;
     private MMRIAServicesManager _mmriaServicesManager;
+    private ICaseRepository _caseRepository;
     public BatchItemProcessingService(mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
         _couchDbHttpClient = couchDbHttpClient;
         _mmriaServicesManager = new MMRIAServicesManager(new MMRIAServicesDAL(_couchDbHttpClient), _couchDbHttpClient);
+        _caseRepository = new CaseDAL(_couchDbHttpClient);
         var httpClientFactory = new mmria.common.SimpleHttpClientFactory();
         _externalHttpClient = httpClientFactory.CreateClient("external");
     }
@@ -2613,7 +2617,6 @@ if
 
             var _dbConfigSet = mmria.services.vitalsimport.Program.DbConfigSet;
             var db_info = _dbConfigSet.detail_list[message.host_state];
-            string request_string = $"{db_info.url}/{db_info.prefix}mmrds/{mmria_id}";
 
             Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings();
             settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
@@ -2622,7 +2625,7 @@ if
             var document_put_response = new mmria.common.model.couchdb.document_put_response();
             try
             {
-                var responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", request_string, object_string, db_info.user_name, db_info.user_value);
+                var responseFromServer = await _caseRepository.PutCaseDocumentJsonAsync(mmria_id, object_string, db_info);
                 document_put_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
             }
             catch (Exception ex)
