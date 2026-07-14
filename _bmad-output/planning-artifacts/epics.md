@@ -787,6 +787,256 @@ So that I cannot accidentally open duplicate CVS windows and I know when the rep
 **Acceptance Criteria:**
 
 **Given** the user clicks a CVS report button
+
+---
+
+## Epic 17: mmrds CRUD Consolidation (SQL Migration Foundation)
+
+All case-document reads and writes against the `{prefix}mmrds` CouchDB database are consolidated behind a single `CaseDAL` surface, backed by an `ICaseRepository` interface. Duplicated URL construction and scattered direct HTTP calls are eliminated across `mmria-server`, `mmria.common`, and `mmria.services`. After this epic, swapping CouchDB for SQL requires changing `CaseDAL` only — no Manager, controller, or services actor code changes are required.
+
+**Architecture rule:** project-context.md §2.2 SharedLibraries pattern + SQL migration readiness.
+
+**Scope summary (verified 2026-07-14):**
+
+Duplicate mmrds operations were found across 16 files in three projects:
+
+- `mmria.common/SharedLibraries`: `CaseDAL`, `CaseManager`, `CaseWorkflowAdminDAL`, `AuditRecoveryDAL`, `CVSDAL`, `VitalImportDAL`, `AttachmentDAL`, `OfflineCaseManager`, `MMRIAServicesDAL`
+- `mmria-server/model/actor`: `JurisdictionSummary`, `VROSummary`, `c_db_setup`, `c_document_sync_all`, `c_document_sync_all_legacy`
+- `mmria.services`: `BatchProcessor`, `BatchItemProcessingService`, `PagedCaseIdLoader`, `core_element_exporter`, `exporter`, `mmrds_exporter`, `c_document_sync_all`
+
+Three URL construction patterns are in active simultaneous use:
+
+- **Pattern A** (wrong — leaks prefix logic): `$"{dbConfig.url}/{dbConfig.prefix}mmrds/{id}"`
+- **Pattern B** (correct): `dbConfig.Get_Prefix_DB_Url($"mmrds/{id}")`
+- **Pattern C** (CDC special-case, inconsistent separator): `$"{dbInfo.url}/{dbInfo.prefix}_mmrds"` — used only in `MMRIAServicesDAL`
+
+---
+
+### Story 17.1: mmrds Operation Catalog
+
+As a developer,
+I want a definitive catalog of every operation against the `mmrds` database across all three projects,
+So that Stories 17.2–17.7 have an agreed-upon, complete operation set before any code changes begin.
+
+**Acceptance Criteria:**
+
+**Given** all `.cs` files in `mmria-server`, `mmria.common`, and `mmria.services`
+**When** the developer completes the catalog
+**Then** `docs/ai/mmrds_operation_catalog.md` exists and contains a table of every distinct operation grouped into: Case CRUD (GET/PUT/DELETE by ID), versioned reads (GET at revision, GET all revisions), view queries (`by_date_created`, `by_date_last_updated`, `by_jurisdiction_id`, `by_last_name`, `by_pmss_number`, `record_id_list`), Mango `_find` queries, bulk operations (`_bulk_docs`, `_all_docs`), and admin/infra operations (`_security`, `_design/*`, `_changes`)
+
+**Given** each catalog entry
+**When** the catalog is complete
+**Then** each entry records: operation name, calling file(s), the URL pattern in use (A, B, or C), and the response type expected
+
+**Given** admin/infra operations (`_security`, `_design/*`, `_changes`, sync `_all_docs`)
+**When** the catalog is written
+**Then** they are listed but marked **out of scope** for Stories 17.2–17.7 — these operations are infrastructure-only and do not belong behind `ICaseRepository`
+
+---
+
+### Story 17.2: Canonicalize CaseDAL and Extract ICaseRepository
+
+As a developer,
+I want a single `ICaseRepository` interface over all mmrds CRUD operations,
+So that every caller in mmria-server and mmria.services can depend on the interface and a SQL migration requires changing only the `CaseDAL` implementation.
+
+**Acceptance Criteria:**
+
+**Given** the existing `CaseDAL` in `mmria.common/SharedLibraries/Case/DAL/CaseDAL.cs`
+**When** this story is complete
+**Then** all existing methods in `CaseDAL` use `dbConfig.Get_Prefix_DB_Url(...)` uniformly — no Pattern A strings remain
+
+**Given** the operation catalog from Story 17.1
+**When** the developer adds missing operations to `CaseDAL`
+**Then** `CaseDAL` contains methods for every in-scope operation: `GetCaseAsync`, `GetCaseDocumentJsonAsync`, `UpdateCaseAsync`, `PutCaseDocumentJsonAsync`, `DeleteCaseAsync`, `GetCaseAtRevisionAsync`, `GetCaseRevisionsAsync`, all required view query methods, and the `_find` overloads needed by other stories
+
+**Given** the full operation set is in `CaseDAL`
+**When** the interface is extracted
+**Then** `ICaseRepository` is defined in `mmria.common/SharedLibraries/Case/` with async method signatures matching every `CaseDAL` method; `CaseDAL` implements `ICaseRepository`
+
+**Given** `ICaseRepository` is defined
+**When** DI registration is updated in `mmria-server`
+**Then** `ICaseRepository` is registered as `CaseDAL` in the server's service collection; all existing callers of the concrete `CaseDAL` compile without changes
+
+**Given** no callers are changed in this story
+**When** the build runs after this story
+**Then** `mmria-server` and `mmria.common` build with zero errors
+
+---
+
+### Story 17.3: Route CaseManager Direct mmrds Calls Through CaseDAL
+
+As a developer,
+I want `CaseManager` to stop calling `CouchDbHttpClient.ExecuteAsync` with mmrds URLs directly,
+So that all case document access in the manager layer routes through `ICaseRepository`.
+
+**Acceptance Criteria:**
+
+**Given** the following direct mmrds HTTP calls in `CaseManager.cs` (approximately lines 900, 1025, 1205, 1330, 1369, 1519, 1723, 2098, 2280, 2294, 2392)
+**When** this story is complete
+**Then** each call is replaced with the corresponding `ICaseRepository` method from Story 17.2; no `$"{dbConfig...}mmrds/..."` strings remain in `CaseManager.cs`
+
+**Given** each replacement
+**When** the developer implements it
+**Then** the HTTP verb, URL path, request body, response deserialization type, and error handling are identical to the original — this is a mechanical substitution only
+
+**Given** the build after all substitutions
+**When** verified
+**Then** `mmria-server`, `mmria.common`, and `mmria.services` all build with zero errors
+
+**Given** no controller action signatures or response shapes change
+**When** verified
+**Then** no changes are made outside of `CaseManager.cs` in this story
+
+---
+
+### Story 17.4: Eliminate Duplicate mmrds CRUD in CaseWorkflowAdminDAL
+
+As a developer,
+I want `CaseWorkflowAdminDAL` to delegate case document operations to `ICaseRepository` instead of reimplementing them,
+So that the five duplicate mmrds methods in this DAL are removed.
+
+**Acceptance Criteria:**
+
+**Given** the following methods in `CaseWorkflowAdminDAL` that duplicate `CaseDAL` operations:
+`GetCaseDocumentAsync`, `UpdateCaseDocumentAsync`, `GetCaseRevisionsRawAsync`, `GetCaseAtRevisionAsync`, `RestoreCaseDocumentAsync`
+**When** this story is complete
+**Then** `ICaseRepository` is injected into `CaseWorkflowAdminDAL` and each of the five methods delegates to the corresponding repository method; the duplicate implementations are removed
+
+**Given** the audit write methods in `CaseWorkflowAdminDAL` (operations against the `audit` database)
+**When** this story is complete
+**Then** they are unchanged — audit writes are not mmrds operations and are out of scope
+
+**Given** `CaseWorkflowAdminManager` calls the above DAL methods
+**When** the DAL signatures are preserved
+**Then** `CaseWorkflowAdminManager` and all controllers that use it compile without changes
+
+---
+
+### Story 17.5: Eliminate Duplicate mmrds Calls in AuditRecoveryDAL, CVSDAL, VitalImportDAL, and AttachmentDAL
+
+As a developer,
+I want the remaining SharedLibraries DAL files that independently call mmrds URLs to delegate to `ICaseRepository`,
+So that mmrds access is fully consolidated within the common library layer.
+
+**Acceptance Criteria:**
+
+**Given** the following direct mmrds calls:
+- `AuditRecoveryDAL.cs` lines 24, 75 — case view `by_id` query and case GET at revision
+- `CVSDAL.cs` lines 73, 84 — `by_date_last_updated` view and case GET by ID
+- `VitalImportDAL.cs` lines 26, 33 — case GET by ID ×2
+- `AttachmentDAL.cs` line 21 — mmrds `by_pmss_number` view query
+**When** this story is complete
+**Then** each is replaced with the corresponding `ICaseRepository` method; `ICaseRepository` is injected into each DAL via constructor injection
+
+**Given** each DAL's existing constructor and DI registration
+**When** `ICaseRepository` is added as a constructor parameter
+**Then** the DI registration in `mmria-server` is updated to satisfy the new dependency; no other registration changes are made
+
+**Given** the build after all changes
+**When** verified
+**Then** all three projects build with zero errors and no manager or controller code changes are required
+
+---
+
+### Story 17.5b: Route mmria-services Case Reads Through ICaseRepository
+
+As a developer,
+I want the background-job and exporter code in `mmria.services` to stop constructing mmrds URLs directly,
+So that the services project is covered by the same `ICaseRepository` contract as the server.
+
+**Acceptance Criteria:**
+
+**Given** the following direct mmrds URL constructions in `mmria.services`:
+- `BatchProcessor.cs` — `_all_docs` and case GET at revision
+- `BatchItemProcessingService.cs` — case GET by ID
+- `PagedCaseIdLoader.cs` — `by_date_created` view
+- `core_element_exporter.cs` — case GET by ID
+- `exporter.cs` — `_all_docs` and case GET by ID
+- `mmrds_exporter.cs` — case GET by ID
+**When** this story is complete
+**Then** each is replaced with the corresponding `ICaseRepository` method; since `mmria.services` already references `mmria.common`, no new project reference is needed
+
+**Given** the `_all_docs` usages in `BatchProcessor` and `exporter`
+**When** the developer evaluates them
+**Then** if a corresponding `ICaseRepository` method does not exist, it is added to `CaseDAL` and `ICaseRepository` as part of this story (following the same rules as Story 17.2)
+
+**Given** `c_document_sync_all.cs` in `mmria.services` (bulk sync `_all_docs`)
+**When** evaluated
+**Then** it is treated as an infrastructure/sync operation — documented in the catalog as out of scope and left unchanged in this story
+
+**Given** the build after all changes
+**When** verified
+**Then** `mmria.services`, `mmria.common`, and `mmria-server` all build with zero errors
+
+---
+
+### Story 17.6: Eliminate Direct mmrds Calls in OfflineCaseManager
+
+As a developer,
+I want `OfflineCaseManager` to stop issuing raw HTTP requests to mmrds URLs,
+So that the offline case path follows the same Manager → DAL boundary as every other feature.
+
+**Acceptance Criteria:**
+
+**Given** the three direct mmrds HTTP calls in `OfflineCaseManager.cs` (lines 104, 298, 398) that assemble URLs as `$"{dbConfig.url}/{dbConfig.prefix}mmrds/{caseId}"`
+**When** this story is complete
+**Then** each is replaced with the corresponding `ICaseRepository` method; `ICaseRepository` is injected into `OfflineCaseManager` via constructor injection
+
+**Given** the `OfflineCase` feature in `SharedLibraries` already has an `OfflineCaseDAL`
+**When** the developer evaluates whether to route through `OfflineCaseDAL` or inject `ICaseRepository` directly into the manager
+**Then** `ICaseRepository` is injected directly into the manager — `OfflineCaseDAL` owns offline-specific document types, not generic case CRUD
+
+**Given** the DI registration for `OfflineCaseManager`
+**When** `ICaseRepository` is added as a constructor parameter
+**Then** the registration is updated in `mmria-server` to satisfy the new dependency
+
+**Given** the build and existing offline sync tests (if any)
+**When** verified
+**Then** all three projects build with zero errors and offline case behavior is unchanged
+
+---
+
+### Story 17.7: MMRIAServicesDAL and Sync Boundary Decision
+
+As a developer,
+I want a written architecture decision on whether the CDC populate path and bulk sync operations in `MMRIAServicesDAL` and `c_document_sync_all` should be unified with `ICaseRepository` or formally declared as separate infrastructure concerns,
+So that the boundary is explicit and future contributors do not try to merge them incorrectly.
+
+**Acceptance Criteria:**
+
+**Given** `MMRIAServicesDAL` has its own `GetMmrdsDatabaseUrl()` helper (lines 553–557) that uses a different prefix separator convention from `Get_Prefix_DB_Url`
+**When** the developer evaluates the CDC populate path
+**Then** a decision is recorded in `docs/ai/mmrds_operation_catalog.md` under a "Boundary Decisions" section: either (a) unify prefix logic and route through `ICaseRepository` or (b) formally declare the CDC bulk path as a separate infrastructure concern that `ICaseRepository` does not cover
+
+**Given** `c_document_sync_all` in both `mmria-server` and `mmria.services` uses bulk `_all_docs` for change-feed synchronization
+**When** the developer evaluates it
+**Then** the same decision document records whether sync bulk reads belong behind `ICaseRepository` or remain as infrastructure-only operations; recommendation is **out of scope** given the change-feed architecture
+
+**Given** the decision document is complete
+**When** it recommends unification (option a)
+**Then** the prefix inconsistency in `MMRIAServicesDAL` is fixed in this story and a follow-on story is created if full interface adoption is needed
+
+**Given** the decision document is complete
+**When** it recommends keeping as separate concerns (option b)
+**Then** no code changes are made to `MMRIAServicesDAL` or `c_document_sync_all` in this epic; the catalog marks them explicitly as out-of-scope infrastructure
+
+---
+
+## Epic 17 — Story Sequencing
+
+| Wave | Story | Risk | Dependencies |
+|---|---|---|---|
+| 17 | 17.1 — mmrds Operation Catalog | None | None — discovery only |
+| 17 | 17.7 — Boundary Decision | None | Can run in parallel with 17.1 |
+| 17 | 17.2 — ICaseRepository + CaseDAL | Low | 17.1 |
+| 17 | 17.3 — CaseManager direct calls | Medium | 17.2 |
+| 17 | 17.4 — CaseWorkflowAdminDAL | Low | 17.2 |
+| 17 | 17.5 — AuditRecovery / CVS / VitalImport / Attachment | Low | 17.2 |
+| 17 | 17.5b — mmria.services | Medium | 17.2 |
+| 17 | 17.6 — OfflineCaseManager | Medium | 17.2 |
+
+17.3, 17.4, 17.5, 17.5b, and 17.6 can proceed in parallel once 17.2 is complete. 17.7 can run alongside 17.1.
 **When** `beginCvsReportRequest(record_id, p_control)` is called
 **Then** the button is disabled, `aria-busy="true"` is set, and the label changes to indicate in-progress state
 
