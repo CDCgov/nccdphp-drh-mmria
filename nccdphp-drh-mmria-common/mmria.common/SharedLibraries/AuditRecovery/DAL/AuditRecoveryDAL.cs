@@ -6,6 +6,7 @@ using mmria.common.metadata;
 using mmria.common.model.couchdb;
 using mmria.common.model.couchdb.audit;
 using mmria.common.SharedLibraries.AuditRecovery.Model;
+using mmria.common.SharedLibraries.Case;
 using Newtonsoft.Json;
 
 namespace mmria.common.SharedLibraries.AuditRecovery.DAL;
@@ -13,16 +14,17 @@ namespace mmria.common.SharedLibraries.AuditRecovery.DAL;
 public sealed class AuditRecoveryDAL
 {
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly ICaseRepository _caseRepository;
 
-    public AuditRecoveryDAL(mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+    public AuditRecoveryDAL(mmria.common.getset.CouchDbHttpClient couchDbHttpClient, ICaseRepository caseRepository)
     {
         _couchDbHttpClient = couchDbHttpClient;
+        _caseRepository = caseRepository;
     }
 
     public async Task<case_view_response> GetCaseViewResponseAsync(string caseId, DBConfigurationDetail db_config)
     {
-        string request = $"{db_config.url}/{db_config.prefix}mmrds/_design/sortable/_view/by_id?key=\"{caseId}\"";
-        string response = await _couchDbHttpClient.ExecuteAsync("GET", request, null, db_config.user_name, db_config.user_value);
+        string response = await _caseRepository.GetCasesByIdViewJsonAsync(caseId, db_config);
         return JsonConvert.DeserializeObject<case_view_response>(response);
     }
 
@@ -72,8 +74,7 @@ public sealed class AuditRecoveryDAL
 
     public async Task<ExpandoObject> GetCaseRevisionAsync(string caseId, string revisionId, DBConfigurationDetail db_config)
     {
-        string request = $"{db_config.url}/{db_config.prefix}mmrds/{caseId}?rev={revisionId}";
-        string response = await _couchDbHttpClient.ExecuteAsync("GET", request, null, db_config.user_name, db_config.user_value);
+        string response = await _caseRepository.GetCaseAtRevisionAsync(caseId, revisionId, db_config);
         return JsonConvert.DeserializeObject<ExpandoObject>(response);
     }
 }

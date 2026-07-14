@@ -16,11 +16,13 @@ public interface ICaseRepository
     Task<string> GetCaseRevisionsAsync(string caseId, DBConfigurationDetail dbConfig);
     Task<string> GetCaseRevisionsRawAsync(string caseId, DBConfigurationDetail dbConfig);
     Task<string> GetCasesByDateLastUpdatedViewJsonAsync(DBConfigurationDetail dbConfig);
+    Task<string> GetCasesByDateLastUpdatedViewJsonAsync(DBConfigurationDetail dbConfig, int limit);
     Task<string> GetCasesByDateCreatedViewJsonAsync(DBConfigurationDetail dbConfig);
     Task<string> GetCasesByJurisdictionIdViewJsonAsync(DBConfigurationDetail dbConfig);
     Task<string> GetCasesByLastNameViewJsonAsync(DBConfigurationDetail dbConfig);
     Task<string> GetCasesByPmssNumberViewJsonAsync(DBConfigurationDetail dbConfig);
     Task<string> GetCaseRecordIdListViewJsonAsync(DBConfigurationDetail dbConfig);
+    Task<string> GetCasesByIdViewJsonAsync(string caseId, DBConfigurationDetail dbConfig);
     Task<string> GetSoftLockedCaseIdForUserInAnotherTabAsync(string userName, string currentTabId, DBConfigurationDetail dbConfig);
     Task<bool> RecordIdExistsAsync(string recordId, DBConfigurationDetail dbInfo);
     Task<(int StatusCode, string Body)> GetCaseDocumentWithStatusAsync(string caseId, DBConfigurationDetail dbConfig);

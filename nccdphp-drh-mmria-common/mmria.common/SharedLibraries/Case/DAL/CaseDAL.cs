@@ -130,6 +130,19 @@ public class CaseDAL : ICaseRepository
         );
     }
 
+    public async Task<string> GetCasesByDateLastUpdatedViewJsonAsync(DBConfigurationDetail dbConfig, int limit)
+    {
+        string requestUrl = dbConfig.Get_Prefix_DB_Url($"mmrds/_design/sortable/_view/by_date_last_updated?skip=0&limit={limit}&descending=true");
+
+        return await _couchDbHttpClient.ExecuteAsync(
+            "GET",
+            requestUrl,
+            null,
+            dbConfig.user_name,
+            dbConfig.user_value
+        );
+    }
+
     public async Task<string> GetCasesByDateCreatedViewJsonAsync(DBConfigurationDetail dbConfig)
     {
         string requestUrl = dbConfig.Get_Prefix_DB_Url("mmrds/_design/sortable/_view/by_date_created?skip=0&take=25000");
@@ -185,6 +198,20 @@ public class CaseDAL : ICaseRepository
     public async Task<string> GetCaseRecordIdListViewJsonAsync(DBConfigurationDetail dbConfig)
     {
         string requestUrl = dbConfig.Get_Prefix_DB_Url("mmrds/_design/sortable/_view/record_id_list");
+
+        return await _couchDbHttpClient.ExecuteAsync(
+            "GET",
+            requestUrl,
+            null,
+            dbConfig.user_name,
+            dbConfig.user_value
+        );
+    }
+
+    public async Task<string> GetCasesByIdViewJsonAsync(string caseId, DBConfigurationDetail dbConfig)
+    {
+        // CouchDB view query with a string key requires the key to be JSON-encoded (with surrounding quotes).
+        string requestUrl = dbConfig.Get_Prefix_DB_Url($"mmrds/_design/sortable/_view/by_id?key=\"{caseId}\"");
 
         return await _couchDbHttpClient.ExecuteAsync(
             "GET",

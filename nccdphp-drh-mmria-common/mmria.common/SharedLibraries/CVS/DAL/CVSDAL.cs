@@ -9,6 +9,7 @@ using mmria.common.couchdb;
 using mmria.common.cvs;
 using mmria.common.getset;
 using mmria.common.model.couchdb;
+using mmria.common.SharedLibraries.Case;
 
 namespace mmria.common.SharedLibraries.CVS.DAL;
 
@@ -23,12 +24,14 @@ public sealed class CVSDAL
 {
     private readonly CouchDbHttpClient _httpClient;
     private readonly HttpClient _externalHttpClient;
+    private readonly ICaseRepository _caseRepository;
 
-    public CVSDAL(CouchDbHttpClient httpClient)
+    public CVSDAL(CouchDbHttpClient httpClient, ICaseRepository caseRepository)
     {
         _httpClient = httpClient;
         var httpClientFactory = new mmria.common.SimpleHttpClientFactory();
         _externalHttpClient = httpClientFactory.CreateClient("external");
+        _caseRepository = caseRepository;
     }
 
     public async Task<string> PostExternalAsync(string base_url, object body)
@@ -70,8 +73,8 @@ public sealed class CVSDAL
 
     public async Task<case_view_response> GetCaseViewByRecordIdAsync(string recordId, DBConfigurationDetail db_config)
     {
-        string request = db_config.Get_Prefix_DB_Url("mmrds/_design/sortable/_view/by_date_last_updated?skip=0&limit=30000&descending=true");
-        string response = await _httpClient.ExecuteAsync("GET", request, null, db_config.user_name, db_config.user_value);
+        // CVSDAL uses limit=30000 (vs CaseDAL default 25000) to ensure all cases are fetched before filtering by record_id.
+        string response = await _caseRepository.GetCasesByDateLastUpdatedViewJsonAsync(db_config, 30000);
         var case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<case_view_response>(response);
         var result = new case_view_response { offset = case_view_response.offset, total_rows = case_view_response.total_rows };
         result.rows = case_view_response.rows.FindAll(cvi => cvi.value.record_id.Equals(recordId, System.StringComparison.OrdinalIgnoreCase));
@@ -81,8 +84,7 @@ public sealed class CVSDAL
 
     public async Task<ExpandoObject> GetCaseAsync(string caseId, DBConfigurationDetail db_config)
     {
-        string request = db_config.Get_Prefix_DB_Url($"mmrds/{caseId}");
-        string response = await _httpClient.ExecuteAsync("GET", request, null, db_config.user_name, db_config.user_value);
+        string response = await _caseRepository.GetCaseDocumentJsonAsync(caseId, db_config);
         return Newtonsoft.Json.JsonConvert.DeserializeObject<ExpandoObject>(response);
     }
 
