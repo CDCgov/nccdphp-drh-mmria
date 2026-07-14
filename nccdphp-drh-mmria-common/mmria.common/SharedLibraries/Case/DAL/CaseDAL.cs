@@ -9,7 +9,7 @@ using Newtonsoft.Json.Linq;
 
 namespace mmria.common.SharedLibraries.Case.DAL;
 
-public class CaseDAL
+public class CaseDAL : ICaseRepository
 {
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
@@ -20,7 +20,7 @@ public class CaseDAL
 
     public async Task<mmria_case> GetCaseAsync(string caseId, DBConfigurationDetail dbConfig)
     {
-        string requestUrl = $"{dbConfig.url}/{dbConfig.prefix}mmrds/{caseId}";
+        string requestUrl = dbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}");
 
         string response = await _couchDbHttpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value, "application/json");
         var result = CaseJsonSerialization.DeserializeMmriaCase(response);
@@ -29,7 +29,7 @@ public class CaseDAL
 
     public async Task<string> GetCaseDocumentJsonAsync(string caseId, DBConfigurationDetail dbConfig)
     {
-        string requestUrl = $"{dbConfig.url}/{dbConfig.prefix}mmrds/{caseId}";
+        string requestUrl = dbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}");
 
         return await _couchDbHttpClient.ExecuteAsync(
             "GET",
@@ -43,7 +43,7 @@ public class CaseDAL
     public async Task<document_put_response> UpdateCaseAsync(string caseId, mmria_case caseDoc, DBConfigurationDetail dbConfig)
     {
         string objectString = CaseJsonSerialization.SerializeMmriaCase(caseDoc);
-        string requestUrl = $"{dbConfig.url}/{dbConfig.prefix}mmrds/{caseId}";
+        string requestUrl = dbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}");
 
         string response = await _couchDbHttpClient.ExecuteAsync("PUT", requestUrl, objectString, dbConfig.user_name, dbConfig.user_value, "application/json");
         var result = JsonConvert.DeserializeObject<document_put_response>(response);
@@ -52,7 +52,7 @@ public class CaseDAL
 
     public async Task<string> PutCaseDocumentJsonAsync(string caseId, string caseDocumentJson, DBConfigurationDetail dbConfig)
     {
-        string requestUrl = $"{dbConfig.url}/{dbConfig.prefix}mmrds/{caseId}";
+        string requestUrl = dbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}");
 
         return await _couchDbHttpClient.ExecuteAsync(
             "PUT",
@@ -63,9 +63,48 @@ public class CaseDAL
         );
     }
 
+    public async Task<string> DeleteCaseAsync(string caseId, string revision, DBConfigurationDetail dbConfig)
+    {
+        string requestUrl = dbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}?rev={revision}");
+
+        return await _couchDbHttpClient.ExecuteAsync(
+            "DELETE",
+            requestUrl,
+            null,
+            dbConfig.user_name,
+            dbConfig.user_value
+        );
+    }
+
+    public async Task<string> GetCaseAtRevisionAsync(string caseId, string revision, DBConfigurationDetail dbConfig)
+    {
+        string requestUrl = dbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}?rev={revision}");
+
+        return await _couchDbHttpClient.ExecuteAsync(
+            "GET",
+            requestUrl,
+            null,
+            dbConfig.user_name,
+            dbConfig.user_value
+        );
+    }
+
+    public async Task<string> GetCaseRevisionsAsync(string caseId, DBConfigurationDetail dbConfig)
+    {
+        string requestUrl = dbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}?revs_info=true");
+
+        return await _couchDbHttpClient.ExecuteAsync(
+            "GET",
+            requestUrl,
+            null,
+            dbConfig.user_name,
+            dbConfig.user_value
+        );
+    }
+
     public async Task<string> GetCasesByDateLastUpdatedViewJsonAsync(DBConfigurationDetail dbConfig)
     {
-        string requestUrl = $"{dbConfig.url}/{dbConfig.prefix}mmrds/_design/sortable/_view/by_date_last_updated?skip=0&limit=25000&descending=true";
+        string requestUrl = dbConfig.Get_Prefix_DB_Url("mmrds/_design/sortable/_view/by_date_last_updated?skip=0&limit=25000&descending=true");
 
         return await _couchDbHttpClient.ExecuteAsync(
             "GET",
@@ -78,15 +117,59 @@ public class CaseDAL
 
     public async Task<string> GetCasesByDateCreatedViewJsonAsync(DBConfigurationDetail dbConfig)
     {
-        string requestUrl;
-        if (string.IsNullOrWhiteSpace(dbConfig.prefix))
-        {
-            requestUrl = $"{dbConfig.url}/mmrds/_design/sortable/_view/by_date_created?skip=0&take=25000";
-        }
-        else
-        {
-            requestUrl = $"{dbConfig.url}/{dbConfig.prefix}mmrds/_design/sortable/_view/by_date_created?skip=0&take=25000";
-        }
+        string requestUrl = dbConfig.Get_Prefix_DB_Url("mmrds/_design/sortable/_view/by_date_created?skip=0&take=25000");
+
+        return await _couchDbHttpClient.ExecuteAsync(
+            "GET",
+            requestUrl,
+            null,
+            dbConfig.user_name,
+            dbConfig.user_value
+        );
+    }
+
+    public async Task<string> GetCasesByJurisdictionIdViewJsonAsync(DBConfigurationDetail dbConfig)
+    {
+        string requestUrl = dbConfig.Get_Prefix_DB_Url("mmrds/_design/sortable/_view/by_jurisdiction_id?skip=0&take=100000");
+
+        return await _couchDbHttpClient.ExecuteAsync(
+            "GET",
+            requestUrl,
+            null,
+            dbConfig.user_name,
+            dbConfig.user_value
+        );
+    }
+
+    public async Task<string> GetCasesByLastNameViewJsonAsync(DBConfigurationDetail dbConfig)
+    {
+        string requestUrl = dbConfig.Get_Prefix_DB_Url("mmrds/_design/sortable/_view/by_last_name?skip=0&limit=100000");
+
+        return await _couchDbHttpClient.ExecuteAsync(
+            "GET",
+            requestUrl,
+            null,
+            dbConfig.user_name,
+            dbConfig.user_value
+        );
+    }
+
+    public async Task<string> GetCasesByPmssNumberViewJsonAsync(DBConfigurationDetail dbConfig)
+    {
+        string requestUrl = dbConfig.Get_Prefix_DB_Url("mmrds/_design/sortable/_view/by_pmss_number?skip=0&take=250000");
+
+        return await _couchDbHttpClient.ExecuteAsync(
+            "GET",
+            requestUrl,
+            null,
+            dbConfig.user_name,
+            dbConfig.user_value
+        );
+    }
+
+    public async Task<string> GetCaseRecordIdListViewJsonAsync(DBConfigurationDetail dbConfig)
+    {
+        string requestUrl = dbConfig.Get_Prefix_DB_Url("mmrds/_design/sortable/_view/record_id_list");
 
         return await _couchDbHttpClient.ExecuteAsync(
             "GET",
