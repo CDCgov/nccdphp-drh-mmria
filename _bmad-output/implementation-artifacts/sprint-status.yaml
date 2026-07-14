@@ -1,0 +1,154 @@
+# generated: 2026-07-14
+# last_updated: 2026-07-14
+# project: mmria
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: _bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2026-07-14
+last_updated: 2026-07-14
+project: mmria
+project_key: NOKEY
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+
+development_status:
+  # ── Epic 1: Case Narrative Editor Fidelity ──────────────────────────────
+  epic-1: done
+  1-1-fix-save-path-html-stripping: done
+  1-2-fix-paste-handler-cursor-integrity: done
+  1-3-update-case-narrative-instruction-text: done
+  1-4-update-case-narrative-guidelines-panel: done
+  epic-1-retrospective: optional
+
+  # ── Epic 2: Vitals Field Validation ─────────────────────────────────────
+  epic-2: done
+  2-1-vitals-range-config-couchdb-and-server-loading: done
+  2-2-on-blur-vitals-validation-and-modal: done
+  2-3-display-time-exclusion-print-pdf-date-fix: done
+  2-4-display-time-exclusion-graph-and-table: done
+  2-5-historical-data-detection-and-indicators: done
+  2-6-vitals-validation-bug-fixes: done
+  epic-2-retrospective: optional
+
+  # ── Epic 3: System Configuration & Print Cleanup ─────────────────────────
+  epic-3: done
+  3-1-config-driven-omb-expiration-date: done
+  3-2-config-driven-mmria-version: done
+  3-3-remove-core-elements-print-option: done
+  epic-3-retrospective: optional
+
+  # ── Epic 4: Vitals Validation Refinements ────────────────────────────────
+  epic-4: done
+  4-0-validation-engine-foundation: done
+  4-1-print-view-pdf-validation-gate: done
+  4-2-print-pdf-comment-appending: done
+  4-3-omb-block-right-alignment: done
+  epic-4-retrospective: optional
+
+  # ── Epic 5: Validation Errors Panel ─────────────────────────────────────
+  epic-5: done
+  5-1-validation-errors-panel: done
+  epic-5-retrospective: optional
+
+  # ── Epic 6: Case Validation Rules Management ─────────────────────────────
+  epic-6: done
+  6-1-decouple-validation-rules-generation: done
+  6-2-port-case-validation-admin-ui: done
+  6-3-add-edit-rule-modal: done
+  epic-6-retrospective: optional
+
+  # ── Epic 7: Admin Action Audit Logging ───────────────────────────────────
+  epic-7: done
+  7-1-audit-logging-year-of-death-maiden-name: done
+  7-2-audit-logging-case-lifecycle-actions: done
+  epic-7-retrospective: optional
+
+  # ── Epic 8: System Going Offline ─────────────────────────────────────────
+  epic-8: done
+  8-1-system-offline-config-services-admin-page: done
+  8-2-login-page-offline-state: done
+  8-3-warning-and-offline-modals: done
+  8-4-periodic-status-check: done
+  epic-8-retrospective: optional
+
+  # ── Epic 9: Standalone Bug Fixes ─────────────────────────────────────────
+  epic-9: done
+  9-1-fix-data-summary-checks-field-filter: done
+  9-2-fix-manage-users-export-respects-filter: done
+  9-3-fix-manage-users-role-filter-endswith: done
+  epic-9-retrospective: optional
+
+  # ── Epic 10: CVS PDF Export Tool Reliability ─────────────────────────────
+  epic-10: done
+  10-1-fix-cvs-batch-supervisor-busy-wait: done
+  10-2-server-side-cvs-error-hardening: done
+  10-3-client-side-cvs-retry-mechanism: done
+  10-4-cvs-parent-page-broadcast-channel-status: done
+  10-5-config-driven-cvs-retry-constants: done
+  epic-10-retrospective: optional
+
+  # ── Epic 11: Vitals Import Integer Type Fix ───────────────────────────────
+  epic-11: done
+  11-1-vitals-import-integer-type-fix: done
+  epic-11-retrospective: optional
+
+  # ── Epic 12: Data Migration Tool Modernization ────────────────────────────
+  epic-12: done
+  12-1-data-migration-environment-config: done
+  12-1-1-fix-data-migration-project-reference: done
+  12-2-vitals-type-correction-migration: done
+  12-2-migration-tool-hardening: done
+  12-3-case-rev-endpoint: done
+  12-4-stale-tab-ux: done
+  epic-12-retrospective: optional
+
+  # ── Epic 13: HTTP Client Modernization: data-migration ───────────────────
+  epic-13: done
+  13-1-data-migration-curl-to-couchdbhttpclient: done
+  epic-13-retrospective: optional
+
+  # ── Epic 14: HTTP Client Modernization: Replication ──────────────────────
+  epic-14: done
+  14-1-replication-curl-to-couchdbhttpclient: done
+  epic-14-retrospective: optional
+
+  # ── Epic 15: Admin Monitoring Enhancements ───────────────────────────────
+  epic-15: done
+  15-1-tenant-database-counts-open-cases: done
+  epic-15-retrospective: optional
+
+  # ── Epic 16: Controller Pattern Remediation ───────────────────────────────
+  epic-16: in-progress
+  16-1-systemoffline-sharedlibraries-feature: ready-for-dev
+  16-2-caseworkflowadmin-wave9-refactor: backlog
+  epic-16-retrospective: optional

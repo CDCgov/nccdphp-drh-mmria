@@ -457,6 +457,19 @@ dev this story _bmad-output/implementation-artifacts/15-1-tenant-database-counts
 
 ---
 
+## Epic 16 — Controller Pattern Remediation _(2026-07-14)_
+
+| Story | File | Status |
+|-------|------|--------|
+| 16.1 — Establish SystemOffline SharedLibraries Feature | [16-1-systemoffline-sharedlibraries-feature.md](16-1-systemoffline-sharedlibraries-feature.md) | ready-for-dev |
+| 16.2 — CaseWorkflowAdmin Wave 9 Refactor | [16-2-caseworkflowadmin-wave9-refactor.md](16-2-caseworkflowadmin-wave9-refactor.md) | not-started |
+
+**Sequencing:** Independent. No dependencies on other epics. Story 16.1 and 16.2 can be done in either order.
+
+> ℹ️ Remediates controllers that violate the `SharedLibraries/{Feature}/Manager/DAL` pattern. Story 16.1 extracts direct `CouchDbHttpClient.ExecuteAsync` calls and `SystemOfflineMessageFormatter` out of `system_offlineController` into a new `SystemOffline` feature. Story 16.2 moves `clear_case_status.cs` and `recover_deleted_case.cs` (Wave 9) plus their Epic 7 audit-write logic into a new `CaseWorkflowAdmin` feature. Story files must be created via `create story` before dev prompts are available.
+
+---
+
 ## Open Items — Resolve Before Affected Story
 
 | OI       | Affects               | What to resolve                                                                                                                                                                                                                                                                                                                                                                                        |
