@@ -26,11 +26,8 @@ RUN dotnet publish mmria-server.csproj -c Release -f net10.0 -o /app/publish
 USER 1001
 
 # ----- Stage 3: Runtime -----
-# TODO: Revert to dotnet-100-runtime once EcPaaS confirms the image includes Microsoft.AspNetCore.App 10.0.0.
-# The dotnet-100-runtime:9.7-1775651129 image is missing the ASP.NET Core framework layer (CrashLoopBackOff).
-# Using the SDK image as a temporary workaround — it includes the full runtime.
-# dotnet-100-runtime target: dotnet-100-runtime:9.7-1775651129@sha256:d2828e5beafbcfb731306523b525575801e5c1438c69524dbba25161fc6bb884
-FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100:9.8-1782912189@sha256:ca21a4d4f70f87c4582a6f5b4463e61c996fb34684985c6622a743560ae10e4a AS runtime
+# https://console-openshift-console.apps.ecpaas-dev.cdc.gov/k8s/ns/trusted-images/imagestreamtags/dotnet-100-aspnet%3A9.7-1776776188
+FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100-aspnet:9.7-1776776188@sha256:a3c1786ae2647dd9c285e701ae5f8cccf50607fad8e6d2f92c294ead6823937a AS runtime
 
 # Switch to root temporarily to create directories
 USER root
