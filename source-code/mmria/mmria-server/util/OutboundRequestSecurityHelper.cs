@@ -42,7 +42,8 @@ public static class OutboundRequestSecurityHelper
             throw new ArgumentException("Bearer token contains unexpected characters.", paramName);
         }
 
-        if (!AuthenticationHeaderValue.TryParse(string.Concat("Bearer", " ", sanitizedToken), out var headerValue) ||
+        var headerText = string.Concat("Bearer", " ", sanitizedToken);
+        if (!AuthenticationHeaderValue.TryParse(headerText, out var headerValue) ||
             !string.Equals(headerValue.Scheme, "Bearer", StringComparison.Ordinal) ||
             !string.Equals(headerValue.Parameter, sanitizedToken, StringComparison.Ordinal))
         {
