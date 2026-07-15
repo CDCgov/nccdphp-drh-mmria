@@ -175,35 +175,35 @@ development_status:
   epic-18-retrospective: optional
 
   # ── Epic 19: jurisdiction Consolidation ───────────────────────────────────
-  epic-19: backlog
-  19-1-jurisdiction-operation-catalog: backlog
-  19-2-ijurisdiction-repository-jurisdictiondal: backlog
-  19-3-ijurisdiction-authorization-reader: backlog
-  19-4-route-out-of-dal-jurisdiction-crud: backlog
+  epic-19: in-progress
+  19-1-jurisdiction-operation-catalog: ready-for-dev
+  19-2-ijurisdiction-repository-jurisdictiondal: ready-for-dev
+  19-3-ijurisdiction-authorization-reader: ready-for-dev
+  19-4-route-out-of-dal-jurisdiction-crud: ready-for-dev
   epic-19-retrospective: optional
 
   # ── Epic 20: metadata Consolidation ───────────────────────────────────────
-  epic-20: backlog
-  20-1-metadata-operation-catalog: backlog
-  20-2-imetadata-repository-metadataversiondal: backlog
-  20-3-sharedlibraries-dal-metadata-calls: backlog
-  20-4-controller-metadata-calls: backlog
-  20-5-mmria-services-metadata-reads: backlog
-  20-6-metadata-boundary-decision: backlog
+  epic-20: in-progress
+  20-1-metadata-operation-catalog: ready-for-dev
+  20-2-imetadata-repository-metadataversiondal: ready-for-dev
+  20-3-sharedlibraries-dal-metadata-calls: ready-for-dev
+  20-4-controller-metadata-calls: ready-for-dev
+  20-5-mmria-services-metadata-reads: ready-for-dev
+  20-6-metadata-boundary-decision: ready-for-dev
   epic-20-retrospective: optional
 
   # ── Epic 21: audit Consolidation ──────────────────────────────────────────
-  epic-21: backlog
-  21-1-audit-operation-catalog: backlog
-  21-2-iaudit-repository-auditdal: backlog
-  21-3-casemanager-audit-writes: backlog
-  21-4-caseworkflowadmindal-audit-calls: backlog
-  21-5-controller-audit-calls: backlog
-  21-6-manageusers-auditrecovery-audit-calls: backlog
+  epic-21: in-progress
+  21-1-audit-operation-catalog: ready-for-dev
+  21-2-iaudit-repository-auditdal: ready-for-dev
+  21-3-casemanager-audit-writes: ready-for-dev
+  21-4-caseworkflowadmindal-audit-calls: ready-for-dev
+  21-5-controller-audit-calls: ready-for-dev
+  21-6-manageusers-auditrecovery-audit-calls: ready-for-dev
   epic-21-retrospective: optional
 
   # ── Epic 22: .NET 10 Upgrade ─────────────────────────────────────────────
-  epic-22: backlog
-  22-1-net-10-compatibility-analysis-and-risk-assessment: backlog
-  22-2-net-10-upgrade-execution: backlog
+  epic-22: in-progress
+  22-1-net-10-compatibility-analysis-and-risk-assessment: ready-for-dev
+  22-2-net-10-upgrade-execution: ready-for-dev
   epic-22-retrospective: optional
