@@ -732,7 +732,7 @@ dev this story _bmad-output/implementation-artifacts/21-6-manageusers-auditrecov
 
 | Story | File | Status |
 |-------|------|--------|
-| 22.1 — Compatibility Analysis and Risk Assessment | [22-1-net-10-compatibility-analysis-and-risk-assessment.md](22-1-net-10-compatibility-analysis-and-risk-assessment.md) | ready-for-dev |
+| 22.1 — Compatibility Analysis and Risk Assessment | [22-1-net-10-compatibility-analysis-and-risk-assessment.md](22-1-net-10-compatibility-analysis-and-risk-assessment.md) | done |
 | 22.2 — Upgrade Execution | [22-2-net-10-upgrade-execution.md](22-2-net-10-upgrade-execution.md) | ready-for-dev |
 
 **Sequencing:** 22.1 must be complete with no unresolved blockers before 22.2 begins. Strictly sequential — do not run in parallel.

@@ -2,8 +2,10 @@
 
 **Epic:** 22 — .NET 10 Upgrade
 **Story ID:** 22.1
-**Status:** ready-for-dev
+**Status:** done
 **Date added:** 2026-07-15
+**Completed:** 2026-07-15
+**Output:** `docs/ai/dotnet10-compatibility-analysis.md`
 **Depends on:** none — discovery only
 **Source requirements:** epics.md §Epic 22 Story 22.1
 
