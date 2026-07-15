@@ -2,7 +2,7 @@
 
 **Epic:** 22 — .NET 10 Upgrade
 **Story ID:** 22.2
-**Status:** ready-for-dev
+**Status:** done
 **Date added:** 2026-07-15
 **Depends on:** 22.1 complete with no unresolved blockers
 **Source requirements:** epics.md §Epic 22 Story 22.2

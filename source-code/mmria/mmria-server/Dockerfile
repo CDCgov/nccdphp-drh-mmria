@@ -1,6 +1,6 @@
 # ----- Stage 1: Build -----
 # https://catalog.redhat.com/en/software/containers/ubi8/dotnet-90/672bc9015e6e9c0c6f7d2ff7
-FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-90:9.0-1784003632@sha256:fbff3be85e7706fbb12afdf02d8f21faf5722f63bdda43150934d0d512374686 AS build
+FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100:9.8-1782912189@sha256:ca21a4d4f70f87c4582a6f5b4463e61c996fb34684985c6622a743560ae10e4a AS build
 WORKDIR /src
 
 # Copy only the csproj for dependency caching
@@ -15,19 +15,19 @@ USER root
 WORKDIR /src/source-code/mmria/mmria-server
 RUN dotnet restore mmria-server.csproj
 
-RUN dotnet build mmria-server.csproj -c Release -f net9.0 -o /app/build
+RUN dotnet build mmria-server.csproj -c Release -f net10.0 -o /app/build
 USER 1001
 
 # ----- Stage 2: Publish -----
 FROM build AS publish
 USER root
 WORKDIR /src/source-code/mmria/mmria-server
-RUN dotnet publish mmria-server.csproj -c Release -f net9.0 -o /app/publish
+RUN dotnet publish mmria-server.csproj -c Release -f net10.0 -o /app/publish
 USER 1001
 
 # ----- Stage 3: Runtime -----
-# https://catalog.redhat.com/en/software/containers/ubi8/dotnet-90-runtime/672bc8de5e6e9c0c6f7d2f65
-FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-90-runtime:9.0-1783975593@sha256:1b7266ecedfbcea13a3e2ae0857405402f31f77ec69fdcff52a6ac2b9eee1fce AS runtime
+# https://catalog.redhat.com/en/software/containers/ubi8/dotnet-100-runtime
+FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100-runtime:9.7-1775651129@sha256:d2828e5beafbcfb731306523b525575801e5c1438c69524dbba25161fc6bb884 AS runtime
 
 # Switch to root temporarily to create directories
 USER root

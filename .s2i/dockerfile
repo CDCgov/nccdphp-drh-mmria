@@ -1,4 +1,10 @@
-FROM idefault-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-80@sha256:d815f801d82d35b69919d2cd234068bea36fefaaa0f2b84832d8fedcc19d9abe
+# RETIRED — 2026-07-15
+# This file referenced the EOL dotnet-80 image and was superseded by the Dockerfiles at:
+#   source-code/mmria/mmria-server/Dockerfile
+#   nccdphp-drh-mmria-services/mmria.services/Dockerfile
+# Do not use this file. It is retained for history only.
+#
+# FROM idefault-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-80@sha256:d815f801d82d35b69919d2cd234068bea36fefaaa0f2b84832d8fedcc19d9abe
 
 RUN apt update
 RUN apt install -y clang zlib1g-dev
