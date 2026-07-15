@@ -2,7 +2,7 @@
 
 **Epic:** 19 — `jurisdiction` Consolidation (SQL Migration Foundation)
 **Story ID:** 19.2
-**Status:** ready-for-dev
+**Status:** done
 **Date added:** 2026-07-15
 **Depends on:** 19.1
 **Source requirements:** epics.md §Epic 19 Story 19.2; project-context.md §2.2

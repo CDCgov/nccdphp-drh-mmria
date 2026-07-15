@@ -8,6 +8,7 @@ using mmria.common.couchdb;
 using mmria.common.model.couchdb;
 using mmria.common.model.couchdb.audit;
 using mmria.common.SharedLibraries.ManageUsers.Model;
+using mmria.common.SharedLibraries.Jurisdiction;
 using System.Text.Json.Serialization;
 
 namespace mmria.common.SharedLibraries.ManageUsers.DAL;
@@ -26,11 +27,16 @@ public class ManageUsersDAL
 
     private readonly CouchDbHttpClient _httpClient;
     private readonly mmria.common.SharedLibraries.Account.IUserRepository _userRepository;
+    private readonly IJurisdictionRepository _jurisdictionRepository;
 
-    public ManageUsersDAL(CouchDbHttpClient httpClient, mmria.common.SharedLibraries.Account.IUserRepository userRepository)
+    public ManageUsersDAL(
+        CouchDbHttpClient httpClient,
+        mmria.common.SharedLibraries.Account.IUserRepository userRepository,
+        IJurisdictionRepository jurisdictionRepository)
     {
         _httpClient = httpClient;
         _userRepository = userRepository;
+        _jurisdictionRepository = jurisdictionRepository;
     }
 
     /// <summary>
@@ -83,19 +89,11 @@ public class ManageUsersDAL
     /// <summary>
     /// Bulk create/update user_role_jurisdiction documents via CouchDB _bulk_docs.
     /// </summary>
-    public async Task<List<document_put_response>> BulkUpsertUserRoleJurisdictionsAsync(
+    public Task<List<document_put_response>> BulkUpsertUserRoleJurisdictionsAsync(
         List<user_role_jurisdiction> user_role_jurisdictions,
         DBConfigurationDetail db_config)
     {
-        JsonSerializerSettings settings = new JsonSerializerSettings();
-        settings.NullValueHandling = NullValueHandling.Ignore;
-        string user_role_jurisdictions_json = JsonConvert.SerializeObject(new { docs = user_role_jurisdictions }, settings);
-
-        string bulk_docs_url = db_config.url + $"/{db_config.prefix}jurisdiction/_bulk_docs";
-
-        string responseFromServer = await _httpClient.ExecuteAsync("POST", bulk_docs_url, user_role_jurisdictions_json, db_config.user_name, db_config.user_value);
-        var results = JsonConvert.DeserializeObject<List<document_put_response>>(responseFromServer);
-        return results;
+        return _jurisdictionRepository.BulkUpsertUserRoleJurisdictionsAsync(user_role_jurisdictions, db_config);
     }
 
     public Task<get_response_header<user>> GetAllUsersAsync(
@@ -106,58 +104,43 @@ public class ManageUsersDAL
         return _userRepository.GetAllUsersAsync(skip, take, db_config);
     }
 
-    public async Task<get_response_header<user_role_jurisdiction>> GetAllUserRoleJurisdictionsAsync(DBConfigurationDetail db_config)
+    public Task<get_response_header<user_role_jurisdiction>> GetAllUserRoleJurisdictionsAsync(DBConfigurationDetail db_config)
     {
-        string request_string = $"{db_config.url}/{db_config.prefix}jurisdiction/_all_docs?include_docs=true";
-        string responseFromServer = await _httpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
-        return JsonConvert.DeserializeObject<get_response_header<user_role_jurisdiction>>(responseFromServer);
+        return _jurisdictionRepository.GetAllUserRoleJurisdictionsAsync(db_config);
     }
 
-    public async Task<user_role_jurisdiction> GetUserRoleJurisdictionAsync(
+    public Task<user_role_jurisdiction> GetUserRoleJurisdictionAsync(
         string id,
         DBConfigurationDetail db_config)
     {
-        string request_string = $"{db_config.url}/{db_config.prefix}jurisdiction/{id}";
-        string responseFromServer = await _httpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
-        return JsonConvert.DeserializeObject<user_role_jurisdiction>(responseFromServer);
+        return _jurisdictionRepository.GetUserRoleJurisdictionAsync(id, db_config);
     }
 
-    public async Task<document_put_response> PutUserRoleJurisdictionAsync(
+    public Task<document_put_response> PutUserRoleJurisdictionAsync(
         user_role_jurisdiction item,
         DBConfigurationDetail db_config)
     {
-        JsonSerializerSettings settings = new JsonSerializerSettings();
-        settings.NullValueHandling = NullValueHandling.Ignore;
-        string object_string = JsonConvert.SerializeObject(item, settings);
-
-        string request_string = $"{db_config.url}/{db_config.prefix}jurisdiction/{item._id}";
-        string responseFromServer = await _httpClient.ExecuteAsync("PUT", request_string, object_string, db_config.user_name, db_config.user_value);
-        return JsonConvert.DeserializeObject<document_put_response>(responseFromServer);
+        return _jurisdictionRepository.PutUserRoleJurisdictionAsync(item, db_config);
     }
 
-    public async Task<document_put_response> DeleteUserRoleJurisdictionAsync(
+    public Task<document_put_response> DeleteUserRoleJurisdictionAsync(
         string id,
         string rev,
         DBConfigurationDetail db_config)
     {
-        string request_string = $"{db_config.url}/{db_config.prefix}jurisdiction/{id}?rev={rev}";
-        string responseFromServer = await _httpClient.ExecuteAsync("DELETE", request_string, null, db_config.user_name, db_config.user_value);
-        return JsonConvert.DeserializeObject<document_put_response>(responseFromServer);
+        return _jurisdictionRepository.DeleteUserRoleJurisdictionAsync(id, rev, db_config);
     }
 
-    public async Task<get_sortable_view_reponse_header<user_role_jurisdiction>> GetUserRoleJurisdictionSortableViewAsync(
+    public Task<get_sortable_view_reponse_header<user_role_jurisdiction>> GetUserRoleJurisdictionSortableViewAsync(
         string request_string,
         DBConfigurationDetail db_config)
     {
-        string responseFromServer = await _httpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
-        return JsonConvert.DeserializeObject<get_sortable_view_reponse_header<user_role_jurisdiction>>(responseFromServer);
+        return _jurisdictionRepository.GetUserRoleJurisdictionSortableViewAsync(request_string, db_config);
     }
 
-    public async Task<jurisdiction_tree> GetJurisdictionTreeAsync(DBConfigurationDetail db_config)
+    public Task<jurisdiction_tree> GetJurisdictionTreeAsync(DBConfigurationDetail db_config)
     {
-        string request_string = db_config.Get_Prefix_DB_Url("jurisdiction/jurisdiction_tree");
-        string responseFromServer = await _httpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
-        return JsonConvert.DeserializeObject<jurisdiction_tree>(responseFromServer);
+        return _jurisdictionRepository.GetJurisdictionTreeAsync(db_config);
     }
 
     public async Task<Audit_Manage_User> GetAuditManageUserAsync(DBConfigurationDetail db_config)
@@ -173,23 +156,15 @@ public class ManageUsersDAL
         return JsonConvert.DeserializeObject<Audit_Manage_User>(responseFromServer);
     }
 
-    public async Task<FormAccessSpecification> GetFormAccessAsync(DBConfigurationDetail db_config)
+    public Task<FormAccessSpecification> GetFormAccessAsync(DBConfigurationDetail db_config)
     {
-        string request_string = db_config.Get_Prefix_DB_Url("jurisdiction/form-access-list");
-        string responseFromServer = await _httpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
-        return JsonConvert.DeserializeObject<FormAccessSpecification>(responseFromServer);
+        return _jurisdictionRepository.GetFormAccessAsync(db_config);
     }
 
-    public async Task<document_put_response> SaveFormAccessAsync(
+    public Task<document_put_response> SaveFormAccessAsync(
         FormAccessSpecification request,
         DBConfigurationDetail db_config)
     {
-        JsonSerializerSettings settings = new JsonSerializerSettings();
-        settings.NullValueHandling = NullValueHandling.Ignore;
-        string object_string = JsonConvert.SerializeObject(request, settings);
-
-        string request_string = db_config.Get_Prefix_DB_Url("jurisdiction/form-access-list");
-        string responseFromServer = await _httpClient.ExecuteAsync("PUT", request_string, object_string, db_config.user_name, db_config.user_value);
-        return JsonConvert.DeserializeObject<document_put_response>(responseFromServer);
+        return _jurisdictionRepository.SaveFormAccessAsync(request, db_config);
     }
 }

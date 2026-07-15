@@ -297,6 +297,10 @@ public sealed partial class Program
             builder.Services.AddScoped<mmria.common.SharedLibraries.Account.IUserRepository>(
                 sp => sp.GetRequiredService<mmria.common.SharedLibraries.Account.DAL.AccountDAL>());
             builder.Services.AddScoped<mmria.common.SharedLibraries.Account.Manager.AccountManager>();
+            // JurisdictionDAL registered as concrete type and as IJurisdictionRepository (SQL migration seam)
+            builder.Services.AddScoped<mmria.common.SharedLibraries.Jurisdiction.DAL.JurisdictionDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.Jurisdiction.IJurisdictionRepository>(
+                sp => sp.GetRequiredService<mmria.common.SharedLibraries.Jurisdiction.DAL.JurisdictionDAL>());
             builder.Services.AddScoped<mmria.common.SharedLibraries.ManageUsers.DAL.ManageUsersDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.ManageUsers.Manager.ManageUsersManager>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.MetadataVersion.DAL.MetadataVersionDAL>();
