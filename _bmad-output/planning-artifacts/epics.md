@@ -1871,3 +1871,227 @@ So that the boundary is explicit and consistent with the decision made for `mmrd
 
 20.3, 20.4, 20.5, and 20.6 can proceed in parallel once 20.2 is complete.
 
+---
+
+## Epic 21: `audit` Consolidation (SQL Migration Foundation)
+
+All CouchDB reads and writes against the `audit` database are consolidated behind a single `IAuditRepository` interface implemented by a new canonical `AuditDAL`. The 19 in-scope call sites currently scattered across controllers, managers, and DAL files are routed through the interface. After this epic, migrating the audit database to SQL requires changing only `AuditDAL` — no manager, controller, or workflow-admin code changes are needed.
+
+**Architecture rule:** project-context.md §2.2 SharedLibraries pattern + SQL migration readiness.
+
+**Scope summary (verified 2026-07-15):**
+
+| Location | # Calls | Layer | URL Pattern | Notes |
+|---|---|---|---|---|
+| `AuditRecoveryDAL.cs` | 3 | DAL ✓ | **A** (wrong) | GET by ID, GET audit-manage-user, PUT audit-manage-user |
+| `CaseWorkflowAdminDAL.cs` | 4 | DAL ✓ | **B** (correct) | WriteAuditEntry, GetDeletedCasesView, GetAuditDoc, DeleteAuditDoc |
+| `ManageUsersDAL.cs` | 1 | DAL ✓ | **A** (wrong) | GET audit-manage-user (duplicate of AuditRecoveryDAL) |
+| `CaseManager.cs` | 6 | **Manager ✗** | **B** (correct) | All audit PUT (Change_Stack writes) — wrong layer |
+| `AuditRecoveryManager.cs` | 1 | **Manager ✗** | **A** (wrong) | Builds `_find` URL directly in manager |
+| `_auditController.cs` | 1 | **Controller ✗** | **A** (wrong) | `_find` by case_id — wrong layer |
+| `AuditRecoverUtilController.cs` | 1 | **Controller ✗** | **A** (wrong) | `_find` — wrong layer |
+| `caseController.pmss.cs` | 2 | **Controller ✗** | **B** (correct) | Audit PUT (Change_Stack writes) — wrong layer |
+| `c_db_setup.cs` | 5 | Infra | — | DB setup/security — **out of scope** |
+
+**Total in-scope: 19 calls.** 8 are already in the DAL layer but behind no interface. 11 are leaking out of the DAL.
+
+**Design decision — AuditDAL vs. AuditRecoveryDAL:**
+The existing `AuditRecoveryDAL` is scoped to one workflow (audit recovery / manage-user). A new canonical `SharedLibraries/Audit/DAL/AuditDAL.cs` is the correct home for all audit CRUD operations. After this epic, `AuditRecoveryDAL` becomes a workflow-specific DAL that delegates its audit reads/writes to `IAuditRepository` and keeps only recovery-specific orchestration.
+
+**Sequencing constraint:** Story 21.4 modifies `CaseWorkflowAdminDAL.cs`. Epic 17 Story 17.4 also modifies the same file. **21.4 must run after Epic 17 is complete** to avoid conflict on that file.
+
+---
+
+### Story 21.1: `audit` Operation Catalog
+
+As a developer,
+I want a definitive catalog of every operation against the `audit` database across all three projects,
+So that Story 21.2 has an agreed-upon, complete operation set before any code changes begin.
+
+**Acceptance Criteria:**
+
+**Given** all `.cs` files in `mmria-server`, `mmria.common`, and `mmria.services`
+**When** the developer completes the catalog
+**Then** `docs/ai/mmrds_operation_catalog.md` gains an `audit` section listing every distinct operation grouped into: audit entry writes (PUT `Change_Stack`), audit entry reads (GET by ID), audit view queries (`by_deleted`), Mango `_find` queries (`by case_id`), special document reads/writes (`audit-manage-user`), and bulk/delete operations
+
+**Given** each catalog entry
+**When** the catalog is complete
+**Then** each entry records: operation name, calling file(s) with line number, URL pattern in use (A or B), and response type expected
+
+**Given** `c_db_setup.cs` references to `audit`
+**When** evaluated
+**Then** they are listed but marked **out of scope** — DB setup and security configuration are infrastructure operations
+
+---
+
+### Story 21.2: Create `AuditDAL` and Extract `IAuditRepository`
+
+As a developer,
+I want a single `IAuditRepository` interface over all audit CRUD operations,
+So that every caller can depend on the interface and a SQL migration requires changing only `AuditDAL`.
+
+**Acceptance Criteria:**
+
+**Given** no canonical `Audit` SharedLibraries feature exists
+**When** this story creates one
+**Then** the following structure exists:
+```
+mmria.common/SharedLibraries/Audit/
+  IAuditRepository.cs
+  DAL/
+    AuditDAL.cs
+```
+
+**Given** the operation catalog from Story 21.1
+**When** `AuditDAL` is created
+**Then** it contains async methods for every in-scope operation, including at minimum:
+- `WriteAuditEntryAsync(Change_Stack entry, DBConfigurationDetail dbConfig)`
+- `GetAuditEntryAsync(string auditId, DBConfigurationDetail dbConfig)` → `Change_Stack`
+- `DeleteAuditEntryAsync(string auditId, string rev, DBConfigurationDetail dbConfig)`
+- `GetDeletedCasesViewAsync(DBConfigurationDetail dbConfig)` → `get_sortable_view_reponse_header<Audit_Detail_View>`
+- `GetAuditManageUserAsync(DBConfigurationDetail dbConfig)` → `Audit_Manage_User?`
+- `SaveAuditManageUserAsync(Audit_Manage_User doc, DBConfigurationDetail dbConfig)`
+- `FindAuditsByCaseAsync(string caseId, DBConfigurationDetail dbConfig)` → `ChangeStackResult`
+
+**Given** all `AuditDAL` methods
+**When** written
+**Then** all use `dbConfig.Get_Prefix_DB_Url(...)` (Pattern B) — no `$"{dbConfig.url}/{dbConfig.prefix}audit/..."` string interpolations
+
+**Given** `IAuditRepository` is defined
+**When** DI registration is updated in `mmria-server/Program.cs`
+**Then** `services.AddScoped<IAuditRepository, AuditDAL>()` is present
+
+**Given** no callers are changed in this story
+**When** the build runs
+**Then** `mmria-server`, `mmria.common`, and `mmria.services` build with zero errors
+
+---
+
+### Story 21.3: Route CaseManager Audit Writes Through `IAuditRepository`
+
+As a developer,
+I want `CaseManager`'s 6 direct audit write calls to delegate to `IAuditRepository`,
+So that audit access in the case manager layer follows the Manager → DAL boundary.
+
+**Acceptance Criteria:**
+
+**Given** the following 6 direct audit PUT calls in `CaseManager.cs` (all using `Get_Prefix_DB_Url`, Pattern B):
+- Line 318: `auditDbConfig.Get_Prefix_DB_Url($"audit/{changeStack._id}")`
+- Line 537: `auditDbConfig.Get_Prefix_DB_Url($"audit/{changeStack._id}")`
+- Line 1180: `dbConfig.Get_Prefix_DB_Url($"audit/{changeStack._id}")`
+- Line 1330: `dbConfig.Get_Prefix_DB_Url($"audit/{changeStack._id}")`
+- Line 1831: `dbConfig.Get_Prefix_DB_Url($"audit/{changeStack._id}")`
+- Line 2330: `dbConfig.Get_Prefix_DB_Url($"audit/{audit_data._id}")`
+**When** this story is complete
+**Then** each is replaced with `IAuditRepository.WriteAuditEntryAsync(changeStack, dbConfig)`; `IAuditRepository` is injected into `CaseManager` via constructor injection
+
+**Given** `CaseManager` will now depend on both `ICaseRepository` and `IAuditRepository`
+**When** DI registration is updated
+**Then** both dependencies are registered and `CaseManager` resolves correctly
+
+**Given** the build after all changes
+**When** verified
+**Then** all three projects build with zero errors and no controller code changes are required
+
+---
+
+### Story 21.4: Route CaseWorkflowAdminDAL Audit Calls Through `IAuditRepository`
+
+As a developer,
+I want `CaseWorkflowAdminDAL`'s 4 direct audit calls to delegate to `IAuditRepository`,
+So that the workflow-admin DAL no longer constructs audit URLs directly.
+
+**Acceptance Criteria:**
+
+**Given** the following 4 audit calls in `CaseWorkflowAdminDAL.cs` (all Pattern B):
+- Line 49: `WriteAuditEntryAsync` — PUT `audit/{auditEntry._id}`
+- Line 57: `GetDeletedCasesViewAsync` — GET `audit/_design/sortable/_view/by_deleted`
+- Line 67: `GetAuditDocumentAsync` — GET `audit/{auditId}`
+- Line 92: `DeleteAuditDocumentAsync` — DELETE `audit/{auditId}?rev={rev}`
+**When** this story is complete
+**Then** each is replaced with the corresponding `IAuditRepository` method; `IAuditRepository` is injected into `CaseWorkflowAdminDAL` via constructor injection
+
+**Given** `CaseWorkflowAdminDAL` after Epic 17 Story 17.4 already delegates mmrds calls to `ICaseRepository`
+**When** this story is implemented
+**Then** `CaseWorkflowAdminDAL` depends on both `ICaseRepository` and `IAuditRepository`; `_couchDbHttpClient` is removed from the class entirely (all its calls will have been moved to repository dependencies)
+
+**Given** the build after all changes
+**When** verified
+**Then** all three projects build with zero errors
+
+**Pre-condition:** This story must not be started until Epic 17 Story 17.4 is `done`.
+
+---
+
+### Story 21.5: Route Controller-Level Audit Calls Through `IAuditRepository`
+
+As a developer,
+I want all direct audit URL construction in controllers eliminated,
+So that controllers never touch the audit database directly.
+
+**Acceptance Criteria:**
+
+**Given** the following direct audit calls in controller/util files:
+- `_auditController.cs` line 107: `$"{db_config.url}/{db_config.prefix}audit/_find"` — builds `_find` URL in a private helper method, passes it to `AuditRecoveryManager`
+- `AuditRecoverUtilController.cs` line 54: `$"{configuration.url}/{configuration.prefix}audit/_find"` — `_find` URL passed to a service
+- `caseController.pmss.cs` line 261: `db_config.Get_Prefix_DB_Url($"audit/{audit_data._id}")` — audit PUT
+- `caseController.pmss.cs` line 418: `db_config.Get_Prefix_DB_Url($"audit/{audit_data._id}")` — audit PUT
+**When** this story is complete
+**Then** all four call sites are replaced with `IAuditRepository` method calls; `IAuditRepository` is injected into each controller via constructor injection; no controller constructs an `audit/` URL
+
+**Given** `_auditController.cs` `get_find_url()` helper method (line ~90–110) that currently builds the `_find` URL tuple `(url, postData)` and passes both to `AuditRecoveryManager.GetAuditViewDataAsync`
+**When** replaced
+**Then** the URL construction is removed from the controller; `FindAuditsByCaseAsync` in `IAuditRepository` accepts the `caseId` directly and handles the `_find` POST internally; the manager receives the result, not the URL
+
+**Given** `caseController.pmss.cs` audit writes at lines 261 and 418
+**When** replaced
+**Then** only the CouchDB URL construction and `ExecuteAsync` calls move to the DAL — the surrounding PMSS business logic and error handling remain in the controller
+
+**Given** the build after all changes
+**When** verified
+**Then** all three projects build with zero errors
+
+---
+
+### Story 21.6: Route `ManageUsersDAL` and `AuditRecoveryDAL` Through `IAuditRepository`
+
+As a developer,
+I want `ManageUsersDAL` and `AuditRecoveryDAL` to delegate their audit operations to `IAuditRepository`,
+So that no DAL outside `AuditDAL` constructs audit URLs directly.
+
+**Acceptance Criteria:**
+
+**Given** `ManageUsersDAL.cs` line 165 — `$"{db_config.url}/{db_config.prefix}audit/audit-manage-user"` (GET `Audit_Manage_User`, Pattern A)
+**When** this story is complete
+**Then** the call is replaced with `IAuditRepository.GetAuditManageUserAsync(db_config)`; `IAuditRepository` is injected into `ManageUsersDAL`
+
+**Given** `AuditRecoveryDAL.cs` lines 39, 53, 70 (all Pattern A):
+- Line 39: GET `audit/{changeId}` → `Change_Stack`
+- Line 53: GET `audit/audit-manage-user` → `Audit_Manage_User`
+- Line 70: PUT `audit/{auditDocument._id}` → `document_put_response`
+**When** this story is complete
+**Then** all three are replaced with the corresponding `IAuditRepository` methods; `AuditRecoveryDAL` injects `IAuditRepository` instead of calling `_couchDbHttpClient` for audit operations
+
+**Given** `AuditRecoveryManager.cs` line 158 — builds `_find` URL directly as `$"{db_config.url}/{db_config.prefix}audit/_find"` and returns it as a tuple to be passed back to the DAL
+**When** this story is complete
+**Then** the `_find` URL construction is removed from `AuditRecoveryManager`; the manager calls `IAuditRepository.FindAuditsByCaseAsync(caseId, dbConfig)` directly and receives the result; `IAuditRepository` is injected into `AuditRecoveryManager`
+
+**Given** the build after all changes
+**When** verified
+**Then** all three projects build with zero errors; `AuditRecoveryDAL` no longer holds any direct `_couchDbHttpClient` audit calls (its `_couchDbHttpClient` field may be removed entirely if no other calls remain)
+
+---
+
+## Epic 21 — Story Sequencing
+
+| Wave | Story | Risk | Dependencies |
+|---|---|---|---|
+| 21 | 21.1 — `audit` Operation Catalog | None | None — discovery only |
+| 21 | 21.2 — `AuditDAL` + `IAuditRepository` | Low | 21.1 |
+| 21 | 21.3 — CaseManager audit writes | Low | 21.2 |
+| 21 | 21.5 — Controller-level audit calls | Low–Medium | 21.2 |
+| 21 | 21.6 — ManageUsersDAL + AuditRecoveryDAL + AuditRecoveryManager | Low | 21.2 |
+| 21 | 21.4 — CaseWorkflowAdminDAL audit calls | Low | 21.2 **+ Epic 17 Story 17.4 done** |
+
+21.3, 21.5, and 21.6 can proceed in parallel once 21.2 is complete. 21.4 must wait for Epic 17 Story 17.4 to avoid file conflict on `CaseWorkflowAdminDAL.cs`.
+

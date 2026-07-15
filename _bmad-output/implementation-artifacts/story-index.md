@@ -545,7 +545,7 @@ dev this story _bmad-output/implementation-artifacts/17-7-mmriaservicesdal-sync-
 | 18.2 — Define `IUserRepository` and Canonicalize `AccountDAL` | [18-2-iuser-repository-accountdal.md](18-2-iuser-repository-accountdal.md) | done |
 | 18.3 — Route Leaking `_users` Calls Through `IUserRepository` | [18-3-route-leaking-users-calls.md](18-3-route-leaking-users-calls.md) | done |
 | 18.4 — Define `IConfigurationRepository` and Create `SystemConfigDAL` | [18-4-iconfiguration-repository-systemconfigdal.md](18-4-iconfiguration-repository-systemconfigdal.md) | done |
-| 18.5 — Extract `IConfigurationBootstrapLoader` | [18-5-iconfiguration-bootstrap-loader.md](18-5-iconfiguration-bootstrap-loader.md) | ready-for-dev |
+| 18.5 — Extract `IConfigurationBootstrapLoader` | [18-5-iconfiguration-bootstrap-loader.md](18-5-iconfiguration-bootstrap-loader.md) | done |
 
 **Sequencing:** 18.1 first (discovery). 18.2 depends on 18.1. 18.3 depends on 18.2. 18.4 and 18.5 are independent — can be done at any time after 18.1 for 18.4, or immediately for 18.5.
 

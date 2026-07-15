@@ -200,7 +200,7 @@ public sealed partial class Program
             Log.Information("***********************\n");
 
             // Load multi-tenant configuration using centralized loader
-            var configLoader = new mmria.common.couchdb.MultiTenantConfigurationLoader(configuration);
+            mmria.common.couchdb.IConfigurationBootstrapLoader configLoader = new mmria.common.couchdb.MultiTenantConfigurationLoader(configuration);
             
             // Create HTTP client for CouchDB during startup (uses SimpleHttpClientFactory)
             var configLoadingHttpFactory = new mmria.common.SimpleHttpClientFactory();

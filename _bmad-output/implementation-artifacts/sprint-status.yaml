@@ -191,3 +191,13 @@ development_status:
   20-5-mmria-services-metadata-reads: backlog
   20-6-metadata-boundary-decision: backlog
   epic-20-retrospective: optional
+
+  # ── Epic 21: audit Consolidation ──────────────────────────────────────────
+  epic-21: backlog
+  21-1-audit-operation-catalog: backlog
+  21-2-iaudit-repository-auditdal: backlog
+  21-3-casemanager-audit-writes: backlog
+  21-4-caseworkflowadmindal-audit-calls: backlog
+  21-5-controller-audit-calls: backlog
+  21-6-manageusers-auditrecovery-audit-calls: backlog
+  epic-21-retrospective: optional
