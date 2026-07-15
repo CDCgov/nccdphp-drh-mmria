@@ -537,6 +537,52 @@ dev this story _bmad-output/implementation-artifacts/17-7-mmriaservicesdal-sync-
 
 ---
 
+## Epic 18 — `_users` and `configuration` Consolidation (SQL Migration Foundation) _(2026-07-14)_
+
+| Story | File | Status |
+|-------|------|--------|
+| 18.1 — `_users` Operation Catalog | [18-1-users-operation-catalog.md](18-1-users-operation-catalog.md) | ready-for-dev |
+| 18.2 — Define `IUserRepository` and Canonicalize `AccountDAL` | [18-2-iuser-repository-accountdal.md](18-2-iuser-repository-accountdal.md) | ready-for-dev |
+| 18.3 — Route Leaking `_users` Calls Through `IUserRepository` | [18-3-route-leaking-users-calls.md](18-3-route-leaking-users-calls.md) | ready-for-dev |
+| 18.4 — Define `IConfigurationRepository` and Create `SystemConfigDAL` | [18-4-iconfiguration-repository-systemconfigdal.md](18-4-iconfiguration-repository-systemconfigdal.md) | ready-for-dev |
+| 18.5 — Extract `IConfigurationBootstrapLoader` | [18-5-iconfiguration-bootstrap-loader.md](18-5-iconfiguration-bootstrap-loader.md) | ready-for-dev |
+
+**Sequencing:** 18.1 first (discovery). 18.2 depends on 18.1. 18.3 depends on 18.2. 18.4 and 18.5 are independent — can be done at any time after 18.1 for 18.4, or immediately for 18.5.
+
+> ℹ️ Goal: all `_users` and `configuration` CouchDB calls consolidated behind `IUserRepository` and `IConfigurationRepository`. SQL migration = swap DAL implementations only. `IConfigurationBootstrapLoader` (18.5) is the separate seam for startup tenant loading.
+
+**Story 18.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/18-1-users-operation-catalog.md
+```
+
+**Story 18.2 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/18-2-iuser-repository-accountdal.md
+```
+
+**Story 18.3 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/18-3-route-leaking-users-calls.md
+```
+
+**Story 18.4 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/18-4-iconfiguration-repository-systemconfigdal.md
+```
+
+**Story 18.5 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/18-5-iconfiguration-bootstrap-loader.md
+```
+
+---
+
 ## Open Items — Resolve Before Affected Story
 
 | OI       | Affects               | What to resolve                                                                                                                                                                                                                                                                                                                                                                                        |

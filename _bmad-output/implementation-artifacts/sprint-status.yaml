@@ -166,12 +166,12 @@ development_status:
   epic-17-retrospective: optional
 
   # ── Epic 18: _users and configuration Consolidation ───────────────────────
-  epic-18: backlog
-  18-1-users-operation-catalog: backlog
-  18-2-iuser-repository-accountdal: backlog
-  18-3-route-leaking-users-calls: backlog
-  18-4-iconfiguration-repository-systemconfigdal: backlog
-  18-5-iconfiguration-bootstrap-loader: backlog
+  epic-18: in-progress
+  18-1-users-operation-catalog: ready-for-dev
+  18-2-iuser-repository-accountdal: ready-for-dev
+  18-3-route-leaking-users-calls: ready-for-dev
+  18-4-iconfiguration-repository-systemconfigdal: ready-for-dev
+  18-5-iconfiguration-bootstrap-loader: ready-for-dev
   epic-18-retrospective: optional
 
   # ── Epic 19: jurisdiction Consolidation ───────────────────────────────────
