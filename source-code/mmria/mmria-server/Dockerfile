@@ -27,7 +27,7 @@ USER 1001
 
 # ----- Stage 3: Runtime -----
 # https://catalog.redhat.com/en/software/containers/ubi8/dotnet-100-runtime
-FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100-runtime:9.7-1775651129@sha256:d2828e5beafbcfb731306523b525575801e5c1438c69524dbba25161fc6bb884 AS runtime
+FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100-runtime:9.8-1782826204@sha256:71a7b3d7f7963f91b0097a6ba5d38731ee760c10a76528e4c4b96e5bd0b4eb0a AS runtime
 
 # Switch to root temporarily to create directories
 USER root
