@@ -1,3 +1,44 @@
+## Scan: 2026-07-15 — Fortify mmria s2i @ 2a26dc0d (SSC 10291)
+
+## Finding 1 — Path Manipulation at source-code/mmria/mmria-server/util/ContainedPathHelper.cs:148
+**SSC Issue ID:** 2223458
+**Severity:** High
+**Verdict:** Already remediated
+
+### Evidence
+- SSC Issue ID 2223458 appeared in the prior scan (Scan: 2026-07-15 — mmria s2i @ 5c69b518) with verdict **Fixed**; the same fix is still present in the current codebase at the same file and line.
+- `EnsureContainedDirectoryExists(...)` calls `ResolveContainedDirectoryPath(...)`, which in turn calls `ValidateContainedName(...)` before combining paths (`source-code/mmria/mmria-server/util/ContainedPathHelper.cs:144-150`). The sink `Directory.CreateDirectory(safePath)` at line 148 only receives a path that has passed allow-list validation.
+- `ValidateContainedName(...)` rejects any character outside letters, digits, dash, underscore, or dot; rejects `.` and `..`; rejects rooted paths and separator characters; and rejects reserved Windows device names (`source-code/mmria/mmria-server/util/ContainedPathHelper.cs:208-252`).
+- `EnsureContainedPath(...)` verifies the resolved combined path still starts with the normalized base directory after `Path.GetFullPath(...)` resolution, preventing any traversal that might survive character filtering (`source-code/mmria/mmria-server/util/ContainedPathHelper.cs:254-260`).
+- Carried from prior scan — evidence unchanged; code fix verified in-place at current HEAD.
+
+### SWA Summary
+Contained directory creation at `Directory.CreateDirectory(safePath)` only receives paths that have passed allow-list validation in `ValidateContainedName(...)` and a post-resolution boundary check in `EnsureContainedPath(...)`. No traversal characters or separator sequences can reach the sink. The fix introduced in scan 5c69b518 remains in the current codebase.
+
+### Verdict rationale
+The taint path from caller-controlled input to `Directory.CreateDirectory(...)` is fully constrained by allow-list validation and a post-resolution containment check already present in the codebase. Fortify reported the same SSC Issue ID (2223458) in the previous scan where the fix was verified; this is a stale Fortify result against code that already contains the remediation.
+
+## Finding 2 — Cross-Site Scripting: Reflected at source-code/mmria/mmria-server/util/EscapedJsonResultFactory.cs:25
+**SSC Issue ID:** 2235651
+**SSC Issue ID:** 2235652
+**Severity:** Critical
+**Verdict:** Already remediated
+
+### Evidence
+- `EscapedJsonResultFactory.Serialize(...)` serializes the response object using Newtonsoft.Json with `StringEscapeHandling.EscapeHtml`, which encodes `<`, `>`, `&`, `'`, and `"` as Unicode escape sequences inside every JSON string value before the content reaches the HTTP response (`source-code/mmria/mmria-server/util/EscapedJsonResultFactory.cs:15-43`).
+- `EscapedJsonResultFactory.Create(...)` wraps the serialized payload in a `SecureEscapedJsonResult` whose `ExecuteResultAsync(...)` injects `X-Content-Type-Options: nosniff` before the response is written, preventing browsers from content-sniffing the escaped JSON as HTML (`source-code/mmria/mmria-server/util/EscapedJsonResultFactory.cs:22-53`).
+- Line 25 (`Content = Serialize(value)`) is the assignment inside `Create(...)` that stores the HTML-escaped JSON string; the tainted value has already been encoded by the time it is set as the `Content` property and before `ExecuteResultAsync(...)` writes it to the wire.
+- A prior XSS finding at this factory (SSC Issue ID 2225918, line 22) was verdicted **Fixed** in scan 5c69b518 using the same sanitizer pair; the two new data-flow traces (IDs 2235651, 2235652) reach the same sink with the same encoding in place.
+- Carried from prior scan — evidence unchanged; code fix verified in-place at current HEAD.
+
+### SWA Summary
+`EscapedJsonResultFactory` HTML-escapes all JSON string content via `StringEscapeHandling.EscapeHtml` and marks every response `X-Content-Type-Options: nosniff`. Both the payload-encoding and content-sniffing preconditions for reflected XSS at this sink are eliminated by controls already present in the current codebase. These new data-flow traces (SSC IDs 2235651, 2235652) are stale results that reach the same already-protected sink as the previously-fixed finding (SSC 2225918).
+
+### Verdict rationale
+The two new data-flow traces follow different entry-point paths to the same `Content = Serialize(value)` sink at line 25. `Serialize(...)` unconditionally applies `StringEscapeHandling.EscapeHtml`, making any HTML or script payload inserted into the JSON string non-executable in a browser context. The `X-Content-Type-Options: nosniff` header additionally prevents content-type coercion. The encoding and header controls verified in the previous scan are still present at HEAD; these findings represent stale Fortify detections of an already-remediated code path.
+
+---
+
 ## Scan: 2026-07-15 — Fortify mmria s2i @ 5c69b518 (SSC 10291)
 
 ## Finding 1 — Path Manipulation at source-code/mmria/mmria-server/util/ContainedPathHelper.cs:148
