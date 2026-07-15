@@ -35,7 +35,7 @@ last_updated: 2026-07-14
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-07-14
-last_updated: 2026-07-14
+last_updated: 2026-07-15
 project: mmria
 project_key: NOKEY
 tracking_system: file-system
@@ -167,8 +167,8 @@ development_status:
 
   # ── Epic 18: _users and configuration Consolidation ───────────────────────
   epic-18: in-progress
-  18-1-users-operation-catalog: ready-for-dev
-  18-2-iuser-repository-accountdal: ready-for-dev
+  18-1-users-operation-catalog: done
+  18-2-iuser-repository-accountdal: done
   18-3-route-leaking-users-calls: ready-for-dev
   18-4-iconfiguration-repository-systemconfigdal: ready-for-dev
   18-5-iconfiguration-bootstrap-loader: ready-for-dev

@@ -19,12 +19,19 @@ namespace mmria.common.SharedLibraries.Account.Manager;
 /// </summary>
 public class AccountManager
 {
-    private readonly AccountDAL _dal;
+    // _users operations are accessed via the interface seam (SQL migration boundary).
+    private readonly mmria.common.SharedLibraries.Account.IUserRepository _dal;
+    // Session/authentication operations stay on AccountDAL (out of _users scope).
+    private readonly AccountDAL _accountDal;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
-    public AccountManager(AccountDAL dal, mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+    public AccountManager(
+        mmria.common.SharedLibraries.Account.IUserRepository dal,
+        AccountDAL accountDal,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
         _dal = dal;
+        _accountDal = accountDal;
         _couchDbHttpClient = couchDbHttpClient;
     }
 
@@ -139,7 +146,7 @@ public class AccountManager
         }
 
         // Get session events for this user
-        var events = await _dal.GetSessionEventsAsync(userName, dbConfig);
+        var events = await _accountDal.GetSessionEventsAsync(userName, dbConfig);
         if (events.Count == 0)
         {
             return LockoutStatus.NotLockedOut();
@@ -199,7 +206,7 @@ public class AccountManager
             bool isAppPrefixOk = ValidateAppPrefixAccess(couchUser.app_prefix_list, dbConfig.prefix);
 
             // Step 3: Authenticate against CouchDB session endpoint
-            var loginResponse = await _dal.AuthenticateWithSessionAsync(
+            var loginResponse = await _accountDal.AuthenticateWithSessionAsync(
                 userName,
                 password,
                 dbConfig.url);
@@ -315,7 +322,7 @@ public class AccountManager
                 data = new Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase)
             };
             var sessionJson = JsonConvert.SerializeObject(sessionDoc, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
-            await _dal.CreateSessionDocumentAsync(sessionJson, sessionId, dbConfig);
+            await _accountDal.CreateSessionDocumentAsync(sessionJson, sessionId, dbConfig);
 
             return SessionInfo.Success(sessionId, expirationDateTime, userName, sessionEventId, roles);
         }

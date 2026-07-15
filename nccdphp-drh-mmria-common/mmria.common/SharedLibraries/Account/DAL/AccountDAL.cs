@@ -2,10 +2,12 @@
 
 using System;
 using System.Collections.Generic;
+using System.Dynamic;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using mmria.common.getset;
@@ -19,8 +21,13 @@ namespace mmria.common.SharedLibraries.Account.DAL;
 /// Contains ALL CouchDB calls for authentication, session events, and session management.
 /// No business logic - only data operations.
 /// </summary>
-public class AccountDAL
+public class AccountDAL : mmria.common.SharedLibraries.Account.IUserRepository
 {
+    private static readonly System.Text.Json.JsonSerializerOptions SensitiveJsonPayloadOptions = new()
+    {
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+
     private readonly CouchDbHttpClient _httpClient;
 
     public AccountDAL(CouchDbHttpClient httpClient)
@@ -208,6 +215,99 @@ public class AccountDAL
     private static string NormalizeUserName(string? userName)
     {
         return (userName ?? string.Empty).Trim().ToLowerInvariant();
+    }
+
+    // -----------------------------------------------------------------------
+    // IUserRepository — canonical _users CRUD methods
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// Get a CouchDB user document by full user_id (e.g. "org.couchdb.user:someone").
+    /// </summary>
+    public async Task<user> GetUserAsync(
+        string userId,
+        DBConfigurationDetail dbConfig)
+    {
+        string requestUrl = $"{dbConfig.url}/_users/{userId}";
+        string responseFromServer = await _httpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value);
+        return JsonConvert.DeserializeObject<user>(responseFromServer);
+    }
+
+    /// <summary>
+    /// Check if a CouchDB user document exists by full user_id.
+    /// Returns an empty user object if not found or on error — never returns null.
+    /// </summary>
+    public async Task<user> CheckUserAsync(
+        string userId,
+        DBConfigurationDetail dbConfig)
+    {
+        try
+        {
+            string requestUrl = $"{dbConfig.url}/_users/{userId}";
+            string responseFromServer = await _httpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value);
+
+            if (string.IsNullOrWhiteSpace(responseFromServer))
+            {
+                return new user();
+            }
+
+            if (responseFromServer.Contains("\"error\"") && responseFromServer.Contains("not_found"))
+            {
+                return new user();
+            }
+
+            return JsonConvert.DeserializeObject<user>(responseFromServer) ?? new user();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+            return new user();
+        }
+    }
+
+    /// <summary>
+    /// Create or update a CouchDB user document via PUT.
+    /// </summary>
+    public async Task<document_put_response> PutUserAsync(
+        user user,
+        DBConfigurationDetail dbConfig)
+    {
+        string userDbUrl = $"{dbConfig.url}/_users/{user._id}";
+        string responseFromServer = await _httpClient.ExecuteJsonAsync(
+            "PUT",
+            userDbUrl,
+            user,
+            SensitiveJsonPayloadOptions,
+            dbConfig.user_name,
+            dbConfig.user_value,
+            "application/json");
+        return JsonConvert.DeserializeObject<document_put_response>(responseFromServer);
+    }
+
+    /// <summary>
+    /// Delete a CouchDB user document via DELETE.
+    /// </summary>
+    public async Task<System.Dynamic.ExpandoObject> DeleteUserAsync(
+        string userId,
+        string rev,
+        DBConfigurationDetail dbConfig)
+    {
+        string requestUrl = $"{dbConfig.url}/_users/{userId}?rev={rev}";
+        string responseFromServer = await _httpClient.ExecuteAsync("DELETE", requestUrl, null, dbConfig.user_name, dbConfig.user_value);
+        return JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(responseFromServer);
+    }
+
+    /// <summary>
+    /// Get all users from _all_docs with pagination.
+    /// </summary>
+    public async Task<get_response_header<user>> GetAllUsersAsync(
+        int skip,
+        int take,
+        DBConfigurationDetail dbConfig)
+    {
+        string requestUrl = $"{dbConfig.url}/_users/_all_docs?include_docs=true&skip={skip}&limit={take}";
+        string responseFromServer = await _httpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value);
+        return JsonConvert.DeserializeObject<get_response_header<user>>(responseFromServer);
     }
 
     /// <summary>

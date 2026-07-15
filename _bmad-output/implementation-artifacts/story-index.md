@@ -541,8 +541,8 @@ dev this story _bmad-output/implementation-artifacts/17-7-mmriaservicesdal-sync-
 
 | Story | File | Status |
 |-------|------|--------|
-| 18.1 — `_users` Operation Catalog | [18-1-users-operation-catalog.md](18-1-users-operation-catalog.md) | ready-for-dev |
-| 18.2 — Define `IUserRepository` and Canonicalize `AccountDAL` | [18-2-iuser-repository-accountdal.md](18-2-iuser-repository-accountdal.md) | ready-for-dev |
+| 18.1 — `_users` Operation Catalog | [18-1-users-operation-catalog.md](18-1-users-operation-catalog.md) | done |
+| 18.2 — Define `IUserRepository` and Canonicalize `AccountDAL` | [18-2-iuser-repository-accountdal.md](18-2-iuser-repository-accountdal.md) | done |
 | 18.3 — Route Leaking `_users` Calls Through `IUserRepository` | [18-3-route-leaking-users-calls.md](18-3-route-leaking-users-calls.md) | ready-for-dev |
 | 18.4 — Define `IConfigurationRepository` and Create `SystemConfigDAL` | [18-4-iconfiguration-repository-systemconfigdal.md](18-4-iconfiguration-repository-systemconfigdal.md) | ready-for-dev |
 | 18.5 — Extract `IConfigurationBootstrapLoader` | [18-5-iconfiguration-bootstrap-loader.md](18-5-iconfiguration-bootstrap-loader.md) | ready-for-dev |

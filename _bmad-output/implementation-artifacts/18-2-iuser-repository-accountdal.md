@@ -2,7 +2,7 @@
 
 **Epic:** 18 — `_users` and `configuration` Consolidation (SQL Migration Foundation)
 **Story ID:** 18.2
-**Status:** ready-for-dev
+**Status:** done
 **Date added:** 2026-07-14
 **Depends on:** 18.1 (`_users` Operation Catalog)
 **Source requirements:** epics.md §Epic 18 Story 18.2; project-context.md §2.2

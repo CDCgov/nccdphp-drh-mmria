@@ -291,7 +291,11 @@ public sealed partial class Program
             builder.Services.AddSingleton<mmria.common.getset.CouchDbHttpClient>();
 
             // Register Account Manager components (DAL and Manager for Account feature)
+            // AccountDAL registered as concrete type (for session ops injected directly into AccountManager)
+            // IUserRepository resolved via factory to the same scoped AccountDAL instance (SQL migration seam)
             builder.Services.AddScoped<mmria.common.SharedLibraries.Account.DAL.AccountDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.Account.IUserRepository>(
+                sp => sp.GetRequiredService<mmria.common.SharedLibraries.Account.DAL.AccountDAL>());
             builder.Services.AddScoped<mmria.common.SharedLibraries.Account.Manager.AccountManager>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.ManageUsers.DAL.ManageUsersDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.ManageUsers.Manager.ManageUsersManager>();
