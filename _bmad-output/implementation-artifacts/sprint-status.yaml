@@ -1,5 +1,5 @@
 # generated: 2026-07-14
-last_updated: 2026-07-14
+last_updated: 2026-07-15
 # project: mmria
 # project_key: NOKEY
 # tracking_system: file-system
@@ -176,7 +176,7 @@ development_status:
 
   # ── Epic 19: jurisdiction Consolidation ───────────────────────────────────
   epic-19: in-progress
-  19-1-jurisdiction-operation-catalog: ready-for-dev
+  19-1-jurisdiction-operation-catalog: done
   19-2-ijurisdiction-repository-jurisdictiondal: ready-for-dev
   19-3-ijurisdiction-authorization-reader: ready-for-dev
   19-4-route-out-of-dal-jurisdiction-crud: ready-for-dev
@@ -203,7 +203,7 @@ development_status:
   epic-21-retrospective: optional
 
   # ── Epic 22: .NET 10 Upgrade ─────────────────────────────────────────────
-  epic-22: in-progress
-  22-1-net-10-compatibility-analysis-and-risk-assessment: ready-for-dev
-  22-2-net-10-upgrade-execution: ready-for-dev
+  epic-22: done
+  22-1-net-10-compatibility-analysis-and-risk-assessment: done
+  22-2-net-10-upgrade-execution: done
   epic-22-retrospective: optional
