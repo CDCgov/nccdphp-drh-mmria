@@ -303,7 +303,7 @@ public sealed class CVSManager
                     file_status_result.message = "The CVS service returned an invalid PDF response.";
                 }
             }
-            else if (responseDictionary.ContainsKey("body") && GetResponseValueAsString(responseDictionary["body"]).StartsWith("PDF "))
+            else if (responseDictionary.ContainsKey("body") && IsGeneratingResponse(GetResponseValueAsString(responseDictionary["body"])))
             {
                 file_status_result.file_status = "generating";
             }
