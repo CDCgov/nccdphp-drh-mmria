@@ -1,3 +1,11 @@
+---
+name: Bug report
+about: Create a report to help us improve
+title: ''
+labels: ''
+assignees: ''
+---
+
 **Please describe the bug this fixes or the feature this adds.**
 
 **Please describe how you tested this change. Include unit tests whenever possible.**
