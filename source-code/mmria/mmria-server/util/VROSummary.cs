@@ -108,6 +108,7 @@ public sealed class VROSummary
 
     string host_prefix;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.Account.IUserRepository _userRepository;
 
 
     public VROSummary
@@ -115,12 +116,14 @@ public sealed class VROSummary
 
         mmria.common.couchdb.OverridableConfiguration _configuration,
         string _host_prefix,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.Account.IUserRepository userRepository
     )
     {
         configuration = _configuration;
         host_prefix = _host_prefix;
         _couchDbHttpClient = couchDbHttpClient;
+        _userRepository = userRepository;
 
         db_config = configuration.GetDBConfig(host_prefix);
 
@@ -257,16 +260,13 @@ public sealed class VROSummary
         ItemCount p_result, 
         VROSummaryItem p_SummaryItem,
         string exclude_jurisdiction,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.Account.IUserRepository userRepository
     ) 
     { 
         try
         {
-            string request_string = $"{p_config_detail.url}/_users/_all_docs?include_docs=true&skip=1";
-
-            string responseFromServer = await couchDbHttpClient.ExecuteAsync("GET", request_string, null, p_config_detail.user_name, p_config_detail.user_value, "application/json");
-
-            var user_alldocs_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_response_header<mmria.common.model.couchdb.user>>(responseFromServer);
+            var user_alldocs_response = await userRepository.GetAllUsersAsync(1, int.MaxValue, p_config_detail);
 
             HashSet<string> user_id_set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             List<mmria.common.model.couchdb.get_response_item<mmria.common.model.couchdb.user>> temp_list = new List<mmria.common.model.couchdb.get_response_item<mmria.common.model.couchdb.user>>();
@@ -306,7 +306,8 @@ public sealed class VROSummary
                 p_config_detail, 
                 p_SummaryItem, 
                 user_id_set,
-                exclude_jurisdiction
+                exclude_jurisdiction,
+                couchDbHttpClient
             );
 
             p_result.total = user_id_set.Count;

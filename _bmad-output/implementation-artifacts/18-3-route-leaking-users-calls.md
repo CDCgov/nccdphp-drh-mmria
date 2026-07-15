@@ -2,7 +2,7 @@
 
 **Epic:** 18 — `_users` and `configuration` Consolidation (SQL Migration Foundation)
 **Story ID:** 18.3
-**Status:** ready-for-dev
+**Status:** done
 **Date added:** 2026-07-14
 **Depends on:** 18.2 (`IUserRepository` defined and `AccountDAL` canonicalized)
 **Source requirements:** epics.md §Epic 18 Story 18.3; project-context.md §2.2
@@ -103,3 +103,28 @@ Then the build succeeds with exit code 0
 ### Architecture note on JurisdictionSummary / VROSummary
 
 These utility classes (`mmria-server/util/`) are not controllers — they're summary-computation helpers. Verify how they receive their dependencies today (constructor injection, or passed as parameters). Follow the same pattern as the existing `CouchDbHttpClient` injection in these classes when adding `IUserRepository`.
+
+---
+
+## Dev Agent Record
+
+### Completion Notes
+
+- All five files updated per story spec; `IUserRepository` is now the sole path for `_users` CouchDB operations in these classes.
+- `AccountController.OIDC.cs`: Added `IUserRepository _userRepository` field + constructor param. Replaced GET with `GetCouchDbUserAsync(email.ToLower(), db_config)` and PUT with `PutUserAsync(user, db_config)`. Restored `config_couchdb_url / config_timer_*` variables that are still needed for the session PUT later in the same method.
+- `passwordChangeController.cs`: Added `IUserRepository _userRepository`. Replaced GET + explicit serialize + PUT block with `CheckUserAsync` + `PutUserAsync`. Null guard changed from `user_object == null` to `string.IsNullOrWhiteSpace(user_object._id)` (CheckUserAsync never returns null). Removed now-unused `object_string` local.
+- `JurisdictionSummary.cs`: Added `IUserRepository _userRepository` to constructor; added `IUserRepository userRepository` parameter to `GetUserCount`; replaced 3-line URL/HTTP/deserialize block with `await userRepository.GetAllUsersAsync(1, int.MaxValue, p_config_detail)`; updated all three `GetUserCount` call sites in `execute()`.
+- `VROSummary.cs` (`#if IS_PMSS_ENHANCED`): Same pattern as JurisdictionSummary. Also fixed pre-existing bug where `GetJurisdictions` was called without the required `couchDbHttpClient` parameter.
+- `jurisdictionSummaryController.cs`: Added `IUserRepository _userRepository` field + constructor param; passes it to both `JurisdictionSummary` constructor calls.
+- `vro_exportController.cs` (`#if IS_PMSS_ENHANCED`): Added both `CouchDbHttpClient _couchDbHttpClient` and `IUserRepository _userRepository` fields + constructor params; passes both to `VROSummary` constructor (also fixes pre-existing missing `couchDbHttpClient` arg).
+- `Program.cs`: No changes needed — `IUserRepository` was already registered as scoped (backed by `AccountDAL`) from Story 18.2.
+- Build verified: `dotnet build mmria-server.csproj -c Release` → **Build succeeded**, no errors.
+
+### File List
+
+- `source-code/mmria/mmria-server/Controllers/AccountController.OIDC.cs` — modified
+- `source-code/mmria/mmria-server/Controllers/api/passwordChangeController.cs` — modified
+- `source-code/mmria/mmria-server/util/JurisdictionSummary.cs` — modified
+- `source-code/mmria/mmria-server/util/VROSummary.cs` — modified
+- `source-code/mmria/mmria-server/Controllers/jurisdictionSummaryController.cs` — modified
+- `source-code/mmria/mmria-server/Controllers/vro_exportController.cs` — modified
