@@ -424,3 +424,231 @@ The following files contain Pattern A calls that are in scope for routing throug
 | `mmria.services/Utilities/Exporter/mmrds_exporter.cs` | 17.5b | 277 |
 
 > **CaseDAL.cs Pattern A note:** `CaseDAL.cs` itself uses Pattern A at lines 23, 32, 46, 55 and 68. Lines 23, 32, 46, 55 are direct `{url}/{prefix}mmrds/{id}` constructions. Only line 128 uses Pattern B. Story 17.2 should harmonize CaseDAL internals to Pattern B throughout, and add any missing CRUD operations.
+
+---
+
+## jurisdiction Operations
+
+**Epic:** 19 — `jurisdiction` Consolidation (SQL Migration Foundation)
+**Story:** 19.1
+**Date:** 2026-07-15
+
+This catalog records every distinct operation against the `{prefix}jurisdiction` CouchDB database across `mmria-server`, `mmria.common`, and `mmria.services`. It is the authoritative operation set for Stories 19.2–19.4.
+
+---
+
+### URL Construction Patterns
+
+| Label | Pattern | Example |
+|-------|---------|---------|
+| **A** | Hand-assembled with prefix interpolation — acceptable | `$"{db_config.url}/{db_config.prefix}jurisdiction/{id}"` |
+| **B** | Uses `Get_Prefix_DB_Url` helper — preferred | `db_config.Get_Prefix_DB_Url("jurisdiction/jurisdiction_tree")` |
+| **C** | Missing prefix — **wrong in multi-tenant** | `$"{db_config.url}/jurisdiction/{id}"` |
+
+---
+
+### Two-Interface Design
+
+| Interface | Purpose |
+|-----------|---------|
+| `IJurisdictionRepository` | Full application CRUD — user-role-jurisdiction documents, jurisdiction tree, form access, pinned cases, admin sortable views |
+| `IJurisdictionAuthorizationReader` | High-frequency read-only auth lookups — runs on every authorized request — `by_user_id` view only |
+
+---
+
+### In-Scope Operations
+
+#### User-Role-Jurisdiction Document CRUD
+
+Individual `user_role_jurisdiction` documents represent a single user–role–folder assignment.
+
+##### GET by ID
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type | Interface |
+|-----------|----------------|---------|-------------|---------------|-----------|
+| `GetUserRoleJurisdictionAsync` | `mmria.common/SharedLibraries/ManageUsers/DAL/ManageUsersDAL.cs` | 120 | A | `user_role_jurisdiction` | `IJurisdictionRepository` |
+
+##### PUT (create/update)
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type | Interface |
+|-----------|----------------|---------|-------------|---------------|-----------|
+| `PutUserRoleJurisdictionAsync` | `mmria.common/SharedLibraries/ManageUsers/DAL/ManageUsersDAL.cs` | 133 | A | `document_put_response` | `IJurisdictionRepository` |
+
+##### DELETE
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type | Interface |
+|-----------|----------------|---------|-------------|---------------|-----------|
+| `DeleteUserRoleJurisdictionAsync` | `mmria.common/SharedLibraries/ManageUsers/DAL/ManageUsersDAL.cs` | 143 | A | `document_put_response` | `IJurisdictionRepository` |
+
+##### GET all docs (`_all_docs`)
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type | Interface |
+|-----------|----------------|---------|-------------|---------------|-----------|
+| `GetAllUserRoleJurisdictionsAsync` | `mmria.common/SharedLibraries/ManageUsers/DAL/ManageUsersDAL.cs` | 111 | A | `get_response_header<user_role_jurisdiction>` | `IJurisdictionRepository` |
+
+##### Bulk write (`_bulk_docs`)
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type | Interface |
+|-----------|----------------|---------|-------------|---------------|-----------|
+| `BulkUpsertUserRoleJurisdictionsAsync` | `mmria.common/SharedLibraries/ManageUsers/DAL/ManageUsersDAL.cs` | 94 | A | `List<document_put_response>` | `IJurisdictionRepository` |
+
+---
+
+#### Jurisdiction Tree Document CRUD
+
+The `jurisdiction_tree` document (`_id = "jurisdiction_tree"`) stores the tenant's entire jurisdiction folder hierarchy as a single well-known document.
+
+##### GET jurisdiction_tree
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type | Interface |
+|-----------|----------------|---------|-------------|---------------|-----------|
+| `GetJurisdictionTreeAsync` | `mmria.common/SharedLibraries/ManageUsers/DAL/ManageUsersDAL.cs` | 158 | B | `jurisdiction_tree` | `IJurisdictionRepository` |
+| `Get()` | `mmria-server/Controllers/api/jurisdiction_treeController.cs` | 55 | B | `jurisdiction_tree` | `IJurisdictionRepository` |
+| `GetJurisdictionTree()` (new_case_folder endpoint) | `mmria-server/Controllers/api/jurisdiction_treeController.cs` | 79 | B | `jurisdiction_tree` | `IJurisdictionRepository` |
+| `GetCurrentJurisdictionTreeAsync()` (private pre-write read) | `mmria-server/Controllers/api/jurisdiction_treeController.cs` | 240 | B | `jurisdiction_tree` | `IJurisdictionRepository` |
+| `GetJurisdictionTree(j)` (single-tenant branch) | `mmria-server/Controllers/vitalsController.cs` | 80, 83 | C then A (conditional) | `jurisdiction_tree` | `IJurisdictionRepository` |
+| `GetJurisdictionTree(j)` (multi-tenant branch) | `mmria-server/Controllers/vitalsController.cs` | 113, 116 | C then A (conditional) | `jurisdiction_tree` | `IJurisdictionRepository` |
+
+> **vitalsController.cs prefix bug:** Both `GetJurisdictionTree` actions assign Pattern C first (`$"{url}/jurisdiction/jurisdiction_tree"`), then conditionally overwrite with Pattern A when `prefix` is non-empty. In true single-tenant (empty prefix) the C-path is correct; in multi-tenant the override fires. Story 19.4 should replace both with `Get_Prefix_DB_Url`.
+
+##### PUT jurisdiction_tree
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type | Interface |
+|-----------|----------------|---------|-------------|---------------|-----------|
+| `Post()` (save jurisdiction tree) | `mmria-server/Controllers/api/jurisdiction_treeController.cs` | 135 | B | `document_put_response` | `IJurisdictionRepository` |
+
+---
+
+#### Form Access List Document
+
+The `form-access-list` document (`_id = "form-access-list"`) stores per-form role access specifications.
+
+##### GET form-access-list
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type | Interface |
+|-----------|----------------|---------|-------------|---------------|-----------|
+| `GetFormAccessAsync` | `mmria.common/SharedLibraries/ManageUsers/DAL/ManageUsersDAL.cs` | 178 | B | `FormAccessSpecification` | `IJurisdictionRepository` |
+| `LoadFormAccessSpecificationAsync()` (private) | `mmria-server/Controllers/_usersController.cs` | 141 | B | `FormAccessSpecification` | `IJurisdictionRepository` |
+
+##### PUT form-access-list
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type | Interface |
+|-----------|----------------|---------|-------------|---------------|-----------|
+| `SaveFormAccessAsync` | `mmria.common/SharedLibraries/ManageUsers/DAL/ManageUsersDAL.cs` | 191 | B | `document_put_response` | `IJurisdictionRepository` |
+| `Post()` (save form access) | `mmria-server/Controllers/_usersController.cs` | 207 | B | `document_put_response` | `IJurisdictionRepository` |
+
+---
+
+#### Pinned Case Set Document
+
+The `pinned-case-set` document (`_id = "pinned-case-set"`) stores per-user and shared pinned case IDs for the case list view.
+
+##### GET pinned-case-set
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type | Interface |
+|-----------|----------------|---------|-------------|---------------|-----------|
+| `LoadPinnedCaseSetAsync()` (single-tenant early-exit branch) | `mmria.common/SharedLibraries/CaseView/CaseViewManager.cs` | 1253 | C | `pinned_case_set` | `IJurisdictionRepository` |
+| `GetPagedViewAsync` (pinned case branch) | `mmria.common/SharedLibraries/CaseView/CaseViewManager.cs` | 1408–1409 | B/C (conditional) | `pinned_case_set` | `IJurisdictionRepository` |
+| `GetCaseViewAsync` (pinned case branch) | `mmria.common/SharedLibraries/CaseView/CaseViewManager.cs` | 1453–1454 | B/C (conditional) | `pinned_case_set` | `IJurisdictionRepository` |
+| `GetPinnedCaseSetAsync` (PMSS) | `mmria-server/util/CaseViewSearch.pmss.cs` | 2293 | C | `pinned_case_set` | `IJurisdictionRepository` |
+
+> **CaseViewManager.cs prefix bug:** Line 1253 unconditionally uses Pattern C (no prefix). Lines 1408–1409 and 1453–1454 use `Get_Prefix_DB_Url` when prefix is non-empty but fall back to Pattern C otherwise. All four call sites should use `Get_Prefix_DB_Url` unconditionally. Story 19.4 must fix these.
+
+---
+
+#### Authorization View Queries (Hot Path — `IJurisdictionAuthorizationReader`)
+
+All queries against `jurisdiction/_design/sortable/_view/by_user_id`. Read-only. Execute on every authorized HTTP request via the auth middleware stack.
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type | Filter |
+|-----------|----------------|---------|-------------|---------------|--------|
+| `LoadActiveUserRoleJurisdictions` (per-user, keyed) | `mmria.common/SharedLibraries/Other/authorization.cs` | 260 | A | `get_sortable_view_reponse_header<user_role_jurisdiction>` | `?startkey={u}&endkey={u}` |
+| `LoadUserJurisdictionSet` (whole-tenant, no filter) | `mmria.common/utils/authorization_case.cs` | 217 | A | `get_sortable_view_reponse_header<user_role_jurisdiction>` | None |
+| `is_authorized_to_handle_jurisdiction_id` (per-user) | `mmria-server/util/authorization_user.cs` | 33 | A | `get_sortable_view_reponse_header<user_role_jurisdiction>` | `?{p_user.name}` |
+| `GetUserRoleJurisdictions` (per-user filter) | `mmria-server/util/authorization_user.cs` | 139 | A | `get_sortable_view_reponse_header<user_role_jurisdiction>` | `?{user_name}` |
+| `LoadActiveUserRoleJurisdictions` (PMSS, per-user) | `mmria-server/util/authorization.pmss.cs` | 235 | A | `get_sortable_view_reponse_header<user_role_jurisdiction>` | `?startkey={u}&endkey={u}` |
+| `LoadUserJurisdictionSet` (PMSS, whole-tenant) | `mmria-server/util/authorization_case.pmss.cs` | 154 | A | `get_sortable_view_reponse_header<user_role_jurisdiction>` | None |
+| `is_authorized_to_handle_jurisdiction_id` (PMSS, per-user) | `mmria-server/util/authorization_user.pmss.cs` | 31 | A | `get_sortable_view_reponse_header<user_role_jurisdiction>` | `?{p_user.name}` |
+| `GetUserRoleJurisdictions` (PMSS, per-user) | `mmria-server/util/authorization_user.pmss.cs` | 162 | A | `get_sortable_view_reponse_header<user_role_jurisdiction>` | `?{user_name}` |
+| `HandleRequirementAsync` (custom authz handler — stub, not actively registered) | `mmria-server/util/JurisdictionAuthorizationRequirement.cs` | 41 | A | `get_response_header<jurisdiction_view_sortable_item>` | None — uses POST |
+| `get_current_user_role_jurisdiction_set_for` (services, whole-tenant) | `mmria.services/Utilities/authorization.cs` | 57, 170, 282 | A | `get_sortable_view_reponse_header<user_role_jurisdiction>` | None |
+
+> **`JurisdictionAuthorizationRequirement.cs` note:** This handler uses `POST` (line 41) rather than `GET`. The body of `HandleRequirementAsync` calls `context.Succeed(requirement)` unconditionally without inspecting the view response, making it a stub. It does not appear to be actively registered in the ASP.NET authorization pipeline. Cataloged for completeness; Story 19.3 should evaluate whether to remove it or wire it properly.
+
+> **`AuthorizationRoleCache.cs` note:** This class is a 5-second TTL in-process cache that sits in front of the `by_user_id` view calls. It performs no CouchDB operations itself — it calls `loader()` (which hits CouchDB) on cache miss. No separate catalog entry; it is a performance wrapper around the `LoadActiveUserRoleJurisdictions` and `LoadUserJurisdictionSet` entries above.
+
+---
+
+#### Admin and Session Sortable View Queries (`IJurisdictionRepository`)
+
+These read `user_role_jurisdiction` (and session) documents via sortable design-doc views for manage-users workflows and admin summary reporting.
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type | Sort View | Interface |
+|-----------|----------------|---------|-------------|---------------|-----------|-----------|
+| `GetSessionSortableViewAsync` (session listing) | `mmria.common/SharedLibraries/Session/DAL/SessionDAL.cs` | 31 | A | `get_sortable_view_reponse_header<session>` | Dynamic (`{sortView}`) | `IJurisdictionRepository` |
+| `IsAuthorizedToDeleteUserAsync` (URJ lookup) | `mmria.common/SharedLibraries/ManageUsers/Manager/ManageUsersManager.cs` | 313 | A | `get_sortable_view_reponse_header<user_role_jurisdiction>` | `by_user_id` | `IJurisdictionRepository` |
+| User listing (URJ by date) | `mmria.common/SharedLibraries/ManageUsers/Manager/ManageUsersManager.cs` | 405 | A | `get_sortable_view_reponse_header<user_role_jurisdiction>` | `by_date_created` | `IJurisdictionRepository` |
+| Dynamic sorted URJ listing | `mmria.common/SharedLibraries/ManageUsers/Manager/ManageUsersManager.cs` | 483 | A | `get_sortable_view_reponse_header<user_role_jurisdiction>` | Dynamic (`{sort_view}`) | `IJurisdictionRepository` |
+| User delete authorization (URJ by user name) | `mmria.common/SharedLibraries/ManageUsers/Manager/ManageUsersManager.cs` | 710 | A | `get_sortable_view_reponse_header<user_role_jurisdiction>` | `by_user_id` | `IJurisdictionRepository` |
+| `GetJurisdictions` (admin summary — role counts) | `mmria-server/util/JurisdictionSummary.cs` | 431 | A | `get_sortable_view_reponse_header<user_role_jurisdiction>` | `by_date_created` | `IJurisdictionRepository` |
+| `GetJurisdictions` (VRO summary — role counts) | `mmria-server/util/VROSummary.cs` | 429 | A | `get_sortable_view_reponse_header<user_role_jurisdiction>` | `by_date_created` | `IJurisdictionRepository` |
+
+> **`SessionDAL.cs` note:** `GetSessionSortableViewAsync` queries the `jurisdiction` database with a dynamic sort view and deserializes to `get_sortable_view_reponse_header<session>`. In MMRIA, `user_role_jurisdiction` and `session` documents coexist in the `jurisdiction` database; the `_design/sortable` design document provides views for both types. This is expected — not a routing error.
+
+> **`ManageUsersManager.cs` note:** Lines 313, 405, 483, and 710 build CouchDB view URLs directly in the Manager layer and pass them to `ManageUsersDAL.GetUserRoleJurisdictionSortableViewAsync(url, config)`, which takes the pre-built URL as a parameter. This is an out-of-DAL URL-construction pattern. Story 19.4 should move URL construction entirely into `JurisdictionDAL`.
+
+---
+
+### Infrastructure / Out of Scope
+
+These operations initialize the `jurisdiction` database during server startup. They are not application CRUD and are not targeted by Stories 19.2–19.4.
+
+| File | Line(s) | Operation | Reason |
+|------|---------|-----------|--------|
+| `mmria-server/util/c_db_setup.cs` | 432 | PUT `jurisdiction/_design/sortable` | Design doc initialization — creates view indexes |
+| `mmria-server/util/c_db_setup.cs` | 439 | PUT `jurisdiction/_design/auth` | Design doc initialization — creates auth security index |
+
+---
+
+### Summary Counts
+
+| Category | Call Sites |
+|----------|-----------|
+| User-role-jurisdiction GET by ID | 1 |
+| User-role-jurisdiction PUT | 1 |
+| User-role-jurisdiction DELETE | 1 |
+| User-role-jurisdiction GET all docs | 1 |
+| User-role-jurisdiction bulk write (`_bulk_docs`) | 1 |
+| Jurisdiction tree GET | 6 |
+| Jurisdiction tree PUT | 1 |
+| Form access list GET | 2 |
+| Form access list PUT | 2 |
+| Pinned case set GET | 4 |
+| Auth `by_user_id` view queries (`IJurisdictionAuthorizationReader`) | 10 |
+| Admin/session sortable view queries (`IJurisdictionRepository`) | 7 |
+| **Total in-scope call sites** | **37** |
+| Infrastructure / out-of-scope | 2 |
+
+---
+
+### Out-of-DAL Callsites to Remediate (Stories 19.3–19.4 scope)
+
+| File | Story | Operations | Prefix Bug? |
+|------|-------|------------|-------------|
+| `mmria-server/Controllers/api/jurisdiction_treeController.cs` | 19.4 | GET/PUT `jurisdiction_tree` (Pattern B — no URL change needed) | No |
+| `mmria-server/Controllers/vitalsController.cs` | 19.4 | GET `jurisdiction_tree` (Pattern C/A conditional) | **Yes** |
+| `mmria-server/Controllers/_usersController.cs` | 19.4 | GET/PUT `form-access-list` (Pattern B — no URL change needed) | No |
+| `mmria.common/SharedLibraries/CaseView/CaseViewManager.cs` | 19.4 | GET `pinned-case-set` (Pattern C at line 1253; B/C at lines 1408–1409, 1453–1454) | **Yes** |
+| `mmria-server/util/CaseViewSearch.pmss.cs` | 19.4 | GET `pinned-case-set` (Pattern C) | **Yes** |
+| `mmria.common/SharedLibraries/ManageUsers/Manager/ManageUsersManager.cs` | 19.4 | GET sortable views — builds URL in Manager (Pattern A, delegates to DAL) | No |
+| `mmria.common/SharedLibraries/Session/DAL/SessionDAL.cs` | 19.4 | GET sortable view (Pattern A — URL built in DAL already) | No |
+| `mmria-server/util/JurisdictionSummary.cs` | 19.4 | GET sortable view (Pattern A) | No |
+| `mmria-server/util/VROSummary.cs` | 19.4 | GET sortable view (Pattern A) | No |
+| `mmria.common/SharedLibraries/Other/authorization.cs` | 19.3 | GET `by_user_id` (Pattern A) | No |
+| `mmria.common/utils/authorization_case.cs` | 19.3 | GET `by_user_id` (Pattern A, whole-tenant) | No |
+| `mmria-server/util/authorization_user.cs` | 19.3 | GET `by_user_id` (Pattern A, ×2) | No |
+| `mmria-server/util/authorization.pmss.cs` | 19.3 | GET `by_user_id` (Pattern A) | No |
+| `mmria-server/util/authorization_case.pmss.cs` | 19.3 | GET `by_user_id` (Pattern A, whole-tenant) | No |
+| `mmria-server/util/authorization_user.pmss.cs` | 19.3 | GET `by_user_id` (Pattern A, ×2) | No |
+| `mmria-server/util/JurisdictionAuthorizationRequirement.cs` | 19.3 | POST `by_user_id` (Pattern A — stub, evaluate for removal) | No |
+| `mmria.services/Utilities/authorization.cs` | 19.3 | GET `by_user_id` (Pattern A, ×3) | No |
