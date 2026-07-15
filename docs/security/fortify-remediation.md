@@ -1,3 +1,43 @@
+## Scan: 2026-07-15 — Fortify mmria s2i @ c8fab9fa (SSC 10291)
+
+## Finding 1 — Path Manipulation at source-code/mmria/mmria-server/util/ContainedPathHelper.cs:148
+**SSC Issue ID:** 2223458
+**Severity:** High
+**Verdict:** Already remediated
+
+### Evidence
+- Taint source: the `childDirectoryName` parameter of `EnsureContainedDirectoryExists(...)` is caller-controlled (e.g. from a route value in `backup_managerController`).
+- Propagation: `EnsureContainedDirectoryExists(...)` calls `ResolveContainedDirectoryPath(...)` which calls `ValidateContainedName(childDirectoryName, ...)` at `source-code/mmria/mmria-server/util/ContainedPathHelper.cs:129`. `ValidateContainedName(...)` rejects any character not in `[A-Za-z0-9\-_.]`, rejects `.`/`..`, rejects rooted paths, and rejects Windows reserved device names (`source-code/mmria/mmria-server/util/ContainedPathHelper.cs:208-251`).
+- Sink: `Directory.CreateDirectory(safePath)` at line 148 only executes after `ResolveContainedDirectoryPath(...)` returns a validated, fully-qualified path that `EnsureContainedPath(...)` has confirmed still starts with the trusted base directory (`source-code/mmria/mmria-server/util/ContainedPathHelper.cs:130-131`).
+- Guard at sink: `ThrowIfExistingPathOrAncestorIsReparsePoint(safePath, ...)` at line 147 additionally blocks symlink/junction escapes before `Directory.CreateDirectory` is called (`source-code/mmria/mmria-server/util/ContainedPathHelper.cs:147`).
+- The allow-list character filter in `ValidateContainedName(...)` is the specific guard that satisfies CWE-22 (Improper Limitation of a Pathname) — the tainted value is reduced to a single safe path segment before it is combined with any file-system path. Carried from prior scan (5c69b518) — code fix unchanged.
+
+### SWA Summary
+`Directory.CreateDirectory(...)` at the tainted sink is guarded by an allow-list character filter (`ValidateContainedName`), a path-escape check (`EnsureContainedPath`), and a reparse-point check. The caller-controlled directory name can no longer contain traversal syntax, alternate separators, or shell metacharacters. Fortify detected a stale result from before these controls were introduced.
+
+### Verdict rationale
+The fix is demonstrably present in the current codebase. `ValidateContainedName(...)` enforces a positive allow-list before the tainted value reaches the `Directory.CreateDirectory(...)` sink; the path is further verified to remain inside the trusted root. The taint path identified by Fortify is therefore fully neutralized by in-repo guards that were committed prior to this scan.
+
+## Finding 2 — Cross-Site Scripting: Reflected at source-code/mmria/mmria-server/util/EscapedJsonResultFactory.cs:25
+**SSC Issue ID:** 2235651
+**SSC Issue ID:** 2235652
+**Severity:** Critical
+**Verdict:** Already remediated
+
+### Evidence
+- Taint source: the `value` parameter of `EscapedJsonResultFactory.Create(object value)` at line 22 is caller-controlled (controllers pass arbitrary model objects including user-supplied data).
+- Propagation: `Create(value)` calls `Serialize(value)` and assigns the result to the `Content` property of `SecureEscapedJsonResult` at line 25 (`source-code/mmria/mmria-server/util/EscapedJsonResultFactory.cs:22-28`).
+- Sink: `Content` is returned to the HTTP response through `ContentResult.ExecuteResultAsync(...)`, which writes the content string to the response body.
+- Sanitizer at source (serialization): `Serialize(value)` uses `JsonTextWriter` with `StringEscapeHandling = StringEscapeHandling.EscapeHtml` (line 37) and `JsonSerializer.Create(HtmlEscapingSerializerSettings)` whose settings also set `StringEscapeHandling.EscapeHtml` (line 18). This encodes `<`, `>`, `&`, `'`, and `"` inside every JSON string value before the content reaches the response (`source-code/mmria/mmria-server/util/EscapedJsonResultFactory.cs:15-43`).
+- Sanitizer at response: `SecureEscapedJsonResult.ExecuteResultAsync(...)` at line 47-51 sets `X-Content-Type-Options: nosniff` on every response, preventing browser content-sniffing from reinterpreting the JSON payload as HTML.
+- These two controls together satisfy the CWE-79 (XSS: Reflected) remediation requirements: HTML-significant characters are encoded at the serialization step so no reflected value can inject executable HTML, and the `nosniff` header forecloses the content-sniffing vector. Carried from prior scan (5c69b518, Finding 3 at line 22) — SSC IDs differ (new data-flow traces) but the code fix is unchanged.
+
+### SWA Summary
+`EscapedJsonResultFactory.Create(...)` HTML-escapes all string content through Newtonsoft.Json's `StringEscapeHandling.EscapeHtml` during serialization and forces `X-Content-Type-Options: nosniff` on every response via `SecureEscapedJsonResult`. Reflected user-controlled values cannot inject executable HTML, and the browser cannot content-sniff the JSON response as HTML. Fortify detected new data-flow traces for the same already-fixed sink.
+
+### Verdict rationale
+The fix is demonstrably present in the current codebase. HTML encoding at serialization (line 37) and the `nosniff` header (line 49) were both in place before this scan. The two new SSC issue IDs represent additional data-flow traces Fortify enumerated for the same `(ruleGuid, path, line)` sink, not new vulnerabilities. The taint path is fully neutralized by the in-repo controls.
+
 ## Scan: 2026-07-15 — Fortify mmria s2i @ 5c69b518 (SSC 10291)
 
 ## Finding 1 — Path Manipulation at source-code/mmria/mmria-server/util/ContainedPathHelper.cs:148
