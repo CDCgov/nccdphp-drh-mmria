@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.IO;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 
@@ -8,6 +9,8 @@ namespace mmria.server.util;
 public static class EscapedJsonResultFactory
 {
     private const string JsonContentType = "application/json; charset=utf-8";
+    private const string NoSniffHeaderName = "X-Content-Type-Options";
+    private const string NoSniffHeaderValue = "nosniff";
 
     private static readonly JsonSerializerSettings HtmlEscapingSerializerSettings = new()
     {
@@ -17,7 +20,7 @@ public static class EscapedJsonResultFactory
     };
 
     public static ContentResult Create(object value) =>
-        new()
+        new SecureEscapedJsonResult
         {
             Content = Serialize(value),
             ContentType = JsonContentType,
@@ -37,5 +40,14 @@ public static class EscapedJsonResultFactory
         JsonSerializer.Create(HtmlEscapingSerializerSettings).Serialize(jsonWriter, value);
         jsonWriter.Flush();
         return stringWriter.ToString();
+    }
+
+    private sealed class SecureEscapedJsonResult : ContentResult
+    {
+        public override Task ExecuteResultAsync(ActionContext context)
+        {
+            context.HttpContext.Response.Headers[NoSniffHeaderName] = NoSniffHeaderValue;
+            return base.ExecuteResultAsync(context);
+        }
     }
 }
