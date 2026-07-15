@@ -1,5 +1,5 @@
 # ----- Stage 1: Build -----
-FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-90:9.0-1779943927@sha256:94f9d6892fc17d574dcf4610f07a24cf1cdd3f06f55084509eba4d31699a1816 AS build
+FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100:9.8-1782912189@sha256:ca21a4d4f70f87c4582a6f5b4463e61c996fb34684985c6622a743560ae10e4a AS build
 WORKDIR /src
 
 # Copy the mmria.services project file first to leverage layer caching for restores.
@@ -19,7 +19,7 @@ WORKDIR /src/nccdphp-drh-mmria-services/mmria.services
 RUN dotnet restore
 
 # Build specifying the targeted framework (project targets multiple frameworks)
-RUN dotnet build -c Release -f net9.0 -o /app/build
+RUN dotnet build -c Release -f net10.0 -o /app/build
 
 USER 1001
 
@@ -29,12 +29,12 @@ USER root
 WORKDIR /src/nccdphp-drh-mmria-services/mmria.services
 
 # Publish the specific target framework to reduce final image size
-RUN dotnet publish -c Release -f net9.0 -o /app/publish
+RUN dotnet publish -c Release -f net10.0 -o /app/publish
 
 USER 1001
 
 # ----- Stage 3: Runtime -----
-FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-90-runtime:9.0-1779914985@sha256:5802a3771fa3e6854f2dadef6b69065a955e4d26cf954f80465ea5faee7a9e44 AS runtime
+FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100-runtime:9.7-1775651129@sha256:d2828e5beafbcfb731306523b525575801e5c1438c69524dbba25161fc6bb884 AS runtime
 WORKDIR /app
 
 # Copy published output from build image
