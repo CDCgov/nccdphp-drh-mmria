@@ -149,6 +149,11 @@ The Community Vital Signs PDF export tool is hardened against transient failures
 Stories in Epics 7 and 8 were authored against an earlier version of `project-context.md`. This epic pays down the resulting SharedLibraries `{Feature}/Manager/DAL` debt for the two remaining controller surfaces that still do direct CouchDB calls: `system_offlineController` (Epic 8) and the Wave 9 `CaseWorkflowAdmin` pair (`clear_case_status`, `recover_deleted_case`).
 **Architecture rule:** project-context.md Â§2.2 SharedLibraries pattern
 
+### Epic 22: .NET 10 Upgrade
+
+All mmria projects (server, services, common, utilities) are upgraded from .NET 9 to .NET 10. The .NET 10 SDK is installed on the developer machine, all project target frameworks are updated, NuGet packages are verified for .NET 10 compatibility, and both production Dockerfiles are updated to use the .NET 10 trusted base images from the EcPaaS registry.
+**Stories:** 22.1 — Compatibility Analysis & Risk Assessment, 22.2 — Upgrade Execution
+
 ---
 
 ## Epic 1: Case Narrative Editor Fidelity
@@ -2094,4 +2099,155 @@ So that no DAL outside `AuditDAL` constructs audit URLs directly.
 | 21 | 21.4 — CaseWorkflowAdminDAL audit calls | Low | 21.2 **+ Epic 17 Story 17.4 done** |
 
 21.3, 21.5, and 21.6 can proceed in parallel once 21.2 is complete. 21.4 must wait for Epic 17 Story 17.4 to avoid file conflict on `CaseWorkflowAdminDAL.cs`.
+
+---
+
+## Epic 22: .NET 10 Upgrade
+
+All mmria projects are upgraded from .NET 9 to .NET 10. The developer machine receives the .NET 10 SDK, all project target frameworks are updated, third-party NuGet packages are verified for .NET 10 compatibility (with any necessary version bumps applied), and both production Dockerfiles are updated to reference the .NET 10 trusted base images from the EcPaaS registry.
+
+**Projects in scope (nccdphp-drh-mmria repo):**
+- `source-code/mmria/mmria-server/mmria-server.csproj`
+- `nccdphp-drh-mmria-common/mmria.common/mmria.common.csproj`
+- `nccdphp-drh-mmria-services/mmria.services/mmria.services.csproj`
+
+**Projects in scope (nccdphp-drh-mmria-utilities repo):**
+- `mmria-server.tests/mmria-server.tests.csproj`
+- `mmria-case-generator/mmria-case-generator.csproj`
+- `strongly-typed-case/strongcase.csproj`
+- `data-migration/migrate.csproj`
+- `Replication/replicate.csproj`
+- `mmria-ije-generator/mmria-ije-generator.csproj`
+- `mmria-tools/mmria-tools.csproj`
+- `mmria-tenant-database-counts/mmria-tenant-database-counts.csproj`
+
+**Dockerfiles in scope:**
+- `source-code/mmria/mmria-server/Dockerfile` — build image `dotnet-90`, runtime image `dotnet-90-runtime`
+- `nccdphp-drh-mmria-services/mmria.services/Dockerfile` — same images
+- `.s2i/dockerfile` — legacy file, currently references `dotnet-80`; assess whether to update or retire
+
+---
+
+### Story 22.1: .NET 10 Compatibility Analysis and Risk Assessment
+
+As a developer,
+I want a documented analysis of all compatibility risks before upgrading to .NET 10,
+So that the upgrade execution story has a clear, evidence-based remediation plan and no surprises block CI/CD.
+
+**Acceptance Criteria:**
+
+**Given** the Microsoft .NET 10 breaking-changes documentation
+**When** the developer reviews it against the mmria codebase
+**Then** a written findings report is produced listing every breaking change that applies (or is suspected to apply) to this codebase, its severity (High / Medium / Low / None), and the affected file(s)
+
+**Given** the key third-party NuGet packages used across the in-scope projects:
+
+| Package | Current Version | Risk Notes |
+|---|---|---|
+| `Akka` / `Akka.Hosting` / `Akka.Cluster` / `Akka.DependencyInjection` | 1.5.52 | Check NuGet for .NET 10 TFM support |
+| `Akka.Quartz.Actor` | 1.5.13 | Transitively depends on Quartz 3.x; verify compatibility |
+| `Akka.DI.Core` / `Akka.DI.Extensions.DependencyInjection` | 1.4.51 / 1.4.22 | Older release train; may not declare net10.0 support |
+| `Quartz` | 3.13.1 | Check for .NET 10 support |
+| `Microsoft.AspNetCore.Mvc.NewtonsoftJson` | 9.0.0 | Must be updated to 10.0.x |
+| `Microsoft.Extensions.Http` | 9.0.0 | Must be updated to 10.0.x |
+| `Serilog.Extensions.Logging` | 9.0.0 | Check for 10.0.x release |
+| `System.Text.Encoding.CodePages` | 9.0.0 | Likely in-box for .NET 10; confirm |
+| `Microsoft.CodeAnalysis.CSharp` | 4.12.0 | Verify .NET 10 compiler support |
+| `NJsonSchema` / `NJsonSchema.CodeGeneration.CSharp` | 11.0.2 | Check for compatibility |
+| `FastExcel` | 3.0.13 | Low risk (no framework coupling) |
+| `SharpZipLib` | 1.4.2 | Low risk |
+| `TinyCsvParser` | 2.7.1 | Low risk |
+| `Newtonsoft.Json` | 13.0.3 | Low risk (framework-agnostic) |
+
+**When** the developer checks each package on NuGet.org for .NET 10 TFM listings, open issues, and release notes
+**Then** the findings report records the latest compatible version for each package (or "no upgrade needed" if the current version is compatible) and flags any packages with no .NET 10 support path as blockers
+
+**Given** the EcPaaS trusted-image registry currently has `dotnet-90` and `dotnet-90-runtime` images
+**When** the developer contacts the EcPaaS platform team or inspects the registry
+**Then** the findings report records whether `dotnet-100` and `dotnet-100-runtime` images exist in the registry, their tag/digest format, and (if absent) the estimated availability timeline and any interim workaround (e.g., use `mcr.microsoft.com/dotnet/aspnet:10.0` with a waiver)
+
+**Given** the suppressed compiler warnings in `mmria-server.csproj` (`SYSLIB0014`, `CS8632`, etc.)
+**When** the developer reviews them against .NET 10 release notes
+**Then** the report notes whether any suppressed warning escalates to an error in .NET 10 and recommends the remediation action (fix the call site or retain the suppression)
+
+**Given** the test suite in `mmria-server.tests`
+**When** the developer reviews the test project's dependencies and test patterns
+**Then** the report notes any test-framework or assertion-library changes needed for .NET 10
+
+**Deliverable:** A markdown findings report committed to `docs/ai/dotnet10-compatibility-analysis.md` covering:
+1. Breaking-change audit results
+2. Per-package compatibility status table with recommended versions
+3. Docker image availability status and path forward
+4. Suppressed-warning review
+5. Recommended story 22.2 task checklist derived from the above findings
+
+---
+
+### Story 22.2: .NET 10 Upgrade Execution
+
+As a developer,
+I want all mmria projects running on .NET 10,
+So that the codebase is on the current LTS release with continued Microsoft support and access to .NET 10 platform improvements.
+
+**Pre-condition:** Story 22.1 is complete and the findings report in `docs/ai/dotnet10-compatibility-analysis.md` shows no unresolved blocker items. Any package with no .NET 10 support path must be resolved before this story begins.
+
+**Acceptance Criteria:**
+
+**Given** the developer machine does not yet have the .NET 10 SDK installed
+**When** the developer runs the upgrade
+**Then** the .NET 10 SDK is installed via `winget install Microsoft.DotNet.SDK.10` (or the equivalent official installer) and `dotnet --list-sdks` confirms the `10.x` SDK is present alongside the existing 9.x SDK
+
+**Given** all eleven in-scope `.csproj` files currently declare `<TargetFramework>net9.0</TargetFramework>` (or `<TargetFrameworks>net9.0</TargetFrameworks>` for mmria-server)
+**When** the developer updates them
+**Then** every in-scope `.csproj` declares `net10.0` and `dotnet build` succeeds with no new errors for each project
+
+**Given** the version-locked Microsoft packages (`Microsoft.AspNetCore.Mvc.NewtonsoftJson 9.0.0`, `Microsoft.Extensions.Http 9.0.0`, `System.Text.Encoding.CodePages 9.0.0`, `Serilog.Extensions.Logging 9.0.0`)
+**When** the developer updates packages
+**Then** each is updated to its `.NET 10`-aligned version (10.0.x or latest stable that lists `net10.0` support) and the projects restore without errors
+
+**Given** the compatibility analysis report's per-package recommended versions
+**When** remaining packages require version bumps (e.g., Akka, Quartz, NJsonSchema as identified in Story 22.1)
+**Then** each is updated to the version specified in the report and the affected projects build and restore cleanly
+
+**Given** the `source-code/mmria/mmria-server/Dockerfile` build stage currently references:
+```
+FROM .../trusted-images/dotnet-90:9.0-<tag>@sha256:<digest> AS build
+```
+and the runtime stage references:
+```
+FROM .../trusted-images/dotnet-90-runtime:9.0-<tag>@sha256:<digest> AS runtime
+```
+**When** the developer updates the Dockerfile
+**Then** both `FROM` lines reference the `.NET 10` trusted images (`dotnet-100` / `dotnet-100-runtime`) with the correct tag and digest as identified in Story 22.1, and the `-f net9.0` flags in `dotnet build` and `dotnet publish` commands are updated to `-f net10.0`
+
+**Given** the `nccdphp-drh-mmria-services/mmria.services/Dockerfile` contains the same `dotnet-90` / `dotnet-90-runtime` image references and `-f net9.0` flags
+**When** the developer updates it
+**Then** both `FROM` lines and both `-f` flags are updated identically to the server Dockerfile
+
+**Given** the `.s2i/dockerfile` currently references `dotnet-80` and is largely commented out
+**When** the developer reviews it per Story 22.1 findings
+**Then** either (a) it is updated to reference `dotnet-100` if the file is still used, or (b) a comment is added to the top of the file documenting that it is retired and not used in the active build pipeline — whichever the analysis in Story 22.1 recommends
+
+**Given** the full build pipeline after all changes
+**When** the developer runs:
+- `dotnet build` on `mmria-server.csproj` (Release, net10.0)
+- `dotnet build` on `mmria.services.csproj` (Release, net10.0)
+- `dotnet build` on `mmria.common.csproj`
+- `dotnet test` on `mmria-server.tests.csproj`
+**Then** all builds succeed and all tests pass with no new failures (pre-existing failures, if any, are noted but do not block this story)
+
+**Given** the `vscode/tasks.json` build tasks reference `net9.0` in `-f` arguments (if any)
+**When** the developer searches task definitions
+**Then** any hardcoded `-f net9.0` flags in `.vscode/tasks.json` or `tasks.json` are updated to `net10.0`
+
+---
+
+## Epic 22 — Story Sequencing
+
+| Wave | Story | Risk | Dependencies |
+|---|---|---|---|
+| 22 | 22.1 — Compatibility Analysis & Risk Assessment | None — discovery only | None |
+| 22 | 22.2 — Upgrade Execution | Medium | 22.1 complete, no blockers in findings report |
+
+22.1 must fully complete and produce a clean findings report before 22.2 begins. The two stories must not run in parallel.
 

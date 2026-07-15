@@ -166,12 +166,12 @@ development_status:
   epic-17-retrospective: optional
 
   # ── Epic 18: _users and configuration Consolidation ───────────────────────
-  epic-18: in-progress
+  epic-18: done
   18-1-users-operation-catalog: done
   18-2-iuser-repository-accountdal: done
   18-3-route-leaking-users-calls: done
   18-4-iconfiguration-repository-systemconfigdal: done
-  18-5-iconfiguration-bootstrap-loader: ready-for-dev
+  18-5-iconfiguration-bootstrap-loader: done
   epic-18-retrospective: optional
 
   # ── Epic 19: jurisdiction Consolidation ───────────────────────────────────
@@ -201,3 +201,9 @@ development_status:
   21-5-controller-audit-calls: backlog
   21-6-manageusers-auditrecovery-audit-calls: backlog
   epic-21-retrospective: optional
+
+  # ── Epic 22: .NET 10 Upgrade ─────────────────────────────────────────────
+  epic-22: backlog
+  22-1-net-10-compatibility-analysis-and-risk-assessment: backlog
+  22-2-net-10-upgrade-execution: backlog
+  epic-22-retrospective: optional
