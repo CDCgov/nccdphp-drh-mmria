@@ -298,6 +298,81 @@ Both already use the correct `{prefix}mmrds` URL (no underscore bug). These are 
 | `MMRIAServicesDAL` — CDC path (`GetMmrdsDatabaseUrl`, Pattern C callers) | Does CDC populate / sync boundary belong behind `ICaseRepository`? Pattern C callers (`GetCaseDocumentForPopulateCDC`, `GetCaseDocumentsForPopulateCDC`, `GetCaseIdsByDateCreated`, `BulkSavePopulateCdcDocumentsAsync`) all target the CDC-side mmrds (no-prefix or underscore-prefix). These cannot share `CaseDAL` without adding CDC-specific config branching. | **TBD — Story 17.7** |
 | `c_document_sync_all` (and `_legacy`, PMSS variants) — sync `_all_docs` + per-document GET | These bulk reads are pure sync infrastructure. They require low-level `_all_docs` paged access that `CaseDAL` does not expose. Routing through `ICaseRepository` would require a cursor/paging API not present in the current DAL contract. | **TBD — Story 17.7** (likely: explicitly excluded) |
 | `Process_DB_Synchronization_Set.cs` / `Synchronize_Deleted_Case_Records.cs` — per-case GET/PUT inside Quartz sync actors | These read and write case documents as part of the de-id/report propagation job. They operate on the Quartz scheduler thread and bypass the normal HTTP request cycle. | **TBD — Story 17.7** (likely: explicitly excluded) |
+
+---
+
+## _users Operations
+
+**Epic:** 18 — `_users` and `configuration` Consolidation (SQL Migration Foundation)
+**Story:** 18.1
+**Date:** 2026-07-14
+
+This catalog records every distinct operation against the CouchDB `_users` database across `mmria-server` and `mmria.common`. It is the authoritative operation set for Story 18.2.
+
+---
+
+### In-Scope Operations
+
+#### User CRUD (GET/PUT/DELETE by ID)
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type |
+|-----------|----------------|---------|-------------|---------------|
+| `GetUserByUserNameAsync` (GET user by doc ID) | `mmria.common/SharedLibraries/Account/DAL/AccountDAL.cs` | 47 | `$"{dbConfig.url}/_users/{HtmlEncode(userDocId)}"` | `user` |
+| `GetUserAsync` (GET user by user_id) | `mmria.common/SharedLibraries/ManageUsers/DAL/ManageUsersDAL.cs` | 41 | `db_config.url + "/_users/" + user_id` | `user` |
+| `CheckUserAsync` (GET user — check-exists) | `mmria.common/SharedLibraries/ManageUsers/DAL/ManageUsersDAL.cs` | 58 | `db_config.url + "/_users/" + user_id` | `user` (empty `user` on not-found or error) |
+| `PutUserAsync` (PUT user — create/update) | `mmria.common/SharedLibraries/ManageUsers/DAL/ManageUsersDAL.cs` | 93 | `db_config.url + "/_users/" + user._id` | `document_put_response` |
+| `DeleteUserAsync` (DELETE user) | `mmria.common/SharedLibraries/ManageUsers/DAL/ManageUsersDAL.cs` | 115 | `db_config.url + "/_users/" + user_id + "?rev=" + rev` | `ExpandoObject` |
+
+#### User List Queries (`_all_docs`)
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type |
+|-----------|----------------|---------|-------------|---------------|
+| `GetAllUsersAsync` (paginated user list) | `mmria.common/SharedLibraries/ManageUsers/DAL/ManageUsersDAL.cs` | 144 | `$"{db_config.url}/_users/_all_docs?include_docs=true&skip={skip}&limit={take}"` | `get_response_header<user>` |
+| `GetCaseCount` (all-users read for jurisdiction summary) | `mmria-server/util/JurisdictionSummary.cs` | 268 | `$"{p_config_detail.url}/_users/_all_docs?include_docs=true&skip=1"` | `get_response_header<user>` (enumerated inline) |
+| `GetCaseCount` (all-users read for VRO summary) | `mmria-server/util/VROSummary.cs` | 265 | `$"{p_config_detail.url}/_users/_all_docs?include_docs=true&skip=1"` | `get_response_header<user>` (enumerated inline) |
+
+#### Out-of-DAL Leaking Calls (targets for Story 18.3)
+
+These calls bypass `ManageUsersDAL` and build `_users` URLs directly in controllers. They are in-scope for cataloging and must be routed through `IUserRepository` in Story 18.2/18.3.
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | HTTP Verb | Response Type |
+|-----------|----------------|---------|-------------|-----------|---------------|
+| GET user (OIDC lookup by email) | `mmria-server/Controllers/AccountController.OIDC.cs` | 255 | `$"{config_couchdb_url}/_users/{Uri.EscapeDataString("org.couchdb.user:" + email)}"` | GET | `user` |
+| PUT user (OIDC provision — create if not found) | `mmria-server/Controllers/AccountController.OIDC.cs` | 301 | `$"{config_couchdb_url}/_users/{Uri.EscapeDataString(user._id)}"` | PUT | `document_put_response` |
+| GET user then PUT user (password change — same URL for both) | `mmria-server/Controllers/api/passwordChangeController.cs` | 137 | `db_config.url + "/_users/org.couchdb.user:" + userName` | GET then PUT | GET → `user`; PUT → `document_put_response` |
+
+---
+
+### `ManageUsersDAL` vs. `AccountDAL` Call Assessment (AC-4)
+
+`ManageUsersDAL` contains 5 `_users` operations. `AccountDAL` contains 1 overlapping `_users` GET. The table below identifies which represent generic user CRUD (candidates for `IUserRepository`) versus manage-users-workflow-specific operations.
+
+| ManageUsersDAL Method | Duplicates AccountDAL? | Assessment |
+|-----------------------|------------------------|------------|
+| `GetUserAsync` | Yes — mirrors `AccountDAL.GetUserByUserNameAsync` (both GET by doc ID) | Generic user CRUD — `IUserRepository` candidate |
+| `CheckUserAsync` | Partial — same URL, different error semantics (never throws, returns empty) | Generic user CRUD — `IUserRepository` candidate (replace with `GetUserAsync` + null check) |
+| `PutUserAsync` | No equivalent in `AccountDAL` | Generic user CRUD — `IUserRepository` candidate |
+| `DeleteUserAsync` | No equivalent in `AccountDAL` | Generic user CRUD — `IUserRepository` candidate |
+| `GetAllUsersAsync` | No equivalent in `AccountDAL` | Manage-users-workflow-specific (paginated admin list) — `IUserRepository` candidate with pagination |
+
+**Summary:** All 5 `ManageUsersDAL` `_users` operations are generic user CRUD (GET, check-exists, PUT, DELETE, paginated list). None are manage-users-workflow-specific in a way that would prevent promotion to `IUserRepository`. `CheckUserAsync` is a defensive wrapper around GET that can be unified with `GetUserAsync` under a shared interface.
+
+---
+
+### Infrastructure / Out of Scope
+
+These operations are not targeted by Stories 18.2–18.x. They initialize the `_users` database as part of startup or health checks.
+
+| File | Line(s) | Operation | Reason |
+|------|---------|-----------|--------|
+| `mmria-server/util/c_db_setup.cs` | 116 | PUT `_users` (database creation) | One-time DB initialization — creates the `_users` database if absent |
+| `mmria-server/model/actor/quartz/Check_DB_Install.cs` | 62 | PUT `_users` (database creation) | Startup health check — ensures `_users` database exists before accepting traffic |
+
+---
+
+### Boundary Decisions
+
+_No boundary decisions recorded for `_users` — pending Story 18.2._
 | `Process_Migrate_Charactor_to_Numeric.cs` / `Process_Migrate_Data.cs` — migration `_all_docs` + per-case PUT | One-time or rare migration scripts inside Quartz. Their direct mmrds access is intentional for bulk operations. | **TBD — Story 17.7** (likely: explicitly excluded as one-time infra) |
 
 ---

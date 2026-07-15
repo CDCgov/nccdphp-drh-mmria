@@ -2,7 +2,7 @@
 
 **Epic:** 18 — `_users` and `configuration` Consolidation (SQL Migration Foundation)
 **Story ID:** 18.1
-**Status:** ready-for-dev
+**Status:** done
 **Date added:** 2026-07-14
 **Depends on:** none — discovery only
 **Source requirements:** epics.md §Epic 18 Story 18.1
@@ -103,3 +103,29 @@ No code changes — discovery and documentation only.
 ### Boundary Decisions
 _Placeholder — no known boundary decisions for _users_
 ```
+
+---
+
+## Dev Agent Record
+
+### Completion Notes
+
+Story 18.1 is documentation-only. The `## _users Operations` section was appended to `docs/ai/mmrds_operation_catalog.md`.
+
+**AC-1:** Section appended with all operations grouped into: User CRUD (GET/PUT/DELETE by ID), User List Queries (`_all_docs`), Out-of-DAL Leaking Calls, and Infrastructure / Out of Scope.
+
+**AC-2:** Every entry records operation name, calling file(s) with line number, URL pattern, and response type.
+
+**AC-3:** `c_db_setup.cs` (line 116) and `Check_DB_Install.cs` (line 62) listed in "Infrastructure / Out of Scope" with reasons.
+
+**AC-4:** All 5 `ManageUsersDAL` `_users` calls assessed — all are generic user CRUD and candidates for `IUserRepository`. `CheckUserAsync` identified as a defensive wrapper that can be unified with `GetUserAsync`. No manage-users-workflow-specific logic prevents promotion.
+
+### File List
+
+- `docs/ai/mmrds_operation_catalog.md` — `## _users Operations` section appended
+
+### Change Log
+
+| Date | Change |
+|------|--------|
+| 2026-07-15 | Appended `## _users Operations` section to `docs/ai/mmrds_operation_catalog.md` (AC-1 through AC-4) |
