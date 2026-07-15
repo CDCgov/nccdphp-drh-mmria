@@ -16,10 +16,14 @@ namespace mmria.common.SharedLibraries.MMRIAServices.DAL;
 public sealed class MMRIAServicesDAL
 {
     private readonly CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.SystemConfig.IConfigurationRepository _configRepository;
 
-    public MMRIAServicesDAL(CouchDbHttpClient couchDbHttpClient)
+    public MMRIAServicesDAL(
+        CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.SystemConfig.IConfigurationRepository configRepository)
     {
         _couchDbHttpClient = couchDbHttpClient ?? throw new ArgumentNullException(nameof(couchDbHttpClient));
+        _configRepository = configRepository ?? throw new ArgumentNullException(nameof(configRepository));
     }
 
     public async Task<case_view_response> GetCaseView(DBConfigurationDetail db_info, string search_key)
@@ -238,12 +242,8 @@ public sealed class MMRIAServicesDAL
         string password
     )
     {
-        string requestUrl = $"{couchDbUrl}/configuration/{configId}";
-
-        using var httpClient = new HttpClient();
-        httpClient.DefaultRequestHeaders.Authorization = CouchDbHttpClient.CreateBasicAuthHeaderValue(userName, password);
-
-        return httpClient.GetStringAsync(requestUrl).GetAwaiter().GetResult();
+        var tempDbConfig = new DBConfigurationDetail { url = couchDbUrl, user_name = userName, user_value = password };
+        return _configRepository.GetConfigurationJsonAsync(configId, tempDbConfig).GetAwaiter().GetResult();
     }
 
     public async Task<ConfigurationSet> GetConfigurationDocumentAsync(
@@ -253,17 +253,8 @@ public sealed class MMRIAServicesDAL
         string password,
         int timeoutSeconds = 20)
     {
-        string requestUrl = $"{couchDbUrl.TrimEnd('/')}/configuration/{Uri.EscapeDataString(configId)}";
-        string response = await _couchDbHttpClient.ExecuteAsync(
-            "GET",
-            requestUrl,
-            null,
-            userName,
-            password,
-            timeoutSeconds: timeoutSeconds,
-            throwOnError: true);
-
-        return Newtonsoft.Json.JsonConvert.DeserializeObject<ConfigurationSet>(response);
+        var tempDbConfig = new DBConfigurationDetail { url = couchDbUrl, user_name = userName, user_value = password };
+        return await _configRepository.GetConfigurationSetAsync(configId, tempDbConfig, timeoutSeconds);
     }
 
     public async Task<ConfigurationSet> GetConfigurationDocumentAsync(
@@ -276,17 +267,7 @@ public sealed class MMRIAServicesDAL
             throw new ArgumentNullException(nameof(dbConfig));
         }
 
-        string requestUrl = $"{dbConfig.url.TrimEnd('/')}/configuration/{Uri.EscapeDataString(configId)}";
-        string response = await _couchDbHttpClient.ExecuteAsync(
-            "GET",
-            requestUrl,
-            null,
-            dbConfig.user_name,
-            dbConfig.user_value,
-            timeoutSeconds: timeoutSeconds,
-            throwOnError: true);
-
-        return Newtonsoft.Json.JsonConvert.DeserializeObject<ConfigurationSet>(response);
+        return await _configRepository.GetConfigurationSetAsync(configId, dbConfig, timeoutSeconds);
     }
 
     public async Task<string> ExecuteDatabaseCall(
