@@ -35,7 +35,7 @@ last_updated: 2026-07-14
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-07-14
-last_updated: 2026-07-14
+last_updated: 2026-07-15
 project: mmria
 project_key: NOKEY
 tracking_system: file-system
@@ -154,40 +154,56 @@ development_status:
   epic-16-retrospective: optional
 
   # ── Epic 17: mmrds CRUD Consolidation (SQL Migration Foundation) ──────────
-  epic-17: in-progress
+  epic-17: done
   17-1-mmrds-operation-catalog: done
   17-2-icase-repository-caseDAL-canonicalize: done
   17-3-casemanager-direct-calls: done
   17-4-caseworkflowadmindal-duplicates: done
   17-5-auditrecovery-cvs-vitalimport-attachment: done
-  17-5b-mmria-services-case-reads: ready-for-dev
-  17-6-offlinecasemanager-direct-calls: ready-for-dev
-  17-7-mmriaservicesdal-sync-boundary-decision: ready-for-dev
+  17-5b-mmria-services-case-reads: done
+  17-6-offlinecasemanager-direct-calls: done
+  17-7-mmriaservicesdal-sync-boundary-decision: done
   epic-17-retrospective: optional
 
   # ── Epic 18: _users and configuration Consolidation ───────────────────────
-  epic-18: backlog
-  18-1-users-operation-catalog: backlog
-  18-2-iuser-repository-accountdal: backlog
-  18-3-route-leaking-users-calls: backlog
-  18-4-iconfiguration-repository-systemconfigdal: backlog
-  18-5-iconfiguration-bootstrap-loader: backlog
+  epic-18: done
+  18-1-users-operation-catalog: done
+  18-2-iuser-repository-accountdal: done
+  18-3-route-leaking-users-calls: done
+  18-4-iconfiguration-repository-systemconfigdal: done
+  18-5-iconfiguration-bootstrap-loader: done
   epic-18-retrospective: optional
 
   # ── Epic 19: jurisdiction Consolidation ───────────────────────────────────
-  epic-19: backlog
-  19-1-jurisdiction-operation-catalog: backlog
-  19-2-ijurisdiction-repository-jurisdictiondal: backlog
-  19-3-ijurisdiction-authorization-reader: backlog
-  19-4-route-out-of-dal-jurisdiction-crud: backlog
+  epic-19: in-progress
+  19-1-jurisdiction-operation-catalog: ready-for-dev
+  19-2-ijurisdiction-repository-jurisdictiondal: ready-for-dev
+  19-3-ijurisdiction-authorization-reader: ready-for-dev
+  19-4-route-out-of-dal-jurisdiction-crud: ready-for-dev
   epic-19-retrospective: optional
 
   # ── Epic 20: metadata Consolidation ───────────────────────────────────────
-  epic-20: backlog
-  20-1-metadata-operation-catalog: backlog
-  20-2-imetadata-repository-metadataversiondal: backlog
-  20-3-sharedlibraries-dal-metadata-calls: backlog
-  20-4-controller-metadata-calls: backlog
-  20-5-mmria-services-metadata-reads: backlog
-  20-6-metadata-boundary-decision: backlog
+  epic-20: in-progress
+  20-1-metadata-operation-catalog: ready-for-dev
+  20-2-imetadata-repository-metadataversiondal: ready-for-dev
+  20-3-sharedlibraries-dal-metadata-calls: ready-for-dev
+  20-4-controller-metadata-calls: ready-for-dev
+  20-5-mmria-services-metadata-reads: ready-for-dev
+  20-6-metadata-boundary-decision: ready-for-dev
   epic-20-retrospective: optional
+
+  # ── Epic 21: audit Consolidation ──────────────────────────────────────────
+  epic-21: in-progress
+  21-1-audit-operation-catalog: ready-for-dev
+  21-2-iaudit-repository-auditdal: ready-for-dev
+  21-3-casemanager-audit-writes: ready-for-dev
+  21-4-caseworkflowadmindal-audit-calls: ready-for-dev
+  21-5-controller-audit-calls: ready-for-dev
+  21-6-manageusers-auditrecovery-audit-calls: ready-for-dev
+  epic-21-retrospective: optional
+
+  # ── Epic 22: .NET 10 Upgrade ─────────────────────────────────────────────
+  epic-22: in-progress
+  22-1-net-10-compatibility-analysis-and-risk-assessment: ready-for-dev
+  22-2-net-10-upgrade-execution: ready-for-dev
+  epic-22-retrospective: optional

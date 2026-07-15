@@ -14,7 +14,7 @@ namespace mmria.common.couchdb;
 /// Loads multi-tenant configuration following the pattern defined in mmria-server Program.cs
 /// Supports both environment variable and appsettings.json configuration sources.
 /// </summary>
-public sealed class MultiTenantConfigurationLoader
+public sealed class MultiTenantConfigurationLoader : IConfigurationBootstrapLoader
 {
     private readonly IConfiguration? _appSettingsConfiguration;
 

@@ -149,6 +149,11 @@ The Community Vital Signs PDF export tool is hardened against transient failures
 Stories in Epics 7 and 8 were authored against an earlier version of `project-context.md`. This epic pays down the resulting SharedLibraries `{Feature}/Manager/DAL` debt for the two remaining controller surfaces that still do direct CouchDB calls: `system_offlineController` (Epic 8) and the Wave 9 `CaseWorkflowAdmin` pair (`clear_case_status`, `recover_deleted_case`).
 **Architecture rule:** project-context.md Â§2.2 SharedLibraries pattern
 
+### Epic 22: .NET 10 Upgrade
+
+All mmria projects (server, services, common, utilities) are upgraded from .NET 9 to .NET 10. The .NET 10 SDK is installed on the developer machine, all project target frameworks are updated, NuGet packages are verified for .NET 10 compatibility, and both production Dockerfiles are updated to use the .NET 10 trusted base images from the EcPaaS registry.
+**Stories:** 22.1 — Compatibility Analysis & Risk Assessment, 22.2 — Upgrade Execution
+
 ---
 
 ## Epic 1: Case Narrative Editor Fidelity
@@ -1870,4 +1875,379 @@ So that the boundary is explicit and consistent with the decision made for `mmrd
 | 20 | 20.5 — `mmria.services` read-only calls | Medium | 20.2 |
 
 20.3, 20.4, 20.5, and 20.6 can proceed in parallel once 20.2 is complete.
+
+---
+
+## Epic 21: `audit` Consolidation (SQL Migration Foundation)
+
+All CouchDB reads and writes against the `audit` database are consolidated behind a single `IAuditRepository` interface implemented by a new canonical `AuditDAL`. The 19 in-scope call sites currently scattered across controllers, managers, and DAL files are routed through the interface. After this epic, migrating the audit database to SQL requires changing only `AuditDAL` — no manager, controller, or workflow-admin code changes are needed.
+
+**Architecture rule:** project-context.md §2.2 SharedLibraries pattern + SQL migration readiness.
+
+**Scope summary (verified 2026-07-15):**
+
+| Location | # Calls | Layer | URL Pattern | Notes |
+|---|---|---|---|---|
+| `AuditRecoveryDAL.cs` | 3 | DAL ✓ | **A** (wrong) | GET by ID, GET audit-manage-user, PUT audit-manage-user |
+| `CaseWorkflowAdminDAL.cs` | 4 | DAL ✓ | **B** (correct) | WriteAuditEntry, GetDeletedCasesView, GetAuditDoc, DeleteAuditDoc |
+| `ManageUsersDAL.cs` | 1 | DAL ✓ | **A** (wrong) | GET audit-manage-user (duplicate of AuditRecoveryDAL) |
+| `CaseManager.cs` | 6 | **Manager ✗** | **B** (correct) | All audit PUT (Change_Stack writes) — wrong layer |
+| `AuditRecoveryManager.cs` | 1 | **Manager ✗** | **A** (wrong) | Builds `_find` URL directly in manager |
+| `_auditController.cs` | 1 | **Controller ✗** | **A** (wrong) | `_find` by case_id — wrong layer |
+| `AuditRecoverUtilController.cs` | 1 | **Controller ✗** | **A** (wrong) | `_find` — wrong layer |
+| `caseController.pmss.cs` | 2 | **Controller ✗** | **B** (correct) | Audit PUT (Change_Stack writes) — wrong layer |
+| `c_db_setup.cs` | 5 | Infra | — | DB setup/security — **out of scope** |
+
+**Total in-scope: 19 calls.** 8 are already in the DAL layer but behind no interface. 11 are leaking out of the DAL.
+
+**Design decision — AuditDAL vs. AuditRecoveryDAL:**
+The existing `AuditRecoveryDAL` is scoped to one workflow (audit recovery / manage-user). A new canonical `SharedLibraries/Audit/DAL/AuditDAL.cs` is the correct home for all audit CRUD operations. After this epic, `AuditRecoveryDAL` becomes a workflow-specific DAL that delegates its audit reads/writes to `IAuditRepository` and keeps only recovery-specific orchestration.
+
+**Sequencing constraint:** Story 21.4 modifies `CaseWorkflowAdminDAL.cs`. Epic 17 Story 17.4 also modifies the same file. **21.4 must run after Epic 17 is complete** to avoid conflict on that file.
+
+---
+
+### Story 21.1: `audit` Operation Catalog
+
+As a developer,
+I want a definitive catalog of every operation against the `audit` database across all three projects,
+So that Story 21.2 has an agreed-upon, complete operation set before any code changes begin.
+
+**Acceptance Criteria:**
+
+**Given** all `.cs` files in `mmria-server`, `mmria.common`, and `mmria.services`
+**When** the developer completes the catalog
+**Then** `docs/ai/mmrds_operation_catalog.md` gains an `audit` section listing every distinct operation grouped into: audit entry writes (PUT `Change_Stack`), audit entry reads (GET by ID), audit view queries (`by_deleted`), Mango `_find` queries (`by case_id`), special document reads/writes (`audit-manage-user`), and bulk/delete operations
+
+**Given** each catalog entry
+**When** the catalog is complete
+**Then** each entry records: operation name, calling file(s) with line number, URL pattern in use (A or B), and response type expected
+
+**Given** `c_db_setup.cs` references to `audit`
+**When** evaluated
+**Then** they are listed but marked **out of scope** — DB setup and security configuration are infrastructure operations
+
+---
+
+### Story 21.2: Create `AuditDAL` and Extract `IAuditRepository`
+
+As a developer,
+I want a single `IAuditRepository` interface over all audit CRUD operations,
+So that every caller can depend on the interface and a SQL migration requires changing only `AuditDAL`.
+
+**Acceptance Criteria:**
+
+**Given** no canonical `Audit` SharedLibraries feature exists
+**When** this story creates one
+**Then** the following structure exists:
+```
+mmria.common/SharedLibraries/Audit/
+  IAuditRepository.cs
+  DAL/
+    AuditDAL.cs
+```
+
+**Given** the operation catalog from Story 21.1
+**When** `AuditDAL` is created
+**Then** it contains async methods for every in-scope operation, including at minimum:
+- `WriteAuditEntryAsync(Change_Stack entry, DBConfigurationDetail dbConfig)`
+- `GetAuditEntryAsync(string auditId, DBConfigurationDetail dbConfig)` → `Change_Stack`
+- `DeleteAuditEntryAsync(string auditId, string rev, DBConfigurationDetail dbConfig)`
+- `GetDeletedCasesViewAsync(DBConfigurationDetail dbConfig)` → `get_sortable_view_reponse_header<Audit_Detail_View>`
+- `GetAuditManageUserAsync(DBConfigurationDetail dbConfig)` → `Audit_Manage_User?`
+- `SaveAuditManageUserAsync(Audit_Manage_User doc, DBConfigurationDetail dbConfig)`
+- `FindAuditsByCaseAsync(string caseId, DBConfigurationDetail dbConfig)` → `ChangeStackResult`
+
+**Given** all `AuditDAL` methods
+**When** written
+**Then** all use `dbConfig.Get_Prefix_DB_Url(...)` (Pattern B) — no `$"{dbConfig.url}/{dbConfig.prefix}audit/..."` string interpolations
+
+**Given** `IAuditRepository` is defined
+**When** DI registration is updated in `mmria-server/Program.cs`
+**Then** `services.AddScoped<IAuditRepository, AuditDAL>()` is present
+
+**Given** no callers are changed in this story
+**When** the build runs
+**Then** `mmria-server`, `mmria.common`, and `mmria.services` build with zero errors
+
+---
+
+### Story 21.3: Route CaseManager Audit Writes Through `IAuditRepository`
+
+As a developer,
+I want `CaseManager`'s 6 direct audit write calls to delegate to `IAuditRepository`,
+So that audit access in the case manager layer follows the Manager → DAL boundary.
+
+**Acceptance Criteria:**
+
+**Given** the following 6 direct audit PUT calls in `CaseManager.cs` (all using `Get_Prefix_DB_Url`, Pattern B):
+- Line 318: `auditDbConfig.Get_Prefix_DB_Url($"audit/{changeStack._id}")`
+- Line 537: `auditDbConfig.Get_Prefix_DB_Url($"audit/{changeStack._id}")`
+- Line 1180: `dbConfig.Get_Prefix_DB_Url($"audit/{changeStack._id}")`
+- Line 1330: `dbConfig.Get_Prefix_DB_Url($"audit/{changeStack._id}")`
+- Line 1831: `dbConfig.Get_Prefix_DB_Url($"audit/{changeStack._id}")`
+- Line 2330: `dbConfig.Get_Prefix_DB_Url($"audit/{audit_data._id}")`
+**When** this story is complete
+**Then** each is replaced with `IAuditRepository.WriteAuditEntryAsync(changeStack, dbConfig)`; `IAuditRepository` is injected into `CaseManager` via constructor injection
+
+**Given** `CaseManager` will now depend on both `ICaseRepository` and `IAuditRepository`
+**When** DI registration is updated
+**Then** both dependencies are registered and `CaseManager` resolves correctly
+
+**Given** the build after all changes
+**When** verified
+**Then** all three projects build with zero errors and no controller code changes are required
+
+---
+
+### Story 21.4: Route CaseWorkflowAdminDAL Audit Calls Through `IAuditRepository`
+
+As a developer,
+I want `CaseWorkflowAdminDAL`'s 4 direct audit calls to delegate to `IAuditRepository`,
+So that the workflow-admin DAL no longer constructs audit URLs directly.
+
+**Acceptance Criteria:**
+
+**Given** the following 4 audit calls in `CaseWorkflowAdminDAL.cs` (all Pattern B):
+- Line 49: `WriteAuditEntryAsync` — PUT `audit/{auditEntry._id}`
+- Line 57: `GetDeletedCasesViewAsync` — GET `audit/_design/sortable/_view/by_deleted`
+- Line 67: `GetAuditDocumentAsync` — GET `audit/{auditId}`
+- Line 92: `DeleteAuditDocumentAsync` — DELETE `audit/{auditId}?rev={rev}`
+**When** this story is complete
+**Then** each is replaced with the corresponding `IAuditRepository` method; `IAuditRepository` is injected into `CaseWorkflowAdminDAL` via constructor injection
+
+**Given** `CaseWorkflowAdminDAL` after Epic 17 Story 17.4 already delegates mmrds calls to `ICaseRepository`
+**When** this story is implemented
+**Then** `CaseWorkflowAdminDAL` depends on both `ICaseRepository` and `IAuditRepository`; `_couchDbHttpClient` is removed from the class entirely (all its calls will have been moved to repository dependencies)
+
+**Given** the build after all changes
+**When** verified
+**Then** all three projects build with zero errors
+
+**Pre-condition:** This story must not be started until Epic 17 Story 17.4 is `done`.
+
+---
+
+### Story 21.5: Route Controller-Level Audit Calls Through `IAuditRepository`
+
+As a developer,
+I want all direct audit URL construction in controllers eliminated,
+So that controllers never touch the audit database directly.
+
+**Acceptance Criteria:**
+
+**Given** the following direct audit calls in controller/util files:
+- `_auditController.cs` line 107: `$"{db_config.url}/{db_config.prefix}audit/_find"` — builds `_find` URL in a private helper method, passes it to `AuditRecoveryManager`
+- `AuditRecoverUtilController.cs` line 54: `$"{configuration.url}/{configuration.prefix}audit/_find"` — `_find` URL passed to a service
+- `caseController.pmss.cs` line 261: `db_config.Get_Prefix_DB_Url($"audit/{audit_data._id}")` — audit PUT
+- `caseController.pmss.cs` line 418: `db_config.Get_Prefix_DB_Url($"audit/{audit_data._id}")` — audit PUT
+**When** this story is complete
+**Then** all four call sites are replaced with `IAuditRepository` method calls; `IAuditRepository` is injected into each controller via constructor injection; no controller constructs an `audit/` URL
+
+**Given** `_auditController.cs` `get_find_url()` helper method (line ~90–110) that currently builds the `_find` URL tuple `(url, postData)` and passes both to `AuditRecoveryManager.GetAuditViewDataAsync`
+**When** replaced
+**Then** the URL construction is removed from the controller; `FindAuditsByCaseAsync` in `IAuditRepository` accepts the `caseId` directly and handles the `_find` POST internally; the manager receives the result, not the URL
+
+**Given** `caseController.pmss.cs` audit writes at lines 261 and 418
+**When** replaced
+**Then** only the CouchDB URL construction and `ExecuteAsync` calls move to the DAL — the surrounding PMSS business logic and error handling remain in the controller
+
+**Given** the build after all changes
+**When** verified
+**Then** all three projects build with zero errors
+
+---
+
+### Story 21.6: Route `ManageUsersDAL` and `AuditRecoveryDAL` Through `IAuditRepository`
+
+As a developer,
+I want `ManageUsersDAL` and `AuditRecoveryDAL` to delegate their audit operations to `IAuditRepository`,
+So that no DAL outside `AuditDAL` constructs audit URLs directly.
+
+**Acceptance Criteria:**
+
+**Given** `ManageUsersDAL.cs` line 165 — `$"{db_config.url}/{db_config.prefix}audit/audit-manage-user"` (GET `Audit_Manage_User`, Pattern A)
+**When** this story is complete
+**Then** the call is replaced with `IAuditRepository.GetAuditManageUserAsync(db_config)`; `IAuditRepository` is injected into `ManageUsersDAL`
+
+**Given** `AuditRecoveryDAL.cs` lines 39, 53, 70 (all Pattern A):
+- Line 39: GET `audit/{changeId}` → `Change_Stack`
+- Line 53: GET `audit/audit-manage-user` → `Audit_Manage_User`
+- Line 70: PUT `audit/{auditDocument._id}` → `document_put_response`
+**When** this story is complete
+**Then** all three are replaced with the corresponding `IAuditRepository` methods; `AuditRecoveryDAL` injects `IAuditRepository` instead of calling `_couchDbHttpClient` for audit operations
+
+**Given** `AuditRecoveryManager.cs` line 158 — builds `_find` URL directly as `$"{db_config.url}/{db_config.prefix}audit/_find"` and returns it as a tuple to be passed back to the DAL
+**When** this story is complete
+**Then** the `_find` URL construction is removed from `AuditRecoveryManager`; the manager calls `IAuditRepository.FindAuditsByCaseAsync(caseId, dbConfig)` directly and receives the result; `IAuditRepository` is injected into `AuditRecoveryManager`
+
+**Given** the build after all changes
+**When** verified
+**Then** all three projects build with zero errors; `AuditRecoveryDAL` no longer holds any direct `_couchDbHttpClient` audit calls (its `_couchDbHttpClient` field may be removed entirely if no other calls remain)
+
+---
+
+## Epic 21 — Story Sequencing
+
+| Wave | Story | Risk | Dependencies |
+|---|---|---|---|
+| 21 | 21.1 — `audit` Operation Catalog | None | None — discovery only |
+| 21 | 21.2 — `AuditDAL` + `IAuditRepository` | Low | 21.1 |
+| 21 | 21.3 — CaseManager audit writes | Low | 21.2 |
+| 21 | 21.5 — Controller-level audit calls | Low–Medium | 21.2 |
+| 21 | 21.6 — ManageUsersDAL + AuditRecoveryDAL + AuditRecoveryManager | Low | 21.2 |
+| 21 | 21.4 — CaseWorkflowAdminDAL audit calls | Low | 21.2 **+ Epic 17 Story 17.4 done** |
+
+21.3, 21.5, and 21.6 can proceed in parallel once 21.2 is complete. 21.4 must wait for Epic 17 Story 17.4 to avoid file conflict on `CaseWorkflowAdminDAL.cs`.
+
+---
+
+## Epic 22: .NET 10 Upgrade
+
+All mmria projects are upgraded from .NET 9 to .NET 10. The developer machine receives the .NET 10 SDK, all project target frameworks are updated, third-party NuGet packages are verified for .NET 10 compatibility (with any necessary version bumps applied), and both production Dockerfiles are updated to reference the .NET 10 trusted base images from the EcPaaS registry.
+
+**Projects in scope (nccdphp-drh-mmria repo):**
+- `source-code/mmria/mmria-server/mmria-server.csproj`
+- `nccdphp-drh-mmria-common/mmria.common/mmria.common.csproj`
+- `nccdphp-drh-mmria-services/mmria.services/mmria.services.csproj`
+
+**Projects in scope (nccdphp-drh-mmria-utilities repo):**
+- `mmria-server.tests/mmria-server.tests.csproj`
+- `mmria-case-generator/mmria-case-generator.csproj`
+- `strongly-typed-case/strongcase.csproj`
+- `data-migration/migrate.csproj`
+- `Replication/replicate.csproj`
+- `mmria-ije-generator/mmria-ije-generator.csproj`
+- `mmria-tools/mmria-tools.csproj`
+- `mmria-tenant-database-counts/mmria-tenant-database-counts.csproj`
+
+**Dockerfiles in scope:**
+- `source-code/mmria/mmria-server/Dockerfile` — build image `dotnet-90`, runtime image `dotnet-90-runtime`
+- `nccdphp-drh-mmria-services/mmria.services/Dockerfile` — same images
+- `.s2i/dockerfile` — legacy file, currently references `dotnet-80`; assess whether to update or retire
+
+---
+
+### Story 22.1: .NET 10 Compatibility Analysis and Risk Assessment
+
+As a developer,
+I want a documented analysis of all compatibility risks before upgrading to .NET 10,
+So that the upgrade execution story has a clear, evidence-based remediation plan and no surprises block CI/CD.
+
+**Acceptance Criteria:**
+
+**Given** the Microsoft .NET 10 breaking-changes documentation
+**When** the developer reviews it against the mmria codebase
+**Then** a written findings report is produced listing every breaking change that applies (or is suspected to apply) to this codebase, its severity (High / Medium / Low / None), and the affected file(s)
+
+**Given** the key third-party NuGet packages used across the in-scope projects:
+
+| Package | Current Version | Risk Notes |
+|---|---|---|
+| `Akka` / `Akka.Hosting` / `Akka.Cluster` / `Akka.DependencyInjection` | 1.5.52 | Check NuGet for .NET 10 TFM support |
+| `Akka.Quartz.Actor` | 1.5.13 | Transitively depends on Quartz 3.x; verify compatibility |
+| `Akka.DI.Core` / `Akka.DI.Extensions.DependencyInjection` | 1.4.51 / 1.4.22 | Older release train; may not declare net10.0 support |
+| `Quartz` | 3.13.1 | Check for .NET 10 support |
+| `Microsoft.AspNetCore.Mvc.NewtonsoftJson` | 9.0.0 | Must be updated to 10.0.x |
+| `Microsoft.Extensions.Http` | 9.0.0 | Must be updated to 10.0.x |
+| `Serilog.Extensions.Logging` | 9.0.0 | Check for 10.0.x release |
+| `System.Text.Encoding.CodePages` | 9.0.0 | Likely in-box for .NET 10; confirm |
+| `Microsoft.CodeAnalysis.CSharp` | 4.12.0 | Verify .NET 10 compiler support |
+| `NJsonSchema` / `NJsonSchema.CodeGeneration.CSharp` | 11.0.2 | Check for compatibility |
+| `FastExcel` | 3.0.13 | Low risk (no framework coupling) |
+| `SharpZipLib` | 1.4.2 | Low risk |
+| `TinyCsvParser` | 2.7.1 | Low risk |
+| `Newtonsoft.Json` | 13.0.3 | Low risk (framework-agnostic) |
+
+**When** the developer checks each package on NuGet.org for .NET 10 TFM listings, open issues, and release notes
+**Then** the findings report records the latest compatible version for each package (or "no upgrade needed" if the current version is compatible) and flags any packages with no .NET 10 support path as blockers
+
+**Given** the EcPaaS trusted-image registry currently has `dotnet-90` and `dotnet-90-runtime` images
+**When** the developer contacts the EcPaaS platform team or inspects the registry
+**Then** the findings report records whether `dotnet-100` and `dotnet-100-runtime` images exist in the registry, their tag/digest format, and (if absent) the estimated availability timeline and any interim workaround (e.g., use `mcr.microsoft.com/dotnet/aspnet:10.0` with a waiver)
+
+**Given** the suppressed compiler warnings in `mmria-server.csproj` (`SYSLIB0014`, `CS8632`, etc.)
+**When** the developer reviews them against .NET 10 release notes
+**Then** the report notes whether any suppressed warning escalates to an error in .NET 10 and recommends the remediation action (fix the call site or retain the suppression)
+
+**Given** the test suite in `mmria-server.tests`
+**When** the developer reviews the test project's dependencies and test patterns
+**Then** the report notes any test-framework or assertion-library changes needed for .NET 10
+
+**Deliverable:** A markdown findings report committed to `docs/ai/dotnet10-compatibility-analysis.md` covering:
+1. Breaking-change audit results
+2. Per-package compatibility status table with recommended versions
+3. Docker image availability status and path forward
+4. Suppressed-warning review
+5. Recommended story 22.2 task checklist derived from the above findings
+
+---
+
+### Story 22.2: .NET 10 Upgrade Execution
+
+As a developer,
+I want all mmria projects running on .NET 10,
+So that the codebase is on the current LTS release with continued Microsoft support and access to .NET 10 platform improvements.
+
+**Pre-condition:** Story 22.1 is complete and the findings report in `docs/ai/dotnet10-compatibility-analysis.md` shows no unresolved blocker items. Any package with no .NET 10 support path must be resolved before this story begins.
+
+**Acceptance Criteria:**
+
+**Given** the developer machine does not yet have the .NET 10 SDK installed
+**When** the developer runs the upgrade
+**Then** the .NET 10 SDK is installed via `winget install Microsoft.DotNet.SDK.10` (or the equivalent official installer) and `dotnet --list-sdks` confirms the `10.x` SDK is present alongside the existing 9.x SDK
+
+**Given** all eleven in-scope `.csproj` files currently declare `<TargetFramework>net9.0</TargetFramework>` (or `<TargetFrameworks>net9.0</TargetFrameworks>` for mmria-server)
+**When** the developer updates them
+**Then** every in-scope `.csproj` declares `net10.0` and `dotnet build` succeeds with no new errors for each project
+
+**Given** the version-locked Microsoft packages (`Microsoft.AspNetCore.Mvc.NewtonsoftJson 9.0.0`, `Microsoft.Extensions.Http 9.0.0`, `System.Text.Encoding.CodePages 9.0.0`, `Serilog.Extensions.Logging 9.0.0`)
+**When** the developer updates packages
+**Then** each is updated to its `.NET 10`-aligned version (10.0.x or latest stable that lists `net10.0` support) and the projects restore without errors
+
+**Given** the compatibility analysis report's per-package recommended versions
+**When** remaining packages require version bumps (e.g., Akka, Quartz, NJsonSchema as identified in Story 22.1)
+**Then** each is updated to the version specified in the report and the affected projects build and restore cleanly
+
+**Given** the `source-code/mmria/mmria-server/Dockerfile` build stage currently references:
+```
+FROM .../trusted-images/dotnet-90:9.0-<tag>@sha256:<digest> AS build
+```
+and the runtime stage references:
+```
+FROM .../trusted-images/dotnet-90-runtime:9.0-<tag>@sha256:<digest> AS runtime
+```
+**When** the developer updates the Dockerfile
+**Then** both `FROM` lines reference the `.NET 10` trusted images (`dotnet-100` / `dotnet-100-runtime`) with the correct tag and digest as identified in Story 22.1, and the `-f net9.0` flags in `dotnet build` and `dotnet publish` commands are updated to `-f net10.0`
+
+**Given** the `nccdphp-drh-mmria-services/mmria.services/Dockerfile` contains the same `dotnet-90` / `dotnet-90-runtime` image references and `-f net9.0` flags
+**When** the developer updates it
+**Then** both `FROM` lines and both `-f` flags are updated identically to the server Dockerfile
+
+**Given** the `.s2i/dockerfile` currently references `dotnet-80` and is largely commented out
+**When** the developer reviews it per Story 22.1 findings
+**Then** either (a) it is updated to reference `dotnet-100` if the file is still used, or (b) a comment is added to the top of the file documenting that it is retired and not used in the active build pipeline — whichever the analysis in Story 22.1 recommends
+
+**Given** the full build pipeline after all changes
+**When** the developer runs:
+- `dotnet build` on `mmria-server.csproj` (Release, net10.0)
+- `dotnet build` on `mmria.services.csproj` (Release, net10.0)
+- `dotnet build` on `mmria.common.csproj`
+- `dotnet test` on `mmria-server.tests.csproj`
+**Then** all builds succeed and all tests pass with no new failures (pre-existing failures, if any, are noted but do not block this story)
+
+**Given** the `vscode/tasks.json` build tasks reference `net9.0` in `-f` arguments (if any)
+**When** the developer searches task definitions
+**Then** any hardcoded `-f net9.0` flags in `.vscode/tasks.json` or `tasks.json` are updated to `net10.0`
+
+---
+
+## Epic 22 — Story Sequencing
+
+| Wave | Story | Risk | Dependencies |
+|---|---|---|---|
+| 22 | 22.1 — Compatibility Analysis & Risk Assessment | None — discovery only | None |
+| 22 | 22.2 — Upgrade Execution | Medium | 22.1 complete, no blockers in findings report |
+
+22.1 must fully complete and produce a clean findings report before 22.2 begins. The two stories must not run in parallel.
 

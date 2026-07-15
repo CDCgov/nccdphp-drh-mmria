@@ -537,6 +537,224 @@ dev this story _bmad-output/implementation-artifacts/17-7-mmriaservicesdal-sync-
 
 ---
 
+## Epic 18 — `_users` and `configuration` Consolidation (SQL Migration Foundation) _(2026-07-14)_
+
+| Story | File | Status |
+|-------|------|--------|
+| 18.1 — `_users` Operation Catalog | [18-1-users-operation-catalog.md](18-1-users-operation-catalog.md) | done |
+| 18.2 — Define `IUserRepository` and Canonicalize `AccountDAL` | [18-2-iuser-repository-accountdal.md](18-2-iuser-repository-accountdal.md) | done |
+| 18.3 — Route Leaking `_users` Calls Through `IUserRepository` | [18-3-route-leaking-users-calls.md](18-3-route-leaking-users-calls.md) | done |
+| 18.4 — Define `IConfigurationRepository` and Create `SystemConfigDAL` | [18-4-iconfiguration-repository-systemconfigdal.md](18-4-iconfiguration-repository-systemconfigdal.md) | done |
+| 18.5 — Extract `IConfigurationBootstrapLoader` | [18-5-iconfiguration-bootstrap-loader.md](18-5-iconfiguration-bootstrap-loader.md) | done |
+
+**Sequencing:** 18.1 first (discovery). 18.2 depends on 18.1. 18.3 depends on 18.2. 18.4 and 18.5 are independent — can be done at any time after 18.1 for 18.4, or immediately for 18.5.
+
+> ℹ️ Goal: all `_users` and `configuration` CouchDB calls consolidated behind `IUserRepository` and `IConfigurationRepository`. SQL migration = swap DAL implementations only. `IConfigurationBootstrapLoader` (18.5) is the separate seam for startup tenant loading.
+
+**Story 18.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/18-1-users-operation-catalog.md
+```
+
+**Story 18.2 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/18-2-iuser-repository-accountdal.md
+```
+
+**Story 18.3 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/18-3-route-leaking-users-calls.md
+```
+
+**Story 18.4 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/18-4-iconfiguration-repository-systemconfigdal.md
+```
+
+**Story 18.5 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/18-5-iconfiguration-bootstrap-loader.md
+```
+
+---
+
+## Epic 19 — `jurisdiction` Consolidation (SQL Migration Foundation) _(2026-07-15)_
+
+| Story | File | Status |
+|-------|------|--------|
+| 19.1 — `jurisdiction` Operation Catalog | [19-1-jurisdiction-operation-catalog.md](19-1-jurisdiction-operation-catalog.md) | done |
+| 19.2 — Define `IJurisdictionRepository` and Create `JurisdictionDAL` | [19-2-ijurisdiction-repository-jurisdictiondal.md](19-2-ijurisdiction-repository-jurisdictiondal.md) | ready-for-dev |
+| 19.3 — Define `IJurisdictionAuthorizationReader` and Route Auth Middleware | [19-3-ijurisdiction-authorization-reader.md](19-3-ijurisdiction-authorization-reader.md) | ready-for-dev |
+| 19.4 — Route Out-of-DAL Application CRUD Through `IJurisdictionRepository` | [19-4-route-out-of-dal-jurisdiction-crud.md](19-4-route-out-of-dal-jurisdiction-crud.md) | ready-for-dev |
+
+**Sequencing:** 19.1 first (discovery). 19.2 and 19.3 depend on 19.1 and can run in parallel. 19.4 depends on 19.2.
+
+> ℹ️ **Two-interface design:** Auth middleware files all query a single read-only view (`by_user_id`) — high-frequency, read-only, architecturally distinct from application CRUD. `IJurisdictionAuthorizationReader` (19.3) is separate from `IJurisdictionRepository` (19.2) by design.
+
+**Story 19.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/19-1-jurisdiction-operation-catalog.md
+```
+
+**Story 19.2 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/19-2-ijurisdiction-repository-jurisdictiondal.md
+```
+
+**Story 19.3 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/19-3-ijurisdiction-authorization-reader.md
+```
+
+**Story 19.4 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/19-4-route-out-of-dal-jurisdiction-crud.md
+```
+
+---
+
+## Epic 20 — `metadata` Consolidation (SQL Migration Foundation) _(2026-07-15)_
+
+| Story | File | Status |
+|-------|------|--------|
+| 20.1 — `metadata` Operation Catalog | [20-1-metadata-operation-catalog.md](20-1-metadata-operation-catalog.md) | ready-for-dev |
+| 20.2 — Define `IMetadataRepository` and Canonicalize `MetadataVersionDAL` | [20-2-imetadata-repository-metadataversiondal.md](20-2-imetadata-repository-metadataversiondal.md) | ready-for-dev |
+| 20.3 — Route SharedLibraries DAL Files Through `IMetadataRepository` | [20-3-sharedlibraries-dal-metadata-calls.md](20-3-sharedlibraries-dal-metadata-calls.md) | ready-for-dev |
+| 20.4 — Route Controller Direct `metadata` Calls Through `IMetadataRepository` | [20-4-controller-metadata-calls.md](20-4-controller-metadata-calls.md) | ready-for-dev |
+| 20.5 — Route `mmria.services` Read-Only `metadata` Calls Through `IMetadataRepository` | [20-5-mmria-services-metadata-reads.md](20-5-mmria-services-metadata-reads.md) | ready-for-dev |
+| 20.6 — `metadata` Boundary Decision — Bulk `_all_docs` and Sync | [20-6-metadata-boundary-decision.md](20-6-metadata-boundary-decision.md) | ready-for-dev |
+
+**Sequencing:** 20.1 first (discovery). 20.6 can run in parallel with 20.1. 20.2 depends on 20.1. Stories 20.3, 20.4, and 20.5 depend on 20.2 and can run in parallel.
+
+> ⚠️ **20.5 is the highest-touch story** — 15 files across `mmria.services`. Work carefully and verify build after each file group.
+
+**Story 20.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/20-1-metadata-operation-catalog.md
+```
+
+**Story 20.2 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/20-2-imetadata-repository-metadataversiondal.md
+```
+
+**Story 20.3 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/20-3-sharedlibraries-dal-metadata-calls.md
+```
+
+**Story 20.4 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/20-4-controller-metadata-calls.md
+```
+
+**Story 20.5 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/20-5-mmria-services-metadata-reads.md
+```
+
+**Story 20.6 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/20-6-metadata-boundary-decision.md
+```
+
+---
+
+## Epic 21 — `audit` Consolidation (SQL Migration Foundation) _(2026-07-15)_
+
+| Story | File | Status |
+|-------|------|--------|
+| 21.1 — `audit` Operation Catalog | [21-1-audit-operation-catalog.md](21-1-audit-operation-catalog.md) | ready-for-dev |
+| 21.2 — Create `AuditDAL` and Extract `IAuditRepository` | [21-2-iaudit-repository-auditdal.md](21-2-iaudit-repository-auditdal.md) | ready-for-dev |
+| 21.3 — Route CaseManager Audit Writes Through `IAuditRepository` | [21-3-casemanager-audit-writes.md](21-3-casemanager-audit-writes.md) | ready-for-dev |
+| 21.4 — Route CaseWorkflowAdminDAL Audit Calls Through `IAuditRepository` | [21-4-caseworkflowadmindal-audit-calls.md](21-4-caseworkflowadmindal-audit-calls.md) | ready-for-dev |
+| 21.5 — Route Controller-Level Audit Calls Through `IAuditRepository` | [21-5-controller-audit-calls.md](21-5-controller-audit-calls.md) | ready-for-dev |
+| 21.6 — Route `ManageUsersDAL` and `AuditRecoveryDAL` Through `IAuditRepository` | [21-6-manageusers-auditrecovery-audit-calls.md](21-6-manageusers-auditrecovery-audit-calls.md) | ready-for-dev |
+
+**Sequencing:** 21.1 first (discovery). 21.2 depends on 21.1. Stories 21.3, 21.5, and 21.6 depend on 21.2 and can run in parallel. **21.4 additionally requires Epic 17 Story 17.4 to be `done`** before starting (file conflict on `CaseWorkflowAdminDAL.cs`) — Epic 17 is complete, so this pre-condition is already satisfied.
+
+> ℹ️ **Design:** A new canonical `AuditDAL` is created for all audit CRUD. The existing `AuditRecoveryDAL` (Story 21.6) becomes a workflow-specific DAL that delegates to `IAuditRepository`.
+
+**Story 21.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/21-1-audit-operation-catalog.md
+```
+
+**Story 21.2 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/21-2-iaudit-repository-auditdal.md
+```
+
+**Story 21.3 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/21-3-casemanager-audit-writes.md
+```
+
+**Story 21.4 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/21-4-caseworkflowadmindal-audit-calls.md
+```
+
+**Story 21.5 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/21-5-controller-audit-calls.md
+```
+
+**Story 21.6 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/21-6-manageusers-auditrecovery-audit-calls.md
+```
+
+---
+
+## Epic 22 — .NET 10 Upgrade _(2026-07-15)_
+
+| Story | File | Status |
+|-------|------|--------|
+| 22.1 — Compatibility Analysis and Risk Assessment | [22-1-net-10-compatibility-analysis-and-risk-assessment.md](22-1-net-10-compatibility-analysis-and-risk-assessment.md) | ready-for-dev |
+| 22.2 — Upgrade Execution | [22-2-net-10-upgrade-execution.md](22-2-net-10-upgrade-execution.md) | ready-for-dev |
+
+**Sequencing:** 22.1 must be complete with no unresolved blockers before 22.2 begins. Strictly sequential — do not run in parallel.
+
+> ⚠️ **22.2 is gated on 22.1.** The findings report at `docs/ai/dotnet10-compatibility-analysis.md` must show no unresolved package or image blockers before any code changes begin.
+>
+> ℹ️ **Scope:** All 11 `.csproj` files across both repos (`net9.0` → `net10.0`), both production Dockerfiles (`dotnet-90`/`dotnet-90-runtime` → `dotnet-100`/`dotnet-100-runtime`), and the `.s2i/dockerfile` assessment.
+
+**Story 22.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/22-1-net-10-compatibility-analysis-and-risk-assessment.md
+```
+
+**Story 22.2 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/22-2-net-10-upgrade-execution.md
+```
+
+---
+
 ## Open Items — Resolve Before Affected Story
 
 | OI       | Affects               | What to resolve                                                                                                                                                                                                                                                                                                                                                                                        |

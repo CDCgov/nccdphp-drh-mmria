@@ -200,7 +200,7 @@ public sealed partial class Program
             Log.Information("***********************\n");
 
             // Load multi-tenant configuration using centralized loader
-            var configLoader = new mmria.common.couchdb.MultiTenantConfigurationLoader(configuration);
+            mmria.common.couchdb.IConfigurationBootstrapLoader configLoader = new mmria.common.couchdb.MultiTenantConfigurationLoader(configuration);
             
             // Create HTTP client for CouchDB during startup (uses SimpleHttpClientFactory)
             var configLoadingHttpFactory = new mmria.common.SimpleHttpClientFactory();
@@ -291,7 +291,11 @@ public sealed partial class Program
             builder.Services.AddSingleton<mmria.common.getset.CouchDbHttpClient>();
 
             // Register Account Manager components (DAL and Manager for Account feature)
+            // AccountDAL registered as concrete type (for session ops injected directly into AccountManager)
+            // IUserRepository resolved via factory to the same scoped AccountDAL instance (SQL migration seam)
             builder.Services.AddScoped<mmria.common.SharedLibraries.Account.DAL.AccountDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.Account.IUserRepository>(
+                sp => sp.GetRequiredService<mmria.common.SharedLibraries.Account.DAL.AccountDAL>());
             builder.Services.AddScoped<mmria.common.SharedLibraries.Account.Manager.AccountManager>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.ManageUsers.DAL.ManageUsersDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.ManageUsers.Manager.ManageUsersManager>();
@@ -303,6 +307,10 @@ public sealed partial class Program
             builder.Services.AddScoped<mmria.common.SharedLibraries.ExportQueue.Manager.ExportQueueManager>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.VitalImport.DAL.VitalImportDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.VitalImport.Manager.VitalImportManager>();
+            // Register SystemConfig repository (SQL migration seam for configuration database)
+            builder.Services.AddScoped<mmria.common.SharedLibraries.SystemConfig.DAL.SystemConfigDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.SystemConfig.IConfigurationRepository>(
+                sp => sp.GetRequiredService<mmria.common.SharedLibraries.SystemConfig.DAL.SystemConfigDAL>());
             builder.Services.AddScoped<mmria.common.SharedLibraries.MMRIAServices.DAL.MMRIAServicesDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.MMRIAServices.Manager.MMRIAServicesManager>();
             builder.Services.AddSingleton<mmria.common.SharedLibraries.MMRIARebuild.DAL.MMRIARebuildDAL>();

@@ -19,17 +19,20 @@ public sealed class _usersController : Controller
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly mmria.server.util.RequestTenantRuntime _tenantRuntime;
+    private readonly mmria.common.SharedLibraries.Account.IUserRepository _userRepository;
 
     public _usersController
     ( 
         IHttpContextAccessor p_httpContextAccessor,
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.Account.IUserRepository userRepository
     )
     {
         httpContextAccessor = p_httpContextAccessor;
         _couchDbHttpClient = couchDbHttpClient;
         _tenantRuntime = tenantRuntime;
+        _userRepository = userRepository;
         host_prefix = tenantRuntime.EffectiveHostPrefix;
 
         configuration = tenantRuntime.RequireConfiguration();
@@ -48,7 +51,7 @@ public sealed class _usersController : Controller
     {
         var result = new Dictionary<string,object>();
         var manageUsersManager = new mmria.common.SharedLibraries.ManageUsers.Manager.ManageUsersManager(
-            new mmria.common.SharedLibraries.ManageUsers.DAL.ManageUsersDAL(_couchDbHttpClient),
+            new mmria.common.SharedLibraries.ManageUsers.DAL.ManageUsersDAL(_couchDbHttpClient, _userRepository),
             _couchDbHttpClient
         );
 

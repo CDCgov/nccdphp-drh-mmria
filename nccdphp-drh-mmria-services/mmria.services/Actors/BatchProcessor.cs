@@ -90,7 +90,7 @@ public sealed class BatchProcessor : ReceiveActor
     public BatchProcessor(mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
         _couchDbHttpClient = couchDbHttpClient;
-        _mmriaServicesManager = new MMRIAServicesManager(new MMRIAServicesDAL(_couchDbHttpClient), _couchDbHttpClient);
+        _mmriaServicesManager = new MMRIAServicesManager(new MMRIAServicesDAL(_couchDbHttpClient, new mmria.common.SharedLibraries.SystemConfig.DAL.SystemConfigDAL(_couchDbHttpClient)), _couchDbHttpClient);
         // Create router pool with 5 workers for bounded parallelism
         batchItemRouter = Context.ActorOf(
             Props.Create<RecordsProcessor_Worker.Actors.BatchItemProcessor>(_couchDbHttpClient)
