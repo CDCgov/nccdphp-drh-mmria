@@ -830,6 +830,92 @@ dev this story _bmad-output/implementation-artifacts/23-8-ilogging-repository-lo
 
 ---
 
+## Epic 24 — Infrastructure Sync and Database Lifecycle Consolidation (SQL Migration Foundation) _(2026-07-16)_
+
+| Story | File | Status |
+|-------|------|--------|
+| 24.1 — Infra Operations Catalog | [24-1-infra-operations-catalog.md](24-1-infra-operations-catalog.md) | not-started |
+| 24.2 — `IDeIdentifiedRepository` + `IReportRepository` write/lifecycle ext. | [24-2-ideidentified-repository-ireport-write-extension.md](24-2-ideidentified-repository-ireport-write-extension.md) | not-started |
+| 24.3 — `ICaseRepository` paged bulk read + change stream | [24-3-icase-repository-sync-extensions.md](24-3-icase-repository-sync-extensions.md) | not-started |
+| 24.4 — Route export queue rebuild actors | [24-4-export-queue-rebuild-routing.md](24-4-export-queue-rebuild-routing.md) | not-started |
+| 24.5 — `IDatabaseLifecycleService` over `c_db_setup` | [24-5-idatabase-lifecycle-service.md](24-5-idatabase-lifecycle-service.md) | not-started |
+| 24.6 — Route `c_sync_document.pmss.cs` | [24-6-c-sync-document-pmss-routing.md](24-6-c-sync-document-pmss-routing.md) | not-started |
+| 24.7 — Route `c_document_sync_all` variants | [24-7-c-document-sync-all-routing.md](24-7-c-document-sync-all-routing.md) | not-started |
+| 24.8 — Route `Process_DB_Synchronization_Set` | [24-8-process-db-synchronization-set-routing.md](24-8-process-db-synchronization-set-routing.md) | not-started |
+| 24.9 — Route `Process_Central_Pull_list` + CDC `c_document_sync_all` | [24-9-process-central-pull-list-cdc-routing.md](24-9-process-central-pull-list-cdc-routing.md) | not-started |
+
+**Sequencing:** 24.1 must run first (infra ops catalog). Once complete, 24.2–24.5 can all proceed in parallel. 24.6 depends on 24.2. 24.7 and 24.8 can proceed in parallel once 24.2, 24.3, and 24.6 are complete. 24.9 must wait for 24.7.
+
+> ⚠️ **24.9 carries highest risk** — CDC data integration is multi-source, cross-tenant, and runs through the de-identification pipeline. Requires full CDC integration test before marking complete.
+>
+> ⚠️ **Lift-and-shift constraint** — Orchestration logic, actor hierarchies, Quartz schedules, rebuild pipelines, and the CDC data flow are NOT restructured. Only CouchDB URL construction and `CouchDbHttpClient.ExecuteAsync` calls are replaced at each call site.
+>
+> ⚠️ **24.4 prerequisite** — Story 24.4 depends on Epic 23 Story 23.4 being complete (`IExportQueueRepository` must exist before it can be extended with `PurgeAndReinitializeAsync`).
+>
+> ⚠️ **24.2 supersedes 23.6 boundary decision** — Story 23.6 declared `report` write operations "infrastructure out-of-scope." Story 24.2 supersedes that decision by adding write and lifecycle methods to `IReportRepository`. Update the catalog accordingly when implementing 24.2.
+>
+> ℹ️ **`c_db_setup.cs` (24.5)** — Interface extraction only. Zero internal changes to `c_db_setup`. The SQL migration seam is the interface; `c_db_setup` remains the complete CouchDB implementation.
+>
+> ℹ️ **Non-PMSS `c_sync_document.cs`** — Story 24.1 should confirm whether the non-PMSS `c_sync_document.cs` also has direct de_id/report CouchDB calls. If yes, scope it into 24.6.
+>
+> ℹ️ **Final migration readiness gate** — When Epic 24 is complete, every CouchDB HTTP call in the entire codebase routes through a typed repository interface. SQL migration requires only swapping DAL implementations and replacing `IDatabaseLifecycleService` with schema-migration tooling.
+
+**Story 24.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/24-1-infra-operations-catalog.md
+```
+
+**Story 24.2 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/24-2-ideidentified-repository-ireport-write-extension.md
+```
+
+**Story 24.3 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/24-3-icase-repository-sync-extensions.md
+```
+
+**Story 24.4 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/24-4-export-queue-rebuild-routing.md
+```
+
+**Story 24.5 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/24-5-idatabase-lifecycle-service.md
+```
+
+**Story 24.6 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/24-6-c-sync-document-pmss-routing.md
+```
+
+**Story 24.7 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/24-7-c-document-sync-all-routing.md
+```
+
+**Story 24.8 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/24-8-process-db-synchronization-set-routing.md
+```
+
+**Story 24.9 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/24-9-process-central-pull-list-cdc-routing.md
+```
+
+---
+
 ## Open Items — Resolve Before Affected Story
 
 | OI       | Affects               | What to resolve                                                                                                                                                                                                                                                                                                                                                                                        |
