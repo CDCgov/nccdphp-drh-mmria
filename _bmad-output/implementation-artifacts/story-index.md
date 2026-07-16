@@ -626,7 +626,7 @@ dev this story _bmad-output/implementation-artifacts/19-4-route-out-of-dal-juris
 
 | Story | File | Status |
 |-------|------|--------|
-| 20.1 — `metadata` Operation Catalog | [20-1-metadata-operation-catalog.md](20-1-metadata-operation-catalog.md) | ready-for-dev |
+| 20.1 — `metadata` Operation Catalog | [20-1-metadata-operation-catalog.md](20-1-metadata-operation-catalog.md) | done |
 | 20.2 — Define `IMetadataRepository` and Canonicalize `MetadataVersionDAL` | [20-2-imetadata-repository-metadataversiondal.md](20-2-imetadata-repository-metadataversiondal.md) | ready-for-dev |
 | 20.3 — Route SharedLibraries DAL Files Through `IMetadataRepository` | [20-3-sharedlibraries-dal-metadata-calls.md](20-3-sharedlibraries-dal-metadata-calls.md) | ready-for-dev |
 | 20.4 — Route Controller Direct `metadata` Calls Through `IMetadataRepository` | [20-4-controller-metadata-calls.md](20-4-controller-metadata-calls.md) | ready-for-dev |
@@ -679,7 +679,7 @@ dev this story _bmad-output/implementation-artifacts/20-6-metadata-boundary-deci
 
 | Story | File | Status |
 |-------|------|--------|
-| 21.1 — `audit` Operation Catalog | [21-1-audit-operation-catalog.md](21-1-audit-operation-catalog.md) | ready-for-dev |
+| 21.1 — `audit` Operation Catalog | [21-1-audit-operation-catalog.md](21-1-audit-operation-catalog.md) | done |
 | 21.2 — Create `AuditDAL` and Extract `IAuditRepository` | [21-2-iaudit-repository-auditdal.md](21-2-iaudit-repository-auditdal.md) | ready-for-dev |
 | 21.3 — Route CaseManager Audit Writes Through `IAuditRepository` | [21-3-casemanager-audit-writes.md](21-3-casemanager-audit-writes.md) | ready-for-dev |
 | 21.4 — Route CaseWorkflowAdminDAL Audit Calls Through `IAuditRepository` | [21-4-caseworkflowadmindal-audit-calls.md](21-4-caseworkflowadmindal-audit-calls.md) | ready-for-dev |

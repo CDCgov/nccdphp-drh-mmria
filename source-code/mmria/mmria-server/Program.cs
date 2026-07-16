@@ -301,6 +301,10 @@ public sealed partial class Program
             builder.Services.AddScoped<mmria.common.SharedLibraries.Jurisdiction.DAL.JurisdictionDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.Jurisdiction.IJurisdictionRepository>(
                 sp => sp.GetRequiredService<mmria.common.SharedLibraries.Jurisdiction.DAL.JurisdictionDAL>());
+            // JurisdictionAuthorizationDAL registered as IJurisdictionAuthorizationReader (SQL migration seam for auth hot path)
+            builder.Services.AddScoped<mmria.common.SharedLibraries.Jurisdiction.DAL.JurisdictionAuthorizationDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.Jurisdiction.IJurisdictionAuthorizationReader>(
+                sp => sp.GetRequiredService<mmria.common.SharedLibraries.Jurisdiction.DAL.JurisdictionAuthorizationDAL>());
             builder.Services.AddScoped<mmria.common.SharedLibraries.ManageUsers.DAL.ManageUsersDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.ManageUsers.Manager.ManageUsersManager>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.MetadataVersion.DAL.MetadataVersionDAL>();

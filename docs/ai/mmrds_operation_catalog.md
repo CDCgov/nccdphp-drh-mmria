@@ -477,6 +477,352 @@ Individual `user_role_jurisdiction` documents represent a single user–role–f
 ##### DELETE
 
 | Operation | Calling File(s) | Line(s) | URL Pattern | Response Type | Interface |
+
+---
+
+## metadata Operations
+
+**Epic:** 20 — `metadata` Consolidation (SQL Migration Foundation)
+**Story:** 20.1
+**Date:** 2026-07-15
+
+This catalog records every distinct operation against the `metadata` CouchDB database across `mmria-server`, `mmria.common`, and `mmria.services`. It is the authoritative operation set for Stories 20.2–20.6.
+
+> **Note:** Unlike `mmrds`, `audit`, and `jurisdiction`, the `metadata` database is **global** (not per-tenant prefixed) in the vast majority of call sites. Two exceptions in `mmria.services` (`broadcastMessageController`, `systemOfflineController`) apply `{prefix}metadata/…` — documented below as Pattern B.
+
+---
+
+### URL Construction Patterns
+
+| Label | Pattern | Example |
+|-------|---------|---------|
+| **A** | Direct assembly — no prefix — correct for this global database | `$"{db_config.url}/metadata/{id}"` |
+| **B** | Prefix-qualified — used in `mmria.services` for two singleton documents | `$"{p_config_detail.url}/{p_config_detail.prefix}metadata/broadcast-message-list"` |
+
+---
+
+### In-Scope Operations
+
+#### Version Specification CRUD
+
+The version specification is the core MMRIA form definition. Two URL shapes exist:
+- `metadata/version_specification-{ver}/metadata` — the **app document** (`mmria.common.metadata.app`), the full field-tree used at runtime
+- `metadata/version_specification-{ver}` — the **envelope** (`Version_Specification`), the metadata record (publish status, dates, etc.)
+
+##### GET app document — `metadata/version_specification-{ver}/metadata`
+
+The most-called metadata operation in the codebase. Every rebuild, sync, export, and import path that needs the form schema calls this URL directly without going through `MetadataVersionManager`.
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type |
+|-----------|----------------|---------|-------------|---------------|
+| `GetAppMetadataAsync` | `mmria.common/SharedLibraries/MetadataVersion/Manager/MetadataVersionManager.cs` | 49 | A | `mmria.common.metadata.app` |
+| `GetMetadataAsync` (AuditRecovery) | `mmria.common/SharedLibraries/AuditRecovery/DAL/AuditRecoveryDAL.cs` | 46 | A | `mmria.common.metadata.app` |
+| `Execute` | `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_convert_to_dqr_detail.cs` | 55 | A | `app` |
+| `Execute` | `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_convert_to_opioid_report_object.cs` | 338 | A | `app` |
+| `Execute` | `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_convert_to_report_object.cs` | 142 | A | `app` |
+| `Execute` (sync legacy) | `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_document_sync_all_legacy.cs` | 171 | A | `app` |
+| `Execute` (freq summary) | `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_generate_frequency_summary_report.cs` | 187 | A | `app` |
+| `Execute` (CDC rebuild) | `mmria.services/Actors/populate-cdc-instance/c_convert_to_dqr_detail.cs` | 55 | A | `app` |
+| `Execute` (CDC rebuild) | `mmria.services/Actors/populate-cdc-instance/c_convert_to_opioid_report_object.cs` | 333 | A | `app` |
+| `Execute` (CDC rebuild) | `mmria.services/Actors/populate-cdc-instance/c_convert_to_report_object.cs` | 137 | A | `app` |
+| `Execute` (CDC sync) | `mmria.services/Actors/populate-cdc-instance/c_document_sync_all.cs` | 154 | A | `app` |
+| `Execute` (CDC freq summary) | `mmria.services/Actors/populate-cdc-instance/c_generate_frequency_summary_report.cs` | 157 | A | `app` |
+| `ProcessBatchItemAsync` (vitals import) | `mmria.services/Services/BatchItemProcessingService.cs` | 790 | A | `app` |
+| `Execute` (core element export) | `mmria.services/Utilities/CoreElementExport/core_element_exporter.cs` | 130 | A | `app` |
+| `Execute` (standard export) | `mmria.services/Utilities/Exporter/exporter.cs` | 157 | A | `app` |
+| `Execute` (mmrds export) | `mmria.services/Utilities/Exporter/mmrds_exporter.cs` | 157 | A | `app` |
+| `Execute` | `mmria-server/util/c_convert_to_dqr_detail.cs` | 55 | A | `app` |
+| `Execute` | `mmria-server/util/c_convert_to_opioid_report_object.cs` | 338 | A | `app` |
+| `Execute` | `mmria-server/util/c_convert_to_report_object.cs` | 142 | A | `app` |
+| `Execute` (sync server) | `mmria-server/util/c_document_sync_all.cs` | 223 | A | `app` |
+| `Execute` (freq summary server) | `mmria-server/util/c_generate_frequency_summary_report.cs` | 187 | A | `app` |
+| `Execute` (sync document server) | `mmria-server/util/c_sync_document.cs` | 213 | A | `app` |
+| `Execute` (core element export server) | `mmria-server/util/core_element_export/core_element_exporter.cs` | 127 | A | `app` |
+
+##### GET app document — `metadata/{version}/metadata` (alternate shape, no `version_specification-` prefix)
+
+Used by the legacy `export_all_generate_name_map` utility. The `{version}` parameter is the raw value passed in by the caller — callers may already include `version_specification-` in the string, making this equivalent to the standard shape. Confirm before routing through `IMetadataRepository`.
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type |
+|-----------|----------------|---------|-------------|---------------|
+| `Execute` (name map) | `mmria.services/Utilities/Exporter/export_all_generate_name_map.cs` | 50 | A | `app` |
+| `Execute` (name map server) | `mmria-server/util/exporter/export_all_generate_name_map.cs` | 52 | A | `app` |
+
+##### GET Version_Specification envelope — `metadata/version_specification-{ver}`
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type |
+|-----------|----------------|---------|-------------|---------------|
+| `GetVersionSpecificationMetadataAsync` | `mmria.common/SharedLibraries/MetadataVersion/Manager/MetadataVersionManager.cs` | 143 | A | `Version_Specification` |
+| `SaveVersionSpecificationAsync` (pre-save existence check) | `mmria.common/SharedLibraries/MetadataVersion/Manager/MetadataVersionManager.cs` | 174 | A | `Version_Specification` |
+| `SaveVersionAttachmentAsync` (pre-save existence check) | `mmria.common/SharedLibraries/MetadataVersion/Manager/MetadataVersionManager.cs` | 232 | A | `Version_Specification` |
+
+##### PUT Version_Specification document
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type |
+|-----------|----------------|---------|-------------|---------------|
+| `SaveMetadataVersionSpecificationAsync` | `mmria.common/SharedLibraries/MetadataVersion/Manager/MetadataVersionManager.cs` | 108 | A | `document_put_response` |
+| `SaveVersionSpecificationAsync` | `mmria.common/SharedLibraries/MetadataVersion/Manager/MetadataVersionManager.cs` | 210 | A | `document_put_response` |
+
+---
+
+#### Default Metadata Document CRUD — `metadata/2016-06-12T13:49:24.759Z`
+
+`DefaultMetadataId = "2016-06-12T13:49:24.759Z"` is the root MMRIA app document — the legacy default form schema that predates the version_specification pattern.
+
+##### GET metadata document by ID
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type |
+|-----------|----------------|---------|-------------|---------------|
+| `GetMetadataAsync()` (no-arg overload) | `mmria.common/SharedLibraries/MetadataVersion/Manager/MetadataVersionManager.cs` | 33 | A | `ExpandoObject` |
+| `GetMetadataAsync(string id, …)` (by-ID overload) | `mmria.common/SharedLibraries/MetadataVersion/Manager/MetadataVersionManager.cs` | 41 | A | `ExpandoObject` |
+
+##### PUT metadata document
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type |
+|-----------|----------------|---------|-------------|---------------|
+| `SaveMetadataAsync` | `mmria.common/SharedLibraries/MetadataVersion/Manager/MetadataVersionManager.cs` | 57 | A | `document_put_response` |
+
+##### GET revision (HEAD probe for `_rev`)
+
+Used before attachment PUTs that require `If-Match: {rev}`.
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type |
+|-----------|----------------|---------|-------------|---------------|
+| `SaveCheckCodeAsync` (pre-write rev fetch) | `mmria.common/SharedLibraries/MetadataVersion/Manager/MetadataVersionManager.cs` | 73 | A | rev `string` |
+| `SaveValidatorAsync` (pre-write rev fetch) | `mmria.common/SharedLibraries/MetadataVersion/Manager/MetadataVersionManager.cs` | 345 | A | rev `string` |
+
+---
+
+#### Attachment Reads and Writes
+
+All attachments belong to `DefaultMetadataId` or a version specification document.
+
+##### GET attachment
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type |
+|-----------|----------------|---------|-------------|---------------|
+| `GetCheckCodeAsync` — `metadata/{DefaultId}/mmria-check-code.js` | `mmria.common/SharedLibraries/MetadataVersion/Manager/MetadataVersionManager.cs` | 63 | A | `string` (JS text) |
+| `GetValidatorAsync` — `metadata/{DefaultId}/validator.js` | `mmria.common/SharedLibraries/MetadataVersion/Manager/MetadataVersionManager.cs` | 151 | A | `string` (JS text) |
+| `GetVersionDocumentAsync` — `metadata/version_specification-{id}/{doc_name}` | `mmria.common/SharedLibraries/MetadataVersion/Manager/MetadataVersionManager.cs` | 159 | A | `string` |
+
+##### PUT attachment
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type |
+|-----------|----------------|---------|-------------|---------------|
+| `SaveCheckCodeAsync` — `metadata/{DefaultId}/mmria-check-code.js` | `mmria.common/SharedLibraries/MetadataVersion/Manager/MetadataVersionManager.cs` | 93 | A | `document_put_response` |
+| `SaveValidatorAsync` — `metadata/{DefaultId}/validator.js` | `mmria.common/SharedLibraries/MetadataVersion/Manager/MetadataVersionManager.cs` | 365 | A | `document_put_response` |
+| `SaveVersionAttachmentAsync` — `metadata/{id}/{doc_name}` | `mmria.common/SharedLibraries/MetadataVersion/Manager/MetadataVersionManager.cs` | 264 | A | `document_put_response` |
+
+---
+
+#### De-Identification List Reads
+
+Two distinct documents: `de-identified-list` (tenant rebuild/sync de-id) and `de-identified-export-list` (CDC export de-id). Both are heavily read across rebuild, sync, and export paths and are read-only from most callers.
+
+##### GET `metadata/de-identified-list`
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type |
+|-----------|----------------|---------|-------------|---------------|
+| `Execute` (rebuild de-id common) | `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_de_identifier.cs` | 74 | A | `ExpandoObject` |
+| `Execute` (sync legacy common) | `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_document_sync_all_legacy.cs` | 174 | A | `ExpandoObject` |
+| `Execute` (CDC rebuild de-id) | `mmria.services/Actors/populate-cdc-instance/c_de_identifier.cs` | 46 | A | `ExpandoObject` |
+| `Execute` (CDC sync) | `mmria.services/Actors/populate-cdc-instance/c_document_sync_all.cs` | 157 | A | `ExpandoObject` |
+| `Execute` (core element export services) | `mmria.services/Utilities/CoreElementExport/core_element_exporter.cs` | 211 | A | `ExpandoObject` |
+| `Execute` (de-id server) | `mmria-server/util/c_de_identifier.cs` | 74 | A | `ExpandoObject` |
+| `Execute` (sync server) | `mmria-server/util/c_document_sync_all.cs` | 226 | A | `ExpandoObject` |
+| `Execute` (sync document server) | `mmria-server/util/c_sync_document.cs` | 225 | A | `ExpandoObject` |
+| `Execute` (core element export server) | `mmria-server/util/core_element_export/core_element_exporter.cs` | 209 | A | `ExpandoObject` |
+| `Get` (controller — `id` absent or not "export") | `mmria-server/Controllers/api/de_identified_listController.cs` | 54 | A | `ExpandoObject` |
+
+##### PUT `metadata/de-identified-list`
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type |
+|-----------|----------------|---------|-------------|---------------|
+| `Post` (controller — `id` absent or not "export") | `mmria-server/Controllers/api/de_identified_listController.cs` | 107 | A | `document_put_response` |
+
+##### GET `metadata/de-identified-export-list`
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type |
+|-----------|----------------|---------|-------------|---------------|
+| `GetDeIdentifiedExportListPathMapAsync` | `mmria.common/SharedLibraries/MMRIAServices/DAL/MMRIAServicesDAL.cs` | 378 | A | `Dictionary<string, HashSet<string>>` |
+| `Execute` (CDC de-id common helper) | `mmria.common/SharedLibraries/MMRIAServices/Helper/c_cdc_de_identifier.cs` | 42 | A | `ExpandoObject` |
+| `Execute` (CDC de-id services) | `mmria.services/Actors/populate-cdc-instance/c_cdc_de_identifier.cs` | 30 | A | `ExpandoObject` |
+| `Execute` (CDC de-id server) | `mmria-server/util/c_cdc_de_identifier.cs` | 69 | A | `ExpandoObject` |
+| `Get` (controller — `id` == "export") | `mmria-server/Controllers/api/de_identified_listController.cs` | 54 | A | `ExpandoObject` |
+
+##### PUT `metadata/de-identified-export-list`
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type |
+|-----------|----------------|---------|-------------|---------------|
+| `Post` (controller — `id` == "export") | `mmria-server/Controllers/api/de_identified_listController.cs` | 107 | A | `document_put_response` |
+
+---
+
+#### UI Specification CRUD
+
+All UI specification operations are behind `MetadataVersionManager` — no out-of-DAL callers.
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type |
+|-----------|----------------|---------|-------------|---------------|
+| `ListUiSpecificationsAsync` — GET `metadata/_all_docs?include_docs=true` (filtered to `data_type == "ui-specification"`) | `mmria.common/SharedLibraries/MetadataVersion/Manager/MetadataVersionManager.cs` | 277 | A | `List<UI_Specification>` |
+| `GetUiSpecificationAsync` — GET `metadata/{id}` | `mmria.common/SharedLibraries/MetadataVersion/Manager/MetadataVersionManager.cs` | 306 | A | `UI_Specification` |
+| `SaveUiSpecificationAsync` — PUT `metadata/{ui_specification._id}` | `mmria.common/SharedLibraries/MetadataVersion/Manager/MetadataVersionManager.cs` | 320 | A | `document_put_response` |
+| `DeleteUiSpecificationAsync` — DELETE `metadata/{id}?rev={rev}` | `mmria.common/SharedLibraries/MetadataVersion/Manager/MetadataVersionManager.cs` | 337 | A | `ExpandoObject` |
+
+---
+
+#### Broadcast / Offline / PopulateCDC Config Document CRUD
+
+These are administrative singleton documents stored in `metadata`.
+
+##### `metadata/broadcast-message-list`
+
+> ⚠️ **Prefix inconsistency:** `mmria-server`'s `broadcast_messageController` uses `metadata/broadcast-message-list` (no prefix — Pattern A). `mmria.services`'s `broadcastMessageController` uses `{prefix}metadata/broadcast-message-list` (Pattern B). In single-tenant mode these are equivalent. In multi-tenant mode the services layer writes to a per-tenant `{prefix}metadata` database while the server writes to the global `metadata` database. This is a boundary decision item for Story 20.6.
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type |
+|-----------|----------------|---------|-------------|---------------|
+| `LoadBroadcastMessageListAsync` (GET) | `mmria-server/Controllers/broadcast_messageController.cs` | 193 | A | `BroadcastMessageList` |
+| `save_request` (PUT) | `mmria-server/Controllers/broadcast_messageController.cs` | 140 | A | `document_put_response` |
+| `get_existing_document` (GET) | `mmria.services/Controllers/broadcastMessageController.cs` | ~165 | B | `BroadcastMessageList` |
+| `UpdateBroadcastMessage` (PUT) | `mmria.services/Controllers/broadcastMessageController.cs` | 106 | B | `document_put_response` |
+
+##### `metadata/populate-cdc-instance`
+
+> ⚠️ **Duplicate DAL:** `PopulateCDCInstanceSupervisor.cs` builds direct URLs that duplicate `MMRIAServicesDAL.cs`. Both must be consolidated under `IMetadataRepository`.
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type |
+|-----------|----------------|---------|-------------|---------------|
+| `GetPopulateCDCInstanceDocumentAsync` (GET) | `mmria.common/SharedLibraries/MMRIAServices/DAL/MMRIAServicesDAL.cs` | 459 | A | `Populate_CDC_Instance` |
+| `SavePopulateCDCInstanceDocumentAsync` (PUT) | `mmria.common/SharedLibraries/MMRIAServices/DAL/MMRIAServicesDAL.cs` | 468 | A | `document_put_response` |
+| `GetPopulate` (GET — duplicate of above) | `mmria.services/Actors/populate-cdc-instance/PopulateCDCInstanceSupervisor.cs` | 383 | A | `Populate_CDC_Instance` |
+| `SavePopulate` (PUT — duplicate of above) | `mmria.services/Actors/populate-cdc-instance/PopulateCDCInstanceSupervisor.cs` | 405 | A | `document_put_response` |
+
+##### `metadata/system-offline-config`
+
+> ℹ️ `mmria-server`'s `system_offlineController` delegates to `SystemOfflineDAL` → `mmria.services` HTTP API — **no direct CouchDB call from mmria-server**. Only `mmria.services.Controllers.systemOfflineController` hits CouchDB directly.
+>
+> ⚠️ Uses Pattern B (`{cdcConfig.prefix}metadata/system-offline-config`). Since `system-offline-config` is a CDC-level document and the CDC prefix is typically empty, this resolves to `metadata/system-offline-config` in practice.
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type |
+|-----------|----------------|---------|-------------|---------------|
+| `GetSystemOfflineConfig` (GET) | `mmria.services/Controllers/systemOfflineController.cs` | 34 | B | `SystemOfflineConfig` |
+| `SaveSystemOfflineConfig` — GET existing rev | `mmria.services/Controllers/systemOfflineController.cs` | ~85 | B | `SystemOfflineConfig` |
+| `SaveSystemOfflineConfig` (PUT) | `mmria.services/Controllers/systemOfflineController.cs` | ~129 | B | `document_put_response` |
+
+---
+
+#### Export List and Substance Mapping CRUD
+
+##### `metadata/export-standard-list`
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type |
+|-----------|----------------|---------|-------------|---------------|
+| `Get` (controller GET) | `mmria-server/Controllers/api/export_list_managerController.cs` | 41 | A | `ExpandoObject` |
+| `Post` (controller PUT) | `mmria-server/Controllers/api/export_list_managerController.cs` | 83 | A | `document_put_response` |
+| `Execute` (standard export — read) | `mmria.services/Utilities/Exporter/exporter.cs` | 168 | A | `StandardReportList` |
+
+##### `metadata/substance-mapping`
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type |
+|-----------|----------------|---------|-------------|---------------|
+| `Get` (controller GET) | `mmria-server/Controllers/api/substance_mappingController.cs` | 45 | A | `Substance_Mapping` |
+| `Post` (controller PUT) | `mmria-server/Controllers/api/substance_mappingController.cs` | 81 | A | `document_put_response` |
+
+##### `metadata/duplicate-multiform-list`
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type |
+|-----------|----------------|---------|-------------|---------------|
+| `GetDuplicateMultiFormList` | `mmria-server/Controllers/abstractorDeidentifiedCaseController.cs` | 70 | A | `DuplicateMultiformResult` |
+| `GetDuplicateMultiFormList` | `mmria-server/Controllers/CaseController.cs` | 141 | A | `DuplicateMultiformResult` |
+
+---
+
+#### Case Validation Rules CRUD — `metadata/case-validation-rules`
+
+Added in Epic 6 (Story 6.1). The document lives in `metadata` database.
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type |
+|-----------|----------------|---------|-------------|---------------|
+| `GetRuleDocumentAsync` (GET) | `mmria.common/SharedLibraries/CaseValidation/DAL/CaseValidationDAL.cs` | 26 | A | `CaseValidationRuleDocument` |
+| `SaveRuleDocumentAsync` (PUT) | `mmria.common/SharedLibraries/CaseValidation/DAL/CaseValidationDAL.cs` | 50 | A | `document_put_response` |
+
+---
+
+#### Bulk Reads (`_all_docs`)
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type |
+|-----------|----------------|---------|-------------|---------------|
+| `ListVersionSpecificationsAsync` — GET `metadata/_all_docs?include_docs=true` (filtered to `data_type == "version-specification"`) | `mmria.common/SharedLibraries/MetadataVersion/Manager/MetadataVersionManager.cs` | 114 | A | `List<Version_Specification>` |
+| `ListUiSpecificationsAsync` — GET `metadata/_all_docs?include_docs=true` (filtered to `data_type == "ui-specification"`) | `mmria.common/SharedLibraries/MetadataVersion/Manager/MetadataVersionManager.cs` | 277 | A | `List<UI_Specification>` |
+
+> ℹ️ Both `_all_docs` calls already go through `MetadataVersionManager` — no callsite remediation needed for these.
+
+---
+
+### Infrastructure / Out of Scope
+
+The following `metadata` operations appear in DB setup and one-time migration scripts. They are **not** in scope for `IMetadataRepository`.
+
+| Operation | Calling File(s) | Line(s) | Notes |
+|-----------|----------------|---------|-------|
+| `PUT metadata/_security` | `mmria-server/util/c_db_setup.cs` | 483 | DB initialization |
+| `PUT metadata/_design/auth` | `mmria-server/util/c_db_setup.cs` | 489 | DB initialization |
+| `PUT metadata/{DefaultMetadataId}` (seed) | `mmria-server/util/c_db_setup.cs` | 496 | DB initialization |
+| `PUT metadata/{DefaultMetadataId}/mmria-check-code.js` (seed) | `mmria-server/util/c_db_setup.cs` | 506 | DB initialization |
+| `PUT metadata/{DefaultMetadataId}/validator.js` (seed) | `mmria-server/util/c_db_setup.cs` | 525 | DB initialization |
+| `PUT metadata/_design/sortable` | `mmria-server/util/c_db_setup.cs` | 541 | DB initialization |
+| `PUT metadata/default_ui_specification` (seed) | `mmria-server/util/c_db_setup.cs` | 548 | DB initialization |
+| `PUT metadata/{id}` (version spec seed loop) | `mmria-server/util/c_db_setup.cs` | 586 | DB initialization — seeds version specs from JSON files |
+| `PUT metadata/de-identified-list` (seed) | `mmria-server/util/c_db_setup.cs` | 611 | DB initialization |
+| `GET metadata/{p_id}` (migration plan read) | `mmria-server/model/actor/quartz/Process_Migrate_Data.cs` | 186 | One-time migration script |
+| `GET metadata/{DefaultMetadataId}` (migration read) | `mmria-server/model/actor/quartz/Process_Migrate_Charactor_to_Numeric.cs` | 51 | One-time migration script |
+
+---
+
+### Summary Counts (metadata)
+
+| Category | Distinct Operations | Call Sites | Notes |
+|----------|--------------------|-----------:|-------|
+| Version spec app doc GET (`version_specification-{v}/metadata`) | 1 | 23 | Highest-volume; all direct CouchDB — primary 20.3–20.5 target |
+| Version spec app doc GET (alternate `{v}/metadata` shape) | 1 | 2 | `export_all_generate_name_map` — confirm URL value before routing |
+| Version spec envelope GET | 3 | 3 | `MetadataVersionManager` only |
+| Version spec PUT | 2 | 2 | `MetadataVersionManager` only |
+| Default metadata document GET/PUT/rev | 4 | 4 | `MetadataVersionManager` only |
+| Attachment GET | 3 | 3 | `MetadataVersionManager` only |
+| Attachment PUT | 3 | 3 | `MetadataVersionManager` only |
+| de-identified-list GET/PUT | 2 | 11 | Spread across rebuild/sync/export — 20.3 + 20.5 targets |
+| de-identified-export-list GET/PUT | 2 | 6 | CDC export paths — 20.5 targets |
+| UI specification CRUD | 4 | 4 | `MetadataVersionManager` only |
+| broadcast-message-list GET/PUT | 2 | 4 | Prefix inconsistency — boundary decision item for 20.6 |
+| populate-cdc-instance GET/PUT | 2 | 4 | `MMRIAServicesDAL` + duplicate in `PopulateCDCInstanceSupervisor` |
+| system-offline-config GET/PUT | 2 | 3 | `mmria.services` only; server uses HTTP relay |
+| export-standard-list GET/PUT | 2 | 3 | Controller + exporter |
+| substance-mapping GET/PUT | 2 | 2 | Controller only |
+| duplicate-multiform-list GET | 1 | 2 | Two controllers |
+| case-validation-rules GET/PUT | 2 | 2 | `CaseValidationDAL` (Epic 6) |
+| Bulk `_all_docs` | 1 (2 filtered uses) | 2 | `MetadataVersionManager` only — no remediation needed |
+| **In-scope total** | **~38** | **~84** | |
+| Out-of-scope (DB setup + migrations) | — | 11 | `c_db_setup.cs` + `Process_Migrate_*` |
+
+---
+
+### Key Observations for Stories 20.2–20.6
+
+1. **`MetadataVersionManager` is already the intended DAL** for version specs, attachments, and UI specs — it routes through `MetadataVersionDAL`. Story 20.2 canonicalizes this into `IMetadataRepository`.
+
+2. **Version spec app document** (`metadata/version_specification-{ver}/metadata`) has **23 out-of-DAL call sites** spread across both repos — the single largest remediation target. These are the primary 20.3–20.5 targets.
+
+3. **`AuditRecoveryDAL`** bypasses `MetadataVersionManager` to read `version_specification-{ver}/metadata` directly — in-scope for Story 20.3 (SharedLibraries DAL routing).
+
+4. **`CaseValidationDAL`** goes directly to CouchDB for `case-validation-rules` — in-scope for Story 20.3.
+
+5. **Duplicate `populate-cdc-instance`** calls in `PopulateCDCInstanceSupervisor.cs` duplicate `MMRIAServicesDAL` — must consolidate; assign to 20.3 or 20.5 depending on which layer owns it.
+
+6. **Prefix inconsistency** for `broadcast-message-list` (server: no prefix; services: prefix-qualified) — boundary decision for Story 20.6.
+
+7. **`_all_docs` bulk reads** are already correctly behind `MetadataVersionManager` — no callsite remediation required.
+
+8. **`export_all_generate_name_map`** uses `metadata/{version}/metadata` without the `version_specification-` prefix — confirm what value is passed as `{version}` before routing through `IMetadataRepository`.
 |-----------|----------------|---------|-------------|---------------|-----------|
 | `DeleteUserRoleJurisdictionAsync` | `mmria.common/SharedLibraries/ManageUsers/DAL/ManageUsersDAL.cs` | 143 | A | `document_put_response` | `IJurisdictionRepository` |
 
@@ -652,3 +998,138 @@ These operations initialize the `jurisdiction` database during server startup. T
 | `mmria-server/util/authorization_user.pmss.cs` | 19.3 | GET `by_user_id` (Pattern A, ×2) | No |
 | `mmria-server/util/JurisdictionAuthorizationRequirement.cs` | 19.3 | POST `by_user_id` (Pattern A — stub, evaluate for removal) | No |
 | `mmria.services/Utilities/authorization.cs` | 19.3 | GET `by_user_id` (Pattern A, ×3) | No |
+
+---
+
+## `audit` Operations
+
+**Epic:** 21 — `audit` Consolidation (SQL Migration Foundation)
+**Story:** 21.1
+**Date:** 2026-07-15
+
+This catalog records every distinct operation against the `{prefix}audit` CouchDB database across `mmria-server` and `mmria.common`. It is the authoritative operation set for Stories 21.2–21.6.
+
+---
+
+### URL Construction Patterns
+
+| Label | Pattern | Example |
+|-------|---------|---------|
+| **A** | Hand-assembled with string interpolation — **wrong** | `$"{db_config.url}/{db_config.prefix}audit/{id}"` |
+| **B** | Uses `Get_Prefix_DB_Url` helper — **correct** | `dbConfig.Get_Prefix_DB_Url($"audit/{id}")` |
+
+---
+
+### In-Scope Operations
+
+#### Audit Entry Writes (PUT `Change_Stack`)
+
+These calls create a new `Change_Stack` document (an audit trail entry) in the `audit` database. The canonical home is a new `AuditDAL` behind `IAuditRepository` (Story 21.2). All Manager and Controller layer writes are wrong-layer and are targeted for extraction in Stories 21.3 and 21.5.
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type |
+|-----------|----------------|---------|-------------|---------------|
+| `WriteAuditEntryAsync` | `mmria.common/SharedLibraries/CaseWorkflowAdmin/DAL/CaseWorkflowAdminDAL.cs` | 45 | **B** ✓ (DAL) | `void` (response ignored) |
+| `UpdateYearOfDeathAsync` (audit write) | `mmria.common/SharedLibraries/Case/Manager/CaseManager.cs` | 318 | **B** (Manager ✗ — wrong layer) | `document_put_response` |
+| `UpdateMaidenNameAsync` (audit write) | `mmria.common/SharedLibraries/Case/Manager/CaseManager.cs` | 537 | **B** (Manager ✗ — wrong layer) | `document_put_response` |
+| `SaveCaseAsync` (audit write) | `mmria.common/SharedLibraries/Case/Manager/CaseManager.cs` | 1180 | **B** (Manager ✗ — wrong layer) | `document_put_response` |
+| `ForceReleaseCaseLockAsync` (audit write) | `mmria.common/SharedLibraries/Case/Manager/CaseManager.cs` | 1330 | **B** (Manager ✗ — wrong layer) | `document_put_response` |
+| `ForceRemoveOfflineLockAsync` (audit write) | `mmria.common/SharedLibraries/Case/Manager/CaseManager.cs` | 1831 | **B** (Manager ✗ — wrong layer) | `document_put_response` |
+| `DeleteCaseAsync` (audit write) | `mmria.common/SharedLibraries/Case/Manager/CaseManager.cs` | 2330 | **B** (Manager ✗ — wrong layer) | `document_put_response` |
+| `Post` (PMSS save — audit write) | `mmria-server/Controllers/api/caseController.pmss.cs` | 261 | **B** (Controller ✗ — wrong layer) | `document_put_response` |
+| `Delete` (PMSS delete — audit write) | `mmria-server/Controllers/api/caseController.pmss.cs` | 418 | **B** (Controller ✗ — wrong layer) | `document_put_response` |
+
+> **Pattern B at wrong layer:** All 6 `CaseManager.cs` writes and both `caseController.pmss.cs` writes already use Pattern B (correct URL construction). The violation is the architectural layer — audit HTTP calls are made directly from Manager and Controller code rather than through a dedicated `AuditDAL`. Stories 21.3 and 21.5 extract these to `IAuditRepository.WriteAuditEntryAsync`.
+
+---
+
+#### Audit Entry Reads (GET by ID)
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type |
+|-----------|----------------|---------|-------------|---------------|
+| `GetChangeStackAsync` (GET `Change_Stack` by audit ID) | `mmria.common/SharedLibraries/AuditRecovery/DAL/AuditRecoveryDAL.cs` | 39 | **A** (wrong) | `Change_Stack` |
+| `GetAuditDocumentAsync` (GET `Change_Stack` by audit ID — recover-deleted workflow) | `mmria.common/SharedLibraries/CaseWorkflowAdmin/DAL/CaseWorkflowAdminDAL.cs` | 65 | **B** ✓ | `Change_Stack` |
+
+---
+
+#### Audit View Queries (`by_deleted`)
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type |
+|-----------|----------------|---------|-------------|---------------|
+| `GetDeletedCasesViewAsync` (GET `_design/sortable/_view/by_deleted`) | `mmria.common/SharedLibraries/CaseWorkflowAdmin/DAL/CaseWorkflowAdminDAL.cs` | 57 | **B** ✓ | `get_sortable_view_reponse_header<Audit_Detail_View>` |
+
+---
+
+#### Mango `_find` Queries (by `case_id`)
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type | Note |
+|-----------|----------------|---------|-------------|---------------|------|
+| `GetFindUrl` (private helper — called by `GetAuditViewDataAsync`) | `mmria.common/SharedLibraries/AuditRecovery/Manager/AuditRecoveryManager.cs` | 144 | **A** (Manager ✗ — wrong layer) | URL passed to `AuditRecoveryDAL.FindChangeStacksAsync` → `ChangeStackResult` | Live — URL construction should move to `AuditDAL` in Story 21.2 |
+| `get_find_url` (private method — **dead code**, never called from any action) | `mmria-server/Controllers/_auditController.cs` | 91 | **A** (Controller ✗ — vestigial) | URL `string` only | Dead — both action methods (`Index`, `MoreDetail`) delegate to `AuditRecoveryManager`; delete in Story 21.5 |
+| `get_find_url` (private method — **dead code**, never called from any action) | `mmria-server/Controllers/api/AuditRecoverUtilController.cs` | 36 | **A** (Controller ✗ — vestigial) | URL `string` only | Dead — `Get` action delegates to `AuditRecoveryManager`; delete in Story 21.5 |
+
+---
+
+#### Special Document Reads/Writes (`audit-manage-user`)
+
+The `audit-manage-user` document is a singleton in the `audit` database that accumulates manage-user admin events. It is not a `Change_Stack`.
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type |
+|-----------|----------------|---------|-------------|---------------|
+| `GetAuditManageUserAsync` (GET `audit-manage-user`) | `mmria.common/SharedLibraries/AuditRecovery/DAL/AuditRecoveryDAL.cs` | 51 | **A** (wrong) | `Audit_Manage_User` (null if not_found) |
+| `SaveAuditManageUserAsync` (PUT `audit-manage-user`) | `mmria.common/SharedLibraries/AuditRecovery/DAL/AuditRecoveryDAL.cs` | 63 | **A** (wrong) | `document_put_response` |
+| `GetAuditManageUserAsync` (GET `audit-manage-user` — **duplicate**) | `mmria.common/SharedLibraries/ManageUsers/DAL/ManageUsersDAL.cs` | 146 | **A** (wrong) | `Audit_Manage_User` (null if not_found) |
+
+> **Duplicate:** `AuditRecoveryDAL.GetAuditManageUserAsync` and `ManageUsersDAL.GetAuditManageUserAsync` are functionally identical GET operations against the same `audit-manage-user` document. After `AuditDAL` is created in Story 21.2, `ManageUsersDAL` must delegate to `IAuditRepository` rather than maintain its own copy (Story 21.6).
+
+---
+
+#### Delete Operations
+
+| Operation | Calling File(s) | Line(s) | URL Pattern | Response Type |
+|-----------|----------------|---------|-------------|---------------|
+| `DeleteAuditDocumentAsync` (DELETE `Change_Stack` by ID + rev) | `mmria.common/SharedLibraries/CaseWorkflowAdmin/DAL/CaseWorkflowAdminDAL.cs` | 92 | **B** ✓ | `void` (response ignored) |
+
+---
+
+### Infrastructure / Out of Scope
+
+These operations initialize the `audit` database and its design documents during server startup. They are **not** targets for `IAuditRepository`.
+
+| File | Line(s) | Operation | Reason |
+|------|---------|-----------|--------|
+| `mmria-server/util/c_db_setup.cs` | 178 | Check existence of `{prefix}audit` database | DB setup — out of scope |
+| `mmria-server/util/c_db_setup.cs` | 180 | PUT `{prefix}audit` (create database) | DB setup — out of scope |
+| `mmria-server/util/c_db_setup.cs` | 183 | PUT `{prefix}audit/_security` (set access roles) | DB setup — out of scope |
+| `mmria-server/util/c_db_setup.cs` | 187 | Check existence of `{prefix}audit/_design/sortable` | DB setup — out of scope |
+| `mmria-server/util/c_db_setup.cs` | 190, 194 | PUT `{prefix}audit/_design/sortable` (create design doc) | DB setup — out of scope |
+
+---
+
+### Summary Counts
+
+| Category | Call Sites |
+|----------|-----------|
+| Audit entry writes — PUT `Change_Stack` | 9 |
+| Audit entry reads — GET by ID | 2 |
+| Audit view queries — `by_deleted` | 1 |
+| Mango `_find` — by `case_id` (1 live + 2 dead code) | 3 |
+| Special document reads/writes — `audit-manage-user` | 3 |
+| DELETE operations | 1 |
+| **Total in-scope call sites** | **19** |
+| Infrastructure / out-of-scope call sites | 5 |
+
+---
+
+### Pattern A Callsites to Remediate (Stories 21.2–21.6 scope)
+
+| File | Method | Line(s) | Target Story |
+|------|--------|---------|-------------|
+| `mmria.common/SharedLibraries/AuditRecovery/DAL/AuditRecoveryDAL.cs` | `GetChangeStackAsync` | 39 | 21.2 — move to `AuditDAL` |
+| `mmria.common/SharedLibraries/AuditRecovery/DAL/AuditRecoveryDAL.cs` | `GetAuditManageUserAsync` | 51 | 21.2 — move to `AuditDAL` |
+| `mmria.common/SharedLibraries/AuditRecovery/DAL/AuditRecoveryDAL.cs` | `SaveAuditManageUserAsync` | 63 | 21.2 — move to `AuditDAL` |
+| `mmria.common/SharedLibraries/ManageUsers/DAL/ManageUsersDAL.cs` | `GetAuditManageUserAsync` | 146 | 21.6 — route through `IAuditRepository` |
+| `mmria.common/SharedLibraries/AuditRecovery/Manager/AuditRecoveryManager.cs` | `GetFindUrl` (private) | 144 | 21.6 — URL construction moves to `AuditDAL` |
+| `mmria-server/Controllers/_auditController.cs` | `get_find_url` (dead code) | 91 | 21.5 — delete vestigial method |
+| `mmria-server/Controllers/api/AuditRecoverUtilController.cs` | `get_find_url` (dead code) | 36 | 21.5 — delete vestigial method |
+
+> **Note on Pattern B at wrong layer:** The 6 `CaseManager.cs` and 2 `caseController.pmss.cs` audit writes already use Pattern B — no URL pattern change is required for those. The remediation is moving the HTTP call site to `AuditDAL` by introducing `IAuditRepository.WriteAuditEntryAsync` and having the Manager/Controller call the interface method instead.
