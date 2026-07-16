@@ -9,6 +9,7 @@ using mmria.common.couchdb;
 using mmria.common.getset;
 using mmria.common.model.couchdb;
 using mmria.common.SharedLibraries.MMRIAServices.Model;
+using mmria.common.SharedLibraries.MetadataVersion;
 using Newtonsoft.Json.Linq;
 
 namespace mmria.common.SharedLibraries.MMRIAServices.DAL;
@@ -17,13 +18,16 @@ public sealed class MMRIAServicesDAL
 {
     private readonly CouchDbHttpClient _couchDbHttpClient;
     private readonly mmria.common.SharedLibraries.SystemConfig.IConfigurationRepository _configRepository;
+    private readonly IMetadataRepository _metadataRepository;
 
     public MMRIAServicesDAL(
         CouchDbHttpClient couchDbHttpClient,
-        mmria.common.SharedLibraries.SystemConfig.IConfigurationRepository configRepository)
+        mmria.common.SharedLibraries.SystemConfig.IConfigurationRepository configRepository,
+        IMetadataRepository metadataRepository)
     {
         _couchDbHttpClient = couchDbHttpClient ?? throw new ArgumentNullException(nameof(couchDbHttpClient));
         _configRepository = configRepository ?? throw new ArgumentNullException(nameof(configRepository));
+        _metadataRepository = metadataRepository ?? throw new ArgumentNullException(nameof(metadataRepository));
     }
 
     public async Task<case_view_response> GetCaseView(DBConfigurationDetail db_info, string search_key)
@@ -373,14 +377,7 @@ public sealed class MMRIAServicesDAL
             return result;
         }
 
-        string response = await _couchDbHttpClient.ExecuteAsync(
-            "GET",
-            $"{dbInfo.url}/metadata/de-identified-export-list",
-            null,
-            dbInfo.user_name,
-            dbInfo.user_value);
-
-        var expandoObject = Newtonsoft.Json.JsonConvert.DeserializeObject<ExpandoObject>(response);
+        var expandoObject = await _metadataRepository.GetDeIdentifiedExportListAsync(dbInfo);
         var document = expandoObject as IDictionary<string, object>;
         if
         (
@@ -456,18 +453,15 @@ public sealed class MMRIAServicesDAL
 
     public async Task<mmria.common.metadata.Populate_CDC_Instance> GetPopulateCDCInstanceDocumentAsync(DBConfigurationDetail db_config)
     {
-        string request_string = $"{db_config.url}/metadata/populate-cdc-instance";
-        string response = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
-        return Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.Populate_CDC_Instance>(response);
+        return await _metadataRepository.GetPopulateCDCInstanceDocumentAsync(db_config);
     }
 
     public async Task<mmria.common.model.couchdb.document_put_response> SavePopulateCDCInstanceDocumentAsync(
         string document_content,
         DBConfigurationDetail db_config)
     {
-        string request_string = $"{db_config.url}/metadata/populate-cdc-instance";
-        string response = await _couchDbHttpClient.ExecuteAsync("PUT", request_string, document_content, db_config.user_name, db_config.user_value);
-        return Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(response);
+        var doc = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.Populate_CDC_Instance>(document_content);
+        return await _metadataRepository.SavePopulateCDCInstanceDocumentAsync(doc, db_config);
     }
 
     public async Task<mmria.common.metadata.Populate_CDC_Instance_Record> GetPopulateCDCInstanceFromServiceAsync(

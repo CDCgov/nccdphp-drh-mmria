@@ -9,6 +9,7 @@ using Akka.Actor;
 using mmria.common.SharedLibraries.MMRIAServices.DAL;
 using mmria.common.SharedLibraries.MMRIAServices.Helper;
 using mmria.common.SharedLibraries.MMRIAServices.Manager;
+using mmria.common.SharedLibraries.MetadataVersion.DAL;
 
 namespace RecordsProcessor_Worker.Actors;
 
@@ -90,7 +91,7 @@ public sealed class BatchProcessor : ReceiveActor
     public BatchProcessor(mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
         _couchDbHttpClient = couchDbHttpClient;
-        _mmriaServicesManager = new MMRIAServicesManager(new MMRIAServicesDAL(_couchDbHttpClient, new mmria.common.SharedLibraries.SystemConfig.DAL.SystemConfigDAL(_couchDbHttpClient)), _couchDbHttpClient);
+        _mmriaServicesManager = new MMRIAServicesManager(new MMRIAServicesDAL(_couchDbHttpClient, new mmria.common.SharedLibraries.SystemConfig.DAL.SystemConfigDAL(_couchDbHttpClient), new MetadataVersionDAL(_couchDbHttpClient)), _couchDbHttpClient);
         // Create router pool with 5 workers for bounded parallelism
         batchItemRouter = Context.ActorOf(
             Props.Create<RecordsProcessor_Worker.Actors.BatchItemProcessor>(_couchDbHttpClient)

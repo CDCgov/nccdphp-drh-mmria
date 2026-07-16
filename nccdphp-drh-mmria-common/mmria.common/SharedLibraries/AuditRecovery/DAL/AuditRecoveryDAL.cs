@@ -7,6 +7,7 @@ using mmria.common.model.couchdb;
 using mmria.common.model.couchdb.audit;
 using mmria.common.SharedLibraries.AuditRecovery.Model;
 using mmria.common.SharedLibraries.Case;
+using mmria.common.SharedLibraries.MetadataVersion;
 using Newtonsoft.Json;
 
 namespace mmria.common.SharedLibraries.AuditRecovery.DAL;
@@ -15,11 +16,13 @@ public sealed class AuditRecoveryDAL
 {
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly ICaseRepository _caseRepository;
+    private readonly IMetadataRepository _metadataRepository;
 
-    public AuditRecoveryDAL(mmria.common.getset.CouchDbHttpClient couchDbHttpClient, ICaseRepository caseRepository)
+    public AuditRecoveryDAL(mmria.common.getset.CouchDbHttpClient couchDbHttpClient, ICaseRepository caseRepository, IMetadataRepository metadataRepository)
     {
         _couchDbHttpClient = couchDbHttpClient;
         _caseRepository = caseRepository;
+        _metadataRepository = metadataRepository;
     }
 
     public async Task<case_view_response> GetCaseViewResponseAsync(string caseId, DBConfigurationDetail db_config)
@@ -43,9 +46,7 @@ public sealed class AuditRecoveryDAL
 
     public async Task<app> GetMetadataAsync(string metadataVersion, DBConfigurationDetail db_config)
     {
-        string request = $"{db_config.url}/metadata/version_specification-{metadataVersion}/metadata";
-        string response = await _couchDbHttpClient.ExecuteAsync("GET", request, null, null, null);
-        return JsonConvert.DeserializeObject<app>(response);
+        return await _metadataRepository.GetAppDocumentAsync(metadataVersion, db_config);
     }
 
     public async Task<Audit_Manage_User> GetAuditManageUserAsync(DBConfigurationDetail db_config)
