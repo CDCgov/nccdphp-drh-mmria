@@ -105,6 +105,11 @@ public sealed class MetadataVersionManager
         return await _dal.GetVersionDocumentAttachmentAsync(version_specification_id, document_name, db_config);
     }
 
+    public async Task<string> GetDuplicateMultiFormListAsync(DBConfigurationDetail db_config)
+    {
+        return await _dal.GetDuplicateMultiFormListAsync(db_config);
+    }
+
     public async Task<document_put_response> SaveVersionSpecificationAsync(Version_Specification versionSpecification, DBConfigurationDetail db_config)
     {
         string id_val = versionSpecification._id;

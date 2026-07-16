@@ -128,6 +128,25 @@ public interface IMetadataRepository
     /// </summary>
     Task<string> GetDuplicateMultiFormListAsync(DBConfigurationDetail dbConfig);
 
+    // ── Broadcast Message List ────────────────────────────────────────────────
+
+    /// <summary>GET metadata/broadcast-message-list.</summary>
+    Task<mmria.common.metadata.BroadcastMessageList> GetBroadcastMessageListAsync(DBConfigurationDetail dbConfig);
+
+    /// <summary>PUT metadata/broadcast-message-list.</summary>
+    Task<document_put_response> SaveBroadcastMessageListAsync(string json, DBConfigurationDetail dbConfig);
+
+    // ── System Offline Config ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// GET {prefix}metadata/system-offline-config. Returns null if the document does not exist (404).
+    /// Uses <see cref="DBConfigurationDetail.Get_Prefix_DB_Url"/> for prefix-aware URL construction.
+    /// </summary>
+    Task<mmria.common.metadata.SystemOfflineConfig?> GetSystemOfflineConfigAsync(DBConfigurationDetail dbConfig);
+
+    /// <summary>PUT {prefix}metadata/system-offline-config.</summary>
+    Task<document_put_response> SaveSystemOfflineConfigAsync(string json, DBConfigurationDetail dbConfig);
+
     // ── Case Validation Rules ─────────────────────────────────────────────────
 
     /// <summary>GET metadata/case-validation-rules. Returns null if the document does not exist (404).</summary>

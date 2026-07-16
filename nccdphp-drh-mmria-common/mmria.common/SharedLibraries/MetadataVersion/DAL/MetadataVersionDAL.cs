@@ -28,6 +28,8 @@ public sealed class MetadataVersionDAL : IMetadataRepository
     private const string SubstanceMappingId = "substance-mapping";
     private const string DuplicateMultiFormListId = "duplicate-multiform-list";
     private const string CaseValidationRulesId = "case-validation-rules";
+    private const string BroadcastMessageListId = "broadcast-message-list";
+    private const string SystemOfflineConfigId = "system-offline-config";
 
     private static readonly JsonSerializerSettings IgnoreNullSettings = new()
     {
@@ -304,6 +306,56 @@ public sealed class MetadataVersionDAL : IMetadataRepository
     {
         string url = $"{dbConfig.url}/metadata/{DuplicateMultiFormListId}";
         return await _couchDbHttpClient.ExecuteAsync("GET", url, null, dbConfig.user_name, dbConfig.user_value);
+    }
+
+    // ── Broadcast Message List ────────────────────────────────────────────────
+
+    /// <inheritdoc />
+    public async Task<mmria.common.metadata.BroadcastMessageList> GetBroadcastMessageListAsync(DBConfigurationDetail dbConfig)
+    {
+        string url = $"{dbConfig.url}/metadata/{BroadcastMessageListId}";
+        string response = await _couchDbHttpClient.ExecuteAsync("GET", url, null, null, null);
+        return JsonConvert.DeserializeObject<mmria.common.metadata.BroadcastMessageList>(response, IgnoreNullSettings)
+            ?? new mmria.common.metadata.BroadcastMessageList();
+    }
+
+    /// <inheritdoc />
+    public async Task<document_put_response> SaveBroadcastMessageListAsync(string json, DBConfigurationDetail dbConfig)
+    {
+        string url = $"{dbConfig.url}/metadata/{BroadcastMessageListId}";
+        string response = await _couchDbHttpClient.ExecuteAsync("PUT", url, json, null, null);
+        return JsonConvert.DeserializeObject<document_put_response>(response);
+    }
+
+    // ── System Offline Config ─────────────────────────────────────────────────
+
+    /// <inheritdoc />
+    public async Task<mmria.common.metadata.SystemOfflineConfig?> GetSystemOfflineConfigAsync(DBConfigurationDetail dbConfig)
+    {
+        string url = $"{dbConfig.Get_Prefix_DB_Url("metadata")}/{SystemOfflineConfigId}";
+        try
+        {
+            string response = await _couchDbHttpClient.ExecuteAsync("GET", url, null, dbConfig.user_name, dbConfig.user_value);
+            return JsonConvert.DeserializeObject<mmria.common.metadata.SystemOfflineConfig>(response, IgnoreNullSettings);
+        }
+        catch (Exception ex)
+        {
+            if (ex.Message.Contains("(404) Object Not Found", StringComparison.OrdinalIgnoreCase) ||
+                ex.Message.Contains("not_found", StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            throw;
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<document_put_response> SaveSystemOfflineConfigAsync(string json, DBConfigurationDetail dbConfig)
+    {
+        string url = $"{dbConfig.Get_Prefix_DB_Url("metadata")}/{SystemOfflineConfigId}";
+        string response = await _couchDbHttpClient.ExecuteAsync("PUT", url, json, dbConfig.user_name, dbConfig.user_value);
+        return JsonConvert.DeserializeObject<document_put_response>(response);
     }
 
     // ── Case Validation Rules ─────────────────────────────────────────────────
