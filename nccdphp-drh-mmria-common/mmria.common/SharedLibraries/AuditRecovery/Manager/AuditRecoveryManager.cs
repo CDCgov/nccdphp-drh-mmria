@@ -7,19 +7,21 @@ using mmria.common.couchdb;
 using mmria.common.metadata;
 using mmria.common.model.couchdb;
 using mmria.common.model.couchdb.audit;
+using mmria.common.SharedLibraries.Audit;
 using mmria.common.SharedLibraries.AuditRecovery.DAL;
 using mmria.common.SharedLibraries.AuditRecovery.Model;
-using Newtonsoft.Json;
 
 namespace mmria.common.SharedLibraries.AuditRecovery.Manager;
 
 public sealed class AuditRecoveryManager
 {
     private readonly AuditRecoveryDAL _dal;
+    private readonly IAuditRepository _auditRepository;
 
-    public AuditRecoveryManager(AuditRecoveryDAL dal)
+    public AuditRecoveryManager(AuditRecoveryDAL dal, IAuditRepository auditRepository)
     {
         _dal = dal;
+        _auditRepository = auditRepository;
     }
 
     public async Task<AuditRecoveryViewData> GetAuditViewDataAsync(
@@ -35,8 +37,7 @@ public sealed class AuditRecoveryManager
         cancellationToken.ThrowIfCancellationRequested();
 
         case_view_sortable_item case_view_item = case_view_response.rows.Where(i => i.id == caseId).FirstOrDefault().value;
-        var (request_string, post_data) = GetFindUrl(db_config, caseId);
-        var view_response = await _dal.FindChangeStacksAsync(request_string, post_data, db_config);
+        var view_response = await _auditRepository.FindAuditsByCaseAsync(caseId, db_config);
         cancellationToken.ThrowIfCancellationRequested();
 
         List<Change_Stack> result = new();
@@ -131,32 +132,14 @@ public sealed class AuditRecoveryManager
         return await _dal.GetAuditManageUserAsync(db_config);
     }
 
-    public async Task<document_put_response> SaveAuditDocumentAsync(Audit_Manage_User auditDocument, DBConfigurationDetail db_config)
+    public async Task SaveAuditDocumentAsync(Audit_Manage_User auditDocument, DBConfigurationDetail db_config)
     {
-        return await _dal.SaveAuditManageUserAsync(auditDocument, db_config);
+        await _dal.SaveAuditManageUserAsync(auditDocument, db_config);
     }
 
     public async Task<System.Dynamic.ExpandoObject> GetCaseRevisionAsync(string caseId, string revisionId, DBConfigurationDetail db_config)
     {
         return await _dal.GetCaseRevisionAsync(caseId, revisionId, db_config);
-    }
-
-    private static (string url, string post) GetFindUrl(DBConfigurationDetail db_config, string caseId)
-    {
-        var selector_struc = new AuditSelector();
-        selector_struc.selector = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
-        selector_struc.limit = 1_000_000;
-        selector_struc.selector.Add("case_id", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
-        selector_struc.selector["case_id"].Add("$eq", caseId);
-        selector_struc.use_index = "case-id-date-last-updated-index";
-
-        string selector_struc_string = JsonConvert.SerializeObject(selector_struc, new JsonSerializerSettings
-        {
-            NullValueHandling = NullValueHandling.Ignore
-        });
-
-        string result = $"{db_config.url}/{db_config.prefix}audit/_find";
-        return (result, selector_struc_string);
     }
 
     private static Dictionary<string, value_node[]> GetLookUp(app metadata)

@@ -755,6 +755,81 @@ dev this story _bmad-output/implementation-artifacts/22-2-net-10-upgrade-executi
 
 ---
 
+## Epic 23 — Remaining Database Consolidation Gap Analysis (SQL Migration Foundation) _(2026-07-16)_
+
+| Story | File | Status |
+|-------|------|--------|
+| 23.1 — Remaining Database Gap Scan | [23-1-remaining-database-gap-scan.md](23-1-remaining-database-gap-scan.md) | done |
+| 23.2 — `ISessionRepository` over `SessionDAL` | [23-2-isession-repository-sessiondal.md](23-2-isession-repository-sessiondal.md) | ready-for-dev |
+| 23.3 — `IOfflineCaseRepository` over `OfflineCaseDAL` | [23-3-iofflinecase-repository-offlinecasedal.md](23-3-iofflinecase-repository-offlinecasedal.md) | ready-for-dev |
+| 23.4 — `IExportQueueRepository` over `ExportQueueDAL` | [23-4-iexportqueue-repository-exportqueuedal.md](23-4-iexportqueue-repository-exportqueuedal.md) | ready-for-dev |
+| 23.5 — Canonicalize `VitalImportDAL` + `IVitalImportRepository` | [23-5-ivitalimport-repository-vitalimportdal-canonicalize.md](23-5-ivitalimport-repository-vitalimportdal-canonicalize.md) | ready-for-dev |
+| 23.6 — `IReportRepository` + `ReportDAL` | [23-6-ireport-repository-reportdal.md](23-6-ireport-repository-reportdal.md) | ready-for-dev |
+| 23.7 — Route Report Read Calls Through `IReportRepository` | [23-7-route-report-read-calls.md](23-7-route-report-read-calls.md) | ready-for-dev |
+| 23.8 — `ILoggingRepository` + `LoggingDAL` | [23-8-ilogging-repository-loggingdal.md](23-8-ilogging-repository-loggingdal.md) | ready-for-dev |
+
+**Sequencing:** 23.1 must run first (gap scan catalog). Once complete, 23.2–23.6 and 23.8 can all proceed in parallel. 23.7 depends on 23.6. Recommend sequencing 23.8 after 23.3 to avoid a `loggerController.cs` file conflict.
+
+> ⚠️ **23.2 carries highest risk** — 10 files touched including Akka.NET actors and a cross-feature DAL injection (`AccountDAL` → `ISessionRepository`).
+>
+> ⚠️ **23.8 file conflict** — both 23.3 and 23.8 modify `loggerController.cs`. Run 23.3 first, then 23.8 adds `ILoggingRepository` on top.
+>
+> ℹ️ **`vital_import` URL exception (23.5)** — This database does not use the tenant prefix separator. All `VitalImportDAL` methods must use `config.url/vital_import/...` directly — never `Get_Prefix_DB_Url`. Document this as a deliberate exception.
+>
+> ℹ️ **`report` write side (23.6/23.7)** — Sync/rebuild actors that write to the `report` database are declared infrastructure out-of-scope. `IReportRepository` covers read operations only.
+>
+> ℹ️ **Migration readiness gate** — When Epic 23 is complete, every CouchDB database access routes through a repository interface. SQL DAL implementation work can begin immediately after.
+
+**Story 23.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/23-1-remaining-database-gap-scan.md
+```
+
+**Story 23.2 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/23-2-isession-repository-sessiondal.md
+```
+
+**Story 23.3 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/23-3-iofflinecase-repository-offlinecasedal.md
+```
+
+**Story 23.4 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/23-4-iexportqueue-repository-exportqueuedal.md
+```
+
+**Story 23.5 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/23-5-ivitalimport-repository-vitalimportdal-canonicalize.md
+```
+
+**Story 23.6 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/23-6-ireport-repository-reportdal.md
+```
+
+**Story 23.7 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/23-7-route-report-read-calls.md
+```
+
+**Story 23.8 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/23-8-ilogging-repository-loggingdal.md
+```
+
+---
+
 ## Open Items — Resolve Before Affected Story
 
 | OI       | Affects               | What to resolve                                                                                                                                                                                                                                                                                                                                                                                        |

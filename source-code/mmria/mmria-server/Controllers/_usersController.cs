@@ -22,6 +22,7 @@ public sealed class _usersController : Controller
     private readonly mmria.server.util.RequestTenantRuntime _tenantRuntime;
     private readonly mmria.common.SharedLibraries.Account.IUserRepository _userRepository;
     private readonly mmria.common.SharedLibraries.Jurisdiction.IJurisdictionRepository _jurisdictionRepository;
+    private readonly mmria.common.SharedLibraries.Audit.IAuditRepository _auditRepository;
 
     public _usersController
     ( 
@@ -29,7 +30,8 @@ public sealed class _usersController : Controller
         mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
         mmria.common.SharedLibraries.Account.IUserRepository userRepository,
-        mmria.common.SharedLibraries.Jurisdiction.IJurisdictionRepository jurisdictionRepository
+        mmria.common.SharedLibraries.Jurisdiction.IJurisdictionRepository jurisdictionRepository,
+        mmria.common.SharedLibraries.Audit.IAuditRepository auditRepository
     )
     {
         httpContextAccessor = p_httpContextAccessor;
@@ -37,6 +39,7 @@ public sealed class _usersController : Controller
         _tenantRuntime = tenantRuntime;
         _userRepository = userRepository;
         _jurisdictionRepository = jurisdictionRepository;
+        _auditRepository = auditRepository;
         host_prefix = tenantRuntime.EffectiveHostPrefix;
 
         configuration = tenantRuntime.RequireConfiguration();
@@ -55,7 +58,7 @@ public sealed class _usersController : Controller
     {
         var result = new Dictionary<string,object>();
         var manageUsersManager = new mmria.common.SharedLibraries.ManageUsers.Manager.ManageUsersManager(
-            new mmria.common.SharedLibraries.ManageUsers.DAL.ManageUsersDAL(_couchDbHttpClient, _userRepository, _jurisdictionRepository),
+            new mmria.common.SharedLibraries.ManageUsers.DAL.ManageUsersDAL(_couchDbHttpClient, _userRepository, _jurisdictionRepository, _auditRepository),
             _couchDbHttpClient
         );
 

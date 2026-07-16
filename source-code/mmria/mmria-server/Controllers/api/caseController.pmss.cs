@@ -26,6 +26,7 @@ public sealed class caseController: ControllerBase
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.Audit.IAuditRepository _auditRepository;
 
     private readonly IAuthorizationService _authorizationService;
     //private readonly IDocumentRepository _documentRepository;
@@ -36,12 +37,14 @@ public sealed class caseController: ControllerBase
         mmria.server.util.RequestTenantRuntime tenantRuntime,
         ActorSystem actorSystem, 
         IAuthorizationService authorizationService,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.Audit.IAuditRepository auditRepository
     )
     {
         _actorSystem = actorSystem;
         _authorizationService = authorizationService;
         _couchDbHttpClient = couchDbHttpClient;
+        _auditRepository = auditRepository;
 
         host_prefix = tenantRuntime.EffectiveHostPrefix;
 
@@ -256,24 +259,13 @@ public sealed class caseController: ControllerBase
             audit_data.record_id = pmssno;
             audit_data.metadata_version = configuration.GetString("metadata_version", host_prefix);
 
-            var audit_string = Newtonsoft.Json.JsonConvert.SerializeObject(audit_data, settings);
-
-            string audit_url = db_config.Get_Prefix_DB_Url($"audit/{audit_data._id}");
             try
             {
-                string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                    "PUT",
-                    audit_url,
-                    audit_string,
-                    db_config.user_name,
-                    db_config.user_value
-                );
-                var audit_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
+                await _auditRepository.WriteAuditEntryAsync(audit_data, db_config);
             }
             catch(Exception ex)
             {
                 Console.Write("problem saving audit\n{0}", ex);
-
             }
 
             var Sync_Document_Message = new mmria.pmss.server.model.actor.Sync_Document_Message
@@ -407,31 +399,14 @@ public sealed class caseController: ControllerBase
                 date_created = DateTime.UtcNow,
             };
 
-            Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-            settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
- 
-
-            var audit_string = Newtonsoft.Json.JsonConvert.SerializeObject(audit_data, settings);
-
             try
             {
-                string audit_url = db_config.Get_Prefix_DB_Url($"audit/{audit_data._id}");
-                string save_delete_audit_response = await _couchDbHttpClient.ExecuteAsync(
-                    "PUT",
-                    audit_url,
-                    audit_string,
-                    db_config.user_name,
-                    db_config.user_value
-                );
-                var audit_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(save_delete_audit_response);
+                await _auditRepository.WriteAuditEntryAsync(audit_data, db_config);
             }
             catch(Exception ex)
             {
                 Console.Write("problem saving audit\n{0}", ex);
-
             }
-
-
 
             if(! string.IsNullOrWhiteSpace(document_json))
             {

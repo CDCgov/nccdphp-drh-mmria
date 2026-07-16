@@ -154,6 +154,17 @@ Stories in Epics 7 and 8 were authored against an earlier version of `project-co
 All mmria projects (server, services, common, utilities) are upgraded from .NET 9 to .NET 10. The .NET 10 SDK is installed on the developer machine, all project target frameworks are updated, NuGet packages are verified for .NET 10 compatibility, and both production Dockerfiles are updated to use the .NET 10 trusted base images from the EcPaaS registry.
 **Stories:** 22.1 — Compatibility Analysis & Risk Assessment, 22.2 — Upgrade Execution
 
+### Epic 23: Remaining Database Consolidation Gap Analysis (SQL Migration Foundation)
+
+The final SQL migration foundation epic. Every CouchDB database access in `mmria-server`, `mmria.common`, and `mmria.services` is placed behind a repository interface. Six databases not covered by Epics 17–21 (`session`, `offline_cases`, `export_queue`, `vital_import`, `report`, `logging`) receive interfaces and canonical DAL implementations. After this epic, a SQL migration requires only swapping DAL implementations — no manager, controller, or services actor changes are needed.
+**Architecture rule:** project-context.md §2.2 SharedLibraries pattern + SQL migration readiness.
+
+### Epic 24: Infrastructure Sync and Database Lifecycle Consolidation (SQL Migration Foundation)
+
+The eight files classified "infra out-of-scope" across Epics 17–23 — `c_db_setup.cs`, `Rebuild_Export_Queue.cs`, `rebuild_export_queue_job.cs`, `Process_Central_Pull_list.cs`, `Process_DB_Synchronization_Set.cs`, `c_document_sync_all*.cs`, `c_document_sync_all_legacy.cs`, and `c_sync_document.pmss.cs` — contain ~150+ direct CouchDB HTTP calls. This epic routes every one of them through typed repository interfaces without restructuring any orchestration logic. New interfaces introduced: `IDeIdentifiedRepository`, write extensions to `IReportRepository`, sync-oriented extensions to `ICaseRepository`, `IDatabaseLifecycleService`, and a `PurgeAndReinitializeAsync` extension to `IExportQueueRepository`. After this epic, every CouchDB call in the entire codebase routes through an interface — completing SQL migration readiness.
+**Architecture rule:** project-context.md §2.2 SharedLibraries pattern + SQL migration readiness. Lift-and-shift: orchestration logic, actor hierarchies, Quartz schedules, and rebuild pipelines are not restructured.
+**Stories:** 23.1 — Remaining Database Gap Scan, 23.2 — `ISessionRepository`, 23.3 — `IOfflineCaseRepository`, 23.4 — `IExportQueueRepository`, 23.5 — `IVitalImportRepository`, 23.6 — `IReportRepository` + `ReportDAL`, 23.7 — Route report reads, 23.8 — `ILoggingRepository` + `LoggingDAL`
+
 ---
 
 ## Epic 1: Case Narrative Editor Fidelity
@@ -2578,5 +2589,447 @@ mmria.common/SharedLibraries/Logging/
 23.2, 23.3, 23.4, 23.5, 23.6, and 23.8 can all proceed in parallel once 23.1 is complete. 23.7 depends on 23.6. Story 23.2 carries medium risk due to the number of call sites (actors + controllers + cross-feature DAL injection); all others are low or low–medium.
 
 **Migration readiness gate:** When Epic 23 is complete, every CouchDB database access in `mmria-server`, `mmria.common`, and `mmria.services` routes through a repository interface. SQL migration work begins here — swap each CouchDB DAL implementation for a SQL implementation one database at a time, with no changes required to managers, controllers, or services actors.
+
+---
+
+## Epic 24: Infrastructure Sync and Database Lifecycle Consolidation (SQL Migration Foundation)
+
+**Architecture rule:** project-context.md §2.2 SharedLibraries pattern + SQL migration readiness.
+
+**Summary:** The eight files classified "infra out-of-scope" across Epics 17–23 contain direct CouchDB HTTP calls for full-database rebuild orchestration, real-time change-feed synchronization, CDC data integration, nightly export-queue lifecycle management, and system startup initialization. After this epic, every CouchDB access call in the entire codebase routes through a repository interface. SQL migration then requires: (a) replacing each CouchDB DAL implementation with a SQL DAL implementation one database at a time, and (b) replacing `IDatabaseLifecycleService` with SQL schema-migration tooling — no orchestration code requires modification.
+
+**Guiding principle — lift and shift:** This epic moves CouchDB HTTP calls into DAL files. It does NOT restructure orchestration logic, change actor message protocols, modify Akka actor hierarchies, alter Quartz schedules, or change the multi-tenant rebuild process or CDC data flow. The sync and rebuild orchestration files change only at their CouchDB call sites — surrounding coordination, error handling, retry logic, and control flow are not touched.
+
+**New interfaces introduced:**
+
+| Interface | Location | Purpose |
+|---|---|---|
+| `IDeIdentifiedRepository` | `mmria.common/SharedLibraries/DeIdentified/` | de_id database: per-doc CRUD, bulk write, and DB lifecycle (drop/reset, design docs, indexes) |
+| `IReportRepository` write ext. | Extends Epic 23 Story 23.6 read-only interface | Adds per-doc write, bulk write, drop/reset, design docs, and index operations |
+| `ICaseRepository` sync ext. | Extends Epic 17 Story 17.2 interface | Adds `GetCasesPagedAsync` (cursor-based bulk read) and `GetCaseChangesSinceAsync` (change-stream) |
+| `IDatabaseLifecycleService` | `mmria-server/` | Interface seam over `c_db_setup.cs` for full system startup initialization |
+| `IExportQueueRepository.PurgeAndReinitializeAsync` | Extends Epic 23 Story 23.4 interface | Adds nightly drop/recreate/security operation to the export-queue interface |
+
+**Scope table — files in scope and which story owns them:**
+
+| File | Project | Primary operations | Story | Risk |
+|---|---|---|---|---|
+| `c_db_setup.cs` | mmria-server/util/ | ALL DBs: CREATE, SECURITY, DESIGN, INDEX, seed data | 24.5 | Low (interface extraction only) |
+| `Rebuild_Export_Queue.cs` | mmria-server/model/actor/quartz/ | export_queue: DELETE DB, CREATE DB, SECURITY | 24.4 | Low |
+| `rebuild_export_queue_job.cs` | mmria-server/model/ | export_queue: DELETE DB, CREATE DB, SECURITY (legacy IJob) | 24.4 | Low |
+| `c_sync_document.pmss.cs` | mmria-server/util/ | de_id: PUT/DELETE per-doc; report: 4 document-type variant PUTs | 24.6 | Low |
+| `c_document_sync_all.cs` | mmria-server/util/ | mmrds: paged bulk read; metadata: via DAL ✓; de_id: bulk write; report: bulk write, design, index | 24.7 | Medium |
+| `c_document_sync_all_legacy.cs` | mmria-server/util/ | mmrds: paged read; de_id: individual PUT; report: design + individual writes | 24.7 | Medium |
+| `c_document_sync_all.pmss.cs` | mmria-server/util/ | mmrds: paged bulk read; de_id: design + writes; report: design + index + writes | 24.7 | Medium |
+| `c_document_sync_all_legacy.cs` | mmria.common/SharedLibraries/MMRIARebuild/Manager/ | metadata: via DAL ✓; mmrds: paged; de_id: bulk write; report: bulk write + design | 24.7 | Medium |
+| `Process_DB_Synchronization_Set.cs` | mmria-server/model/actor/quartz/ | mmrds: `_changes` feed + doc GET; de_id: per-doc PUT/DELETE; report: per-doc PUT/DELETE | 24.8 | Medium |
+| `Process_Central_Pull_list.cs` | mmria-server/model/actor/quartz/ | mmrds (multi-source): bulk read; de_id: bulk write; report: design + index + bulk write | 24.9 | High |
+| `c_document_sync_all.cs` | mmria.services/Actors/populate-cdc-instance/ | metadata: via DAL ✓; mmrds: cursor paged; de_id: bulk write; report: design + bulk write | 24.9 | High |
+
+---
+
+### Story 24.1: Infra Operations Catalog
+
+As a developer,
+I want a definitive catalog of every database operation in all in-scope infra files,
+So that Stories 24.2–24.9 have an agreed-upon, complete operation set and every call site is identified before any code changes begin.
+
+**Acceptance Criteria:**
+
+**Given** all eleven in-scope files (ten files in the scope table above plus the mmria.services `c_document_sync_all.cs`)
+**When** the developer completes the catalog
+**Then** `docs/ai/mmrds_operation_catalog.md` gains an "Epic 24 — Infrastructure Consolidation" section documenting every distinct operation grouped by: DB lifecycle (CREATE database, DELETE database, SECURITY, PUT design document, POST `_index`), paged bulk read (`_all_docs` with cursor/skip), change-stream read (`_changes`), per-document CRUD (GET/PUT/DELETE by ID), and bulk write (`_bulk_docs`)
+
+**Given** each catalog entry
+**When** the catalog is complete
+**Then** each entry records: file name, approximate line number, operation type, target database, URL pattern in use (A, B, or other), and which new interface from the "New interfaces introduced" table will own the call
+
+**Given** the `c_document_sync_all.cs` in `mmria.services/Actors/populate-cdc-instance/`
+**When** cataloged
+**Then** its CDC-specific characteristics are noted: cursor-based pagination, bulk-write throttling, and metadata already routed through DAL (already correct — no change needed for that subset)
+
+**Given** design document PUT and Mango index POST operations in sync/rebuild files
+**When** cataloged
+**Then** they are explicitly marked as DB-lifecycle operations to be routed through `IDeIdentifiedRepository` or `IReportRepository` lifecycle methods (not through `IDatabaseLifecycleService`) — the catalog records this routing decision
+
+---
+
+### Story 24.2: `IDeIdentifiedRepository` and Extend `IReportRepository` for Sync Writes and Lifecycle
+
+As a developer,
+I want repository interfaces covering all de_id and report database operations — including write, bulk-write, and DB-lifecycle — that sync and rebuild files require,
+So that Stories 24.6–24.9 can route every call through a typed interface instead of direct HTTP calls.
+
+**Acceptance Criteria:**
+
+**Given** no `DeIdentified` SharedLibraries feature exists
+**When** this story creates one
+**Then** the following structure exists:
+```
+mmria.common/SharedLibraries/DeIdentified/
+  IDeIdentifiedRepository.cs
+  DAL/
+    DeIdentifiedDAL.cs
+```
+
+**Given** the de_id operations identified in Story 24.1
+**When** `DeIdentifiedDAL` is created
+**Then** it contains async methods covering:
+- `GetRevisionAsync(string id, DBConfigurationDetail dbConfig)` → `string? rev` — used to check before write/delete
+- `UpsertDocumentAsync(string id, JObject doc, DBConfigurationDetail dbConfig)` → `document_put_response`
+- `DeleteDocumentAsync(string id, string rev, DBConfigurationDetail dbConfig)` → `document_put_response`
+- `BulkUpsertAsync(IEnumerable<JObject> docs, DBConfigurationDetail dbConfig)` → `IEnumerable<document_put_response>`
+- `DropAndResetAsync(DBConfigurationDetail dbConfig)` — drops the de_id database and recreates it empty; used by rebuild flows; in SQL migration, the implementation executes `TRUNCATE TABLE de_id`
+- `EnsureDesignDocumentAsync(string designName, string designDocJson, DBConfigurationDetail dbConfig)` — PUT `de_id/_design/{designName}`; in SQL migration, this is a no-op or triggers index creation
+- `EnsureIndexAsync(string indexJson, DBConfigurationDetail dbConfig)` — POST `de_id/_index`; in SQL migration, this creates or verifies a SQL index
+
+All CRUD and bulk methods use `dbConfig.Get_Prefix_DB_Url($"de_id/...")` (Pattern B). The `DropAndResetAsync` method uses `dbConfig.Get_Prefix_DB_Url("de_id")` for the database-level DELETE and PUT.
+
+**Given** `IDeIdentifiedRepository` is defined
+**When** DI registration is updated in `mmria-server/Program.cs`
+**Then** `IDeIdentifiedRepository` is registered as `DeIdentifiedDAL` in the service collection; `mmria.services` already references `mmria.common` so no new project reference is needed
+
+**Given** `IReportRepository` from Story 23.6 is currently read-only
+**When** this story extends it
+**Then** `IReportRepository` gains these additional methods implemented in `ReportDAL`:
+- `GetRevisionAsync(string id, DBConfigurationDetail dbConfig)` → `string? rev`
+- `UpsertDocumentAsync(string id, JObject doc, DBConfigurationDetail dbConfig)` → `document_put_response`
+- `DeleteDocumentAsync(string id, string rev, DBConfigurationDetail dbConfig)` → `document_put_response`
+- `BulkUpsertAsync(IEnumerable<JObject> docs, DBConfigurationDetail dbConfig)` → `IEnumerable<document_put_response>`
+- `DropAndResetWithSystemDocPreservationAsync(DBConfigurationDetail dbConfig)` — drops and recreates the report database while preserving system/config documents that must survive; in SQL migration, the implementation executes a targeted `DELETE FROM report_documents WHERE type NOT IN ('system', 'config')`
+- `EnsureDesignDocumentAsync(string designName, string designDocJson, DBConfigurationDetail dbConfig)`
+- `EnsureIndexAsync(string indexJson, DBConfigurationDetail dbConfig)`
+
+**Given** the note in Story 23.6 that write/rebuild operations on `report` were declared "out of scope" for that story
+**When** this story adds the write methods
+**Then** the catalog entry for `report` in `docs/ai/mmrds_operation_catalog.md` is updated to reflect that write operations are now covered by `IReportRepository`; the boundary decision recorded in Story 23.6 is superseded
+
+**Given** no existing callers are changed in this story
+**When** the build runs after this story
+**Then** all three projects build with zero errors
+
+---
+
+### Story 24.3: Extend `ICaseRepository` with Paged Bulk Read and Change-Stream Read
+
+As a developer,
+I want `ICaseRepository` to expose the paged bulk read and change-stream read patterns needed by rebuild and sync orchestrators,
+So that `c_document_sync_all` variants and `Process_DB_Synchronization_Set` can replace their direct `mmrds` calls with interface calls.
+
+**Acceptance Criteria:**
+
+**Given** `ICaseRepository` from Story 17.2 covers per-document CRUD and view queries but not bulk paged reads or change-feed access
+**When** this story is complete
+**Then** `ICaseRepository` gains:
+- `GetCasesPagedAsync(string? startKey, int limit, DBConfigurationDetail dbConfig)` → `CasePage` containing `IReadOnlyList<JObject> documents` and `string? lastId`
+- `startKey` null means start from beginning; `lastId` of the returned page is passed as `startKey` for the next page
+- Implemented in `CaseDAL` as `GET {prefix}mmrds/_all_docs?include_docs=true&startkey={startKey}&limit={limit}` (cursor-based pagination)
+- In SQL migration: `SELECT * FROM cases WHERE id > @startKey ORDER BY id FETCH NEXT @limit ROWS ONLY`
+
+**Given** `Process_DB_Synchronization_Set` polls `mmrds/_changes` to detect mutations
+**When** this story is complete
+**Then** `ICaseRepository` gains:
+- `GetCaseChangesSinceAsync(string sinceSeq, DBConfigurationDetail dbConfig)` → `CaseChangeFeedResult` containing `string lastSeq` and `IReadOnlyList<CaseChangeEntry>`
+- `CaseChangeEntry` holds: `string id`, `string seq`, `bool deleted`, `JObject? doc` (full document for updates; null for deletes)
+- Implemented in `CaseDAL` as `GET {prefix}mmrds/_changes?since={sinceSeq}&include_docs=true`
+- In SQL migration: the implementation polls a SQL change-tracking query or CDC table instead of a `_changes` feed; the interface contract is identical
+
+**Given** `CasePage` and `CaseChangeFeedResult` are new model types
+**When** they are created
+**Then** they live in `mmria.common/SharedLibraries/Case/` alongside the existing interface
+
+**Given** `CaseDAL` implements the new methods
+**When** the build runs after this story
+**Then** all three projects build with zero errors; no existing callers require modification
+
+---
+
+### Story 24.4: Route Export Queue Rebuild Actors Through `IExportQueueRepository`
+
+As a developer,
+I want `Rebuild_Export_Queue` and `rebuild_export_queue_job` to route their database lifecycle operations through `IExportQueueRepository`,
+So that the nightly export-queue drop/recreate is fully behind the repository interface established in Story 23.4.
+
+**Acceptance Criteria:**
+
+**Given** `IExportQueueRepository` from Story 23.4 covers application CRUD but not database-lifecycle operations
+**When** this story extends it
+**Then** `IExportQueueRepository` gains:
+- `PurgeAndReinitializeAsync(DBConfigurationDetail dbConfig)` — drops the `export_queue` database, recreates it empty, and restores the security document (`abstractor` role only); in SQL migration, the implementation executes `TRUNCATE TABLE export_queue` and resets row-level permissions
+
+**Given** `ExportQueueDAL` implements `PurgeAndReinitializeAsync`
+**When** implemented
+**Then** the DELETE database, PUT database, and PUT `_security` calls that were previously assembled in `Rebuild_Export_Queue.cs` are moved into `ExportQueueDAL.PurgeAndReinitializeAsync`; the method uses `dbConfig.Get_Prefix_DB_Url("export_queue")` and `dbConfig.Get_Prefix_DB_Url("export_queue/_security")` (Pattern B)
+
+**Given** `Rebuild_Export_Queue.cs` currently assembles `{url}/{prefix}export_queue` and `{url}/{prefix}export_queue/_security` URLs directly
+**When** this story is complete
+**Then** all direct `CouchDbHttpClient.ExecuteAsync` calls in this file are replaced with `await _exportQueueRepository.PurgeAndReinitializeAsync(dbConfig)`; `IExportQueueRepository` is injected into the actor via Akka.NET actor props factory; the Akka message-handling logic, scheduling conditions, and midnight-only check are **not changed**
+
+**Given** `rebuild_export_queue_job.cs` is a legacy `IJob` implementation containing identical lifecycle calls
+**When** the developer evaluates it against the Quartz scheduler registration in `Program.cs`
+**Then** if the job is actively registered: it is updated to inject and use `IExportQueueRepository.PurgeAndReinitializeAsync` following the same pattern; if it is not registered in the scheduler and is unreachable: it is left unchanged and a comment is added marking it as superseded by the `Rebuild_Export_Queue` Akka actor — the catalog records which applies
+
+**Given** the filesystem directory cleanup in `Rebuild_Export_Queue` (deletes the export output directory)
+**When** evaluated
+**Then** it remains in the actor class — filesystem operations are not CouchDB operations and do not belong in `ExportQueueDAL`
+
+**Given** the build and nightly export-queue rebuild behavior
+**When** verified after all changes
+**Then** all three projects build with zero errors; the export-queue rebuild actor's external behavior is identical to pre-change
+
+---
+
+### Story 24.5: Extract `IDatabaseLifecycleService` over `c_db_setup.cs`
+
+As a developer,
+I want `c_db_setup.cs` to be registered behind an `IDatabaseLifecycleService` interface,
+So that the entire system startup database initialization path has a clean SQL migration seam and a SQL implementation can substitute it with schema-migration tooling without touching `Program.cs`.
+
+**Acceptance Criteria:**
+
+**Given** `c_db_setup.cs` in `mmria-server/util/` is currently instantiated or called directly from `Program.cs` startup code
+**When** this story is complete
+**Then** `IDatabaseLifecycleService` is defined with the public async method(s) that `Program.cs` calls on startup; `c_db_setup` implements `IDatabaseLifecycleService`; `Program.cs` resolves via `IDatabaseLifecycleService` — the concrete `c_db_setup` type does not appear in `Program.cs`
+
+**Given** the internals of `c_db_setup.cs`
+**When** this story is implemented
+**Then** the internal `CouchDbHttpClient.ExecuteAsync` calls inside `c_db_setup.cs` are NOT moved or changed — `c_db_setup` remains the complete CouchDB implementation; this story introduces the interface seam only, exactly one layer above `c_db_setup`
+
+**Given** `IDatabaseLifecycleService` is defined
+**When** DI registration is updated in `Program.cs`
+**Then** `services.AddScoped<IDatabaseLifecycleService, c_db_setup>()` (or `AddSingleton` if that matches the current lifetime) is present; the service lifetime matches how `c_db_setup` is currently used
+
+**Given** the PMSS-specific conditional compilation paths in `c_db_setup.cs` (e.g., `#if IS_PMSS_ENHANCED`)
+**When** the interface is extracted
+**Then** the `IDatabaseLifecycleService` method signatures are identical regardless of compile-time flag; `c_db_setup` continues to branch internally on `IS_PMSS_ENHANCED` as before; no interface member is conditional
+
+**Given** `IDatabaseLifecycleService` as the SQL migration seam
+**When** a future SQL migration story implements it
+**Then** the SQL implementation handles schema creation via EF Core migrations or equivalent tooling, role/permission setup, and initial seed data without touching `Program.cs` — the `Program.cs` call to `IDatabaseLifecycleService` remains unchanged
+
+**Note:** This story does NOT route the design-doc and index operations embedded in the sync/rebuild files through `IDatabaseLifecycleService`. Those calls will be routed through `IDeIdentifiedRepository` and `IReportRepository` lifecycle methods in Stories 24.6–24.9. `IDatabaseLifecycleService` is the seam for the startup-only initialization path in `c_db_setup.cs` exclusively.
+
+**Given** the build after this story
+**When** verified
+**Then** `mmria-server` builds with zero errors; startup database initialization behavior is identical to pre-change
+
+---
+
+### Story 24.6: Route `c_sync_document.pmss.cs` Through Repository Interfaces
+
+As a developer,
+I want `c_sync_document.pmss.cs` to route its de_id and report writes through repository interfaces,
+So that this leaf-level per-document sync utility has no direct CouchDB calls — completing the foundation that Stories 24.7 and 24.8 build on.
+
+**Acceptance Criteria:**
+
+**Given** `c_sync_document.pmss.cs` in `mmria-server/util/` writes de-identified and report documents per case using `CouchDbHttpClient.ExecuteAsync` directly
+**When** this story is complete
+**Then** every direct CouchDB call in this file is replaced with the corresponding repository method call; `IDeIdentifiedRepository` and `IReportRepository` are injected via constructor injection
+
+**Given** the de_id operations in this file (identified in Story 24.1):
+- GET to check existing document revision before overwrite or delete
+- PUT de-identified document (Pattern B or A — as discovered)
+- DELETE de-identified document
+**When** this story is complete
+**Then** each is replaced with: `IDeIdentifiedRepository.GetRevisionAsync(...)`, `IDeIdentifiedRepository.UpsertDocumentAsync(...)`, `IDeIdentifiedRepository.DeleteDocumentAsync(...)` respectively
+
+**Given** the report operations in this file — writes to four document-type variants per case (`freq-{id}`, `opioid-{id}`, `powerbi-{id}`, `dqr-{id}`):
+- GET revision for each variant before overwrite
+- PUT each variant
+- DELETE each variant (when a case is deleted from mmrds)
+**When** this story is complete
+**Then** each revision GET is replaced with `IReportRepository.GetRevisionAsync(...)` and each PUT/DELETE is replaced with `IReportRepository.UpsertDocumentAsync(...)` / `IReportRepository.DeleteDocumentAsync(...)` using the full document-type-prefixed ID (e.g., `"freq-{caseId}"`) as the `id` parameter — the document-type prefix is preserved in the ID, not extracted as a separate concept
+
+**Given** the PMSS-specific de-identification and report-generation logic in this file (`c_de_identifier`, `c_generate_frequency_summary_report`, etc.)
+**When** this story is implemented
+**Then** the transformation and generation logic remains in `c_sync_document.pmss.cs` — only the CouchDB HTTP calls are replaced; the transformation pipeline is not touched
+
+**Given** `c_sync_document.pmss.cs` is called by `c_document_sync_all.pmss.cs` and `Process_DB_Synchronization_Set.cs`
+**When** this story completes
+**Then** those callers continue to work unchanged — the constructor signature of `c_sync_document.pmss.cs` gains the two repository parameters; callers that instantiate it directly must pass the injected repositories (resolved at the point this story is implemented: either callers are updated in this story or via DI)
+
+**Given** the build after all changes
+**When** verified
+**Then** `mmria-server` builds with zero errors
+
+---
+
+### Story 24.7: Route `c_document_sync_all` Variants Through Repository Interfaces
+
+As a developer,
+I want all four `c_document_sync_all` variants (server main, server legacy, server PMSS, and common/SharedLibraries legacy) to route their mmrds reads, de_id writes, report writes, and DB-lifecycle operations through the repository interfaces established in Stories 24.2–24.3,
+So that the full-database rebuild orchestration has no direct CouchDB calls.
+
+**Acceptance Criteria:**
+
+**Given** the four files in scope:
+1. `mmria-server/util/c_document_sync_all.cs`
+2. `mmria-server/util/c_document_sync_all_legacy.cs`
+3. `mmria-server/util/c_document_sync_all.pmss.cs`
+4. `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_document_sync_all_legacy.cs`
+**When** this story is complete
+**Then** every direct `CouchDbHttpClient.ExecuteAsync` call in each file is replaced with the corresponding interface method; the four interfaces used are `ICaseRepository`, `IDeIdentifiedRepository`, `IReportRepository`, and (for metadata reads not yet routed via DAL, if any) `IMetadataRepository`
+
+**Given** the mmrds paged bulk read operations in all four files
+**When** this story is complete
+**Then** each is replaced with `ICaseRepository.GetCasesPagedAsync(startKey, limit, dbConfig)`; cursor-loop logic stays in the orchestrator — the repository returns one page; the orchestrator advances the cursor; no orchestration logic changes
+
+**Given** the de_id operations:
+- Drop/recreate de_id (during full rebuild start)
+- PUT design document on de_id
+- Bulk write de-identified documents (`_bulk_docs`)
+- Individual per-document writes (legacy variant)
+**When** this story is complete
+**Then** drop/recreate → `IDeIdentifiedRepository.DropAndResetAsync(dbConfig)`; design doc → `IDeIdentifiedRepository.EnsureDesignDocumentAsync(name, json, dbConfig)`; bulk write → `IDeIdentifiedRepository.BulkUpsertAsync(docs, dbConfig)`; individual write → `IDeIdentifiedRepository.UpsertDocumentAsync(id, doc, dbConfig)`
+
+**Given** the report operations:
+- Drop/recreate report (during full rebuild, with system-doc preservation where applicable)
+- PUT design documents (`interactive_aggregate_report`, `data_summary_view_report`, `powerbi-report-index`, etc.)
+- POST Mango indexes (`opioid`, `powerbi` partial-filter indexes)
+- Bulk write report documents
+**When** this story is complete
+**Then** drop/recreate with system-doc preservation → `IReportRepository.DropAndResetWithSystemDocPreservationAsync(dbConfig)`; design docs → `IReportRepository.EnsureDesignDocumentAsync(name, json, dbConfig)`; indexes → `IReportRepository.EnsureIndexAsync(json, dbConfig)`; bulk write → `IReportRepository.BulkUpsertAsync(docs, dbConfig)`
+
+**Given** barrier queries in `c_document_sync_all_legacy.cs` (common) — these query `de_id/_design/sortable/_view/by_date_created?limit=1&update=true` and `report/_find` purely to wait for index readiness
+**When** evaluated
+**Then** a `WaitForIndexReadyAsync(DBConfigurationDetail dbConfig)` method is added to each of `IDeIdentifiedRepository` and `IReportRepository`; the barrier query call sites are replaced with these methods; the waiting and retry logic in the orchestrator remains unchanged
+
+**Given** the `c_document_sync_all.cs` (server) calls `c_sync_document.build_documents_async()` for per-document transformation
+**When** this story is complete
+**Then** the calls to `c_sync_document` remain unchanged — `c_sync_document` is a transformation utility, not a CouchDB caller; only the wrapping CouchDB calls in `c_document_sync_all.cs` itself are replaced
+
+**Given** the PMSS variant (`c_document_sync_all.pmss.cs`) has `#if IS_PMSS_ENHANCED` guarding
+**When** this story is implemented
+**Then** PMSS-specific paths use the same repository interfaces; no PMSS-specific divergence is introduced in the interface signatures; both PMSS and non-PMSS code paths route through `IDeIdentifiedRepository` and `IReportRepository`
+
+**Given** the rebuild orchestration, progress-tracking, retry logic, and parallel-processing logic in all four files
+**When** this story is implemented
+**Then** none of it changes — the `db_rebuild` progress document writes (if any — as discovered in Story 24.1) are routed through whichever interface owns the `db_rebuild` database; the retry decorators, progress callbacks, and startup-checkpoint handling stay exactly as they are
+
+**Given** the build after all changes
+**When** verified
+**Then** `mmria-server`, `mmria.common`, and `mmria.services` all build with zero errors; no rebuild behavior changes
+
+**Pre-condition:** Stories 24.2 and 24.3 must be complete before this story begins. Story 24.6 must be complete if `c_sync_document.pmss` is used by `c_document_sync_all.pmss.cs` with constructor injection.
+
+---
+
+### Story 24.8: Route `Process_DB_Synchronization_Set` Through Repository Interfaces
+
+As a developer,
+I want `Process_DB_Synchronization_Set.cs` to route its `mmrds` change-stream reads and its `de_id`/`report` per-document sync writes through repository interfaces,
+So that the real-time change-feed synchronization actor has no direct CouchDB calls.
+
+**Acceptance Criteria:**
+
+**Given** `Process_DB_Synchronization_Set.cs` polls `mmrds/_changes?since={last_seq}` to detect case mutations
+**When** this story is complete
+**Then** that call is replaced with `ICaseRepository.GetCaseChangesSinceAsync(lastSeq, dbConfig)`; the returned `CaseChangeFeedResult.lastSeq` is stored in `TenantChangeSequenceState` as before; the actor's polling timer, message-handling, and fan-out parallelism logic (`Parallel.ForEachAsync`) are not changed
+
+**Given** `Process_DB_Synchronization_Set.cs` fetches the full case document for UPDATE events via `GET mmrds/{id}`
+**When** this story is complete
+**Then** that call is replaced with `ICaseRepository.GetCaseDocumentJsonAsync(id, dbConfig)` (or the equivalent ICaseRepository GET method from Story 17.2); `ICaseRepository` is injected via the Akka.NET actor props factory
+
+**Given** `Process_DB_Synchronization_Set.cs` uses `c_sync_document` utility for per-document transformation and writes to `de_id` and `report`
+**When** evaluated
+**Then** if `c_sync_document` itself is already using repository interfaces after Story 24.6, the dependency chain is already satisfied; if `c_sync_document` (non-PMSS variant) still has direct CouchDB calls, those calls are routed through `IDeIdentifiedRepository` and `IReportRepository` in this story following the same pattern as Story 24.6
+
+**Given** DELETE events from the `_changes` feed (case deleted from mmrds) that require DELETE from `de_id` and `report`
+**When** this story is complete
+**Then** those DELETE calls are replaced with `IDeIdentifiedRepository.DeleteDocumentAsync(id, rev, dbConfig)` and `IReportRepository.DeleteDocumentAsync(id, rev, dbConfig)` respectively; revision lookups use `GetRevisionAsync(...)` on each repository
+
+**Given** the paged `_all_docs` calls in `Process_DB_Synchronization_Set` (used for union/cleanup of deleted documents — noted as a commented code area)
+**When** evaluated per Story 24.1 catalog
+**Then** active (non-commented) `_all_docs` calls are replaced with `ICaseRepository.GetCasesPagedAsync(...)` or `IDeIdentifiedRepository`/`IReportRepository` equivalent; commented-out calls are left as comments — dead code is not refactored
+
+**Given** `TenantChangeSequenceState` sequence tracking in the actor
+**When** this story is implemented
+**Then** sequence state management remains in the actor — it is not moved to a repository; the sequence value passed to `GetCaseChangesSinceAsync` comes from the actor's state as before
+
+**Given** the build and real-time sync behavior
+**When** verified after all changes
+**Then** all three projects build with zero errors; the change-feed polling actor operates identically to pre-change
+
+**Pre-condition:** Stories 24.2 and 24.3 must be complete. Story 24.6 must be complete if the non-PMSS `c_sync_document` is used by this actor.
+
+---
+
+### Story 24.9: Route `Process_Central_Pull_list` and CDC `c_document_sync_all` Through Repository Interfaces
+
+As a developer,
+I want `Process_Central_Pull_list.cs` and the CDC populate `c_document_sync_all.cs` (in `mmria.services`) to route all their CouchDB calls through repository interfaces,
+So that the CDC data integration path — the most complex infra flow — has no direct HTTP calls and is SQL-migration-ready.
+
+**Acceptance Criteria:**
+
+**Given** `Process_Central_Pull_list.cs` is a conditional actor (`!IS_PMSS_ENHANCED` guard) that pulls case data from multiple CDC source instances, de-identifies it, and writes to the local `mmrds`, `de_id`, and `report` databases
+**When** this story is complete
+**Then** all direct `CouchDbHttpClient.ExecuteAsync` calls in `Process_Central_Pull_list.cs` are replaced with repository interface calls; the CDC source-instance iteration loop, de-identification delegation (`c_cdc_de_identifier`), and `Synchronize_Case` actor dispatch remain exactly as they are
+
+**Given** the source-instance reads in `Process_Central_Pull_list.cs` — paged `_all_docs?include_docs=true` from each source `mmrds` database
+**When** this story is complete
+**Then** each is replaced with `ICaseRepository.GetCasesPagedAsync(startKey, limit, sourceDbConfig)` where `sourceDbConfig` is the `DBConfigurationDetail` for the source instance; the multi-instance loop over `cdc_instance_pull_list` entries is unchanged
+
+**Given** the target writes in `Process_Central_Pull_list.cs`:
+- DELETE and recreate target `mmrds`, `de_id`, `report` databases at the start of each CDC pull
+- PUT design documents on target `de_id` (sortable)
+- POST Mango indexes on target `report` (opioid, powerbi)
+- Per-document writes to target `mmrds` (via `Synchronize_Case` actor dispatch — these are already abstracted by the actor)
+**When** this story is complete
+**Then** mmrds target lifecycle → `ICaseRepository` lifecycle method (add `DropAndResetAsync(DBConfigurationDetail)` to `ICaseRepository` and `CaseDAL`); de_id lifecycle → `IDeIdentifiedRepository.DropAndResetAsync(...)` and `EnsureDesignDocumentAsync(...)`; report lifecycle → `IReportRepository.DropAndResetWithSystemDocPreservationAsync(...)` and `EnsureIndexAsync(...)`
+
+**Given** adding `DropAndResetAsync` to `ICaseRepository`
+**When** evaluated
+**Then** this is a CDC-specific operation. It is added to `ICaseRepository` with a note that this method is used exclusively by the CDC populate path; in SQL migration, the implementation executes `TRUNCATE TABLE cases` scoped to the target tenant prefix; the standard Story 17.2 CRUD methods are not affected
+
+**Given** `c_document_sync_all.cs` in `mmria.services/Actors/populate-cdc-instance/` is the modern bulk-sync implementation used by the CDC populate flow
+**When** this story is complete
+**Then** its direct mmrds cursor-paged reads are replaced with `ICaseRepository.GetCasesPagedAsync(...)`; its de_id bulk writes are replaced with `IDeIdentifiedRepository.BulkUpsertAsync(...)`; its report bulk writes are replaced with `IReportRepository.BulkUpsertAsync(...)`; its design document and index operations are replaced with `IDeIdentifiedRepository.EnsureDesignDocumentAsync(...)`, `IReportRepository.EnsureDesignDocumentAsync(...)`, and `IReportRepository.EnsureIndexAsync(...)` — its metadata reads are already routed through the metadata DAL and are **not changed**
+
+**Given** the `c_cdc_de_identifier` de-identification actor used by `Process_Central_Pull_list`
+**When** evaluated
+**Then** it is evaluated for direct CouchDB calls in Story 24.1; if it has direct calls, they are routed through the appropriate repository in this story; if it has none, it is confirmed as clean and noted
+
+**Given** `Report_Opioid_Index_Struct` and other index-definition structures defined in the original `c_document_sync_all.cs` and referenced by `Process_Central_Pull_list`
+**When** Story 24.7 may relocate them
+**Then** this story resolves any reference breakage introduced by Story 24.7 — the struct definitions remain accessible to `Process_Central_Pull_list` via whatever location Story 24.7 establishes them in
+
+**Given** the IS_PMSS_ENHANCED guard on `Process_Central_Pull_list`
+**When** this story is implemented
+**Then** only the non-PMSS code path (`!IS_PMSS_ENHANCED`) is modified — the PMSS path, if it exists, is evaluated independently and noted in the catalog
+
+**Given** the sensitivity of the CDC data integration path
+**When** this story is implemented
+**Then** the developer runs the full CDC populate integration flow in the multi-tenant test environment before marking the story complete; a regression test confirming de-identification is preserved through the refactor is documented
+
+**Given** the build and CDC populate behavior
+**When** verified after all changes
+**Then** all three projects build with zero errors; the CDC pull actor operates identically to pre-change
+
+**Pre-condition:** Stories 24.2, 24.3, and 24.7 must all be complete before this story begins.
+
+---
+
+## Epic 24 — Story Sequencing
+
+| Wave | Story | Risk | Dependencies |
+|---|---|---|---|
+| 24 | 24.1 — Infra Operations Catalog | None | None — discovery only |
+| 24 | 24.2 — `IDeIdentifiedRepository` + `IReportRepository` write/lifecycle ext. | Low | 24.1 |
+| 24 | 24.3 — `ICaseRepository` paged bulk read + change stream | Low | 24.1 |
+| 24 | 24.4 — Export queue rebuild routing | Low | 24.1; Epic 23 Story 23.4 done |
+| 24 | 24.5 — `IDatabaseLifecycleService` over `c_db_setup` | Low | 24.1 |
+| 24 | 24.6 — `c_sync_document.pmss.cs` routing | Low | 24.2 |
+| 24 | 24.7 — `c_document_sync_all` variants routing | Medium | 24.2, 24.3, 24.6 |
+| 24 | 24.8 — `Process_DB_Synchronization_Set` routing | Medium | 24.2, 24.3, 24.6 |
+| 24 | 24.9 — `Process_Central_Pull_list` + CDC `c_document_sync_all` routing | High | 24.2, 24.3, 24.7 |
+
+24.2, 24.3, 24.4, and 24.5 can all proceed in parallel once 24.1 is complete.
+24.6 depends only on 24.2 and can start as soon as 24.2 is done.
+24.7 and 24.8 can proceed in parallel once 24.2, 24.3, and 24.6 are complete.
+24.9 must wait for 24.7 due to shared struct definitions and file proximity.
+
+**Final migration readiness gate:** When Epic 24 is complete, every CouchDB HTTP call in the entire mmria codebase — application, infrastructure, sync, rebuild, and lifecycle — routes through a typed repository interface. SQL migration is reduced to: swap each DAL implementation, replace `IDatabaseLifecycleService` with schema-migration tooling, and update the SQL `GetCaseChangesSinceAsync` to use SQL change-tracking instead of `_changes`. No orchestration code, no actor logic, no controller code, and no rebuild pipelines require modification during SQL migration.
 
 

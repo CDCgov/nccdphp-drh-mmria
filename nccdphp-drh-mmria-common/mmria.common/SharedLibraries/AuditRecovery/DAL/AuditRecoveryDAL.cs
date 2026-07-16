@@ -5,6 +5,7 @@ using mmria.common.couchdb;
 using mmria.common.metadata;
 using mmria.common.model.couchdb;
 using mmria.common.model.couchdb.audit;
+using mmria.common.SharedLibraries.Audit;
 using mmria.common.SharedLibraries.AuditRecovery.Model;
 using mmria.common.SharedLibraries.Case;
 using mmria.common.SharedLibraries.MetadataVersion;
@@ -14,13 +15,13 @@ namespace mmria.common.SharedLibraries.AuditRecovery.DAL;
 
 public sealed class AuditRecoveryDAL
 {
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IAuditRepository _auditRepository;
     private readonly ICaseRepository _caseRepository;
     private readonly IMetadataRepository _metadataRepository;
 
-    public AuditRecoveryDAL(mmria.common.getset.CouchDbHttpClient couchDbHttpClient, ICaseRepository caseRepository, IMetadataRepository metadataRepository)
+    public AuditRecoveryDAL(IAuditRepository auditRepository, ICaseRepository caseRepository, IMetadataRepository metadataRepository)
     {
-        _couchDbHttpClient = couchDbHttpClient;
+        _auditRepository = auditRepository;
         _caseRepository = caseRepository;
         _metadataRepository = metadataRepository;
     }
@@ -31,17 +32,9 @@ public sealed class AuditRecoveryDAL
         return JsonConvert.DeserializeObject<case_view_response>(response);
     }
 
-    public async Task<ChangeStackResult> FindChangeStacksAsync(string requestUrl, string postData, DBConfigurationDetail db_config)
-    {
-        string response = await _couchDbHttpClient.ExecuteAsync("POST", requestUrl, postData, db_config.user_name, db_config.user_value);
-        return JsonConvert.DeserializeObject<ChangeStackResult>(response);
-    }
-
     public async Task<Change_Stack> GetChangeStackAsync(string changeId, DBConfigurationDetail db_config)
     {
-        string request = $"{db_config.url}/{db_config.prefix}audit/{changeId}";
-        string response = await _couchDbHttpClient.ExecuteAsync("GET", request, null, db_config.user_name, db_config.user_value);
-        return JsonConvert.DeserializeObject<Change_Stack>(response);
+        return await _auditRepository.GetAuditEntryAsync(changeId, db_config);
     }
 
     public async Task<app> GetMetadataAsync(string metadataVersion, DBConfigurationDetail db_config)
@@ -49,28 +42,14 @@ public sealed class AuditRecoveryDAL
         return await _metadataRepository.GetAppDocumentAsync(metadataVersion, db_config);
     }
 
-    public async Task<Audit_Manage_User> GetAuditManageUserAsync(DBConfigurationDetail db_config)
+    public async Task<Audit_Manage_User?> GetAuditManageUserAsync(DBConfigurationDetail db_config)
     {
-        string request = $"{db_config.url}/{db_config.prefix}audit/audit-manage-user";
-        string response = await _couchDbHttpClient.ExecuteAsync("GET", request, null, db_config.user_name, db_config.user_value);
-        if (response.Contains("\"error\":\"not_found\""))
-        {
-            return null;
-        }
-
-        return JsonConvert.DeserializeObject<Audit_Manage_User>(response);
+        return await _auditRepository.GetAuditManageUserAsync(db_config);
     }
 
-    public async Task<document_put_response> SaveAuditManageUserAsync(Audit_Manage_User auditDocument, DBConfigurationDetail db_config)
+    public async Task SaveAuditManageUserAsync(Audit_Manage_User auditDocument, DBConfigurationDetail db_config)
     {
-        string body = JsonConvert.SerializeObject(auditDocument, new JsonSerializerSettings
-        {
-            NullValueHandling = NullValueHandling.Ignore
-        });
-
-        string request = $"{db_config.url}/{db_config.prefix}audit/{auditDocument._id}";
-        string response = await _couchDbHttpClient.ExecuteAsync("PUT", request, body, db_config.user_name, db_config.user_value);
-        return JsonConvert.DeserializeObject<document_put_response>(response);
+        await _auditRepository.SaveAuditManageUserAsync(auditDocument, db_config);
     }
 
     public async Task<ExpandoObject> GetCaseRevisionAsync(string caseId, string revisionId, DBConfigurationDetail db_config)

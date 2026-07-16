@@ -10,6 +10,7 @@ using mmria.common.model.couchdb.audit;
 using mmria.common.SharedLibraries.ManageUsers.Model;
 using mmria.common.SharedLibraries.Jurisdiction;
 using System.Text.Json.Serialization;
+using mmria.common.SharedLibraries.Audit;
 
 namespace mmria.common.SharedLibraries.ManageUsers.DAL;
 
@@ -28,15 +29,18 @@ public class ManageUsersDAL
     private readonly CouchDbHttpClient _httpClient;
     private readonly mmria.common.SharedLibraries.Account.IUserRepository _userRepository;
     private readonly IJurisdictionRepository _jurisdictionRepository;
+    private readonly IAuditRepository _auditRepository;
 
     public ManageUsersDAL(
         CouchDbHttpClient httpClient,
         mmria.common.SharedLibraries.Account.IUserRepository userRepository,
-        IJurisdictionRepository jurisdictionRepository)
+        IJurisdictionRepository jurisdictionRepository,
+        IAuditRepository auditRepository)
     {
         _httpClient = httpClient;
         _userRepository = userRepository;
         _jurisdictionRepository = jurisdictionRepository;
+        _auditRepository = auditRepository;
     }
 
     /// <summary>
@@ -154,17 +158,9 @@ public class ManageUsersDAL
         return _jurisdictionRepository.GetJurisdictionTreeAsync(db_config);
     }
 
-    public async Task<Audit_Manage_User> GetAuditManageUserAsync(DBConfigurationDetail db_config)
+    public Task<Audit_Manage_User?> GetAuditManageUserAsync(DBConfigurationDetail db_config)
     {
-        string request_string = $"{db_config.url}/{db_config.prefix}audit/audit-manage-user";
-        string responseFromServer = await _httpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
-
-        if (!string.IsNullOrWhiteSpace(responseFromServer) && responseFromServer.Contains("\"error\":\"not_found\""))
-        {
-            return null;
-        }
-
-        return JsonConvert.DeserializeObject<Audit_Manage_User>(responseFromServer);
+        return _auditRepository.GetAuditManageUserAsync(db_config);
     }
 
     public Task<FormAccessSpecification> GetFormAccessAsync(DBConfigurationDetail db_config)

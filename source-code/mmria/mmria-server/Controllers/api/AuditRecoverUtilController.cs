@@ -33,28 +33,6 @@ public sealed class AuditRecoverUtilController: ControllerBase
         _tenantCatalog = tenantCatalog;
     }
 
-    (string url, string post) get_find_url
-    (
-        mmria.common.couchdb.DBConfigurationDetail configuration,
-        string p_id
-    )
-    {
-        var selector_struc = new Selector_Struc();
-        selector_struc.selector = new System.Collections.Generic.Dictionary<string,System.Collections.Generic.Dictionary<string,string>>(StringComparer.OrdinalIgnoreCase);
-        // Hard cap audit history fetch (was 1_000_000). See _auditController.get_find_url.
-        selector_struc.limit = 10_000;
-        selector_struc.selector.Add("case_id", new System.Collections.Generic.Dictionary<string,string>(StringComparer.OrdinalIgnoreCase));
-        selector_struc.selector["case_id"].Add("$eq", p_id);
-        selector_struc.use_index = "case-id-date-last-updated-index";
-
-        string selector_struc_string = Newtonsoft.Json.JsonConvert.SerializeObject(selector_struc, new JsonSerializerSettings{
-            NullValueHandling = NullValueHandling.Ignore
-        });
-
-        string result = $"{configuration.url}/{configuration.prefix}audit/_find";
-        return (result, selector_struc_string);
-    }
-
     [Authorize(Roles  = "installation_admin")]
     [HttpGet]
     public async Task<Audit_View> Get
@@ -385,17 +363,6 @@ public sealed class AuditRecoverUtilController: ControllerBase
         return result;
     }
 
-
-    struct Selector_Struc
-    {
-        //public System.Dynamic.ExpandoObject selector;
-        public System.Collections.Generic.Dictionary<string,System.Collections.Generic.Dictionary<string,string>> selector;
-        public string[] fields;
-
-        public string use_index;
-
-        public int limit;
-    }
 
     public sealed class Audit_Detail_View
     {

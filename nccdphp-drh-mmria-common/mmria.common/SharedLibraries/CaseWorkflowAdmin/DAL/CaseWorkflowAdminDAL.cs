@@ -3,19 +3,20 @@ using mmria.common.couchdb;
 using mmria.common.getset;
 using mmria.common.model.couchdb;
 using mmria.common.model.couchdb.audit;
+using mmria.common.SharedLibraries.Audit;
 using mmria.common.SharedLibraries.Case;
 
 namespace mmria.common.SharedLibraries.CaseWorkflowAdmin.DAL;
 
 public sealed class CaseWorkflowAdminDAL
 {
-    private readonly CouchDbHttpClient _couchDbHttpClient;
     private readonly ICaseRepository _caseRepository;
+    private readonly IAuditRepository _auditRepository;
 
-    public CaseWorkflowAdminDAL(CouchDbHttpClient couchDbHttpClient, ICaseRepository caseRepository)
+    public CaseWorkflowAdminDAL(ICaseRepository caseRepository, IAuditRepository auditRepository)
     {
-        _couchDbHttpClient = couchDbHttpClient;
         _caseRepository = caseRepository;
+        _auditRepository = auditRepository;
     }
 
     // ── clear_case_status: FindRecord ────────────────────────────────────
@@ -44,29 +45,21 @@ public sealed class CaseWorkflowAdminDAL
 
     public async Task WriteAuditEntryAsync(DBConfigurationDetail dbConfig, Change_Stack auditEntry)
     {
-        var settings = new Newtonsoft.Json.JsonSerializerSettings { NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore };
-        var json = Newtonsoft.Json.JsonConvert.SerializeObject(auditEntry, settings);
-        var url = dbConfig.Get_Prefix_DB_Url($"audit/{auditEntry._id}");
-        await _couchDbHttpClient.ExecuteAsync("PUT", url, json, dbConfig.user_name, dbConfig.user_value);
+        await _auditRepository.WriteAuditEntryAsync(auditEntry, dbConfig);
     }
 
     // ── recover_deleted_case: FindRecord ─────────────────────────────────
 
     public async Task<get_sortable_view_reponse_header<Audit_Detail_View>> GetDeletedCasesViewAsync(DBConfigurationDetail dbConfig)
     {
-        var url = dbConfig.Get_Prefix_DB_Url("audit/_design/sortable/_view/by_deleted?skip=0&limit=25000&descending=true");
-        var response = await _couchDbHttpClient.ExecuteAsync("GET", url, null, dbConfig.user_name, dbConfig.user_value);
-        return Newtonsoft.Json.JsonConvert.DeserializeObject<get_sortable_view_reponse_header<Audit_Detail_View>>(response)
-            ?? new get_sortable_view_reponse_header<Audit_Detail_View>();
+        return await _auditRepository.GetDeletedCasesViewAsync(dbConfig);
     }
 
     // ── recover_deleted_case: UpdateDeletedCase ───────────────────────────
 
     public async Task<Change_Stack> GetAuditDocumentAsync(DBConfigurationDetail dbConfig, string auditId)
     {
-        var url = dbConfig.Get_Prefix_DB_Url($"audit/{auditId}");
-        var response = await _couchDbHttpClient.ExecuteAsync("GET", url, null, dbConfig.user_name, dbConfig.user_value);
-        return Newtonsoft.Json.JsonConvert.DeserializeObject<Change_Stack>(response);
+        return await _auditRepository.GetAuditEntryAsync(auditId, dbConfig);
     }
 
     public async Task<string> GetCaseRevisionsRawAsync(DBConfigurationDetail dbConfig, string caseId)
@@ -89,8 +82,7 @@ public sealed class CaseWorkflowAdminDAL
 
     public async Task DeleteAuditDocumentAsync(DBConfigurationDetail dbConfig, string auditId, string rev)
     {
-        var url = dbConfig.Get_Prefix_DB_Url($"audit/{auditId}?rev={rev}");
-        await _couchDbHttpClient.ExecuteAsync("DELETE", url, null, dbConfig.user_name, dbConfig.user_value);
+        await _auditRepository.DeleteAuditEntryAsync(auditId, rev, dbConfig);
     }
 }
 
