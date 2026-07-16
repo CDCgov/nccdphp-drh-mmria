@@ -16,6 +16,7 @@ using Akka.Actor;
 using  mmria.server.extension;
 using mmria.common.SharedLibraries.Account.Manager;
 using mmria.common.SharedLibraries.Account.Model;
+using mmria.common.SharedLibraries.Session;
 using mmria.common.SharedLibraries.Session.Model;
 using mmria.common.SharedLibraries.Session.Manager;
 using mmria.common.SharedLibraries.SystemOffline.Manager;
@@ -34,6 +35,7 @@ public sealed partial class AccountController : Controller
 
     IHttpContextAccessor _accessor;
     mmria.common.SharedLibraries.Session.Manager.SessionManager _sessionManager;
+    private readonly ISessionRepository _sessionRepository;
 
     mmria.common.couchdb.OverridableConfiguration _configuration;
     mmria.common.couchdb.DBConfigurationDetail db_config;
@@ -48,6 +50,7 @@ public AccountController
 (
     IHttpContextAccessor httpContextAccessor, 
     mmria.common.SharedLibraries.Session.Manager.SessionManager sessionManager,
+    ISessionRepository sessionRepository,
     mmria.server.util.RequestTenantRuntime tenantRuntime,
     mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
     AccountManager accountManager,
@@ -56,6 +59,7 @@ public AccountController
 {
     _accessor = httpContextAccessor;
     _sessionManager = sessionManager;
+    _sessionRepository = sessionRepository;
     _configuration = tenantRuntime.RequireConfiguration();
     db_config = tenantRuntime.RequireDbConfig();
     _couchDbHttpClient = couchDbHttpClient;
@@ -343,19 +347,10 @@ public AccountController
             Session_MessageDTO session_message = null;
             try
             {
-                string request_string = $"{config_couchdb_url}/{config_db_prefix}session/{Request.Cookies["sid"]}";
-                System.Console.WriteLine($"Connection Refused on method: Get url: {request_string}");
-            
-                
-                var responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                    "GET",
-                    request_string,
-                    null,
-                    config_timer_user_name,
-                    config_timer_password
-                );
+                var sessionId = Request.Cookies["sid"];
+                var rawJson = await _sessionRepository.GetSessionDocumentRawAsync(sessionId, db_config);
 
-                session_message = Newtonsoft.Json.JsonConvert.DeserializeObject<Session_MessageDTO>(responseFromServer);
+                session_message = Newtonsoft.Json.JsonConvert.DeserializeObject<Session_MessageDTO>(rawJson);
 
             }
             catch(System.Exception ex)
@@ -499,18 +494,7 @@ public AccountController
                     u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
 
                 
-                var session_event_request_url = db_config.Get_Prefix_DB_Url($"session/_design/session_event_sortable/_view/by_user_id?startkey=\"{userName}\"&endkey=\"{userName}\"");
-
-                string response_from_server = await _couchDbHttpClient.ExecuteAsync(
-                    "GET",
-                    session_event_request_url,
-                    null,
-                    db_config.user_name,
-                    db_config.user_value
-                );
-
-                //var session_event_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_object_key_header<mmria.common.model.couchdb.session_event>>(response_from_server);
-                var session_event_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.session_event>>(response_from_server);
+                var session_event_response = await _sessionRepository.GetSessionEventsByUserIdAsync(userName, db_config);
 
                 DateTime first_item_date = DateTime.Now;
                 DateTime last_item_date = DateTime.Now;

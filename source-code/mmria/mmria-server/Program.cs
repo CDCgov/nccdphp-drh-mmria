@@ -405,6 +405,7 @@ public sealed partial class Program
             builder.Services.AddScoped<mmria.common.SharedLibraries.Case.ICaseRepository, mmria.common.SharedLibraries.Case.DAL.CaseDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.Case.DAL.CaseDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.Session.DAL.SessionDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.Session.ISessionRepository, mmria.common.SharedLibraries.Session.DAL.SessionDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.OfflineCase.Manager.IOfflineCaseManager, mmria.common.SharedLibraries.OfflineCase.Manager.OfflineCaseManager>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.Case.Manager.CaseManager>();
             

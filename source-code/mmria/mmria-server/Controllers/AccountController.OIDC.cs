@@ -31,6 +31,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Akka.Actor;
 using mmria.common.SharedLibraries.Session.Model;
 using mmria.common.SharedLibraries.Session.Manager;
+using mmria.common.SharedLibraries.Session;
 
 using mmria.server.Controllers;
 
@@ -78,11 +79,13 @@ public sealed partial class AccountController : Controller
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly mmria.common.SharedLibraries.Account.IUserRepository _userRepository;
+    private readonly ISessionRepository _sessionRepository;
 
     public AccountController
     (
         IHttpContextAccessor httpContextAccessor,
         mmria.common.SharedLibraries.Session.Manager.SessionManager sessionManager,
+        ISessionRepository sessionRepository,
         mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
         mmria.common.SharedLibraries.Account.IUserRepository userRepository
@@ -90,6 +93,7 @@ public sealed partial class AccountController : Controller
     {
         _accessor = httpContextAccessor;
         _sessionManager = sessionManager;
+        _sessionRepository = sessionRepository;
         configuration = tenantRuntime.RequireConfiguration();
         db_config = tenantRuntime.RequireDbConfig();
         _couchDbHttpClient = couchDbHttpClient;
@@ -398,17 +402,9 @@ public sealed partial class AccountController : Controller
             settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
             var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(Session_Message, settings);
 
-            string request_string = config_couchdb_url + $"/{db_config.prefix}session/{Session_Message._id}";
             try
             {
-                string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                    "PUT",
-                    request_string,
-                    object_string,
-                    config_timer_user_name,
-                    config_timer_value
-                );
-                var result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
+                var result = await _sessionRepository.SaveSessionRawAsync(Session_Message._id, object_string, db_config);
 
                 if(result.ok)
                 {

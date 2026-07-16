@@ -13,6 +13,7 @@ using Newtonsoft.Json;
 using mmria.common.getset;
 using mmria.common.couchdb;
 using mmria.common.model.couchdb;
+using mmria.common.SharedLibraries.Session;
 
 namespace mmria.common.SharedLibraries.Account.DAL;
 
@@ -29,10 +30,12 @@ public class AccountDAL : mmria.common.SharedLibraries.Account.IUserRepository
     };
 
     private readonly CouchDbHttpClient _httpClient;
+    private readonly ISessionRepository _sessionRepository;
 
-    public AccountDAL(CouchDbHttpClient httpClient)
+    public AccountDAL(CouchDbHttpClient httpClient, ISessionRepository sessionRepository)
     {
         _httpClient = httpClient;
+        _sessionRepository = sessionRepository;
     }
 
     /// <summary>
@@ -319,18 +322,7 @@ public class AccountDAL : mmria.common.SharedLibraries.Account.IUserRepository
     {
         try
         {
-            var url = dbConfig.Get_Prefix_DB_Url(
-                $"session/_design/session_event_sortable/_view/by_user_id?startkey=\"{userName}\"&endkey=\"{userName}\"");
-
-            var response = await _httpClient.ExecuteAsync(
-                "GET",
-                url,
-                null,
-                dbConfig.user_name,
-                dbConfig.user_value);
-
-            var viewResponse = JsonConvert.DeserializeObject<
-                get_sortable_view_reponse_header<session_event>>(response);
+            var viewResponse = await _sessionRepository.GetSessionEventsByUserIdAsync(userName, dbConfig);
 
             if (viewResponse?.rows != null)
             {
@@ -370,18 +362,8 @@ public class AccountDAL : mmria.common.SharedLibraries.Account.IUserRepository
                 ip = ipAddress
             };
 
-            var json = JsonConvert.SerializeObject(sessionEvent);
-            var url = dbConfig.Get_Prefix_DB_Url($"session/{sessionEventId}");
-
-            var response = await _httpClient.ExecuteAsync(
-                "PUT",
-                url,
-                json,
-                dbConfig.user_name,
-                dbConfig.user_value);
-
-            var result = JsonConvert.DeserializeObject<document_put_response>(response);
-            return result?.ok ?? false;
+            await _sessionRepository.SaveSessionEventAsync(sessionEvent, dbConfig);
+            return true;
         }
         catch (Exception ex)
         {
@@ -400,17 +382,7 @@ public class AccountDAL : mmria.common.SharedLibraries.Account.IUserRepository
     {
         try
         {
-            var url = dbConfig.Get_Prefix_DB_Url($"session/{sessionId}");
-
-            var response = await _httpClient.ExecuteAsync(
-                "PUT",
-                url,
-                sessionJson,
-                dbConfig.user_name,
-                dbConfig.user_value);
-
-            var result = JsonConvert.DeserializeObject<document_put_response>(response);
-            return result;
+            return await _sessionRepository.SaveSessionRawAsync(sessionId, sessionJson, dbConfig);
         }
         catch (Exception ex)
         {
@@ -428,16 +400,7 @@ public class AccountDAL : mmria.common.SharedLibraries.Account.IUserRepository
     {
         try
         {
-            var url = dbConfig.Get_Prefix_DB_Url($"session/{sessionId}");
-
-            var response = await _httpClient.ExecuteAsync(
-                "GET",
-                url,
-                null,
-                dbConfig.user_name,
-                dbConfig.user_value);
-
-            return response;
+            return await _sessionRepository.GetSessionDocumentRawAsync(sessionId, dbConfig);
         }
         catch (Exception ex)
         {
