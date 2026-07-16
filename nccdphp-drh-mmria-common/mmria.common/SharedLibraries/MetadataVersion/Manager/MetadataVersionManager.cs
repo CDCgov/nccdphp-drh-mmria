@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Dynamic;
 using System.Linq;
@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using mmria.common.couchdb;
 using mmria.common.metadata;
 using mmria.common.model.couchdb;
-using mmria.common.SharedLibraries.MetadataVersion.DAL;
 using Newtonsoft.Json;
 
 namespace mmria.common.SharedLibraries.MetadataVersion.Manager;
@@ -17,84 +16,42 @@ public sealed class MetadataVersionManager
     private const string DeIdentifiedListId = "de-identified-list";
     private const string DefaultUiSpecificationId = "default-ui-specification";
     private const string DefaultVersionSpecificationId = "default_version_specification";
-    private const string CheckCodeAttachmentName = "mmria-check-code.js";
-    private const string ValidatorAttachmentName = "validator.js";
 
-    private readonly MetadataVersionDAL _dal;
+    private readonly IMetadataRepository _dal;
 
-    public MetadataVersionManager(MetadataVersionDAL dal)
+    public MetadataVersionManager(IMetadataRepository dal)
     {
         _dal = dal;
     }
 
     public async Task<ExpandoObject> GetMetadataAsync(DBConfigurationDetail db_config)
     {
-        return await _dal.GetExpandoDocumentAsync(
-            $"{db_config.url}/metadata/{DefaultMetadataId}",
-            null,
-            null);
+        return await _dal.GetDefaultMetadataDocumentAsync(db_config);
     }
 
     public async Task<ExpandoObject> GetMetadataAsync(string id, DBConfigurationDetail db_config)
     {
-        return await _dal.GetExpandoDocumentAsync(
-            $"{db_config.url}/metadata/{id}",
-            null,
-            null);
+        return await _dal.GetMetadataDocumentByIdAsync(id, db_config);
     }
 
     public async Task<mmria.common.metadata.app> GetAppMetadataAsync(string id, DBConfigurationDetail db_config)
     {
-        return await _dal.GetDocumentAsync<mmria.common.metadata.app>(
-            $"{db_config.url}/metadata/version_specification-{id}/metadata",
-            null,
-            null);
+        return await _dal.GetAppDocumentAsync(id, db_config);
     }
 
     public async Task<document_put_response> SaveMetadataAsync(app metadata, DBConfigurationDetail db_config)
     {
-        string object_string = JsonConvert.SerializeObject(metadata, CreateSerializerSettings());
-        return await _dal.PutJsonAsync($"{db_config.url}/metadata/{metadata._id}", object_string, db_config.user_name, db_config.user_value);
+        return await _dal.SaveMetadataDocumentAsync(metadata, db_config);
     }
 
     public async Task<string> GetCheckCodeAsync(DBConfigurationDetail db_config)
     {
-        return await _dal.GetStringAsync(
-            $"{db_config.url}/metadata/{DefaultMetadataId}/{CheckCodeAttachmentName}",
-            null,
-            null);
+        return await _dal.GetCheckCodeAttachmentAsync(db_config);
     }
 
     public async Task<document_put_response> SaveCheckCodeAsync(string check_code_json, DBConfigurationDetail db_config)
     {
-        string revision = null;
-        try
-        {
-            revision = await _dal.GetRevisionAsync($"{db_config.url}/metadata/{DefaultMetadataId}", db_config.user_name, db_config.user_value);
-        }
-        catch (Exception ex)
-        {
-            if (!(ex.Message.IndexOf("(404) Object Not Found") > -1))
-            {
-                throw;
-            }
-        }
-
-        mmria.common.getset.CouchDbRequestOptions requestOptions = null;
-        if (!string.IsNullOrWhiteSpace(revision))
-        {
-            requestOptions = new mmria.common.getset.CouchDbRequestOptions
-            {
-                IfMatch = revision
-            };
-        }
-
-        return await _dal.PutTextAsync(
-            $"{db_config.url}/metadata/{DefaultMetadataId}/{CheckCodeAttachmentName}",
-            check_code_json,
-            db_config.user_name,
-            db_config.user_value,
-            requestOptions);
+        return await _dal.SaveCheckCodeAttachmentAsync(check_code_json, db_config);
     }
 
     public async Task<document_put_response> SaveMetadataVersionSpecificationAsync(Version_Specification versionSpecification, DBConfigurationDetail db_config)
@@ -105,16 +62,12 @@ public sealed class MetadataVersionManager
         }
 
         string json_string = JsonConvert.SerializeObject(versionSpecification, CreateSerializerSettings());
-        return await _dal.PutJsonAsync($"{db_config.url}/metadata/{versionSpecification._id}", json_string, db_config.user_name, db_config.user_value);
+        return await _dal.SaveVersionSpecificationDocumentAsync(versionSpecification._id, json_string, db_config);
     }
 
     public async Task<List<Version_Specification>> ListVersionSpecificationsAsync(DBConfigurationDetail db_config)
     {
-        var response = await _dal.GetAllDocsAsync<Version_Specification>(
-            $"{db_config.url}/metadata/_all_docs?include_docs=true",
-            db_config.user_name,
-            db_config.user_value,
-            CreateSerializerSettings());
+        var response = await _dal.GetAllVersionSpecificationHeadersAsync(db_config);
 
         var result = new List<Version_Specification>();
         foreach (var row in response.rows)
@@ -139,26 +92,17 @@ public sealed class MetadataVersionManager
 
     public async Task<Version_Specification> GetVersionSpecificationMetadataAsync(string version_specification_id, DBConfigurationDetail db_config)
     {
-        return await _dal.GetDocumentAsync<Version_Specification>(
-            $"{db_config.url}/metadata/version_specification-{version_specification_id}",
-            db_config.user_name,
-            db_config.user_value);
+        return await _dal.GetVersionSpecificationEnvelopeAsync(version_specification_id, db_config);
     }
 
     public async Task<string> GetValidatorAsync(DBConfigurationDetail db_config)
     {
-        return await _dal.GetStringAsync(
-            $"{db_config.url}/metadata/{DefaultMetadataId}/{ValidatorAttachmentName}",
-            null,
-            null);
+        return await _dal.GetValidatorAttachmentAsync(db_config);
     }
 
     public async Task<string> GetVersionDocumentAsync(string version_specification_id, string document_name, DBConfigurationDetail db_config)
     {
-        return await _dal.GetStringAsync(
-            $"{db_config.url}/metadata/version_specification-{version_specification_id}/{document_name}",
-            null,
-            null);
+        return await _dal.GetVersionDocumentAttachmentAsync(version_specification_id, document_name, db_config);
     }
 
     public async Task<document_put_response> SaveVersionSpecificationAsync(Version_Specification versionSpecification, DBConfigurationDetail db_config)
@@ -170,10 +114,7 @@ public sealed class MetadataVersionManager
         {
             try
             {
-                var check_result = await _dal.GetDocumentAsync<Version_Specification>(
-                    $"{db_config.url}/metadata/{id_val}",
-                    db_config.user_name,
-                    db_config.user_value);
+                var check_result = await _dal.GetVersionSpecificationByRawIdAsync(id_val, db_config);
 
                 if
                 (
@@ -207,7 +148,7 @@ public sealed class MetadataVersionManager
             NullValueHandling = NullValueHandling.Ignore
         });
 
-        return await _dal.PutJsonAsync($"{db_config.url}/metadata/{id_val}", object_string, db_config.user_name, db_config.user_value);
+        return await _dal.SaveVersionSpecificationDocumentAsync(id_val, object_string, db_config);
     }
 
     public async Task<document_put_response> SaveVersionAttachmentAsync(Add_Attachement add_attachement, DBConfigurationDetail db_config, bool requireEditableVersion)
@@ -228,10 +169,7 @@ public sealed class MetadataVersionManager
 
             try
             {
-                var check_result = await _dal.GetDocumentAsync<Version_Specification>(
-                    $"{db_config.url}/metadata/{add_attachement._id}",
-                    db_config.user_name,
-                    db_config.user_value);
+                var check_result = await _dal.GetVersionSpecificationByRawIdAsync(add_attachement._id, db_config);
 
                 if
                 (
@@ -260,24 +198,17 @@ public sealed class MetadataVersionManager
             }
         }
 
-        return await _dal.PutTextAsync(
-            $"{db_config.url}/metadata/{add_attachement._id}/{add_attachement.doc_name}",
+        return await _dal.SaveVersionDocumentAttachmentAsync(
+            add_attachement._id,
+            add_attachement.doc_name,
             add_attachement.document_content,
-            db_config.user_name,
-            db_config.user_value,
-            new mmria.common.getset.CouchDbRequestOptions
-            {
-                IfMatch = add_attachement._rev
-            });
+            add_attachement._rev,
+            db_config);
     }
 
     public async Task<List<UI_Specification>> ListUiSpecificationsAsync(DBConfigurationDetail db_config)
     {
-        var response = await _dal.GetAllDocsAsync<UI_Specification>(
-            $"{db_config.url}/metadata/_all_docs?include_docs=true",
-            db_config.user_name,
-            db_config.user_value,
-            CreateSerializerSettings());
+        var response = await _dal.GetAllUiSpecificationHeadersAsync(db_config);
 
         var result = new List<UI_Specification>();
         foreach (var row in response.rows)
@@ -302,11 +233,7 @@ public sealed class MetadataVersionManager
 
     public async Task<UI_Specification> GetUiSpecificationAsync(string id, DBConfigurationDetail db_config)
     {
-        return await _dal.GetDocumentAsync<UI_Specification>(
-            $"{db_config.url}/metadata/{id}",
-            db_config.user_name,
-            db_config.user_value,
-            CreateSerializerSettings());
+        return await _dal.GetUiSpecificationByIdAsync(id, db_config);
     }
 
     public async Task<document_put_response> SaveUiSpecificationAsync(UI_Specification ui_specification, DBConfigurationDetail db_config)
@@ -317,7 +244,7 @@ public sealed class MetadataVersionManager
         }
 
         string ui_specification_json = JsonConvert.SerializeObject(ui_specification, CreateSerializerSettings());
-        return await _dal.PutJsonAsync($"{db_config.url}/metadata/{ui_specification._id}", ui_specification_json, db_config.user_name, db_config.user_value);
+        return await _dal.SaveUiSpecificationDocumentAsync(ui_specification._id, ui_specification_json, db_config);
     }
 
     public async Task<ExpandoObject> DeleteUiSpecificationAsync(string id, string rev, DBConfigurationDetail db_config)
@@ -334,39 +261,12 @@ public sealed class MetadataVersionManager
             return null;
         }
 
-        return await _dal.DeleteDocumentAsync($"{db_config.url}/metadata/{id}?rev={rev}", db_config.user_name, db_config.user_value);
+        return await _dal.DeleteMetadataDocumentAsync(id, rev, db_config);
     }
 
     public async Task<document_put_response> SaveValidatorAsync(string validator_js_text, DBConfigurationDetail db_config)
     {
-        string revision = null;
-        try
-        {
-            revision = await _dal.GetRevisionAsync($"{db_config.url}/metadata/{DefaultMetadataId}", db_config.user_name, db_config.user_value);
-        }
-        catch (Exception ex)
-        {
-            if (!(ex.Message.IndexOf("(404) Object Not Found") > -1))
-            {
-                throw;
-            }
-        }
-
-        mmria.common.getset.CouchDbRequestOptions requestOptions = null;
-        if (!string.IsNullOrWhiteSpace(revision))
-        {
-            requestOptions = new mmria.common.getset.CouchDbRequestOptions
-            {
-                IfMatch = revision
-            };
-        }
-
-        return await _dal.PutTextAsync(
-            $"{db_config.url}/metadata/{DefaultMetadataId}/{ValidatorAttachmentName}",
-            validator_js_text,
-            db_config.user_name,
-            db_config.user_value,
-            requestOptions);
+        return await _dal.SaveValidatorAttachmentAsync(validator_js_text, db_config);
     }
 
     private static JsonSerializerSettings CreateSerializerSettings()

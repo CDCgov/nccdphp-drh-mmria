@@ -185,7 +185,7 @@ development_status:
   # ── Epic 20: metadata Consolidation ───────────────────────────────────────
   epic-20: in-progress
   20-1-metadata-operation-catalog: ready-for-dev
-  20-2-imetadata-repository-metadataversiondal: ready-for-dev
+  20-2-imetadata-repository-metadataversiondal: done
   20-3-sharedlibraries-dal-metadata-calls: ready-for-dev
   20-4-controller-metadata-calls: ready-for-dev
   20-5-mmria-services-metadata-reads: ready-for-dev

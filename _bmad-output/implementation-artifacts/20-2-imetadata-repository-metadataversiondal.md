@@ -2,7 +2,7 @@
 
 **Epic:** 20 — `metadata` Consolidation (SQL Migration Foundation)
 **Story ID:** 20.2
-**Status:** ready-for-dev
+**Status:** done
 **Date added:** 2026-07-15
 **Depends on:** 20.1
 **Source requirements:** epics.md §Epic 20 Story 20.2; project-context.md §2.2

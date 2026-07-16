@@ -627,7 +627,7 @@ dev this story _bmad-output/implementation-artifacts/19-4-route-out-of-dal-juris
 | Story | File | Status |
 |-------|------|--------|
 | 20.1 — `metadata` Operation Catalog | [20-1-metadata-operation-catalog.md](20-1-metadata-operation-catalog.md) | done |
-| 20.2 — Define `IMetadataRepository` and Canonicalize `MetadataVersionDAL` | [20-2-imetadata-repository-metadataversiondal.md](20-2-imetadata-repository-metadataversiondal.md) | ready-for-dev |
+| 20.2 — Define `IMetadataRepository` and Canonicalize `MetadataVersionDAL` | [20-2-imetadata-repository-metadataversiondal.md](20-2-imetadata-repository-metadataversiondal.md) | done |
 | 20.3 — Route SharedLibraries DAL Files Through `IMetadataRepository` | [20-3-sharedlibraries-dal-metadata-calls.md](20-3-sharedlibraries-dal-metadata-calls.md) | ready-for-dev |
 | 20.4 — Route Controller Direct `metadata` Calls Through `IMetadataRepository` | [20-4-controller-metadata-calls.md](20-4-controller-metadata-calls.md) | ready-for-dev |
 | 20.5 — Route `mmria.services` Read-Only `metadata` Calls Through `IMetadataRepository` | [20-5-mmria-services-metadata-reads.md](20-5-mmria-services-metadata-reads.md) | ready-for-dev |
