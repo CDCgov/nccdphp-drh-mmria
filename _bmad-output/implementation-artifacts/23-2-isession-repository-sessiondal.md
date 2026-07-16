@@ -89,3 +89,36 @@ Then `mmria-server`, `mmria.common`, and `mmria.services` all build with zero er
 ## Sequencing
 
 Depends on 23.1. Can proceed in parallel with 23.3, 23.4, 23.5, 23.6, 23.8.
+
+---
+
+## Dev Agent Record
+
+**Completed:** 2026-07-16  
+**Build result:** mmria.common — 0 errors, mmria-server — 0 errors
+
+**Completion Notes:**
+- Created `ISessionRepository` with all `SessionDAL` method signatures plus two additional methods: `GetSessionDocumentRawAsync` (raw JSON GET, preserves `role_list` for Logout) and `DeleteSessionAsync`.
+- `SessionDAL` implements `ISessionRepository` throughout with Pattern B URLs.
+- `SessionManager` constructor changed from `SessionDAL` to `ISessionRepository`; Pattern A `request_string` leaks in `PostSessionAsync` and `PostSessionDocumentAsync` removed.
+- `AccountDAL` now injects `ISessionRepository`; all 4 cross-feature session calls delegate to the repository.
+- `AccountController.cs` injects `ISessionRepository`; Logout GET fixed (Pattern A → `GetSessionDocumentRawAsync`); Profile session-events view fixed (Pattern B → `GetSessionEventsByUserIdAsync`).
+- `AccountController.OIDC.cs` injects `ISessionRepository`; OIDC login session PUT fixed (Pattern A → `SaveSessionRawAsync`).
+- `Post_Session_Actor` constructor changed to `ISessionRepository`; GET and PUT routed through repository.
+- `Record_Session_Event` constructor changed to `ISessionRepository`; session-event PUT routed through `SaveSessionEventAsync`.
+- `SessionSummary` constructor updated with `ISessionRepository`; `GetSessionCount` uses `GetSessionByDateCreatedViewAsync`.
+- `sessionSummaryController` injects `ISessionRepository` and passes to `SessionSummary`.
+- `Program.cs`: Added `services.AddScoped<ISessionRepository, SessionDAL>()`.
+
+**Changed Files:**
+- `mmria.common/SharedLibraries/Session/ISessionRepository.cs` — CREATED
+- `mmria.common/SharedLibraries/Session/DAL/SessionDAL.cs` — UPDATED
+- `mmria.common/SharedLibraries/Session/Manager/SessionManager.cs` — UPDATED
+- `mmria.common/SharedLibraries/Account/DAL/AccountDAL.cs` — UPDATED
+- `mmria-server/Controllers/AccountController.cs` — UPDATED
+- `mmria-server/Controllers/AccountController.OIDC.cs` — UPDATED
+- `mmria-server/model/actor/Post_Session_Actor.cs` — UPDATED
+- `mmria-server/model/actor/Record_Session_Event.cs` — UPDATED
+- `mmria-server/util/SessionSummary.cs` — UPDATED
+- `mmria-server/Controllers/sessionSummaryController.cs` — UPDATED
+- `mmria-server/Program.cs` — UPDATED
