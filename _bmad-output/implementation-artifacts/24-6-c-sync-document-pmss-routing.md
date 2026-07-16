@@ -1,4 +1,91 @@
-# Story 24.6 — Route `c_sync_document.pmss.cs` Through Repository Interfaces
+# Story 24.6 — Route `c_sync_document` Variants Through Repository Interfaces
+
+**Epic:** 24 — Infrastructure Sync and Database Lifecycle Consolidation (SQL Migration Foundation)
+**Story ID:** 24.6
+**Status:** not-started
+**Date added:** 2026-07-16
+**Depends on:** 24.2
+**Source requirements:** epics.md §Epic 24 Story 24.6; project-context.md §2.2
+
+---
+
+## User Story
+
+As a developer,
+I want all `c_sync_document` variants to route their `de_id` and `report` writes through repository interfaces,
+So that these leaf-level per-document sync utilities have no direct CouchDB calls — establishing the foundation that Stories 24.7, 24.8, and 24.9 build on.
+
+---
+
+## Files in Scope
+
+Four `c_sync_document` variants all perform the same logical operation (per-document de-identify-and-write to de_id + report) but live in different projects:
+
+| File | Project | Used by |
+|---|---|---|
+| `mmria-server/util/c_sync_document.pmss.cs` | mmria-server | `c_document_sync_all.pmss.cs`, `Process_DB_Synchronization_Set.cs` (PMSS path) |
+| `mmria-server/util/c_sync_document.cs` | mmria-server | `c_document_sync_all.cs`, `Process_DB_Synchronization_Set.cs` (non-PMSS path) |
+| `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_sync_document.cs` | mmria.common | Common library rebuild manager (`c_document_sync_all_legacy.cs` in common) |
+| `mmria.services/Actors/populate-cdc-instance/c_sync_document.cs` | mmria.services | CDC populate path |
+
+---
+
+## Acceptance Criteria
+
+**AC-1 — All `de_id` calls replaced with `IDeIdentifiedRepository` across all four variants**
+Given each `c_sync_document` variant fetches existing document revisions from de_id before writes and then PUTs or DELETEs the de-identified document
+When this story is complete
+Then in each variant:
+- Revision fetch → `IDeIdentifiedRepository.GetRevisionAsync(id, dbConfig)`
+- Write → `IDeIdentifiedRepository.UpsertDocumentAsync(id, doc, dbConfig)`
+- Delete → `IDeIdentifiedRepository.DeleteDocumentAsync(id, rev, dbConfig)`
+`IDeIdentifiedRepository` is injected via constructor parameters in all four variants
+
+**AC-2 — All `report` calls replaced with `IReportRepository` across all four variants**
+Given each variant writes to multiple report document-type variants per case (`freq-{id}`, `opioid-{id}`, `powerbi-{id}`, `dqr-{id}`)
+When this story is complete
+Then in each variant: revision GETs → `IReportRepository.GetRevisionAsync(fullId, dbConfig)`; PUTs/DELETEs → `IReportRepository.UpsertDocumentAsync(fullId, doc, dbConfig)` / `IReportRepository.DeleteDocumentAsync(fullId, rev, dbConfig)` — the full document-type-prefixed ID is passed; the prefix is part of the ID, not a separate parameter
+
+**AC-3 — Transformation logic unchanged in all variants**
+Given de-identification, report-generation, and error-silencing patterns in each variant
+When this story is implemented
+Then all transformation and generation logic remains unchanged — only CouchDB HTTP calls are replaced; the transformation pipeline is not restructured in any variant
+
+**AC-4 — Callers updated to pass repositories**
+Given the four variants are called by orchestrators that will themselves be updated in Stories 24.7 and 24.8
+When this story is complete
+Then each variant's constructor gains `IDeIdentifiedRepository` and `IReportRepository` parameters; any callers that instantiate these classes directly (as opposed to via DI) are updated to pass the repositories through; callers in `c_document_sync_all.pmss.cs` and `c_document_sync_all.cs` are updated in this story if they instantiate the sync document directly, or in Story 24.7 if they receive it via DI
+
+**AC-5 — Build passes**
+Given the build after all changes
+When verified
+Then `mmria-server`, `mmria.common`, and `mmria.services` all build with zero errors
+
+---
+
+## Dev Notes — Files to Change
+
+| File | Change |
+|------|--------|
+| `source-code/mmria/mmria-server/util/c_sync_document.pmss.cs` | **UPDATE** — inject `IDeIdentifiedRepository`, `IReportRepository`; replace all direct CouchDB calls (PMSS variant) |
+| `source-code/mmria/mmria-server/util/c_sync_document.cs` | **UPDATE** — inject `IDeIdentifiedRepository`, `IReportRepository`; replace all direct CouchDB calls (non-PMSS server variant) |
+| `nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIARebuild/Manager/c_sync_document.cs` | **UPDATE** — inject `IDeIdentifiedRepository`, `IReportRepository`; replace all direct CouchDB calls (common library variant) |
+| `nccdphp-drh-mmria-services/mmria.services/Actors/populate-cdc-instance/c_sync_document.cs` | **UPDATE** — inject `IDeIdentifiedRepository`, `IReportRepository`; replace all direct CouchDB calls (CDC services variant) |
+| Callers that instantiate any of the above directly | **UPDATE** — pass repositories through as identified in Story 24.1 catalog |
+
+**Design notes:**
+- The PMSS variant (`c_sync_document.pmss.cs`) has `#if IS_PMSS_ENHANCED` guarding. The non-PMSS variants are separate files — not the same file with different compilation paths.
+- The revision fetch pattern (GET doc → extract `_rev` → use rev in PUT or DELETE) is encapsulated by `GetRevisionAsync` in each repository DAL. The DAL implementation can use a lightweight HEAD or a minimal GET — the interface contract does not change.
+- Error silencing in any variant: catch blocks that swallow exceptions are preserved exactly as-is — they are not call sites.
+- The CDC services `c_sync_document.cs` may write additional report document types beyond the four PMSS variants. Confirm exact document types from Story 24.1 catalog before implementing.
+- `mmria.common` variant is used by both server rebuild paths (via `MMRIARebuildManager`) and potentially by `mmria.services`. Confirm usage from Story 24.1 catalog.
+
+---
+
+## Sequencing
+
+Depends on 24.2 (`IDeIdentifiedRepository` and `IReportRepository` write extension must exist). Stories 24.7 and 24.8 both depend on this story — implement all four variants before starting 24.7 or 24.8. Implement in order: PMSS variant → non-PMSS server → common library → CDC services to reduce risk.
+
 
 **Epic:** 24 — Infrastructure Sync and Database Lifecycle Consolidation (SQL Migration Foundation)
 **Story ID:** 24.6

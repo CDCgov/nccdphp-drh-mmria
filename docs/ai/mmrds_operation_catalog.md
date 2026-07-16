@@ -1665,3 +1665,331 @@ This catalog records every distinct operation against the `{prefix}logging` Couc
 | `vital_import` | `IVitalImportRepository` | 23.5 |
 | `report` | `IReportRepository` (read-only) | 23.6 / 23.7 |
 | `logging` | `ILoggingRepository` | 23.8 |
+
+---
+
+## Infrastructure Consolidation Operations
+
+**Epic:** 24 — Infrastructure Sync and Database Lifecycle Consolidation (SQL Migration Foundation)
+**Story:** 24.1
+**Date:** 2026-07-16
+
+This catalog records every distinct database operation in the eleven in-scope infra files across `mmria-server`, `mmria.common`, and `mmria.services`. It is the authoritative operation set for Stories 24.2–24.9.
+
+---
+
+### URL Construction Patterns (Epic 24)
+
+| Label | Pattern | Example |
+|-------|---------|---------|
+| **D** | Direct infra string interpolation — `{url}/{prefix}{db}/...` | `$"{db_config.url}/{db_config.prefix}de_id"` |
+| **S** | ScheduleInfo-parameterized — `{scheduleInfo.couch_db_url}/{scheduleInfo.db_prefix}{db}/...` | `$"{scheduleInfo.couch_db_url}/{scheduleInfo.db_prefix}mmrds"` |
+| **CDC-src** | Source CDC instance URL — `{db_info.url}/{db_info.prefix}mmrds/...` | `$"{db_info.url}/{db_info.prefix}mmrds/_all_docs"` |
+
+> **Note on Pattern D:** Unlike Pattern A in the mmrds application-CRUD section, Pattern D is not "wrong" here. These files manage database lifecycle and sync orchestration — they legitimately own raw URL construction. The purpose of Epic 24 routing is SQL-migration readiness (interface extraction), not URL correctness.
+
+---
+
+### In-Scope Files
+
+| File | Project | Category | Routed by Story |
+|------|---------|----------|-----------------|
+| `source-code/mmria/mmria-server/util/c_db_setup.cs` | mmria-server | DB lifecycle — startup initialization | 24.5 |
+| `source-code/mmria/mmria-server/model/actor/quartz/Rebuild_Export_Queue.cs` | mmria-server | DB lifecycle — nightly export_queue rebuild (Akka actor) | 24.4 |
+| `source-code/mmria/mmria-server/model/rebuild_export_queue_job.cs` | mmria-server | DB lifecycle — legacy Quartz IJob (dead code — see AC-5) | 24.4 |
+| `source-code/mmria/mmria-server/util/c_sync_document.pmss.cs` | mmria-server | Per-doc writes to de_id and report (PMSS only) | 24.6 |
+| `source-code/mmria/mmria-server/util/c_document_sync_all.cs` | mmria-server | Full rebuild orchestrator (non-PMSS) | 24.7 |
+| `source-code/mmria/mmria-server/util/c_document_sync_all_legacy.cs` | mmria-server | Legacy individual-document rebuild (non-PMSS) | 24.7 |
+| `source-code/mmria/mmria-server/util/c_document_sync_all.pmss.cs` | mmria-server | Full rebuild orchestrator (PMSS variant) | 24.7 |
+| `nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIARebuild/Manager/c_document_sync_all_legacy.cs` | mmria.common | Shared rebuild — barrier queries, progress tracking | 24.7 |
+| `source-code/mmria/mmria-server/model/actor/quartz/Process_DB_Synchronization_Set.cs` | mmria-server | Change-feed sync actor | 24.8 |
+| `source-code/mmria/mmria-server/model/actor/quartz/Process_Central_Pull_list.cs` | mmria-server | CDC data integration actor | 24.9 |
+| `nccdphp-drh-mmria-services/mmria.services/Actors/populate-cdc-instance/c_document_sync_all.cs` | mmria.services | CDC bulk rebuild (modern, bulk-write path) | 24.9 |
+
+---
+
+### DB Lifecycle Operations
+
+#### CREATE Database (PUT `{prefix}{db}`)
+
+| Operation | File | ~Line | URL Pattern | Target DB | Owning Interface / Story |
+|-----------|------|-------|-------------|-----------|--------------------------|
+| PUT `_users` (first-time setup) | `mmria-server/util/c_db_setup.cs` | ~116 | `{url}/_users` | `_users` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `_replicator` (first-time setup) | `mmria-server/util/c_db_setup.cs` | ~117 | `{url}/_replicator` | `_replicator` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `_global_changes` (first-time setup) | `mmria-server/util/c_db_setup.cs` | ~118 | `{url}/_global_changes` | `_global_changes` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `{prefix}mmrds` (startup repair) | `mmria-server/util/c_db_setup.cs` | ~141 | D | `mmrds` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `{prefix}audit` (startup repair) | `mmria-server/util/c_db_setup.cs` | ~195 | D | `audit` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `{prefix}session` (startup repair) | `mmria-server/util/c_db_setup.cs` | ~225 | D | `session` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `{prefix}export_queue` (startup, always recreated) | `mmria-server/util/c_db_setup.cs` | ~265 | D | `export_queue` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `{prefix}offline_cases` (startup repair) | `mmria-server/util/c_db_setup.cs` | ~283 | D | `offline_cases` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `{prefix}logging` (startup repair) | `mmria-server/util/c_db_setup.cs` | ~303 | D | `logging` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `{prefix}db_rebuild` (startup repair) | `mmria-server/util/c_db_setup.cs` | ~325 | D | `db_rebuild` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `{prefix}jurisdiction` (UpdateJurisdiction) | `mmria-server/util/c_db_setup.cs` | ~412 | D | `jurisdiction` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `metadata` (UpdateMetadata) | `mmria-server/util/c_db_setup.cs` | ~485 | `{url}/metadata` | `metadata` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `{prefix}export_queue` (Akka nightly rebuild) | `mmria-server/model/actor/quartz/Rebuild_Export_Queue.cs` | ~73 | D | `export_queue` | `IExportQueueRepository.PurgeAndReinitializeAsync` — 24.4 |
+| PUT `{prefix}export_queue` (legacy Quartz IJob — dead code) | `mmria-server/model/rebuild_export_queue_job.cs` | ~87 | D | `export_queue` | `IExportQueueRepository.PurgeAndReinitializeAsync` — 24.4 (dead) |
+| PUT `{prefix}de_id` (full rebuild — reset) | `mmria-server/util/c_document_sync_all.cs` | ~820 | D | `de_id` | `IDeIdentifiedRepository` lifecycle — 24.2 / 24.7 |
+| PUT `{prefix}report` (full rebuild — reset) | `mmria-server/util/c_document_sync_all.cs` | ~833 | D | `report` | `IReportRepository` lifecycle — 24.2 / 24.7 |
+| PUT `{prefix}db_rebuild` (ensure exists) | `mmria-server/util/c_document_sync_all.cs` | ~381 | D | `db_rebuild` | Stays in orchestration (internal rebuild-state) — 24.7 |
+| PUT `{prefix}de_id` (legacy rebuild — reset) | `mmria-server/util/c_document_sync_all_legacy.cs` | ~222 | D | `de_id` | `IDeIdentifiedRepository` lifecycle — 24.2 / 24.7 |
+| PUT `{prefix}report` (legacy rebuild — reset) | `mmria-server/util/c_document_sync_all_legacy.cs` | ~232 | D | `report` | `IReportRepository` lifecycle — 24.2 / 24.7 |
+| PUT `{prefix}de_id` (PMSS full rebuild — reset) | `mmria-server/util/c_document_sync_all.pmss.cs` | ~131 | D | `de_id` | `IDeIdentifiedRepository` lifecycle — 24.2 / 24.7 |
+| PUT `{prefix}report` (PMSS full rebuild — reset) | `mmria-server/util/c_document_sync_all.pmss.cs` | ~155 | D | `report` | `IReportRepository` lifecycle — 24.2 / 24.7 |
+| PUT `{prefix}de_id` (common legacy rebuild) | `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_document_sync_all_legacy.cs` | ~228 | D | `de_id` | `IDeIdentifiedRepository` lifecycle — 24.2 / 24.7 |
+| PUT `{prefix}report` (common legacy rebuild) | `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_document_sync_all_legacy.cs` | ~238 | D | `report` | `IReportRepository` lifecycle — 24.2 / 24.7 |
+| PUT `{scheduleInfo.db_prefix}mmrds` (CDC target rebuild) | `mmria-server/model/actor/quartz/Process_Central_Pull_list.cs` | ~78 | S | `mmrds` (CDC target) | `IDatabaseLifecycleService` extension — 24.9 |
+| PUT `{scheduleInfo.db_prefix}de_id` (CDC target rebuild) | `mmria-server/model/actor/quartz/Process_Central_Pull_list.cs` | ~130 | S | `de_id` (CDC target) | `IDeIdentifiedRepository` lifecycle — 24.2 / 24.9 |
+| PUT `{scheduleInfo.db_prefix}report` (CDC target rebuild) | `mmria-server/model/actor/quartz/Process_Central_Pull_list.cs` | ~155 | S | `report` (CDC target) | `IReportRepository` lifecycle — 24.2 / 24.9 |
+| PUT `{prefix}de_id` (CDC services rebuild) | `mmria.services/Actors/populate-cdc-instance/c_document_sync_all.cs` | ~453 | D | `de_id` | `IDeIdentifiedRepository` lifecycle — 24.2 / 24.9 |
+| PUT `{prefix}report` (CDC services rebuild — if not exists) | `mmria.services/Actors/populate-cdc-instance/c_document_sync_all.cs` | ~493 | D | `report` | `IReportRepository` lifecycle — 24.2 / 24.9 |
+
+#### DELETE Database (DELETE `{prefix}{db}`)
+
+| Operation | File | ~Line | URL Pattern | Target DB | Owning Interface / Story |
+|-----------|------|-------|-------------|-----------|--------------------------|
+| DELETE `{prefix}export_queue` (Akka nightly rebuild) | `mmria-server/model/actor/quartz/Rebuild_Export_Queue.cs` | ~68 | D | `export_queue` | `IExportQueueRepository.PurgeAndReinitializeAsync` — 24.4 |
+| DELETE `{prefix}export_queue` (startup, always) | `mmria-server/util/c_db_setup.cs` | ~255 | D | `export_queue` | `IDatabaseLifecycleService` — 24.5 |
+| DELETE `{prefix}export_queue` (legacy Quartz IJob — dead code) | `mmria-server/model/rebuild_export_queue_job.cs` | ~74 | D | `export_queue` | `IExportQueueRepository.PurgeAndReinitializeAsync` — 24.4 (dead) |
+| DELETE `{prefix}de_id` (full rebuild — reset) | `mmria-server/util/c_document_sync_all.cs` | ~806 | D | `de_id` | `IDeIdentifiedRepository` lifecycle — 24.2 / 24.7 |
+| DELETE `{prefix}report` (full rebuild — reset) | `mmria-server/util/c_document_sync_all.cs` | ~806 | D | `report` | `IReportRepository` lifecycle — 24.2 / 24.7 |
+| DELETE `{prefix}de_id` (legacy rebuild — reset) | `mmria-server/util/c_document_sync_all_legacy.cs` | ~218 | D | `de_id` | `IDeIdentifiedRepository` lifecycle — 24.2 / 24.7 |
+| DELETE `{prefix}report` (legacy rebuild — reset) | `mmria-server/util/c_document_sync_all_legacy.cs` | ~225 | D | `report` | `IReportRepository` lifecycle — 24.2 / 24.7 |
+| DELETE `{prefix}de_id` (PMSS full rebuild — reset) | `mmria-server/util/c_document_sync_all.pmss.cs` | ~109 | D | `de_id` | `IDeIdentifiedRepository` lifecycle — 24.2 / 24.7 |
+| DELETE `{prefix}report` (PMSS full rebuild — reset) | `mmria-server/util/c_document_sync_all.pmss.cs` | ~120 | D | `report` | `IReportRepository` lifecycle — 24.2 / 24.7 |
+| DELETE `{prefix}de_id` (common legacy rebuild) | `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_document_sync_all_legacy.cs` | ~218 | D | `de_id` | `IDeIdentifiedRepository` lifecycle — 24.2 / 24.7 |
+| DELETE `{prefix}report` (common legacy rebuild) | `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_document_sync_all_legacy.cs` | ~225 | D | `report` | `IReportRepository` lifecycle — 24.2 / 24.7 |
+| DELETE `{scheduleInfo.db_prefix}mmrds` (CDC target rebuild) | `mmria-server/model/actor/quartz/Process_Central_Pull_list.cs` | ~73 | S | `mmrds` (CDC target) | `IDatabaseLifecycleService` extension — 24.9 |
+| DELETE `{scheduleInfo.db_prefix}de_id` (CDC target rebuild) | `mmria-server/model/actor/quartz/Process_Central_Pull_list.cs` | ~113 | S | `de_id` (CDC target) | `IDeIdentifiedRepository` lifecycle — 24.2 / 24.9 |
+| DELETE `{scheduleInfo.db_prefix}report` (CDC target rebuild) | `mmria-server/model/actor/quartz/Process_Central_Pull_list.cs` | ~121 | S | `report` (CDC target) | `IReportRepository` lifecycle — 24.2 / 24.9 |
+| DELETE `{prefix}de_id` (CDC services rebuild) | `mmria.services/Actors/populate-cdc-instance/c_document_sync_all.cs` | ~434 | D | `de_id` | `IDeIdentifiedRepository` lifecycle — 24.2 / 24.9 |
+
+#### Security Setup (PUT `{prefix}{db}/_security`)
+
+| Operation | File | ~Line | URL Pattern | Target DB | Owning Interface / Story |
+|-----------|------|-------|-------------|-----------|--------------------------|
+| PUT `{prefix}mmrds/_security` | `mmria-server/util/c_db_setup.cs` | ~144 | D | `mmrds` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `{prefix}audit/_security` | `mmria-server/util/c_db_setup.cs` | ~200 | D | `audit` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `{prefix}session/_security` | `mmria-server/util/c_db_setup.cs` | ~229 | D | `session` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `{prefix}export_queue/_security` | `mmria-server/util/c_db_setup.cs` | ~267 | D | `export_queue` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `{prefix}offline_cases/_security` | `mmria-server/util/c_db_setup.cs` | ~288 | D | `offline_cases` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `{prefix}logging/_security` | `mmria-server/util/c_db_setup.cs` | ~307 | D | `logging` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `{prefix}db_rebuild/_security` | `mmria-server/util/c_db_setup.cs` | ~328 | D | `db_rebuild` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `{prefix}jurisdiction/_security` | `mmria-server/util/c_db_setup.cs` | ~416 | D | `jurisdiction` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `metadata/_security` | `mmria-server/util/c_db_setup.cs` | ~488 | `{url}/metadata/_security` | `metadata` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `{prefix}export_queue/_security` (Akka actor) | `mmria-server/model/actor/quartz/Rebuild_Export_Queue.cs` | ~74 | D | `export_queue` | `IExportQueueRepository.PurgeAndReinitializeAsync` — 24.4 |
+| PUT `{prefix}export_queue/_security` (legacy IJob — dead code) | `mmria-server/model/rebuild_export_queue_job.cs` | ~88 | D | `export_queue` | `IExportQueueRepository.PurgeAndReinitializeAsync` — 24.4 (dead) |
+| PUT `{prefix}db_rebuild/_security` (sync_all ensure-exists) | `mmria-server/util/c_document_sync_all.cs` | ~389 | D | `db_rebuild` | Stays in orchestration — 24.7 |
+| PUT `{scheduleInfo.db_prefix}mmrds/_security` (CDC target) | `mmria-server/model/actor/quartz/Process_Central_Pull_list.cs` | ~83 | S | `mmrds` (CDC target) | `IDatabaseLifecycleService` extension — 24.9 |
+
+#### PUT Design Document (PUT `{prefix}{db}/_design/...`)
+
+| Operation | File | ~Line | URL Pattern | Target DB / Design | Owning Interface / Story |
+|-----------|------|-------|-----------|--------------------|--------------------------|
+| PUT `{prefix}mmrds/_design/sortable` | `mmria-server/util/c_db_setup.cs` | ~154 | D | `mmrds/_design/sortable` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `{prefix}mmrds/_design/auth` | `mmria-server/util/c_db_setup.cs` | ~163 | D | `mmrds/_design/auth` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `{prefix}audit/_design/sortable` | `mmria-server/util/c_db_setup.cs` | ~210 | D | `audit/_design/sortable` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `{prefix}session/_design/session_event_sortable` | `mmria-server/util/c_db_setup.cs` | ~243 | D | `session/_design/session_event_sortable` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `{prefix}session/_design/session_sortable` | `mmria-server/util/c_db_setup.cs` | ~250 | D | `session/_design/session_sortable` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `{prefix}offline_cases/_design/sortable` | `mmria-server/util/c_db_setup.cs` | ~296 | D | `offline_cases/_design/sortable` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `{prefix}logging/_design/sortable` | `mmria-server/util/c_db_setup.cs` | ~315 | D | `logging/_design/sortable` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `{prefix}jurisdiction/_design/sortable` | `mmria-server/util/c_db_setup.cs` | ~424 | D | `jurisdiction/_design/sortable` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `{prefix}jurisdiction/_design/auth` | `mmria-server/util/c_db_setup.cs` | ~430 | D | `jurisdiction/_design/auth` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `metadata/_design/auth` | `mmria-server/util/c_db_setup.cs` | ~493 | `{url}/metadata/_design/auth` | `metadata/_design/auth` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `metadata/_design/sortable` | `mmria-server/util/c_db_setup.cs` | ~545 | `{url}/metadata/_design/sortable` | `metadata/_design/sortable` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `{prefix}de_id/_design/sortable` (full rebuild) | `mmria-server/util/c_document_sync_all.cs` | ~855 | D | `de_id/_design/sortable` | `IDeIdentifiedRepository` lifecycle — 24.2 / 24.7 (**AC-4**) |
+| PUT `{prefix}report/_design/interactive_aggregate_report` | `mmria-server/util/c_document_sync_all.cs` | ~893 | D | `report/_design/interactive_aggregate_report` | `IReportRepository` lifecycle — 24.2 / 24.7 (**AC-4**) |
+| PUT `{prefix}report/_design/data_summary_view_report` | `mmria-server/util/c_document_sync_all.cs` | ~908 | D | `report/_design/data_summary_view_report` | `IReportRepository` lifecycle — 24.2 / 24.7 (**AC-4**) |
+| PUT `{prefix}de_id/_design/sortable` (legacy rebuild) | `mmria-server/util/c_document_sync_all_legacy.cs` | ~248 | D | `de_id/_design/sortable` | `IDeIdentifiedRepository` lifecycle — 24.2 / 24.7 (**AC-4**) |
+| PUT `{prefix}report/_design/interactive_aggregate_report` (legacy) | `mmria-server/util/c_document_sync_all_legacy.cs` | ~303 | D | `report/_design/interactive_aggregate_report` | `IReportRepository` lifecycle — 24.2 / 24.7 (**AC-4**) |
+| PUT `{prefix}report/_design/data_summary_view_report` (legacy) | `mmria-server/util/c_document_sync_all_legacy.cs` | ~316 | D | `report/_design/data_summary_view_report` | `IReportRepository` lifecycle — 24.2 / 24.7 (**AC-4**) |
+| PUT `{prefix}de_id/_design/sortable` (PMSS rebuild) | `mmria-server/util/c_document_sync_all.pmss.cs` | ~140 | D | `de_id/_design/sortable` | `IDeIdentifiedRepository` lifecycle — 24.2 / 24.7 (**AC-4**) |
+| PUT `{prefix}report/_design/interactive_aggregate_report` (PMSS) | `mmria-server/util/c_document_sync_all.pmss.cs` | ~188 | D | `report/_design/interactive_aggregate_report` | `IReportRepository` lifecycle — 24.2 / 24.7 (**AC-4**) |
+| PUT `{prefix}report/_design/data_summary_view_report` (PMSS) | `mmria-server/util/c_document_sync_all.pmss.cs` | ~198 | D | `report/_design/data_summary_view_report` | `IReportRepository` lifecycle — 24.2 / 24.7 (**AC-4**) |
+| PUT `{prefix}de_id/_design/sortable` (common legacy rebuild) | `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_document_sync_all_legacy.cs` | ~248 | D | `de_id/_design/sortable` | `IDeIdentifiedRepository` lifecycle — 24.2 / 24.7 (**AC-4**) |
+| PUT `{prefix}report/_design/interactive_aggregate_report` (common legacy) | `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_document_sync_all_legacy.cs` | ~303 | D | `report/_design/interactive_aggregate_report` | `IReportRepository` lifecycle — 24.2 / 24.7 (**AC-4**) |
+| PUT `{prefix}report/_design/data_summary_view_report` (common legacy) | `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_document_sync_all_legacy.cs` | ~316 | D | `report/_design/data_summary_view_report` | `IReportRepository` lifecycle — 24.2 / 24.7 (**AC-4**) |
+| PUT `{scheduleInfo.db_prefix}mmrds/_design/sortable` (CDC target) | `mmria-server/model/actor/quartz/Process_Central_Pull_list.cs` | ~92 | S | `mmrds/_design/sortable` (CDC target) | `IDatabaseLifecycleService` extension — 24.9 (**AC-4**) |
+| PUT `{scheduleInfo.db_prefix}mmrds/_design/auth` (CDC target) | `mmria-server/model/actor/quartz/Process_Central_Pull_list.cs` | ~98 | S | `mmrds/_design/auth` (CDC target) | `IDatabaseLifecycleService` extension — 24.9 (**AC-4**) |
+| PUT `{scheduleInfo.db_prefix}de_id/_design/sortable` (CDC target) | `mmria-server/model/actor/quartz/Process_Central_Pull_list.cs` | ~143 | S | `de_id/_design/sortable` (CDC target) | `IDeIdentifiedRepository` lifecycle — 24.2 / 24.9 (**AC-4**) |
+| PUT `{prefix}de_id/_design/sortable` (CDC services rebuild) | `mmria.services/Actors/populate-cdc-instance/c_document_sync_all.cs` | ~468 | D | `de_id/_design/sortable` | `IDeIdentifiedRepository` lifecycle — 24.2 / 24.9 (**AC-4**) |
+| PUT `{prefix}report/_design/interactive_aggregate_report` (CDC services) | `mmria.services/Actors/populate-cdc-instance/c_document_sync_all.cs` | ~522 | D | `report/_design/interactive_aggregate_report` | `IReportRepository` lifecycle — 24.2 / 24.9 (**AC-4**) |
+| PUT `{prefix}report/_design/data_summary_view_report` (CDC services) | `mmria.services/Actors/populate-cdc-instance/c_document_sync_all.cs` | ~556 | D | `report/_design/data_summary_view_report` | `IReportRepository` lifecycle — 24.2 / 24.9 (**AC-4**) |
+
+#### POST Mango Index (POST `{prefix}{db}/_index`)
+
+| Operation | File | ~Line | URL Pattern | Target DB / Index | Owning Interface / Story |
+|-----------|------|-------|-------------|-------------------|--------------------------|
+| POST `{prefix}report/_index` (opioid-report-index) | `mmria-server/util/c_document_sync_all.cs` | ~869 | D | `report/_index` | `IReportRepository` lifecycle — 24.2 / 24.7 (**AC-4**) |
+| POST `{prefix}report/_index` (powerbi-report-index) | `mmria-server/util/c_document_sync_all.cs` | ~880 | D | `report/_index` | `IReportRepository` lifecycle — 24.2 / 24.7 (**AC-4**) |
+| POST `{prefix}report/_index` (opioid, legacy) | `mmria-server/util/c_document_sync_all_legacy.cs` | ~273 | D | `report/_index` | `IReportRepository` lifecycle — 24.2 / 24.7 (**AC-4**) |
+| POST `{prefix}report/_index` (powerbi, legacy) | `mmria-server/util/c_document_sync_all_legacy.cs` | ~289 | D | `report/_index` | `IReportRepository` lifecycle — 24.2 / 24.7 (**AC-4**) |
+| POST `{prefix}report/_index` (opioid, PMSS) | `mmria-server/util/c_document_sync_all.pmss.cs` | ~166 | D | `report/_index` | `IReportRepository` lifecycle — 24.2 / 24.7 (**AC-4**) |
+| POST `{prefix}report/_index` (powerbi, PMSS) | `mmria-server/util/c_document_sync_all.pmss.cs` | ~177 | D | `report/_index` | `IReportRepository` lifecycle — 24.2 / 24.7 (**AC-4**) |
+| POST `{prefix}report/_index` (opioid, common legacy) | `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_document_sync_all_legacy.cs` | ~273 | D | `report/_index` | `IReportRepository` lifecycle — 24.2 / 24.7 (**AC-4**) |
+| POST `{prefix}report/_index` (powerbi, common legacy) | `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_document_sync_all_legacy.cs` | ~289 | D | `report/_index` | `IReportRepository` lifecycle — 24.2 / 24.7 (**AC-4**) |
+| POST `{scheduleInfo.db_prefix}report/_index` (opioid, CDC target) | `mmria-server/model/actor/quartz/Process_Central_Pull_list.cs` | ~176 | S | `report/_index` (CDC target) | `IReportRepository` lifecycle — 24.2 / 24.9 (**AC-4**) |
+| POST `{prefix}report/_index` (opioid, CDC services) | `mmria.services/Actors/populate-cdc-instance/c_document_sync_all.cs` | ~501 | D | `report/_index` | `IReportRepository` lifecycle — 24.2 / 24.9 (**AC-4**) |
+| POST `{prefix}report/_index` (powerbi, CDC services) | `mmria.services/Actors/populate-cdc-instance/c_document_sync_all.cs` | ~512 | D | `report/_index` | `IReportRepository` lifecycle — 24.2 / 24.9 (**AC-4**) |
+
+#### Barrier Queries / Index Warmup (GET `{prefix}{db}/_design/.../_view/...?update=true`)
+
+These `GET` calls are not data reads — they block until the named index/view has finished building after a fresh `_design` or `_index` PUT. Owned by the same lifecycle interfaces as the PUT/POST operations above.
+
+| Operation | File | ~Line | URL Pattern | Target DB / View | Owning Interface / Story |
+|-----------|------|-------|-------------|------------------|--------------------------|
+| GET `{prefix}de_id/_design/sortable/_view/by_date_created?limit=1&update=true` | `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_document_sync_all_legacy.cs` | ~510 | D | `de_id` | `IDeIdentifiedRepository` lifecycle — 24.2 / 24.7 |
+| GET `{prefix}report/_design/interactive_aggregate_report/_view/indicator_id?limit=1&update=true` | `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_document_sync_all_legacy.cs` | ~520 | D | `report` | `IReportRepository` lifecycle — 24.2 / 24.7 |
+| GET `{prefix}report/_design/data_summary_view_report/_view/year_of_death?limit=1&update=true` | `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_document_sync_all_legacy.cs` | ~530 | D | `report` | `IReportRepository` lifecycle — 24.2 / 24.7 |
+| POST `{prefix}report/_find` (with `use_index` barrier — opioid/powerbi) | `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_document_sync_all_legacy.cs` | ~480 | D | `report` | `IReportRepository` lifecycle — 24.2 / 24.7 |
+
+---
+
+### Paged Bulk Read (`_all_docs` with cursor/skip)
+
+These are the source-read operations that drive rebuild orchestration. See also **Boundary Decision 2** (Story 17.7) which explicitly declared the mmrds sync reads infrastructure-only. For Epic 24, the cursor-based reads are extended into `ICaseRepository` as new paged-read methods.
+
+| Operation | File | ~Line | URL Pattern | Source DB | Owning Interface / Story |
+|-----------|------|-------|-------------|-----------|--------------------------|
+| GET `{prefix}mmrds/_all_docs?include_docs=true&startkey=...&limit=...` (cursor-based, full rebuild) | `mmria-server/util/c_document_sync_all.cs` | ~936 | D | `mmrds` | `ICaseRepository.GetPagedCasesAsync` — 24.3 / 24.7 |
+| POST `{prefix}de_id/_all_docs?include_docs=false` + keys body (rev lookup before bulk write) | `mmria-server/util/c_document_sync_all.cs` | ~994 | D | `de_id` | `IDeIdentifiedRepository.GetBulkRevisionsAsync` — 24.2 / 24.7 |
+| POST `{prefix}report/_all_docs?include_docs=false` + keys body (rev lookup before bulk write) | `mmria-server/util/c_document_sync_all.cs` | ~994 | D | `report` | `IReportRepository.GetBulkRevisionsAsync` — 24.2 / 24.7 |
+| GET `{prefix}mmrds/_all_docs?skip=...&limit=...` (skip-based, legacy rebuild) | `mmria-server/util/c_document_sync_all_legacy.cs` | ~155 | D | `mmrds` | `ICaseRepository.GetPagedCasesAsync` — 24.3 / 24.7 |
+| GET `{prefix}mmrds/_all_docs?skip=...&limit=...` (skip-based, PMSS rebuild) | `mmria-server/util/c_document_sync_all.pmss.cs` | ~241 | D | `mmrds` | `ICaseRepository.GetPagedCasesAsync` — 24.3 / 24.7 |
+| GET `{prefix}mmrds/_all_docs?skip=...&limit=...` (skip-based, common legacy rebuild) | `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_document_sync_all_legacy.cs` | ~155 | D | `mmrds` | `ICaseRepository.GetPagedCasesAsync` — 24.3 / 24.7 |
+| GET `{prefix}mmrds/_all_docs` (ID reconciliation — streaming JsonDocument) | `mmria-server/model/actor/quartz/Process_DB_Synchronization_Set.cs` | ~170 | D | `mmrds` | `ICaseRepository.GetAllCaseIdsAsync` — 24.3 / 24.8 |
+| GET `{prefix}de_id/_all_docs` (ID reconciliation) | `mmria-server/model/actor/quartz/Process_DB_Synchronization_Set.cs` | ~180 | D | `de_id` | `IDeIdentifiedRepository.GetAllIdsAsync` — 24.2 / 24.8 |
+| GET `{prefix}report/_all_docs` (ID reconciliation) | `mmria-server/model/actor/quartz/Process_DB_Synchronization_Set.cs` | ~198 | D | `report` | `IReportRepository.GetAllIdsAsync` — 24.2 / 24.8 |
+| GET `{db_info.prefix}mmrds/_all_docs?include_docs=true` (CDC source read — **reads from source CDC instance**) | `mmria-server/model/actor/quartz/Process_Central_Pull_list.cs` | ~200 | CDC-src | `mmrds` (source) | CDC-specific read — stays infra or new `ICdcCaseSourceReader` — 24.9 |
+| GET `{prefix}mmrds/_all_docs?include_docs=true&startkey=...&limit=...` (cursor-based, CDC services) | `mmria.services/Actors/populate-cdc-instance/c_document_sync_all.cs` | ~202 | D | `mmrds` | `ICaseRepository.GetPagedCasesAsync` — 24.3 / 24.9 |
+| GET `{prefix}mmrds/_all_docs?limit=0` (total count probe, CDC services) | `mmria.services/Actors/populate-cdc-instance/c_document_sync_all.cs` | ~260 | D | `mmrds` | `ICaseRepository.GetCaseCountAsync` — 24.3 / 24.9 |
+| GET `{prefix}mmrds/_all_docs?startkey=_design/&endkey=_design0` (design doc count, CDC services) | `mmria.services/Actors/populate-cdc-instance/c_document_sync_all.cs` | ~272 | D | `mmrds` | `ICaseRepository.GetCaseCountAsync` (folded into count logic) — 24.3 / 24.9 |
+
+> **CDC-src note (Process_Central_Pull_list):** The source `_all_docs` read at line ~200 reads from `db_info.url/{db_info.prefix}mmrds`, where `db_info` is a source CDC instance — a completely different CouchDB server. This cannot share the same `ICaseRepository` instance as the target without CDC-specific config branching. Story 24.9 must decide whether to wrap this in a CDC-specific interface or leave as a direct infra call.
+
+---
+
+### Change-Stream Read (`_changes`)
+
+| Operation | File | ~Line | URL Pattern | Source DB | Owning Interface / Story |
+|-----------|------|-------|-------------|-----------|--------------------------|
+| GET `{prefix}mmrds/_changes` (startup last_seq probe) | `mmria-server/util/c_db_setup.cs` | ~342 | D | `mmrds` | `IDatabaseLifecycleService` — 24.5 |
+| GET `{prefix}mmrds/_changes` (since=last_seq, sync feed) | `mmria-server/model/actor/quartz/Process_DB_Synchronization_Set.cs` | ~220 | D | `mmrds` | `ICaseRepository.GetChangesSinceAsync` — 24.3 / 24.8 |
+| GET `{prefix}mmrds/_changes` (no since — full feed initial call) | `mmria-server/model/actor/quartz/Process_DB_Synchronization_Set.cs` | ~224 | D | `mmrds` | `ICaseRepository.GetChangesSinceAsync` — 24.3 / 24.8 |
+
+---
+
+### Per-Document CRUD
+
+#### Per-Document Read (GET `{prefix}{db}/{id}`)
+
+| Operation | File | ~Line | URL Pattern | Source DB | Owning Interface / Story |
+|-----------|------|-------|-------------|-----------|--------------------------|
+| GET `{prefix}de_id/{id}` (revision probe before PUT/DELETE) | `mmria-server/util/c_sync_document.pmss.cs` | ~68 | D | `de_id` | `IDeIdentifiedRepository` — 24.2 / 24.6 |
+| GET `{prefix}report/freq-{id}` (revision probe) | `mmria-server/util/c_sync_document.pmss.cs` | ~186 | D | `report` | `IReportRepository` — 24.2 / 24.6 |
+| GET `{prefix}mmrds/{id}` (per-doc fetch inside PMSS rebuild loop) | `mmria-server/util/c_document_sync_all.pmss.cs` | ~257 | D | `mmrds` | `ICaseRepository.GetCaseDocumentJsonAsync` — 24.7 |
+| GET `{prefix}mmrds/{id}` (per-doc fetch inside legacy rebuild loop) | `mmria-server/util/c_document_sync_all_legacy.cs` | ~180 | D | `mmrds` | `ICaseRepository.GetCaseDocumentJsonAsync` — 24.7 |
+| GET `{prefix}mmrds/{id}` (per-doc fetch inside common legacy rebuild loop) | `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_document_sync_all_legacy.cs` | ~180 | D | `mmrds` | `ICaseRepository.GetCaseDocumentJsonAsync` — 24.7 |
+| GET `{prefix}mmrds/{id}` (change-feed per-case sync — PUT branch) | `mmria-server/model/actor/quartz/Process_DB_Synchronization_Set.cs` | ~113 | D | `mmrds` | `ICaseRepository.GetCaseDocumentJsonAsync` — 24.8 |
+| GET `{target}/{db_prefix}mmrds/{id}` (revision probe before CDC write) | `mmria-server/model/actor/quartz/Process_Central_Pull_list.cs` | ~225 | S | `mmrds` (CDC target) | `ICaseRepository.GetCaseAsync` (target instance) — 24.9 |
+| GET `{prefix}db_rebuild/startup-run-summary` (run summary read) | `mmria-server/util/c_document_sync_all.cs` | ~451 | D | `db_rebuild` | Internal orchestration state — stays in 24.7 |
+| GET `{prefix}db_rebuild/startup-rebuild-status` (legacy checkpoint read) | `mmria-server/util/c_document_sync_all.cs` | ~404 | D | `db_rebuild` | Internal orchestration state — stays in 24.7 |
+
+#### Per-Document Write (PUT / DELETE `{prefix}{db}/{id}`)
+
+| Operation | File | ~Line | URL Pattern | Target DB | Owning Interface / Story |
+|-----------|------|-------|-------------|-----------|--------------------------|
+| PUT/DELETE `{prefix}de_id/{id}` (per-case sync) | `mmria-server/util/c_sync_document.pmss.cs` | ~174 | D | `de_id` | `IDeIdentifiedRepository.WriteDocumentAsync` — 24.2 / 24.6 |
+| PUT/DELETE `{prefix}report/freq-{id}` (per-case freq-detail report sync) | `mmria-server/util/c_sync_document.pmss.cs` | ~228 | D | `report` | `IReportRepository.WriteDocumentAsync` — 24.2 / 24.6 |
+| PUT `{prefix}de_id/{id}` (per-case write, legacy rebuild compatibility path) | `mmria-server/util/c_document_sync_all_legacy.cs` | ~348 | D | `de_id` | `IDeIdentifiedRepository.WriteDocumentAsync` — 24.2 / 24.7 |
+| PUT `{prefix}report/{id}` (per-case write, legacy rebuild compatibility path) | `mmria-server/util/c_document_sync_all_legacy.cs` | ~348 | D | `report` | `IReportRepository.WriteDocumentAsync` — 24.2 / 24.7 |
+| PUT `{prefix}de_id/{id}` (per-case write, common legacy rebuild) | `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_document_sync_all_legacy.cs` | ~348 | D | `de_id` | `IDeIdentifiedRepository.WriteDocumentAsync` — 24.2 / 24.7 |
+| PUT `{prefix}report/{id}` (per-case write, common legacy rebuild) | `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_document_sync_all_legacy.cs` | ~348 | D | `report` | `IReportRepository.WriteDocumentAsync` — 24.2 / 24.7 |
+| PUT `{prefix}de_id/{id}` (per-case compatibility path, main sync_all) | `mmria-server/util/c_document_sync_all.cs` | ~1220 | D | `de_id` | `IDeIdentifiedRepository.WriteDocumentAsync` — 24.2 / 24.7 |
+| PUT `{prefix}report/{id}` (per-case compatibility path, main sync_all) | `mmria-server/util/c_document_sync_all.cs` | ~1220 | D | `report` | `IReportRepository.WriteDocumentAsync` — 24.2 / 24.7 |
+| PUT `{target}/{db_prefix}mmrds/{id}` (CDC de-ided case write to target) | `mmria-server/model/actor/quartz/Process_Central_Pull_list.cs` | ~241 | S | `mmrds` (CDC target) | `ICaseRepository.SaveCaseAsync` (target instance) — 24.9 |
+| DELETE `{prefix}de_id/{id}?rev=...` (orphan cleanup — dead branch, Union bug) | `mmria-server/model/actor/quartz/Process_DB_Synchronization_Set.cs` | ~206 | D | `de_id` | Dead branch (see Process_DB_Synchronization_Set note) — 24.8 |
+| DELETE `{prefix}report/{id}?rev=...` (orphan cleanup — dead branch, Union bug) | `mmria-server/model/actor/quartz/Process_DB_Synchronization_Set.cs` | ~214 | D | `report` | Dead branch (see Process_DB_Synchronization_Set note) — 24.8 |
+| PUT `{prefix}db_rebuild/startup-run-summary` (run summary write) | `mmria-server/util/c_document_sync_all.cs` | ~636 | D | `db_rebuild` | Internal orchestration state — stays in 24.7 |
+| DELETE `{prefix}db_rebuild/startup-rebuild-status?rev=...` (legacy checkpoint delete) | `mmria-server/util/c_document_sync_all.cs` | ~430 | D | `db_rebuild` | Internal orchestration state — stays in 24.7 |
+| PUT `metadata/{id}` (migration plan document PUT) | `mmria-server/util/c_db_setup.cs` | ~560+ | `{url}/metadata/{id}` | `metadata` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `metadata/2016-06-12T13:49:24.759Z` (metadata seed document) | `mmria-server/util/c_db_setup.cs` | ~510 | `{url}/metadata/...` | `metadata` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `metadata/2016-06-12T13:49:24.759Z/mmria-check-code.js` (metadata attachment) | `mmria-server/util/c_db_setup.cs` | ~520 | `{url}/metadata/.../attachment` | `metadata` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `metadata/de-identified-list` | `mmria-server/util/c_db_setup.cs` | ~610 | `{url}/metadata/de-identified-list` | `metadata` | `IDatabaseLifecycleService` — 24.5 |
+| PUT `{prefix}jurisdiction/jurisdiction_tree` (seed doc) | `mmria-server/util/c_db_setup.cs` | ~440 | D | `jurisdiction` | `IDatabaseLifecycleService` — 24.5 |
+
+> **Process_DB_Synchronization_Set dead-branch note:** The orphan-cleanup DELETE calls at ~206 and ~214 are inside loops that never execute. The preceding `deleted_id_set.Union(...)` call discards its return value — `deleted_id_set` remains empty. These loops are preserved from the original code for future correctness and must be included in the interface design even though they currently never fire.
+
+---
+
+### Bulk Write (`_bulk_docs`)
+
+| Operation | File | ~Line | URL Pattern | Target DB | Owning Interface / Story |
+|-----------|------|-------|-------------|-----------|--------------------------|
+| POST `{prefix}de_id/_bulk_docs` (batch write — bulk mode) | `mmria-server/util/c_document_sync_all.cs` | ~1098 | D | `de_id` | `IDeIdentifiedRepository.BulkWriteAsync` — 24.2 / 24.7 |
+| POST `{prefix}report/_bulk_docs` (batch write — bulk mode) | `mmria-server/util/c_document_sync_all.cs` | ~1098 | D | `report` | `IReportRepository.BulkWriteAsync` — 24.2 / 24.7 |
+| POST `{prefix}de_id/_bulk_docs` (CDC services rebuild) | `mmria.services/Actors/populate-cdc-instance/c_document_sync_all.cs` | ~325 | D | `de_id` | `IDeIdentifiedRepository.BulkWriteAsync` — 24.2 / 24.9 |
+| POST `{prefix}report/_bulk_docs` (CDC services rebuild) | `mmria.services/Actors/populate-cdc-instance/c_document_sync_all.cs` | ~325 | D | `report` | `IReportRepository.BulkWriteAsync` — 24.2 / 24.9 |
+
+---
+
+### AC-5 Finding: `rebuild_export_queue_job.cs` Registration Status
+
+**Finding:** `rebuild_export_queue_job.cs` (class `rebuild_queue_job : IJob`) is **dead code** — not actively registered in the Quartz scheduler.
+
+- The Quartz registration block for `rebuild_queue_job` in `QuartzSupervisor.cs` (lines ~258–272) is inside a large `/* ... */` comment block. The opening `/*` is approximately at line ~220 and the closing `*/` is at approximately line ~292.
+- The active export queue rebuild is handled by the `Rebuild_Export_Queue` Akka actor (in `Rebuild_Export_Queue.cs`), which is registered and called via the Akka actor system.
+
+**Story 24.4 approach:** `Rebuild_Export_Queue.cs` (Akka actor) is the **live** call site to route through `IExportQueueRepository.PurgeAndReinitializeAsync`. `rebuild_export_queue_job.cs` may be left in place (it will remain dead) or deleted — the story should note this and leave the decision to the developer.
+
+---
+
+### AC-4 Routing Decision: Design Doc and Index Operations
+
+Design document PUTs and Mango index POSTs in all sync/rebuild files are **DB-lifecycle operations**, NOT application CRUD. They are routed as follows:
+
+| Database | Operation type | Owning Interface | Story |
+|----------|---------------|-----------------|-------|
+| `de_id` | PUT `_design/sortable` | `IDeIdentifiedRepository` lifecycle method | 24.2 |
+| `report` | POST `_index` (opioid, powerbi) | `IReportRepository` lifecycle method | 24.2 |
+| `report` | PUT `_design/interactive_aggregate_report` | `IReportRepository` lifecycle method | 24.2 |
+| `report` | PUT `_design/data_summary_view_report` | `IReportRepository` lifecycle method | 24.2 |
+| `mmrds` | PUT `_design/sortable`, PUT `_design/auth` | `IDatabaseLifecycleService` | 24.5 / 24.9 |
+| `report` barrier queries | GET `_design/.../_view/...?update=true` | `IReportRepository` lifecycle method | 24.2 |
+| `de_id` barrier queries | GET `_design/sortable/_view/...?update=true` | `IDeIdentifiedRepository` lifecycle method | 24.2 |
+
+These operations are **not** `IReportRepository.GetReportAsync` / `IDeIdentifiedRepository.GetAsync` — they are lifecycle setup methods added to each interface as part of Story 24.2. The SQL migration replaces them with schema-migration tooling; they are not part of the runtime data access path.
+
+---
+
+### AC-3 Note: CDC Services `c_document_sync_all.cs` Characteristics
+
+**File:** `mmria.services/Actors/populate-cdc-instance/c_document_sync_all.cs`
+
+This file has three CDC-specific characteristics that distinguish it from the mmria-server sync_all variants:
+
+1. **Cursor-based pagination:** Source reads use `startkey`/`limit` cursor paging (not skip-based), matching the mmria-server non-PMSS `c_document_sync_all.cs`. This maps cleanly to `ICaseRepository.GetPagedCasesAsync`.
+
+2. **Bulk-write throttling:** Writes to de_id and report use `bulk_write_async` with configurable `chunk_size`, `retry_count`, and `retry_delay_ms` via `PopulateCdcThrottleSettings`. The `IDeIdentifiedRepository.BulkWriteAsync` and `IReportRepository.BulkWriteAsync` signatures must accept these throttle parameters or accept them via a separate throttle config overload.
+
+3. **Metadata already routed through DAL:** Both `_metadataRepository.GetAppDocumentAsync(...)` and `_metadataRepository.GetDeIdentifiedListAsync(...)` are already correct — they use `IMetadataRepository` (via `MetadataVersionDAL`). These calls require **no change** in Epic 24. Only the direct `de_id`/`report`/`mmrds` `ExecuteAsync` calls require routing.
+
+---
+
+### Summary Counts (Epic 24)
+
+| Category | Distinct call sites (across 11 files) |
+|----------|--------------------------------------|
+| DB lifecycle — CREATE database | 28 |
+| DB lifecycle — DELETE database | 16 |
+| DB lifecycle — SECURITY | 13 |
+| DB lifecycle — PUT design doc | 28 |
+| DB lifecycle — POST Mango index | 11 |
+| DB lifecycle — barrier queries / warmup | 4 |
+| Paged bulk read (`_all_docs`) | 14 |
+| Change-stream read (`_changes`) | 3 |
+| Per-document read | 10 |
+| Per-document write (PUT/DELETE) | 18 |
+| Bulk write (`_bulk_docs`) | 4 |
+| **Total in-scope call sites** | **~149** |
+
+> Dead-code call sites (rebuild_export_queue_job.cs Quartz IJob — 3 calls; Process_DB_Synchronization_Set orphan-cleanup DELETE loop — 2 calls) are included in the count above since they are present in source code and must be addressed in each story even if they produce no runtime effect.

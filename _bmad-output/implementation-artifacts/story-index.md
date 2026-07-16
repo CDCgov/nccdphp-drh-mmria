@@ -834,7 +834,7 @@ dev this story _bmad-output/implementation-artifacts/23-8-ilogging-repository-lo
 
 | Story | File | Status |
 |-------|------|--------|
-| 24.1 — Infra Operations Catalog | [24-1-infra-operations-catalog.md](24-1-infra-operations-catalog.md) | not-started |
+| 24.1 — Infra Operations Catalog | [24-1-infra-operations-catalog.md](24-1-infra-operations-catalog.md) | done |
 | 24.2 — `IDeIdentifiedRepository` + `IReportRepository` write/lifecycle ext. | [24-2-ideidentified-repository-ireport-write-extension.md](24-2-ideidentified-repository-ireport-write-extension.md) | not-started |
 | 24.3 — `ICaseRepository` paged bulk read + change stream | [24-3-icase-repository-sync-extensions.md](24-3-icase-repository-sync-extensions.md) | not-started |
 | 24.4 — Route export queue rebuild actors | [24-4-export-queue-rebuild-routing.md](24-4-export-queue-rebuild-routing.md) | not-started |
@@ -843,9 +843,19 @@ dev this story _bmad-output/implementation-artifacts/23-8-ilogging-repository-lo
 | 24.7 — Route `c_document_sync_all` variants | [24-7-c-document-sync-all-routing.md](24-7-c-document-sync-all-routing.md) | not-started |
 | 24.8 — Route `Process_DB_Synchronization_Set` | [24-8-process-db-synchronization-set-routing.md](24-8-process-db-synchronization-set-routing.md) | not-started |
 | 24.9 — Route `Process_Central_Pull_list` + CDC `c_document_sync_all` | [24-9-process-central-pull-list-cdc-routing.md](24-9-process-central-pull-list-cdc-routing.md) | not-started |
+| 24.10 — Route `mmria.services` export queue calls _(Epic 23.4 miss)_ | [24-10-mmria-services-export-queue-routing.md](24-10-mmria-services-export-queue-routing.md) | not-started |
+| 24.11 — Route `mmria.services` vital import calls _(Epic 23.5 miss)_ | [24-11-mmria-services-vital-import-routing.md](24-11-mmria-services-vital-import-routing.md) | not-started |
 
 **Sequencing:** 24.1 must run first (infra ops catalog). Once complete, 24.2–24.5 can all proceed in parallel. 24.6 depends on 24.2. 24.7 and 24.8 can proceed in parallel once 24.2, 24.3, and 24.6 are complete. 24.9 must wait for 24.7.
 
+> ⚠️ **24.6 expanded scope** — Story 24.6 was amended to cover all four `c_sync_document` variants (PMSS + non-PMSS server + common library + CDC services), not just the PMSS variant. All three non-PMSS variants also have direct `de_id`/`report` CouchDB calls confirmed by Story 24.1.
+>
+> ⚠️ **24.2 amended** — `GetRevisionBulkAsync` added to both `IDeIdentifiedRepository` and `IReportRepository`. Required by `c_document_sync_all.cs` which does a bulk rev lookup (`POST _all_docs?include_docs=false` with keys body) before bulk writes to avoid 409 conflicts.
+>
+> ⚠️ **24.3 amended** — `GetCaseTotalCountAsync` and `GetDesignDocCountAsync` added to `ICaseRepository`. Required by the CDC services `c_document_sync_all.cs` count-probe operations (lines ~260 and ~272).
+>
+> ⚠️ **24.10 + 24.11 — Epic 23 misses** — The Story 23.1 catalog found export_queue and vital_import callers in `mmria.services` that were not addressed by Stories 23.4 and 23.5 respectively. These two cleanup stories complete that coverage. Both are low-risk and independent of the other Epic 24 stories.
+>
 > ⚠️ **24.9 carries highest risk** — CDC data integration is multi-source, cross-tenant, and runs through the de-identification pipeline. Requires full CDC integration test before marking complete.
 >
 > ⚠️ **Lift-and-shift constraint** — Orchestration logic, actor hierarchies, Quartz schedules, rebuild pipelines, and the CDC data flow are NOT restructured. Only CouchDB URL construction and `CouchDbHttpClient.ExecuteAsync` calls are replaced at each call site.
@@ -912,6 +922,18 @@ dev this story _bmad-output/implementation-artifacts/24-8-process-db-synchroniza
 
 ```
 dev this story _bmad-output/implementation-artifacts/24-9-process-central-pull-list-cdc-routing.md
+```
+
+**Story 24.10 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/24-10-mmria-services-export-queue-routing.md
+```
+
+**Story 24.11 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/24-11-mmria-services-vital-import-routing.md
 ```
 
 ---
