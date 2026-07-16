@@ -680,7 +680,7 @@ dev this story _bmad-output/implementation-artifacts/20-6-metadata-boundary-deci
 | Story | File | Status |
 |-------|------|--------|
 | 21.1 — `audit` Operation Catalog | [21-1-audit-operation-catalog.md](21-1-audit-operation-catalog.md) | done |
-| 21.2 — Create `AuditDAL` and Extract `IAuditRepository` | [21-2-iaudit-repository-auditdal.md](21-2-iaudit-repository-auditdal.md) | ready-for-dev |
+| 21.2 — Create `AuditDAL` and Extract `IAuditRepository` | [21-2-iaudit-repository-auditdal.md](21-2-iaudit-repository-auditdal.md) | done |
 | 21.3 — Route CaseManager Audit Writes Through `IAuditRepository` | [21-3-casemanager-audit-writes.md](21-3-casemanager-audit-writes.md) | ready-for-dev |
 | 21.4 — Route CaseWorkflowAdminDAL Audit Calls Through `IAuditRepository` | [21-4-caseworkflowadmindal-audit-calls.md](21-4-caseworkflowadmindal-audit-calls.md) | ready-for-dev |
 | 21.5 — Route Controller-Level Audit Calls Through `IAuditRepository` | [21-5-controller-audit-calls.md](21-5-controller-audit-calls.md) | ready-for-dev |

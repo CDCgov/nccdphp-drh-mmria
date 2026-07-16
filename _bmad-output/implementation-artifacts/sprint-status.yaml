@@ -207,3 +207,15 @@ development_status:
   22-1-net-10-compatibility-analysis-and-risk-assessment: done
   22-2-net-10-upgrade-execution: done
   epic-22-retrospective: optional
+
+  # ── Epic 23: Remaining Database Consolidation Gap Analysis (SQL Migration Foundation) ──
+  epic-23: backlog
+  23-1-remaining-database-gap-scan: backlog
+  23-2-isession-repository-sessiondal: backlog
+  23-3-iofflinecase-repository-offlinecasedal: backlog
+  23-4-iexportqueue-repository-exportqueuedal: backlog
+  23-5-ivitalimport-repository-vitalimportdal-canonicalize: backlog
+  23-6-ireport-repository-reportdal: backlog
+  23-7-route-report-read-calls: backlog
+  23-8-ilogging-repository-loggingdal: backlog
+  epic-23-retrospective: optional

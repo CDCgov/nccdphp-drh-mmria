@@ -2251,3 +2251,332 @@ FROM .../trusted-images/dotnet-90-runtime:9.0-<tag>@sha256:<digest> AS runtime
 
 22.1 must fully complete and produce a clean findings report before 22.2 begins. The two stories must not run in parallel.
 
+---
+
+## Epic 23: Remaining Database Consolidation Gap Analysis (SQL Migration Foundation)
+
+Epics 17–21 established repository interfaces for `mmrds`, `_users`, `configuration`, `jurisdiction`, `metadata`, and `audit`. Six additional CouchDB databases used by the application have no repository interface. After this epic, every application-layer database call routes through an interface, and a SQL migration requires changing only DAL implementations — no manager, controller, or services actor code changes are needed.
+
+**Architecture rule:** project-context.md §2.2 SharedLibraries pattern + SQL migration readiness.
+
+**Scope summary (verified 2026-07-16):**
+
+| Database | Existing DAL | Interface | Out-of-DAL application leaks | Notes |
+|---|---|---|---|---|
+| `session` | `SessionDAL` ✓ | None | `SessionManager` (2), `AccountController` (1), `AccountController.OIDC` (1), `Post_Session_Actor` (1), `Record_Session_Event` (1), `SessionSummary` (1); `AccountDAL` cross-feature (4) | All SessionDAL URLs are Pattern A — need canonicalization |
+| `offline_cases` | `OfflineCaseDAL` ✓ | None | `loggerController` (1 view read) | DAL CRUD uses Pattern A; view queries already Pattern B — need CRUD canonicalized |
+| `export_queue` | `ExportQueueDAL` ✓ | None | `core_element_exporter.cs` (1); Rebuild actors = infra out-of-scope | DAL uses Pattern B throughout — no URL fixes needed |
+| `vital_import` | `VitalImportDAL` partial (1 op), `MMRIAServicesDAL` (3 ops) | None | `ije_messageController` (3); `MMRIAServicesDAL` (3) must delegate to canonical DAL | No prefix separator in URL — special non-tenant config DB |
+| `report` | None | None | `AggregateReportManager` (1), `InteractiveReportManager` (1), 4 controllers (4) | Read-only interface only; sync/rebuild actors = infra out-of-scope |
+| `logging` | None | None | `loggerController` (3 reads/writes) | No SharedLibraries representation at all |
+
+**Infra out-of-scope across all stories:** `c_db_setup.cs`, `Rebuild_Export_Queue.cs`, `rebuild_export_queue_job.cs`, `Process_Central_Pull_list.cs`, `Process_DB_Synchronization_Set.cs`, `c_document_sync_all*.cs`, `c_document_sync_all_legacy.cs`, `c_sync_document.pmss.cs` — these perform DB lifecycle (create/delete/index) and bulk document writes. SQL migration will address these as infrastructure replacement, not application interface substitution.
+
+---
+
+### Story 23.1: Remaining Database Gap Scan
+
+As a developer,
+I want a definitive catalog of every operation against the six remaining databases (`session`, `offline_cases`, `export_queue`, `vital_import`, `report`, `logging`) across all three projects,
+So that Stories 23.2–23.8 have an agreed-upon, complete operation set and no call sites are missed before any code changes begin.
+
+**Acceptance Criteria:**
+
+**Given** all `.cs` files in `mmria-server`, `mmria.common`, and `mmria.services`
+**When** the developer completes the catalog
+**Then** `docs/ai/mmrds_operation_catalog.md` gains a section for each of the six databases, listing every distinct operation grouped by: document CRUD (GET/PUT/DELETE by ID), view queries, Mango `_find` queries, list reads (`_all_docs`), and bulk/admin operations
+
+**Given** each catalog entry
+**When** the catalog is complete
+**Then** each entry records: operation name, calling file(s), URL pattern in use (A, B, or other), response type expected, and layer classification (DAL ✓, Manager ✗, Controller ✗, Actor ✗)
+
+**Given** infra operations (`c_db_setup`, rebuild actors, sync actors, `Rebuild_Export_Queue`)
+**When** encountered
+**Then** they are listed but marked **out of scope** — DB lifecycle and bulk-write infrastructure do not belong behind application repository interfaces
+
+**Given** the `vital_import` database
+**When** cataloged
+**Then** the entry notes that URLs use `config.url/vital_import/...` with no prefix separator, and this is intentional (non-tenant special config DB); all callers preserve this pattern
+
+---
+
+### Story 23.2: `ISessionRepository` over `SessionDAL`
+
+As a developer,
+I want a single `ISessionRepository` interface over all `session` database operations, with `SessionDAL` as the sole canonical implementation,
+So that every caller depends on the interface and a SQL session-store migration requires changing only `SessionDAL`.
+
+**Acceptance Criteria:**
+
+**Given** `SessionDAL` in `mmria.common/SharedLibraries/Session/DAL/SessionDAL.cs` currently uses Pattern A (`$"{dbConfig.url}/{dbConfig.prefix}session/{id}"`) for all CRUD methods (lines ~80, 90, 96, 103, 111)
+**When** this story is complete
+**Then** all `SessionDAL` methods use `dbConfig.Get_Prefix_DB_Url($"session/{...}")` (Pattern B) throughout — no direct string interpolation remains
+
+**Given** the full operation set in `SessionDAL`
+**When** the interface is extracted
+**Then** `ISessionRepository` is defined in `mmria.common/SharedLibraries/Session/` with async method signatures matching every `SessionDAL` method; `SessionDAL` implements `ISessionRepository`
+
+**Given** `ISessionRepository` is defined
+**When** DI registration is updated in `mmria-server/Program.cs`
+**Then** `ISessionRepository` is registered as `SessionDAL` in the service collection
+
+**Given** `SessionManager.cs` has 2 direct `session/` URL constructions (lines ~60, 201 — Pattern A session document writes in the Manager layer)
+**When** this story is complete
+**Then** each is replaced with the corresponding `ISessionRepository` method; `ISessionRepository` is injected into `SessionManager` via constructor injection
+
+**Given** the following direct `session/` calls outside the Session feature:
+- `AccountController.cs` — 1 hit (session document DELETE on logout)
+- `AccountController.OIDC.cs` — 1 hit (session document PUT on OIDC login)
+- `Post_Session_Actor.cs` — 1 hit (session document PUT via actor)
+- `Record_Session_Event.cs` — 1 hit (session event document PUT via actor)
+- `SessionSummary.cs` — 1 hit (session view GET for summary page)
+**When** this story is complete
+**Then** each is replaced with the corresponding `ISessionRepository` method; `ISessionRepository` is injected into each class via constructor injection or Akka.NET actor props factory as appropriate
+
+**Given** `AccountDAL.cs` has 4 session-database calls (all already Pattern B — `dbConfig.Get_Prefix_DB_Url($"session/...")`):
+- Line ~323: session-event sortable view GET by user ID
+- Lines ~374, 403, 431: session document GET, GET, DELETE
+**When** this story is complete
+**Then** `AccountDAL` injects `ISessionRepository` and delegates those 4 calls to it; `AccountDAL` constructs no `session/` URLs directly
+
+**Given** the build after all changes
+**When** verified
+**Then** `mmria-server`, `mmria.common`, and `mmria.services` all build with zero errors
+
+---
+
+### Story 23.3: `IOfflineCaseRepository` over `OfflineCaseDAL`
+
+As a developer,
+I want a single `IOfflineCaseRepository` interface over all `offline_cases` database operations,
+So that the offline case path can be migrated to SQL by changing only `OfflineCaseDAL`.
+
+**Acceptance Criteria:**
+
+**Given** `OfflineCaseDAL` in `mmria.common/SharedLibraries/OfflineCase/DAL/OfflineCaseDAL.cs` uses Pattern A for CRUD methods (lines ~46, 55, 197, 206) and Pattern B for view queries (lines ~183, 216)
+**When** this story is complete
+**Then** all `OfflineCaseDAL` CRUD methods use `dbConfig.Get_Prefix_DB_Url($"offline_cases/{...}")` (Pattern B) — no Pattern A strings remain in the file
+
+**Given** the full operation set in `OfflineCaseDAL`
+**When** the interface is extracted
+**Then** `IOfflineCaseRepository` is defined in `mmria.common/SharedLibraries/OfflineCase/` with async method signatures matching every `OfflineCaseDAL` method; `OfflineCaseDAL` implements `IOfflineCaseRepository`
+
+**Given** `IOfflineCaseRepository` is defined
+**When** DI registration is updated in `mmria-server/Program.cs`
+**Then** `IOfflineCaseRepository` is registered as `OfflineCaseDAL` in the service collection
+
+**Given** `loggerController.cs` line ~101 reads `offline_cases/_design/sortable/_view/lightweight-status-only` directly using `dbConfig.Get_Prefix_DB_Url(...)`
+**When** this story is complete
+**Then** that call is replaced with the corresponding `IOfflineCaseRepository` method; `IOfflineCaseRepository` is injected into `loggerController` via constructor injection
+
+**Given** the build after all changes
+**When** verified
+**Then** all three projects build with zero errors
+
+---
+
+### Story 23.4: `IExportQueueRepository` over `ExportQueueDAL`
+
+As a developer,
+I want a single `IExportQueueRepository` interface over all `export_queue` database operations,
+So that the export queue can be migrated to SQL (or a dedicated job-queue store) by changing only `ExportQueueDAL`.
+
+**Acceptance Criteria:**
+
+**Given** `ExportQueueDAL` in `mmria.common/SharedLibraries/ExportQueue/DAL/ExportQueueDAL.cs` already uses `dbConfig.Get_Prefix_DB_Url(...)` throughout
+**When** the interface is extracted
+**Then** `IExportQueueRepository` is defined in `mmria.common/SharedLibraries/ExportQueue/` with async method signatures matching every `ExportQueueDAL` method; `ExportQueueDAL` implements `IExportQueueRepository`; no URL changes are required in `ExportQueueDAL`
+
+**Given** `IExportQueueRepository` is defined
+**When** DI registration is updated in `mmria-server/Program.cs`
+**Then** `IExportQueueRepository` is registered as `ExportQueueDAL` in the service collection
+
+**Given** `core_element_exporter.cs` in `mmria-server/util/` line ~804 reads an export queue document directly (`$"{db_config.url}/{db_config.prefix}export_queue/{item_id}"` — Pattern A)
+**When** this story is complete
+**Then** that call is replaced with the corresponding `IExportQueueRepository` method; `IExportQueueRepository` is injected
+
+**Given** `Rebuild_Export_Queue.cs` and `rebuild_export_queue_job.cs` perform DROP/CREATE on the export_queue database
+**When** evaluated
+**Then** they are listed in the catalog as out of scope — DB lifecycle operations are not application CRUD and do not belong behind `IExportQueueRepository`
+
+**Given** the build after all changes
+**When** verified
+**Then** all three projects build with zero errors
+
+---
+
+### Story 23.5: Canonicalize `VitalImportDAL` for `vital_import` DB and Extract `IVitalImportRepository`
+
+As a developer,
+I want all `vital_import` database operations consolidated in `VitalImportDAL` behind `IVitalImportRepository`,
+So that the vital import batch store can be migrated by changing only `VitalImportDAL`.
+
+**Acceptance Criteria:**
+
+**Given** the `vital_import` database is currently accessed in three places:
+- `VitalImportDAL.cs` line ~47: `GET vital_import/_all_docs` (1 operation — already in DAL)
+- `MMRIAServicesDAL.cs` lines ~118, 141, 156: `GET vital_import/_all_docs`, `PUT vital_import/{batch_id}`, `PUT vital_import/{_id}` (3 operations)
+- `ije_messageController.cs` lines ~73, 107, 148: `GET vital_import/_all_docs`, `DELETE vitals_url` (external service), `PUT vitals_url` (external service) — the external `vitals_url` calls are **not** CouchDB and are out of scope
+**When** this story is complete
+**Then** `VitalImportDAL` contains all in-scope `vital_import` CRUD operations: GET all docs, PUT batch document, PUT/DELETE individual document; `IVitalImportRepository` is defined in `mmria.common/SharedLibraries/VitalImport/` with async method signatures for every operation
+
+**Given** the `vital_import` database URL uses no prefix separator (`$"{config.url}/vital_import/..."` — intentional, non-tenant DB)
+**When** `VitalImportDAL` methods are written or updated
+**Then** all methods preserve this exact URL construction — no `Get_Prefix_DB_Url` is used for the `vital_import` database because it is not a tenant-prefixed database; this is documented as a deliberate exception in the catalog
+
+**Given** `IVitalImportRepository` is defined
+**When** DI registration is updated in `mmria-server/Program.cs`
+**Then** `IVitalImportRepository` is registered as `VitalImportDAL` in the service collection
+
+**Given** `MMRIAServicesDAL.cs` lines ~118, 141, 156 construct `vital_import` URLs directly
+**When** this story is complete
+**Then** each is replaced with the corresponding `IVitalImportRepository` method; `IVitalImportRepository` is injected into `MMRIAServicesDAL` via constructor injection
+
+**Given** `ije_messageController.cs` line ~73 constructs `vital_import/_all_docs` directly
+**When** this story is complete
+**Then** that call is replaced with `IVitalImportRepository.GetAllBatchesAsync(...)`; `IVitalImportRepository` is injected into the controller via constructor injection; the external `vitals_url` POST/DELETE calls at lines ~107 and ~148 are **not changed** — they are external-service calls, not CouchDB operations
+
+**Given** the build after all changes
+**When** verified
+**Then** all three projects build with zero errors
+
+---
+
+### Story 23.6: `IReportRepository` + `ReportDAL` (Application Read Interface)
+
+As a developer,
+I want a single `IReportRepository` interface over all application-layer `report` database read operations,
+So that report query controllers and managers depend on the interface and a SQL migration requires changing only `ReportDAL`.
+
+**Acceptance Criteria:**
+
+**Given** no `Report` SharedLibraries feature exists
+**When** this story creates one
+**Then** the following structure exists:
+```
+mmria.common/SharedLibraries/Report/
+  IReportRepository.cs
+  DAL/
+    ReportDAL.cs
+```
+
+**Given** the in-scope application read operations from the catalog:
+- `GET report/_all_docs?include_docs=true` — used by `AggregateReportManager`
+- `GET report/_design/interactive_aggregate_report/_view/indicator_id?...` — used by `InteractiveReportManager`
+- `GET report/_design/data_summary_view_report/_view/year_of_death?skip=N&limit=N` — used by `data_summary_viewController`
+- `POST report/_find` — used by `dqrReportController`, `overdose_measureController`, `powerbi_measureController`
+**When** `ReportDAL` is created
+**Then** it contains async methods for each: `GetAllReportDocumentsAsync(DBConfigurationDetail dbConfig)`, `GetIndicatorByIdAsync(string indicatorId, DBConfigurationDetail dbConfig)`, `GetDataSummaryViewAsync(int skip, int take, DBConfigurationDetail dbConfig)`, `FindReportDocumentsAsync(string selectorJson, DBConfigurationDetail dbConfig)` — each uses Pattern B via `dbConfig.Get_Prefix_DB_Url($"report/...")`
+
+**Given** the sync/rebuild actors in `mmria-server/util/` and `mmria.common/SharedLibraries/MMRIARebuild/` write to and manage the `report` database
+**When** they are evaluated
+**Then** a boundary decision is recorded in `docs/ai/mmrds_operation_catalog.md` under the `report` Boundary Decisions section: write/rebuild operations (DROP DB, CREATE DB, bulk PUT report documents, `_index` creation, design document PUT) are declared **infrastructure out-of-scope** — these will be addressed as part of the SQL migration implementation, not as application interface changes; `IReportRepository` covers read operations only
+
+**Given** `IReportRepository` is defined
+**When** DI registration is updated in `mmria-server/Program.cs`
+**Then** `IReportRepository` is registered as `ReportDAL` in the service collection
+
+**Given** no callers are changed in this story
+**When** the build runs
+**Then** all three projects build with zero errors
+
+---
+
+### Story 23.7: Route Report Read Calls Through `IReportRepository`
+
+As a developer,
+I want all application-layer files that directly construct `report` database read URLs to delegate to `IReportRepository`,
+So that no manager or controller constructs a `report/` URL directly.
+
+**Acceptance Criteria:**
+
+**Given** `AggregateReportManager.cs` line ~35 uses `dbConfig.Get_Prefix_DB_Url("report/_all_docs?include_docs=true")` directly in the Manager layer
+**When** this story is complete
+**Then** that call is replaced with `IReportRepository.GetAllReportDocumentsAsync(dbConfig)`; `IReportRepository` is injected into `AggregateReportManager` via constructor injection
+
+**Given** `InteractiveReportManager.cs` line ~30 constructs `report/_design/interactive_aggregate_report/_view/indicator_id?...` directly using Pattern A
+**When** this story is complete
+**Then** that call is replaced with `IReportRepository.GetIndicatorByIdAsync(indicatorId, dbConfig)`; `IReportRepository` is injected into `InteractiveReportManager` via constructor injection
+
+**Given** the following controllers with direct `report` URL construction:
+- `data_summary_viewController.cs` — 1 hit (view GET — Wave 8 planned migration target)
+- `dqrReportController.cs` — 1 hit (`_find` POST)
+- `overdose_measureController.cs` — 1 hit (`_find` POST)
+- `powerbi_measureController.cs` — 1 hit (`_find` POST)
+**When** this story is complete
+**Then** each is replaced with the corresponding `IReportRepository` method; `IReportRepository` is injected into each controller via constructor injection; no controller constructs a `report/` URL
+
+**Given** `data_summary_viewController` is also a Wave 8 SharedLibraries migration target
+**When** this story touches it
+**Then** only the URL construction is replaced — the Wave 8 `DataSummary` feature extraction is deferred; this story does not restructure the controller's business logic
+
+**Given** the build after all changes
+**When** verified
+**Then** all three projects build with zero errors and no route, action signature, or response shape changes are made
+
+---
+
+### Story 23.8: `ILoggingRepository` + `LoggingDAL`
+
+As a developer,
+I want all `logging` database operations consolidated in a new `LoggingDAL` behind `ILoggingRepository`,
+So that the logging store can be migrated (SQL, Elasticsearch, or other) by changing only `LoggingDAL`.
+
+**Acceptance Criteria:**
+
+**Given** no `Logging` SharedLibraries feature exists
+**When** this story creates one
+**Then** the following structure exists:
+```
+mmria.common/SharedLibraries/Logging/
+  ILoggingRepository.cs
+  DAL/
+    LoggingDAL.cs
+```
+
+**Given** the in-scope `logging` database operations in `loggerController.cs`:
+- Line ~93: `GET {prefix}logging` — reads the list of logging modules (Pattern A)
+- Lines ~283, 653: one is a filtered view read, one is a document write (Pattern A throughout)
+**When** `LoggingDAL` is created
+**Then** it contains async methods for each in-scope operation using `dbConfig.Get_Prefix_DB_Url($"logging/...")` (Pattern B) throughout; `ILoggingRepository` is defined in the same directory; `LoggingDAL` implements `ILoggingRepository`
+
+**Given** `c_db_setup.cs` creates the `logging` database on first install
+**When** evaluated
+**Then** it is listed in the catalog but marked **out of scope** — DB creation is infrastructure
+
+**Given** `ILoggingRepository` is defined
+**When** DI registration is updated in `mmria-server/Program.cs`
+**Then** `ILoggingRepository` is registered as `LoggingDAL` in the service collection
+
+**Given** `loggerController.cs` currently owns all direct `logging` database access (3 hits, all Pattern A)
+**When** this story is complete
+**Then** each is replaced with the corresponding `ILoggingRepository` method; `ILoggingRepository` is injected into `loggerController` via constructor injection; `loggerController` constructs no `logging/` URLs
+
+**Given** `loggerController` also reads from `offline_cases` (Story 23.3) and now from `ILoggingRepository`
+**When** this story and Story 23.3 are both complete
+**Then** `loggerController` injects both `IOfflineCaseRepository` and `ILoggingRepository`; DI registration satisfies both dependencies
+
+**Given** the build after all changes
+**When** verified
+**Then** all three projects build with zero errors
+
+---
+
+## Epic 23 — Story Sequencing
+
+| Wave | Story | Risk | Dependencies |
+|---|---|---|---|
+| 23 | 23.1 — Remaining Database Gap Scan | None | None — discovery only |
+| 23 | 23.2 — `ISessionRepository` + `SessionDAL` | Medium | 23.1 |
+| 23 | 23.3 — `IOfflineCaseRepository` + `OfflineCaseDAL` | Low | 23.1 |
+| 23 | 23.4 — `IExportQueueRepository` + `ExportQueueDAL` | Low | 23.1 |
+| 23 | 23.5 — `IVitalImportRepository` + `VitalImportDAL` canonicalization | Low–Medium | 23.1 |
+| 23 | 23.6 — `IReportRepository` + `ReportDAL` (read interface) | Low | 23.1 |
+| 23 | 23.7 — Route report read calls through `IReportRepository` | Low–Medium | 23.6 |
+| 23 | 23.8 — `ILoggingRepository` + `LoggingDAL` | Low | 23.1 |
+
+23.2, 23.3, 23.4, 23.5, 23.6, and 23.8 can all proceed in parallel once 23.1 is complete. 23.7 depends on 23.6. Story 23.2 carries medium risk due to the number of call sites (actors + controllers + cross-feature DAL injection); all others are low or low–medium.
+
+**Migration readiness gate:** When Epic 23 is complete, every CouchDB database access in `mmria-server`, `mmria.common`, and `mmria.services` routes through a repository interface. SQL migration work begins here — swap each CouchDB DAL implementation for a SQL implementation one database at a time, with no changes required to managers, controllers, or services actors.
+
+

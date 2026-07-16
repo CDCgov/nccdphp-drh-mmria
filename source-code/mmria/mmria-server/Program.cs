@@ -313,6 +313,10 @@ public sealed partial class Program
             builder.Services.AddScoped<mmria.common.SharedLibraries.MetadataVersion.Manager.MetadataVersionManager>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.AuditRecovery.DAL.AuditRecoveryDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.AuditRecovery.Manager.AuditRecoveryManager>();
+            // AuditDAL registered as concrete type and as IAuditRepository (SQL migration seam for audit database)
+            builder.Services.AddScoped<mmria.common.SharedLibraries.Audit.DAL.AuditDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.Audit.IAuditRepository>(
+                sp => sp.GetRequiredService<mmria.common.SharedLibraries.Audit.DAL.AuditDAL>());
             builder.Services.AddScoped<mmria.common.SharedLibraries.ExportQueue.DAL.ExportQueueDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.ExportQueue.Manager.ExportQueueManager>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.VitalImport.DAL.VitalImportDAL>();
