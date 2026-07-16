@@ -46,6 +46,16 @@ Then `ICaseRepository` gains:
 - `DropAndResetAsync(DBConfigurationDetail dbConfig)` — drops the tenant-prefixed mmrds database and recreates it empty; SQL equivalent: `TRUNCATE TABLE cases` (scoped to the target tenant)
 - This method is used exclusively by the CDC populate path; this is documented in the interface with an XML summary comment noting the limited use case
 
+**AC-3b — CDC count probe methods added to `ICaseRepository`**
+Given `mmria.services/Actors/populate-cdc-instance/c_document_sync_all.cs` uses two special count-probe operations not covered by `GetCasesPagedAsync`:
+- Line ~260: `GET {prefix}mmrds/_all_docs?limit=0` — total document count probe used to initialize throttle calculations
+- Line ~272: `GET {prefix}mmrds/_all_docs?startkey=_design/&endkey=_design0` — design document count probe
+When this story is complete
+Then `ICaseRepository` gains:
+- `GetCaseTotalCountAsync(DBConfigurationDetail dbConfig)` → `int` — total doc count excluding design docs; implemented as `GET {prefix}mmrds/_all_docs?limit=0` and reads `total_rows` from response
+- `GetDesignDocCountAsync(DBConfigurationDetail dbConfig)` → `int` — design doc count only; implemented as `GET {prefix}mmrds/_all_docs?startkey=_design/&endkey=_design0`
+SQL migration equivalents: `SELECT COUNT(*) FROM cases` and a count of index objects respectively
+
 **AC-4 — New model types live alongside interface**
 Given `CasePage`, `CaseChangeFeedResult`, and `CaseChangeEntry` are new model types
 When they are created
@@ -82,6 +92,10 @@ Task<CaseChangeFeedResult> GetCaseChangesSinceAsync(string sinceSeq, DBConfigura
 
 // CDC-only: drop and recreate target mmrds (used by Process_Central_Pull_list)
 Task DropAndResetAsync(DBConfigurationDetail dbConfig);
+
+// CDC services: total case count and design-doc count probes
+Task<int> GetCaseTotalCountAsync(DBConfigurationDetail dbConfig);
+Task<int> GetDesignDocCountAsync(DBConfigurationDetail dbConfig);
 ```
 
 **`CasePage` model:**

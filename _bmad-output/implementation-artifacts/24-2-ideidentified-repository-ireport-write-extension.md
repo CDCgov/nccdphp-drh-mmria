@@ -42,6 +42,7 @@ Then it contains async methods for:
 - `EnsureDesignDocumentAsync(string designName, string designDocJson, DBConfigurationDetail dbConfig)` — PUT `de_id/_design/{designName}`
 - `EnsureIndexAsync(string indexJson, DBConfigurationDetail dbConfig)` — POST `de_id/_index`
 - `WaitForIndexReadyAsync(DBConfigurationDetail dbConfig)` — barrier query: `GET de_id/_design/sortable/_view/by_date_created?limit=1&update=true`; used by rebuild orchestrators to confirm index availability before marking rebuild complete
+- `GetRevisionBulkAsync(IEnumerable<string> ids, DBConfigurationDetail dbConfig)` → `IDictionary<string, string>` (id → rev) — executes `POST de_id/_all_docs?include_docs=false` with a keys body; used by `c_document_sync_all.cs` to look up existing revisions before a bulk write in order to set the `_rev` field correctly and avoid 409 conflicts
 
 All CRUD and bulk methods use `dbConfig.Get_Prefix_DB_Url($"de_id/...")` (Pattern B). `DropAndResetAsync` uses `dbConfig.Get_Prefix_DB_Url("de_id")` for the database-level DELETE and PUT.
 
@@ -62,6 +63,7 @@ Then `IReportRepository` gains these additional methods, implemented in `ReportD
 - `EnsureDesignDocumentAsync(string designName, string designDocJson, DBConfigurationDetail dbConfig)`
 - `EnsureIndexAsync(string indexJson, DBConfigurationDetail dbConfig)`
 - `WaitForIndexReadyAsync(DBConfigurationDetail dbConfig)` — barrier query: `POST report/_find` with a minimal selector to confirm index availability
+- `GetRevisionBulkAsync(IEnumerable<string> ids, DBConfigurationDetail dbConfig)` → `IDictionary<string, string>` (id → rev) — executes `POST report/_all_docs?include_docs=false` with a keys body; used by `c_document_sync_all.cs` to look up existing report document revisions before bulk writes
 
 **AC-5 — Catalog updated to reflect write coverage**
 Given the boundary decision in Story 23.6 declared `report` write/rebuild operations as "infrastructure out-of-scope"
@@ -96,6 +98,7 @@ Task DropAndResetAsync(DBConfigurationDetail dbConfig);
 Task EnsureDesignDocumentAsync(string designName, string designDocJson, DBConfigurationDetail dbConfig);
 Task EnsureIndexAsync(string indexJson, DBConfigurationDetail dbConfig);
 Task WaitForIndexReadyAsync(DBConfigurationDetail dbConfig);
+Task<IDictionary<string, string>> GetRevisionBulkAsync(IEnumerable<string> ids, DBConfigurationDetail dbConfig);
 ```
 
 **Design notes:**
