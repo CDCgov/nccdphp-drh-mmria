@@ -823,6 +823,71 @@ The following `metadata` operations appear in DB setup and one-time migration sc
 7. **`_all_docs` bulk reads** are already correctly behind `MetadataVersionManager` — no callsite remediation required.
 
 8. **`export_all_generate_name_map`** uses `metadata/{version}/metadata` without the `version_specification-` prefix — confirm what value is passed as `{version}` before routing through `IMetadataRepository`.
+
+---
+
+### Boundary Decisions (metadata)
+
+**Story 20.6 — Decision recorded 2026-07-16**
+
+---
+
+#### Decision 1: `_all_docs` bulk reads — Option (a) Application-owned — already in `IMetadataRepository`
+
+**Finding:** `MetadataVersionManager` issues `GET metadata/_all_docs?include_docs=true` in two places:
+
+- `ListVersionSpecificationsAsync` (line 68) → `_dal.GetAllVersionSpecificationHeadersAsync(dbConfig)` → `IMetadataRepository.GetAllVersionSpecificationHeadersAsync`
+- `ListUiSpecificationsAsync` (line ~220) → `_dal.GetAllUiSpecificationHeadersAsync(dbConfig)` → `IMetadataRepository.GetAllUiSpecificationHeadersAsync`
+
+Both methods are already declared in `IMetadataRepository` and implemented in `MetadataVersionDAL`. `MetadataVersionManager` holds `IMetadataRepository` via constructor injection (`_dal`) and calls through it exclusively. No direct CouchDB URL construction for `_all_docs` exists in the Manager layer.
+
+**Resolution:** Both bulk reads are **application-owned enumeration operations** (admin UX lists version and UI specs for the version manager). They belong in `IMetadataRepository` and are already there. No additional method, no remediation work required for Story 20.2.
+
+**Consistency with Story 17.7:** Story 17.7-Decision 2 excluded `c_document_sync_all` bulk reads from `ICaseRepository` because they are full-database streaming operations that drive sync infrastructure, not application requests. The metadata `_all_docs` calls are architecturally distinct:
+- They enumerate a bounded set of version/UI specification records for admin UX display
+- They are already managed entirely within the `MetadataVersionManager` → `MetadataVersionDAL` → `IMetadataRepository` chain
+- They are not infrastructure drivers — they do not power sync, replication, or low-level paging operations
+
+The metadata case is closer to the 17.7 CDC-read pattern decision (which kept `GetCaseIdsByDateCreated` etc. in `MMRIAServicesDAL`, not `ICaseRepository`) than to the sync exclusion: the reads are specific to a single manager's workflow and the manager already provides the correct encapsulation.
+
+| Concern | Decision | `IMetadataRepository` scope? |
+|---------|----------|------------------------------|
+| `_all_docs` version-spec enumeration (`ListVersionSpecificationsAsync`) | Already in `IMetadataRepository` (option a) | Yes — `GetAllVersionSpecificationHeadersAsync` |
+| `_all_docs` UI-spec enumeration (`ListUiSpecificationsAsync`) | Already in `IMetadataRepository` (option a) | Yes — `GetAllUiSpecificationHeadersAsync` |
+
+---
+
+#### Decision 2: `broadcast-message-list` prefix inconsistency — Intentional by design (not a bug)
+
+**Finding:** Two different URL shapes exist for `broadcast-message-list`:
+
+- `mmria-server`'s `broadcast_messageController` routes through `IMetadataRepository.GetBroadcastMessageListAsync` / `SaveBroadcastMessageListAsync`, which use `$"{dbConfig.url}/metadata/broadcast-message-list"` (Pattern A — global, no prefix). The server writes the canonical broadcast message to the global `metadata` database, then calls the services `api/broadcastMessage/ReplicateMessage` endpoint to trigger per-tenant replication.
+
+- `mmria.services`'s `broadcastMessageController.ReplicateMessage` is a replication sink. It receives a signed server-push, loops over every configured tenant, and writes the message to `$"{p_config_detail.url}/{p_config_detail.prefix}metadata/broadcast-message-list"` (Pattern B — per-tenant prefix). This is not application CRUD — it is explicit broadcast replication infrastructure.
+
+**Resolution:** The prefix difference is **intentional multi-tenant broadcast architecture**:
+
+1. CDC admin writes to the global `metadata` database via the server (IMetadataRepository, no prefix).
+2. The server triggers per-tenant replication by calling the services endpoint.
+3. The services endpoint writes the message to each tenant's own `{prefix}metadata` database so every tenant's case workers see it.
+
+The `IMetadataRepository` boundary applies to the `mmria-server` layer only (global `metadata`). The `mmria.services` `broadcastMessageController.ReplicateMessage` is a replication sink and its direct URL construction with per-tenant prefix is correct. It is not routed through `IMetadataRepository` — no change required for Stories 20.3–20.5.
+
+| Layer | Database targeted | Correct? | `IMetadataRepository`? |
+|-------|-------------------|----------|------------------------|
+| `mmria-server` `broadcast_messageController` | Global `metadata` (no prefix) | ✅ | Yes — routes through interface |
+| `mmria.services` `broadcastMessageController.ReplicateMessage` | Per-tenant `{prefix}metadata` | ✅ (by design) | No — replication infrastructure sink |
+
+---
+
+#### Scope summary for Epic 20
+
+| Concern | Decision | `IMetadataRepository` scope? |
+|---------|----------|------------------------------|
+| `_all_docs` version-spec enumeration | Already in interface — application-owned | Yes (already done) |
+| `_all_docs` UI-spec enumeration | Already in interface — application-owned | Yes (already done) |
+| `broadcast-message-list` prefix in services | Intentional replication sink — not a bug | No — services replication infrastructure |
+
 |-----------|----------------|---------|-------------|---------------|-----------|
 | `DeleteUserRoleJurisdictionAsync` | `mmria.common/SharedLibraries/ManageUsers/DAL/ManageUsersDAL.cs` | 143 | A | `document_put_response` | `IJurisdictionRepository` |
 

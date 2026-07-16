@@ -631,7 +631,7 @@ dev this story _bmad-output/implementation-artifacts/19-4-route-out-of-dal-juris
 | 20.3 — Route SharedLibraries DAL Files Through `IMetadataRepository` | [20-3-sharedlibraries-dal-metadata-calls.md](20-3-sharedlibraries-dal-metadata-calls.md) | ready-for-dev |
 | 20.4 — Route Controller Direct `metadata` Calls Through `IMetadataRepository` | [20-4-controller-metadata-calls.md](20-4-controller-metadata-calls.md) | ready-for-dev |
 | 20.5 — Route `mmria.services` Read-Only `metadata` Calls Through `IMetadataRepository` | [20-5-mmria-services-metadata-reads.md](20-5-mmria-services-metadata-reads.md) | done |
-| 20.6 — `metadata` Boundary Decision — Bulk `_all_docs` and Sync | [20-6-metadata-boundary-decision.md](20-6-metadata-boundary-decision.md) | ready-for-dev |
+| 20.6 — `metadata` Boundary Decision — Bulk `_all_docs` and Sync | [20-6-metadata-boundary-decision.md](20-6-metadata-boundary-decision.md) | done |
 
 **Sequencing:** 20.1 first (discovery). 20.6 can run in parallel with 20.1. 20.2 depends on 20.1. Stories 20.3, 20.4, and 20.5 depend on 20.2 and can run in parallel.
 
