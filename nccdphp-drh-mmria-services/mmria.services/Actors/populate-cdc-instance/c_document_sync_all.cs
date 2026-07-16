@@ -6,6 +6,8 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using mmria.common.SharedLibraries.MMRIAServices.Model;
+using mmria.common.SharedLibraries.MetadataVersion;
+using mmria.common.SharedLibraries.MetadataVersion.DAL;
 using Newtonsoft.Json.Linq;
 
 namespace mmria.server.utils;
@@ -95,6 +97,7 @@ public sealed class Report_PowerBI_Index_Struct
 
     private string prefix;
     mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IMetadataRepository _metadataRepository;
     private readonly mmria.common.couchdb.OverridableConfiguration _configuration;
     private readonly string _host_prefix;
     private readonly Action<string> _progressCallback;
@@ -117,6 +120,7 @@ public sealed class Report_PowerBI_Index_Struct
         this.user_value = connection.user_value;
         this.prefix = connection.prefix;
         _couchDbHttpClient = couchDbHttpClient;
+        _metadataRepository = new MetadataVersionDAL(couchDbHttpClient);
         _configuration = configuration;
         _host_prefix = host_prefix;
         _progressCallback = progressCallback;
@@ -151,16 +155,14 @@ public sealed class Report_PowerBI_Index_Struct
 
     private async Task<c_document_sync_rebuild_context> load_rebuild_context_async()
     {
-        string metadata_url = connection.url + $"/metadata/version_specification-{metadata_release_version_name}/metadata";
-
-        var metadata_task = _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, connection.user_name, connection.user_value);
-        var de_identified_list_task = _couchDbHttpClient.ExecuteAsync("GET", connection.url + "/metadata/de-identified-list", null, connection.user_name, connection.user_value);
+        var metadata_task = _metadataRepository.GetAppDocumentAsync(metadata_release_version_name, connection);
+        var de_identified_list_task = _metadataRepository.GetDeIdentifiedListAsync(connection);
         var case_template_task = read_case_template_json_async();
 
         await Task.WhenAll(metadata_task, de_identified_list_task, case_template_task);
 
-        var metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_task.Result);
-        var de_identified_expando_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(de_identified_list_task.Result);
+        var metadata = metadata_task.Result;
+        var de_identified_expando_object = de_identified_list_task.Result;
         var de_identified_set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach(string path in (IList<object>)(((IDictionary<string, object>)de_identified_expando_object)["paths"]))

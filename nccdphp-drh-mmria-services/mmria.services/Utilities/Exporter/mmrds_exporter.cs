@@ -7,6 +7,8 @@ using Microsoft.Extensions.Configuration;
 using mmria.common.getset;
 using mmria.common.SharedLibraries.Case;
 using mmria.common.SharedLibraries.Case.DAL;
+using mmria.common.SharedLibraries.MetadataVersion;
+using mmria.common.SharedLibraries.MetadataVersion.DAL;
 using mmria.services.Models;
 
 
@@ -57,6 +59,7 @@ public sealed class mmrds_exporter
 
     private ScheduleInfoMessage Configuration;
     private mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IMetadataRepository _metadataRepository;
     private ICaseRepository _caseRepository;
 
     public mmrds_exporter
@@ -68,6 +71,7 @@ public sealed class mmrds_exporter
         this.Configuration = configuration;
         _couchDbHttpClient = couchDbHttpClient;
         _caseRepository = new CaseDAL(_couchDbHttpClient);
+        _metadataRepository = new MetadataVersionDAL(_couchDbHttpClient);
 
         db_config = new()
         {
@@ -154,8 +158,7 @@ public sealed class mmrds_exporter
         #endif
 
 
-        string metadata_url = db_config.url + $"/metadata/version_specification-{this.Configuration.version_number}/metadata";
-        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, this.user_name, this.value_string));
+        mmria.common.metadata.app metadata = await _metadataRepository.GetAppDocumentAsync(this.Configuration.version_number, db_config);
         this.current_metadata = metadata;
 
         System.Collections.Generic.Dictionary<string, int> path_to_int_map = new Dictionary<string, int>();

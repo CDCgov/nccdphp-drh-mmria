@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using mmria.common.SharedLibraries.MetadataVersion;
+using mmria.common.SharedLibraries.MetadataVersion.DAL;
 
 namespace mmria.server.utils;
 
@@ -13,6 +15,7 @@ public sealed class c_de_identifier
     string metadata_release_version_name;
     HashSet<string> de_identified_set = new HashSet<string>();
     mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IMetadataRepository _metadataRepository;
     private readonly System.Dynamic.ExpandoObject _case_item_object;
     private readonly c_document_sync_rebuild_context _rebuild_context;
     
@@ -30,6 +33,7 @@ public sealed class c_de_identifier
         connection = p_connection;
         metadata_release_version_name = p_metadata_release_version_name;
         _couchDbHttpClient = couchDbHttpClient;
+        _metadataRepository = new MetadataVersionDAL(couchDbHttpClient);
         _case_item_object = p_case_item_object;
         _rebuild_context = p_rebuild_context;
     }
@@ -43,8 +47,7 @@ public sealed class c_de_identifier
         }
         else
         {
-            var de_identified_list_response = await _couchDbHttpClient.ExecuteAsync("GET", connection.url + "/metadata/de-identified-list", null, connection.user_name, connection.user_value);
-            System.Dynamic.ExpandoObject de_identified_ExpandoObject = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(de_identified_list_response);
+            System.Dynamic.ExpandoObject de_identified_ExpandoObject = await _metadataRepository.GetDeIdentifiedListAsync(connection);
             de_identified_set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach(string path in (IList<object>)(((IDictionary<string, object>)de_identified_ExpandoObject)["paths"]))
             {

@@ -760,11 +760,13 @@ public sealed class BatchItemProcessingService
     private System.Net.Http.HttpClient _externalHttpClient;
     private MMRIAServicesManager _mmriaServicesManager;
     private ICaseRepository _caseRepository;
+    private readonly mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository _metadataRepository;
     public BatchItemProcessingService(mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
         _couchDbHttpClient = couchDbHttpClient;
         _mmriaServicesManager = new MMRIAServicesManager(new MMRIAServicesDAL(_couchDbHttpClient, new mmria.common.SharedLibraries.SystemConfig.DAL.SystemConfigDAL(_couchDbHttpClient), new MetadataVersionDAL(_couchDbHttpClient)), _couchDbHttpClient);
         _caseRepository = new CaseDAL(_couchDbHttpClient);
+        _metadataRepository = new MetadataVersionDAL(_couchDbHttpClient);
         var httpClientFactory = new mmria.common.SimpleHttpClientFactory();
         _externalHttpClient = httpClientFactory.CreateClient("external");
     }
@@ -788,9 +790,13 @@ public sealed class BatchItemProcessingService
         var fet_field_set = fet_get_header(message.fet);
 
 
-        string metadata_url = $"{mmria.services.vitalsimport.Program.couchdb_url}/metadata/version_specification-{db_config_set.name_value["metadata_version"]}/metadata";
-        string metadata_response = await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, config_timer_user_name, config_timer_value);
-        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_response);
+        var metadata_db_config = new mmria.common.couchdb.DBConfigurationDetail
+        {
+            url = mmria.services.vitalsimport.Program.couchdb_url,
+            user_name = config_timer_user_name,
+            user_value = config_timer_value
+        };
+        mmria.common.metadata.app metadata = await _metadataRepository.GetAppDocumentAsync(db_config_set.name_value["metadata_version"], metadata_db_config);
 
         lookup = get_look_up(metadata);
 

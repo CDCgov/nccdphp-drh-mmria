@@ -7,6 +7,8 @@ using Microsoft.Extensions.Configuration;
 using mmria.common.getset;
 using mmria.common.SharedLibraries.Case;
 using mmria.common.SharedLibraries.Case.DAL;
+using mmria.common.SharedLibraries.MetadataVersion;
+using mmria.common.SharedLibraries.MetadataVersion.DAL;
 using mmria.services.Models;
 
 namespace mmria.services.Utilities.CoreElementExport;
@@ -49,6 +51,7 @@ public sealed class core_element_exporter
 
     mmria.common.couchdb.DBConfigurationDetail db_config;
     private mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IMetadataRepository _metadataRepository;
     private ICaseRepository _caseRepository;
     
     public core_element_exporter(ScheduleInfoMessage configuration, mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
@@ -56,6 +59,7 @@ public sealed class core_element_exporter
         this.Configuration = configuration;
         _couchDbHttpClient = couchDbHttpClient;
         _caseRepository = new CaseDAL(_couchDbHttpClient);
+        _metadataRepository = new MetadataVersionDAL(_couchDbHttpClient);
 
         db_config = new()
         {
@@ -127,8 +131,7 @@ public async System.Threading.Tasks.Task Execute(export_queue_item queue_item)
     this.qualitativeStreamWriter[1] = new System.IO.StreamWriter(System.IO.Path.Combine(export_directory, "case-narrative.txt"), true);
     this.qualitativeStreamWriter[2] = new System.IO.StreamWriter(System.IO.Path.Combine(export_directory, "informant-interview.txt"), true);
 
-    string metadata_url = db_config.url + $"/metadata/version_specification-{this.Configuration.version_number}/metadata";
-    mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, this.user_name, this.value_string));
+    mmria.common.metadata.app metadata = await _metadataRepository.GetAppDocumentAsync(this.Configuration.version_number, db_config);
     current_metadata = metadata;
 
 
@@ -208,7 +211,7 @@ public async System.Threading.Tasks.Task Execute(export_queue_item queue_item)
     grantee_column.DefaultValue = queue_item.grantee_name;
     path_to_csv_writer[core_file_name].Table.Columns.Add(grantee_column);
 
-    System.Dynamic.ExpandoObject de_identified_ExpandoObject = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + "/metadata/de-identified-list", null, this.user_name, this.value_string));
+    System.Dynamic.ExpandoObject de_identified_ExpandoObject = await _metadataRepository.GetDeIdentifiedListAsync(db_config);
     de_identified_set = new HashSet<string>();
 
     if (queue_item.de_identified_field_set != null)
