@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Http;
 
 using  mmria.server.extension;
 using mmria.server.util;
+using mmria.common.SharedLibraries.Jurisdiction;
 
 
 namespace VitalsImport_FileUpload.Controllers;
@@ -26,6 +27,7 @@ public sealed class vitalsController : Controller
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly mmria.server.util.TenantCatalog _tenantCatalog;
+    private readonly IJurisdictionRepository _jurisdictionRepository;
 
     public vitalsController
     (
@@ -34,13 +36,15 @@ public sealed class vitalsController : Controller
         IHttpContextAccessor httpContextAccessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.server.util.TenantCatalog tenantCatalog,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        IJurisdictionRepository jurisdictionRepository
     )
     {
         _logger = logger;
         _appConfiguration = appConfiguration;
         _couchDbHttpClient = couchDbHttpClient;
         _tenantCatalog = tenantCatalog;
+        _jurisdictionRepository = jurisdictionRepository;
         host_prefix = tenantRuntime.EffectiveHostPrefix;
         configuration = tenantRuntime.RequireConfiguration();
         db_config = tenantRuntime.RequireDbConfig();
@@ -110,22 +114,11 @@ public sealed class vitalsController : Controller
             {
                 return EscapedJsonResultFactory.Create(result);
             }
-            string jurisdiction_tree_url = $"{detail.url}/jurisdiction/jurisdiction_tree";
-            if(!string.IsNullOrWhiteSpace(detail.prefix))
-            {
-                jurisdiction_tree_url = $"{detail.url}/{detail.prefix}jurisdiction/jurisdiction_tree";
-            }
 
-            string response_from_server = await _couchDbHttpClient.ExecuteAsync("GET", jurisdiction_tree_url, null, detail.user_name, detail.user_value);
-
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.jurisdiction_tree>(response_from_server);
-
+            result = await _jurisdictionRepository.GetJurisdictionTreeAsync(detail);
         }
         catch(Exception ex) 
         {
-            var message = $"{ex}";
-             
-             
             System.Console.WriteLine($"{ex}");
         }
 

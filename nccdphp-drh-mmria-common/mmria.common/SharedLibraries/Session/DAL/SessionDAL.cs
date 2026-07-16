@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using mmria.common.couchdb;
 using mmria.common.getset;
 using mmria.common.model.couchdb;
+using mmria.common.SharedLibraries.Jurisdiction;
 using mmria.common.SharedLibraries.Session.Model;
 using Newtonsoft.Json;
 
@@ -12,10 +13,12 @@ namespace mmria.common.SharedLibraries.Session.DAL;
 public class SessionDAL
 {
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IJurisdictionRepository _jurisdictionRepository;
 
-    public SessionDAL(mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+    public SessionDAL(mmria.common.getset.CouchDbHttpClient couchDbHttpClient, IJurisdictionRepository jurisdictionRepository = null)
     {
         _couchDbHttpClient = couchDbHttpClient;
+        _jurisdictionRepository = jurisdictionRepository;
     }
 
     public async Task<get_sortable_view_reponse_header<session>> GetSessionSortableViewAsync(
@@ -26,6 +29,12 @@ public class SessionDAL
         bool descending,
         DBConfigurationDetail dbConfig)
     {
+        if (_jurisdictionRepository != null)
+        {
+            return await _jurisdictionRepository.GetSessionSortableViewAsync(skip, take, sortView, hasSearchKey, descending, dbConfig);
+        }
+
+        // Fallback for backward-compat when instantiated without IJurisdictionRepository
         var requestBuilder = new StringBuilder();
         requestBuilder.Append(dbConfig.url);
         requestBuilder.Append($"/{dbConfig.prefix}jurisdiction/_design/sortable/_view/{sortView}?");

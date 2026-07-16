@@ -590,7 +590,7 @@ dev this story _bmad-output/implementation-artifacts/18-5-iconfiguration-bootstr
 | 19.1 — `jurisdiction` Operation Catalog | [19-1-jurisdiction-operation-catalog.md](19-1-jurisdiction-operation-catalog.md) | done |
 | 19.2 — Define `IJurisdictionRepository` and Create `JurisdictionDAL` | [19-2-ijurisdiction-repository-jurisdictiondal.md](19-2-ijurisdiction-repository-jurisdictiondal.md) | ready-for-dev |
 | 19.3 — Define `IJurisdictionAuthorizationReader` and Route Auth Middleware | [19-3-ijurisdiction-authorization-reader.md](19-3-ijurisdiction-authorization-reader.md) | ready-for-dev |
-| 19.4 — Route Out-of-DAL Application CRUD Through `IJurisdictionRepository` | [19-4-route-out-of-dal-jurisdiction-crud.md](19-4-route-out-of-dal-jurisdiction-crud.md) | ready-for-dev |
+| 19.4 — Route Out-of-DAL Application CRUD Through `IJurisdictionRepository` | [19-4-route-out-of-dal-jurisdiction-crud.md](19-4-route-out-of-dal-jurisdiction-crud.md) | done |
 
 **Sequencing:** 19.1 first (discovery). 19.2 and 19.3 depend on 19.1 and can run in parallel. 19.4 depends on 19.2.
 

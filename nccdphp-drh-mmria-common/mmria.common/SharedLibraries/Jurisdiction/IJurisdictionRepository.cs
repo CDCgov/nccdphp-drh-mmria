@@ -36,9 +36,21 @@ public interface IJurisdictionRepository
 
     /// <summary>
     /// GET user_role_jurisdiction documents via a pre-built sortable view URL.
-    /// The caller is responsible for URL construction (Story 19.4 moves URL building into JurisdictionDAL).
+    /// Prefer <see cref="GetUserRoleJurisdictionSortableViewByParamsAsync"/> for new call sites.
     /// </summary>
     Task<get_sortable_view_reponse_header<user_role_jurisdiction>> GetUserRoleJurisdictionSortableViewAsync(string requestUrl, DBConfigurationDetail dbConfig);
+
+    /// <summary>
+    /// GET user_role_jurisdiction documents from a sortable design-doc view, building the URL internally.
+    /// Use this for all new call sites — URL construction belongs in JurisdictionDAL, not in callers.
+    /// </summary>
+    Task<get_sortable_view_reponse_header<user_role_jurisdiction>> GetUserRoleJurisdictionSortableViewByParamsAsync(
+        int skip,
+        int take,
+        string sortView,
+        bool hasSearchKey,
+        bool descending,
+        DBConfigurationDetail dbConfig);
 
     /// <summary>
     /// GET session documents from the jurisdiction database via a sortable design-doc view.

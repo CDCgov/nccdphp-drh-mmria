@@ -138,6 +138,17 @@ public class ManageUsersDAL
         return _jurisdictionRepository.GetUserRoleJurisdictionSortableViewAsync(request_string, db_config);
     }
 
+    public Task<get_sortable_view_reponse_header<user_role_jurisdiction>> GetUserRoleJurisdictionSortableViewByParamsAsync(
+        int skip,
+        int take,
+        string sortView,
+        bool hasSearchKey,
+        bool descending,
+        DBConfigurationDetail db_config)
+    {
+        return _jurisdictionRepository.GetUserRoleJurisdictionSortableViewByParamsAsync(skip, take, sortView, hasSearchKey, descending, db_config);
+    }
+
     public Task<jurisdiction_tree> GetJurisdictionTreeAsync(DBConfigurationDetail db_config)
     {
         return _jurisdictionRepository.GetJurisdictionTreeAsync(db_config);

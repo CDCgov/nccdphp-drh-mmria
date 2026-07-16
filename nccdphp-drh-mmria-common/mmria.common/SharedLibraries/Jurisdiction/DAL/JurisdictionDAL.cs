@@ -86,6 +86,47 @@ public sealed class JurisdictionDAL : IJurisdictionRepository
     }
 
     /// <inheritdoc />
+    public async Task<get_sortable_view_reponse_header<user_role_jurisdiction>> GetUserRoleJurisdictionSortableViewByParamsAsync(
+        int skip,
+        int take,
+        string sortView,
+        bool hasSearchKey,
+        bool descending,
+        DBConfigurationDetail dbConfig)
+    {
+        var urlBuilder = new StringBuilder();
+        urlBuilder.Append(dbConfig.url);
+        urlBuilder.Append($"/{dbConfig.prefix}jurisdiction/_design/sortable/_view/{sortView}?");
+
+        if (!hasSearchKey)
+        {
+            urlBuilder.Append(skip > -1 ? $"skip={skip}" : "skip=0");
+
+            if (take > -1)
+            {
+                urlBuilder.Append($"&limit={take}");
+            }
+
+            if (descending)
+            {
+                urlBuilder.Append("&descending=true");
+            }
+        }
+        else
+        {
+            urlBuilder.Append("skip=0");
+
+            if (descending)
+            {
+                urlBuilder.Append("&descending=true");
+            }
+        }
+
+        string response = await _httpClient.ExecuteAsync("GET", urlBuilder.ToString(), null, dbConfig.user_name, dbConfig.user_value);
+        return JsonConvert.DeserializeObject<get_sortable_view_reponse_header<user_role_jurisdiction>>(response);
+    }
+
+    /// <inheritdoc />
     public async Task<get_sortable_view_reponse_header<session>> GetSessionSortableViewAsync(
         int skip,
         int take,
