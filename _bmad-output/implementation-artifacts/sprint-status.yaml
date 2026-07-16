@@ -1,5 +1,5 @@
 # generated: 2026-07-14
-last_updated: 2026-07-15
+last_updated: 2026-07-16
 # project: mmria
 # project_key: NOKEY
 # tracking_system: file-system
@@ -223,12 +223,14 @@ development_status:
   # ── Epic 24: Infrastructure Sync and Database Lifecycle Consolidation ────
   epic-24: in-progress
   24-1-infra-operations-catalog: done
-  24-2-ideidentified-repository-ireport-write-extension: ready-for-dev
-  24-3-icase-repository-sync-extensions: ready-for-dev
-  24-4-export-queue-rebuild-routing: ready-for-dev
-  24-5-idatabase-lifecycle-service: ready-for-dev
-  24-6-c-sync-document-pmss-routing: ready-for-dev
-  24-7-c-document-sync-all-routing: ready-for-dev
-  24-8-process-db-synchronization-set-routing: ready-for-dev
-  24-9-process-central-pull-list-cdc-routing: ready-for-dev
+  24-2-ideidentified-repository-ireport-write-extension: done
+  24-3-icase-repository-sync-extensions: done
+  24-4-export-queue-rebuild-routing: done
+  24-5-idatabase-lifecycle-service: done
+  24-6-c-sync-document-pmss-routing: done
+  24-7-c-document-sync-all-routing: done
+  24-8-process-db-synchronization-set-routing: done
+  24-9-process-central-pull-list-cdc-routing: done
+  24-10-mmria-services-export-queue-routing: done
+  24-11-mmria-services-vital-import-routing: done
   epic-24-retrospective: optional

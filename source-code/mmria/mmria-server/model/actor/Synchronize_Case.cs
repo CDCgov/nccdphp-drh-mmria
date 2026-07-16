@@ -84,8 +84,8 @@ public sealed class Synchronize_Case : UntypedActor
                 sync_document_message.metadata_version,
                 db_config,
                 _couchDbHttpClient,
-                _configuration,
-                _host_prefix
+                configuration: _configuration,
+                host_prefix: _host_prefix
             );
 
             try

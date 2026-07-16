@@ -7,7 +7,7 @@ using Akka.Actor;
 
 namespace mmria.server.utils;
 
-public sealed class c_db_setup
+public sealed class c_db_setup : mmria.server.IDatabaseLifecycleService
 {
     ActorSystem _actorSystem;
     string metadata_version;

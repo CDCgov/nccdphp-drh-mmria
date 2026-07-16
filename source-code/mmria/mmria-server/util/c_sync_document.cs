@@ -2,6 +2,9 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using mmria.common.SharedLibraries.DeIdentified;
+using mmria.common.SharedLibraries.Report;
+using Newtonsoft.Json.Linq;
 
 
 namespace mmria.server.utils;
@@ -17,6 +20,8 @@ public sealed class c_sync_document
 
     mmria.common.couchdb.DBConfigurationDetail db_config = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IDeIdentifiedRepository _deIdentifiedRepository;
+    private readonly IReportRepository _reportRepository;
     private readonly bool _isShowSyncDocumentStatus;
     private readonly mmria.common.couchdb.OverridableConfiguration _configuration;
     private readonly string _host_prefix;
@@ -31,6 +36,8 @@ public sealed class c_sync_document
         string p_metadata_version,
         mmria.common.couchdb.DBConfigurationDetail _db_config,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        IDeIdentifiedRepository deIdentifiedRepository = null,
+        IReportRepository reportRepository = null,
         mmria.common.couchdb.OverridableConfiguration configuration = null,
         string host_prefix = null,
         c_document_sync_rebuild_context rebuild_context = null,
@@ -42,6 +49,8 @@ public sealed class c_sync_document
         metadata_version = p_metadata_version;
         db_config = _db_config;
         _couchDbHttpClient = couchDbHttpClient;
+        _deIdentifiedRepository = deIdentifiedRepository;
+        _reportRepository = reportRepository;
         _configuration = configuration;
         _host_prefix = host_prefix;
         _rebuild_context = rebuild_context;
@@ -314,15 +323,41 @@ public sealed class c_sync_document
 
     private async System.Threading.Tasks.Task persist_document_async(string p_database_name, string p_document_id, string p_document_json, string p_error_label)
     {
-        string revision = await get_revision(db_config.url + $"/{db_config.prefix}{p_database_name}/" + p_document_id);
-        string request_url = build_document_url(p_database_name, p_document_id, revision);
-        string request_json = this.method == "DELETE"
-            ? null
-            : prepare_document_json_for_persist(p_document_json, p_document_id, revision);
+        string revision;
+        if(_skip_revision_lookup)
+        {
+            revision = null;
+        }
+        else if(p_database_name == "de_id")
+        {
+            revision = await _deIdentifiedRepository.GetRevisionAsync(p_document_id, db_config);
+        }
+        else
+        {
+            revision = await _reportRepository.GetRevisionAsync(p_document_id, db_config);
+        }
 
         try
         {
-            await _couchDbHttpClient.ExecuteAsync(this.method, request_url, request_json, db_config.user_name, db_config.user_value);
+            if(this.method == "DELETE")
+            {
+                if(p_database_name == "de_id")
+                    await _deIdentifiedRepository.DeleteDocumentAsync(p_document_id, revision, db_config);
+                else
+                    await _reportRepository.DeleteDocumentAsync(p_document_id, revision, db_config);
+            }
+            else
+            {
+                string request_json = prepare_document_json_for_persist(p_document_json, p_document_id, revision);
+                if(!string.IsNullOrWhiteSpace(request_json))
+                {
+                    var doc = JObject.Parse(request_json);
+                    if(p_database_name == "de_id")
+                        await _deIdentifiedRepository.UpsertDocumentAsync(p_document_id, doc, db_config);
+                    else
+                        await _reportRepository.UpsertDocumentAsync(p_document_id, doc, db_config);
+                }
+            }
         }
         catch(Exception ex)
         {

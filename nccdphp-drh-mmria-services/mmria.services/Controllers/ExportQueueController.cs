@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Akka.Actor;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using mmria.common.SharedLibraries.ExportQueue;
 using mmria.services.Models;
 namespace mmria.services.vitalsimport.Controllers;
 
@@ -14,15 +15,18 @@ public sealed class ExportQueueController : ControllerBase
     private ActorSystem _actorSystem;
     private mmria.common.couchdb.ConfigurationSet _configurationSet;
     private mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IExportQueueRepository _exportQueueRepository;
 
     public ExportQueueController(
         ActorSystem actorSystem, 
         mmria.common.couchdb.ConfigurationSet configurationSet,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        IExportQueueRepository exportQueueRepository)
     {
         _actorSystem = actorSystem;
         _configurationSet = configurationSet;
         _couchDbHttpClient = couchDbHttpClient;
+        _exportQueueRepository = exportQueueRepository;
     }
 
     [HttpPost]
@@ -66,7 +70,7 @@ public sealed class ExportQueueController : ControllerBase
             );
 
             // Create and tell the actor to process
-            var actor = _actorSystem.ActorOf(Akka.Actor.Props.Create<mmria.services.ExportQueue.Process_Export_Queue>(db_config, _couchDbHttpClient));
+            var actor = _actorSystem.ActorOf(Akka.Actor.Props.Create<mmria.services.ExportQueue.Process_Export_Queue>(db_config, _couchDbHttpClient, _exportQueueRepository));
             actor.Tell(scheduleInfo);
 
             return Ok(new { success = true, message = "Export queue processing initiated" });

@@ -6,6 +6,7 @@ using mmria.common.couchdb;
 using mmria.common.model.couchdb;
 using mmria.case_version.v260615;
 using mmria.common.utils;
+using mmria.common.SharedLibraries.Case;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -344,5 +345,89 @@ public class CaseDAL : ICaseRepository
     {
         string requestUrl = dbConfig.Get_Prefix_DB_Url($"mmrds/_design/sortable/_view/by_date_created?skip={skip}&limit={pageSize}");
         return await _couchDbHttpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value);
+    }
+
+    public async Task<CasePage> GetCasesPagedAsync(string? startKey, int limit, DBConfigurationDetail dbConfig)
+    {
+        string query = $"mmrds/_all_docs?include_docs=true&limit={limit}";
+        if (startKey != null)
+        {
+            query += $"&startkey=\"{startKey}\"";
+        }
+        string requestUrl = dbConfig.Get_Prefix_DB_Url(query);
+        string response = await _couchDbHttpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value);
+
+        var parsed = JObject.Parse(response);
+        var rows = parsed["rows"] as JArray ?? new JArray();
+
+        var documents = new List<JObject>();
+        string? lastId = null;
+
+        foreach (var row in rows)
+        {
+            var doc = row["doc"] as JObject;
+            if (doc != null)
+            {
+                documents.Add(doc);
+            }
+            if (row["id"] != null)
+            {
+                lastId = row["id"]!.ToString();
+            }
+        }
+
+        return new CasePage(documents, lastId);
+    }
+
+    public async Task<CaseChangeFeedResult> GetCaseChangesSinceAsync(string sinceSeq, DBConfigurationDetail dbConfig)
+    {
+        string requestUrl = dbConfig.Get_Prefix_DB_Url($"mmrds/_changes?since={sinceSeq}&include_docs=true");
+        string response = await _couchDbHttpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value);
+
+        var parsed = JObject.Parse(response);
+        string lastSeq = parsed["last_seq"]?.ToString() ?? sinceSeq;
+        var results = parsed["results"] as JArray ?? new JArray();
+
+        var changes = new List<CaseChangeEntry>();
+        foreach (var item in results)
+        {
+            string id = item["id"]?.ToString() ?? string.Empty;
+            string seq = item["seq"]?.ToString() ?? string.Empty;
+            bool deleted = item["deleted"]?.Value<bool>() ?? false;
+            var doc = item["doc"] as JObject;
+            changes.Add(new CaseChangeEntry(id, seq, deleted, doc));
+        }
+
+        return new CaseChangeFeedResult(lastSeq, changes);
+    }
+
+    /// <summary>
+    /// Drops and recreates the tenant-prefixed mmrds database empty.
+    /// Used exclusively by the CDC populate path (Process_Central_Pull_list). SQL equivalent: TRUNCATE TABLE cases.
+    /// </summary>
+    public async Task DropAndResetAsync(DBConfigurationDetail dbConfig)
+    {
+        string dbUrl = dbConfig.Get_Prefix_DB_Url("mmrds");
+        await _couchDbHttpClient.ExecuteAsync("DELETE", dbUrl, null, dbConfig.user_name, dbConfig.user_value);
+        await _couchDbHttpClient.ExecuteAsync("PUT", dbUrl, null, dbConfig.user_name, dbConfig.user_value);
+    }
+
+    public async Task<int> GetCaseTotalCountAsync(DBConfigurationDetail dbConfig)
+    {
+        string requestUrl = dbConfig.Get_Prefix_DB_Url("mmrds/_all_docs?limit=0");
+        string response = await _couchDbHttpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value);
+
+        var parsed = JObject.Parse(response);
+        return parsed["total_rows"]?.Value<int>() ?? 0;
+    }
+
+    public async Task<int> GetDesignDocCountAsync(DBConfigurationDetail dbConfig)
+    {
+        string requestUrl = dbConfig.Get_Prefix_DB_Url("mmrds/_all_docs?startkey=\"_design/\"&endkey=\"_design0\"");
+        string response = await _couchDbHttpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value);
+
+        var parsed = JObject.Parse(response);
+        var rows = parsed["rows"] as JArray;
+        return rows?.Count ?? 0;
     }
 }

@@ -7,6 +7,7 @@ using Microsoft.Extensions.Configuration;
 using mmria.common.getset;
 using mmria.common.SharedLibraries.Case;
 using mmria.common.SharedLibraries.Case.DAL;
+using mmria.common.SharedLibraries.ExportQueue;
 using mmria.common.SharedLibraries.MetadataVersion;
 using mmria.common.SharedLibraries.MetadataVersion.DAL;
 using mmria.services.Models;
@@ -61,15 +62,18 @@ public sealed class mmrds_exporter
     private mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly IMetadataRepository _metadataRepository;
     private ICaseRepository _caseRepository;
+    private IExportQueueRepository? _exportQueueRepository;
 
     public mmrds_exporter
     (
         ScheduleInfoMessage configuration,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        IExportQueueRepository? exportQueueRepository = null
     )
     {
         this.Configuration = configuration;
         _couchDbHttpClient = couchDbHttpClient;
+        _exportQueueRepository = exportQueueRepository;
         _caseRepository = new CaseDAL(_couchDbHttpClient);
         _metadataRepository = new MetadataVersionDAL(_couchDbHttpClient);
 
@@ -1791,8 +1795,14 @@ public sealed class mmrds_exporter
         );
 
 
-        string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}export_queue/" + this.item_id, null, this.user_name, this.value_string);
-        export_queue_item export_queue_item = Newtonsoft.Json.JsonConvert.DeserializeObject<export_queue_item>(responseFromServer);
+        export_queue_item export_queue_item;
+        if (_exportQueueRepository != null)
+            export_queue_item = await _exportQueueRepository.GetQueueDocumentAsync<export_queue_item>(this.item_id, db_config);
+        else
+        {
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}export_queue/" + this.item_id, null, this.user_name, this.value_string);
+            export_queue_item = Newtonsoft.Json.JsonConvert.DeserializeObject<export_queue_item>(responseFromServer);
+        }
 
         export_queue_item.status = "Download";
 
@@ -1800,7 +1810,10 @@ public sealed class mmrds_exporter
         Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings();
         settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
         string object_string = Newtonsoft.Json.JsonConvert.SerializeObject(export_queue_item, settings);
-        responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue/" + export_queue_item._id, object_string, this.user_name, this.value_string);
+        if (_exportQueueRepository != null)
+            await _exportQueueRepository.SaveQueueDocumentAsync(export_queue_item._id, object_string, db_config);
+        else
+            await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue/" + export_queue_item._id, object_string, this.user_name, this.value_string);
 
 
         Console.WriteLine("{0} Export Finished", System.DateTime.Now);
@@ -1813,15 +1826,24 @@ public sealed class mmrds_exporter
         catch (Exception ex)
         {
 
-        string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}export_queue/" + this.item_id, null, this.user_name, this.value_string);
-        export_queue_item export_queue_item = Newtonsoft.Json.JsonConvert.DeserializeObject<export_queue_item>(responseFromServer);
+        export_queue_item export_queue_item;
+        if (_exportQueueRepository != null)
+            export_queue_item = await _exportQueueRepository.GetQueueDocumentAsync<export_queue_item>(this.item_id, db_config);
+        else
+        {
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}export_queue/" + this.item_id, null, this.user_name, this.value_string);
+            export_queue_item = Newtonsoft.Json.JsonConvert.DeserializeObject<export_queue_item>(responseFromServer);
+        }
 
         export_queue_item.status = "Queue Failed:" + ex.ToString();
 
         Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings();
         settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
         string object_string = Newtonsoft.Json.JsonConvert.SerializeObject(export_queue_item, settings);
-        responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue/" + export_queue_item._id, object_string, this.user_name, this.value_string);
+        if (_exportQueueRepository != null)
+            await _exportQueueRepository.SaveQueueDocumentAsync(export_queue_item._id, object_string, db_config);
+        else
+            await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue/" + export_queue_item._id, object_string, this.user_name, this.value_string);
 
 
         return false;

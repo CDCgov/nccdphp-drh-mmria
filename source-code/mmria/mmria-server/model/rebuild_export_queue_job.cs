@@ -10,6 +10,7 @@ using Microsoft.Extensions.Configuration;
 
 namespace mmria.server.model;
 
+// Superseded by Rebuild_Export_Queue Akka actor. Not registered in scheduler. Retained for reference only.
 public sealed class rebuild_queue_job : IJob
 {
     string couch_db_url = null;

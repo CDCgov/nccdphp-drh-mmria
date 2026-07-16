@@ -1,5 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using mmria.common.SharedLibraries.DeIdentified;
+using mmria.common.SharedLibraries.Report;
+using Newtonsoft.Json.Linq;
 
 
 namespace mmria.server.utils;
@@ -15,6 +18,8 @@ public sealed class c_sync_document
 
     string metadata_release_version_name;
     mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IDeIdentifiedRepository _deIdentifiedRepository;
+    private readonly IReportRepository _reportRepository;
     private readonly bool _isShowSyncDocumentStatus;
     private readonly c_document_sync_rebuild_context _rebuild_context;
     private readonly bool _skip_revision_lookup;
@@ -26,6 +31,8 @@ public sealed class c_sync_document
         common.couchdb.DBConfigurationDetail p_connection,
         string p_metadata_release_version_name,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        IDeIdentifiedRepository deIdentifiedRepository = null,
+        IReportRepository reportRepository = null,
         string p_method = "PUT",
         mmria.common.couchdb.OverridableConfiguration configuration = null,
         string host_prefix = null,
@@ -38,6 +45,8 @@ public sealed class c_sync_document
         connection = p_connection;
         metadata_release_version_name = p_metadata_release_version_name;
         _couchDbHttpClient = couchDbHttpClient;
+        _deIdentifiedRepository = deIdentifiedRepository;
+        _reportRepository = reportRepository;
         _isShowSyncDocumentStatus = configuration?.GetBoolean("is_show_sync_document_status", host_prefix ?? "shared") ?? true;
         _rebuild_context = rebuild_context;
         _skip_revision_lookup = skip_revision_lookup || rebuild_context != null;
@@ -231,19 +240,11 @@ public sealed class c_sync_document
     public async System.Threading.Tasks.Task executeAsync()
     {
 
-        string de_identified_revision = await get_revision (connection.url + $"/de_id/" + this.document_id);
-        System.Text.StringBuilder de_identfied_url = new System.Text.StringBuilder();
+        string de_identified_revision = _skip_revision_lookup ? null : await _deIdentifiedRepository.GetRevisionAsync(this.document_id, connection);
         string de_identified_json = null;
-
-        de_identfied_url.Append(connection.url);
-        de_identfied_url.Append($"/de_id/");
-        de_identfied_url.Append(this.document_id);
 
         if(this.method == "DELETE")
         {
-            de_identfied_url.Append("?rev=");
-            de_identfied_url.Append(de_identified_revision);	
-
         }
         else
         {
@@ -257,13 +258,14 @@ public sealed class c_sync_document
 
         try
         {
-            string de_id_result = await _couchDbHttpClient.ExecuteAsync(this.method, de_identfied_url.ToString(), de_identified_json, connection.user_name, connection.user_value);
-            if (_isShowSyncDocumentStatus)
+            if(this.method == "DELETE")
             {
-                System.Console.WriteLine("sync de_id");
-                System.Console.WriteLine(de_id_result);
+                await _deIdentifiedRepository.DeleteDocumentAsync(this.document_id, de_identified_revision, connection);
             }
-
+            else if(!string.IsNullOrEmpty(de_identified_json))
+            {
+                await _deIdentifiedRepository.UpsertDocumentAsync(this.document_id, JObject.Parse(de_identified_json), connection);
+            }
         }
         catch (Exception)
         {
@@ -278,31 +280,20 @@ public sealed class c_sync_document
         {
             string aggregate_json = await new mmria.server.utils.c_convert_to_report_object(document_json, connection, metadata_release_version_name, _couchDbHttpClient).execute();
 
-            string aggregate_revision = await get_revision (connection.url + $"/report/" + this.document_id);
-
-            System.Text.StringBuilder aggregate_url = new System.Text.StringBuilder();
+            string aggregate_revision = _skip_revision_lookup ? null : await _reportRepository.GetRevisionAsync(this.document_id, connection);
 
             if(!string.IsNullOrEmpty(aggregate_revision))
             {
                 aggregate_json = set_revision (aggregate_json, aggregate_revision);
             }
 
-
-            aggregate_url.Append(connection.url);
-            aggregate_url.Append($"/report/");
-            aggregate_url.Append(this.document_id);
-
             if(this.method == "DELETE")
             {
-                aggregate_url.Append("?rev=");
-                aggregate_url.Append(aggregate_revision);	
+                await _reportRepository.DeleteDocumentAsync(this.document_id, aggregate_revision, connection);
             }
-
-            string aggregate_result = await _couchDbHttpClient.ExecuteAsync(this.method, aggregate_url.ToString(), aggregate_json, connection.user_name, connection.user_value);
-            if (_isShowSyncDocumentStatus)
+            else if(!string.IsNullOrWhiteSpace(aggregate_json))
             {
-                System.Console.WriteLine("c_sync_document aggregate_id");
-                System.Console.WriteLine(aggregate_result);
+                await _reportRepository.UpsertDocumentAsync(this.document_id, JObject.Parse(aggregate_json), connection);
             }
 
         }

@@ -1509,7 +1509,7 @@ This catalog records every distinct operation against the `vital_import` CouchDB
 
 This catalog records every distinct **application read** operation against the `{prefix}report` CouchDB database across `mmria-server` and `mmria.common`. It is the authoritative operation set for Stories 23.6 and 23.7.
 
-> ℹ️ **Write side is out of scope:** The `report` database is written exclusively by sync and rebuild actors (`c_sync_document.cs` variants, `c_document_sync_all.cs` variants, `Process_DB_Synchronization_Set.cs`, `Process_Central_Pull_list.cs`, PMSS variants). These are sync/rebuild infrastructure and are explicitly excluded. `IReportRepository` covers **read operations only**.
+> ✅ **Story 24.2 update — write side is now covered:** The "write side is out of scope" declaration from Story 23.6 is superseded. Story 24.2 added write and lifecycle methods (`UpsertDocumentAsync`, `DeleteDocumentAsync`, `BulkUpsertAsync`, `DropAndResetWithSystemDocPreservationAsync`, `EnsureDesignDocumentAsync`, `EnsureIndexAsync`, `WaitForIndexReadyAsync`, `GetRevisionAsync`, `GetRevisionBulkAsync`) to `IReportRepository` and `ReportDAL`. These methods provide the interface seam required by Stories 24.6–24.9 to route all sync and rebuild writes through a typed repository instead of direct HTTP calls.
 
 ---
 

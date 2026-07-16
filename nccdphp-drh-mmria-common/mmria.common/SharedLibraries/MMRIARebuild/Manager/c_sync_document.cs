@@ -1,6 +1,9 @@
 #if !IS_PMSS_ENHANCED
 using System;
 using System.Collections.Generic;
+using mmria.common.SharedLibraries.DeIdentified;
+using mmria.common.SharedLibraries.Report;
+using Newtonsoft.Json.Linq;
 
 
 namespace mmria.common.SharedLibraries.MMRIARebuild.Manager;
@@ -16,6 +19,8 @@ public sealed class c_sync_document
 
     mmria.common.couchdb.DBConfigurationDetail db_config = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IDeIdentifiedRepository _deIdentifiedRepository;
+    private readonly IReportRepository _reportRepository;
     private readonly bool _isShowSyncDocumentStatus;
     private readonly mmria.common.couchdb.OverridableConfiguration _configuration;
     private readonly string _host_prefix;
@@ -30,6 +35,8 @@ public sealed class c_sync_document
         string p_metadata_version,
         mmria.common.couchdb.DBConfigurationDetail _db_config,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        IDeIdentifiedRepository deIdentifiedRepository = null,
+        IReportRepository reportRepository = null,
         mmria.common.couchdb.OverridableConfiguration configuration = null,
         string host_prefix = null,
         c_document_sync_rebuild_context rebuild_context = null,
@@ -41,6 +48,8 @@ public sealed class c_sync_document
         metadata_version = p_metadata_version;
         db_config = _db_config;
         _couchDbHttpClient = couchDbHttpClient;
+        _deIdentifiedRepository = deIdentifiedRepository;
+        _reportRepository = reportRepository;
         _configuration = configuration;
         _host_prefix = host_prefix;
         _rebuild_context = rebuild_context;
@@ -230,19 +239,11 @@ public sealed class c_sync_document
     public async System.Threading.Tasks.Task executeAsync()
     {
 
-        string de_identified_revision = await get_revision (db_config.url + $"/{db_config.prefix}de_id/" + this.document_id);
-        System.Text.StringBuilder de_identfied_url = new System.Text.StringBuilder();
+        string de_identified_revision = _skip_revision_lookup ? null : await _deIdentifiedRepository.GetRevisionAsync(this.document_id, db_config);
         string de_identified_json = null;
-
-        de_identfied_url.Append(db_config.url);
-        de_identfied_url.Append($"/{db_config.prefix}de_id/");
-        de_identfied_url.Append(this.document_id);
 
         if(this.method == "DELETE")
         {
-            de_identfied_url.Append("?rev=");
-            de_identfied_url.Append(de_identified_revision);	
-
         }
         else
         {
@@ -298,7 +299,14 @@ public sealed class c_sync_document
 
         try
         {
-            await _couchDbHttpClient.ExecuteAsync(this.method, de_identfied_url.ToString(), de_identified_json, db_config.user_name, db_config.user_value);
+            if(this.method == "DELETE")
+            {
+                await _deIdentifiedRepository.DeleteDocumentAsync(this.document_id, de_identified_revision, db_config);
+            }
+            else if(!string.IsNullOrEmpty(de_identified_json))
+            {
+                await _deIdentifiedRepository.UpsertDocumentAsync(this.document_id, JObject.Parse(de_identified_json), db_config);
+            }
         }
         catch (Exception)
         {
@@ -313,27 +321,21 @@ public sealed class c_sync_document
         {
             string aggregate_json = await new mmria.common.SharedLibraries.MMRIARebuild.Manager.c_convert_to_report_object(document_json, metadata_version, db_config, _couchDbHttpClient, _configuration, _host_prefix).executeAsync();
 
-            string aggregate_revision = await get_revision (db_config.url + $"/{db_config.prefix}report/" + this.document_id);
-
-            System.Text.StringBuilder aggregate_url = new System.Text.StringBuilder();
+            string aggregate_revision = _skip_revision_lookup ? null : await _reportRepository.GetRevisionAsync(this.document_id, db_config);
 
             if(!string.IsNullOrEmpty(aggregate_revision))
             {
                 aggregate_json = set_revision (aggregate_json, aggregate_revision);
             }
 
-
-            aggregate_url.Append(db_config.url);
-            aggregate_url.Append($"/{db_config.prefix}report/");
-            aggregate_url.Append(this.document_id);
-
             if(this.method == "DELETE")
             {
-                aggregate_url.Append("?rev=");
-                aggregate_url.Append(aggregate_revision);	
+                await _reportRepository.DeleteDocumentAsync(this.document_id, aggregate_revision, db_config);
             }
-
-            await _couchDbHttpClient.ExecuteAsync(this.method, aggregate_url.ToString(), aggregate_json, db_config.user_name, db_config.user_value);
+            else if(!string.IsNullOrWhiteSpace(aggregate_json))
+            {
+                await _reportRepository.UpsertDocumentAsync(this.document_id, JObject.Parse(aggregate_json), db_config);
+            }
 
         }
         catch (Exception)
@@ -351,7 +353,7 @@ public sealed class c_sync_document
             if(!string.IsNullOrWhiteSpace(opioid_report_json))
             {
                 var opioid_id = "opioid-" + this.document_id;
-                string aggregate_revision = await get_revision (db_config.url + $"/{db_config.prefix}report/" + opioid_id);
+                string aggregate_revision = _skip_revision_lookup ? null : await _reportRepository.GetRevisionAsync(opioid_id, db_config);
 
 
                 var opioid_report_expando_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (opioid_report_json);
@@ -359,25 +361,19 @@ public sealed class c_sync_document
                 byName["_id"] = opioid_id;
                 opioid_report_json =  Newtonsoft.Json.JsonConvert.SerializeObject(opioid_report_expando_object);
 
-                System.Text.StringBuilder opioid_aggregate_url = new System.Text.StringBuilder();
-
                 if(!string.IsNullOrEmpty(aggregate_revision))
                 {
                     opioid_report_json = set_revision (opioid_report_json, aggregate_revision);
                 }
 
-
-                opioid_aggregate_url.Append(db_config.url);
-                opioid_aggregate_url.Append($"/{db_config.prefix}report/");
-                opioid_aggregate_url.Append(opioid_id);
-    
                 if(this.method == "DELETE")
                 {
-                    opioid_aggregate_url.Append("?rev=");
-                    opioid_aggregate_url.Append(aggregate_revision);	
+                    await _reportRepository.DeleteDocumentAsync(opioid_id, aggregate_revision, db_config);
                 }
-
-                await _couchDbHttpClient.ExecuteAsync(this.method, opioid_aggregate_url.ToString(), opioid_report_json, db_config.user_name, db_config.user_value);
+                else
+                {
+                    await _reportRepository.UpsertDocumentAsync(opioid_id, JObject.Parse(opioid_report_json), db_config);
+                }
             }
 
         }
@@ -394,7 +390,7 @@ public sealed class c_sync_document
             if(!string.IsNullOrWhiteSpace(opioid_report_json))
             {
                 var opioid_id = "powerbi-" + this.document_id;
-                string aggregate_revision = await get_revision (db_config.url + $"/{db_config.prefix}report/" + opioid_id);
+                string aggregate_revision = _skip_revision_lookup ? null : await _reportRepository.GetRevisionAsync(opioid_id, db_config);
 
 
                 var opioid_report_expando_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (opioid_report_json);
@@ -402,25 +398,19 @@ public sealed class c_sync_document
                 byName["_id"] = opioid_id;
                 opioid_report_json =  Newtonsoft.Json.JsonConvert.SerializeObject(opioid_report_expando_object);
 
-                System.Text.StringBuilder opioid_aggregate_url = new System.Text.StringBuilder();
-
                 if(!string.IsNullOrEmpty(aggregate_revision))
                 {
                     opioid_report_json = set_revision (opioid_report_json, aggregate_revision);
                 }
 
-
-                opioid_aggregate_url.Append(db_config.url);
-                opioid_aggregate_url.Append($"/{db_config.prefix}report/");
-                opioid_aggregate_url.Append(opioid_id);
-    
                 if(this.method == "DELETE")
                 {
-                    opioid_aggregate_url.Append("?rev=");
-                    opioid_aggregate_url.Append(aggregate_revision);	
+                    await _reportRepository.DeleteDocumentAsync(opioid_id, aggregate_revision, db_config);
                 }
-
-                await _couchDbHttpClient.ExecuteAsync(this.method, opioid_aggregate_url.ToString(), opioid_report_json, db_config.user_name, db_config.user_value);
+                else
+                {
+                    await _reportRepository.UpsertDocumentAsync(opioid_id, JObject.Parse(opioid_report_json), db_config);
+                }
             }
 
         }
@@ -438,15 +428,13 @@ public sealed class c_sync_document
             if(!string.IsNullOrWhiteSpace(dqr_detail_report_json))
             {
                 var dqr_id = "dqr-" + this.document_id;
-                string current_detail_revision = await get_revision (db_config.url + $"/{db_config.prefix}report/" + dqr_id);
+                string current_detail_revision = _skip_revision_lookup ? null : await _reportRepository.GetRevisionAsync(dqr_id, db_config);
 
 
                 var dqr_report_expando_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (dqr_detail_report_json);
                 var byName = (IDictionary<string,object>)dqr_report_expando_object;
                 byName["_id"] = dqr_id;
                 dqr_detail_report_json =  Newtonsoft.Json.JsonConvert.SerializeObject(dqr_report_expando_object);
-                
-                System.Text.StringBuilder dqr_detail_url = new System.Text.StringBuilder();
 
                 if(!string.IsNullOrEmpty(current_detail_revision))
                 {
@@ -458,18 +446,14 @@ public sealed class c_sync_document
                     dqr_detail_report_json =  Newtonsoft.Json.JsonConvert.SerializeObject(dqr_report_expando_object);
                 }
 
-
-                dqr_detail_url.Append(db_config.url);
-                dqr_detail_url.Append($"/{db_config.prefix}report/");
-                dqr_detail_url.Append(dqr_id);
-    
                 if(this.method == "DELETE")
                 {
-                    dqr_detail_url.Append("?rev=");
-                    dqr_detail_url.Append(current_detail_revision);	
+                    await _reportRepository.DeleteDocumentAsync(dqr_id, current_detail_revision, db_config);
                 }
-
-                await _couchDbHttpClient.ExecuteAsync(this.method, dqr_detail_url.ToString(), dqr_detail_report_json, db_config.user_name, db_config.user_value);
+                else
+                {
+                    await _reportRepository.UpsertDocumentAsync(dqr_id, JObject.Parse(dqr_detail_report_json), db_config);
+                }
             }
 
         }
@@ -490,15 +474,13 @@ public sealed class c_sync_document
             if(!string.IsNullOrWhiteSpace(freq_detail_report_json))
             {
                 var freq_id = "freq-" + this.document_id;
-                string current_detail_revision = await get_revision (db_config.url + $"/{db_config.prefix}report/" + freq_id);
+                string current_detail_revision = _skip_revision_lookup ? null : await _reportRepository.GetRevisionAsync(freq_id, db_config);
 
 
                 var dqr_report_expando_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (freq_detail_report_json);
                 var byName = (IDictionary<string,object>)dqr_report_expando_object;
                 byName["_id"] = freq_id;
                 freq_detail_report_json =  Newtonsoft.Json.JsonConvert.SerializeObject(dqr_report_expando_object);
-                
-                System.Text.StringBuilder freq_detail_url = new System.Text.StringBuilder();
 
                 if(!string.IsNullOrEmpty(current_detail_revision))
                 {
@@ -510,18 +492,14 @@ public sealed class c_sync_document
                     freq_detail_report_json =  Newtonsoft.Json.JsonConvert.SerializeObject(dqr_report_expando_object);
                 }
 
-
-                freq_detail_url.Append(db_config.url);
-                freq_detail_url.Append($"/{db_config.prefix}report/");
-                freq_detail_url.Append(freq_id);
-    
                 if(this.method == "DELETE")
                 {
-                    freq_detail_url.Append("?rev=");
-                    freq_detail_url.Append(current_detail_revision);	
+                    await _reportRepository.DeleteDocumentAsync(freq_id, current_detail_revision, db_config);
                 }
-
-                await _couchDbHttpClient.ExecuteAsync(this.method, freq_detail_url.ToString(), freq_detail_report_json, db_config.user_name, db_config.user_value);
+                else
+                {
+                    await _reportRepository.UpsertDocumentAsync(freq_id, JObject.Parse(freq_detail_report_json), db_config);
+                }
             }
 
         }

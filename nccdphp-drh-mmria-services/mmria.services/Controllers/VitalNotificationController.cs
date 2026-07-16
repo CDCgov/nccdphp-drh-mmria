@@ -13,6 +13,8 @@ using System.Net.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Authorization;
 using System.Net;
+using mmria.common.SharedLibraries.VitalImport;
+using mmria.common.couchdb;
 
 namespace mmria.services.vitalsimport.Controllers;
 
@@ -23,11 +25,13 @@ public sealed class VitalNotificationController : ControllerBase
 {
     private ActorSystem _actorSystem;
     private mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IVitalImportRepository? _vitalImportRepository;
 
-    public VitalNotificationController(ActorSystem actorSystem, mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+    public VitalNotificationController(ActorSystem actorSystem, mmria.common.getset.CouchDbHttpClient couchDbHttpClient, IVitalImportRepository? vitalImportRepository = null)
     {
         _actorSystem = actorSystem;
         _couchDbHttpClient = couchDbHttpClient;
+        _vitalImportRepository = vitalImportRepository;
     }
 
     [HttpGet]
@@ -36,17 +40,20 @@ public sealed class VitalNotificationController : ControllerBase
     {
         var  result = new List<mmria.common.ije.Batch>();
 
-        string url = $"{mmria.services.vitalsimport.Program.couchdb_url}/vital_import/_all_docs?include_docs=true";
         try
         {
-            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", url, null, mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
-            var alldocs = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.alldocs_response<mmria.common.ije.Batch>>(responseFromServer);
+            var dbConfig = new DBConfigurationDetail
+            {
+                url = mmria.services.vitalsimport.Program.couchdb_url,
+                user_name = mmria.services.vitalsimport.Program.timer_user_name,
+                user_value = mmria.services.vitalsimport.Program.timer_value
+            };
+            var alldocs = await _vitalImportRepository!.GetAllBatchesAsync(dbConfig);
 
             foreach(var item in alldocs.rows)
             {
                 result.Add(item.doc);
             }
-            
         }
         catch(Exception ex)
         {
@@ -68,17 +75,20 @@ public sealed class VitalNotificationController : ControllerBase
 
         var  batch_list = new List<mmria.common.ije.Batch>();
 
-        string url = $"{mmria.services.vitalsimport.Program.couchdb_url}/vital_import/_all_docs?include_docs=true";
         try
         {
-            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", url, null, mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
-            var alldocs = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.alldocs_response<mmria.common.ije.Batch>>(responseFromServer);
+            var dbConfig = new DBConfigurationDetail
+            {
+                url = mmria.services.vitalsimport.Program.couchdb_url,
+                user_name = mmria.services.vitalsimport.Program.timer_user_name,
+                user_value = mmria.services.vitalsimport.Program.timer_value
+            };
+            var alldocs = await _vitalImportRepository!.GetAllBatchesAsync(dbConfig);
 
             foreach(var item in alldocs.rows)
             {
                 batch_list.Add(item.doc);
             }
-            
         }
         catch(Exception ex)
         {

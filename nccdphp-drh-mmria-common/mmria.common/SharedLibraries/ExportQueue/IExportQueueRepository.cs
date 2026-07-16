@@ -34,4 +34,11 @@ public interface IExportQueueRepository
         string service_url,
         string request_json,
         string vitalServiceKey);
+
+    /// <summary>
+    /// Drops the export_queue database, recreates it empty, and restores the security document
+    /// restricting access to the abstractor role.
+    /// SQL migration equivalent: TRUNCATE TABLE export_queue + reset row-level permissions.
+    /// </summary>
+    Task PurgeAndReinitializeAsync(DBConfigurationDetail dbConfig);
 }
