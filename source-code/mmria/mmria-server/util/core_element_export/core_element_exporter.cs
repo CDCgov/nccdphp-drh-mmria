@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Linq;
 using Microsoft.Extensions.Configuration;
+using mmria.common.SharedLibraries.ExportQueue;
 using mmria.common.SharedLibraries.Other;
 
 namespace mmria.server.utils;
@@ -46,14 +47,17 @@ public sealed class core_element_exporter
 
     mmria.common.couchdb.DBConfigurationDetail db_config;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IExportQueueRepository _exportQueueRepository;
     
     public core_element_exporter(
         mmria.server.model.actor.ScheduleInfoMessage configuration,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        IExportQueueRepository exportQueueRepository
     )
     {
         this.Configuration = configuration;
         _couchDbHttpClient = couchDbHttpClient;
+        _exportQueueRepository = exportQueueRepository;
 
         db_config = new()
         {
@@ -801,15 +805,14 @@ public async System.Threading.Tasks.Task ExecuteAsync(mmria.server.export_queue_
 
 
 
-    string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}export_queue/" + this.item_id, null, this.user_name, this.value_string);
-    export_queue_item export_queue_item = Newtonsoft.Json.JsonConvert.DeserializeObject<export_queue_item>(responseFromServer);
+    export_queue_item export_queue_item = await _exportQueueRepository.GetQueueDocumentAsync<export_queue_item>(this.item_id, db_config);
 
     export_queue_item.status = "Download";
 
     Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings();
     settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
     string object_string = Newtonsoft.Json.JsonConvert.SerializeObject(export_queue_item, settings);
-    responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue/" + export_queue_item._id, object_string, this.user_name, this.value_string);
+    await _exportQueueRepository.SaveQueueDocumentAsync(export_queue_item._id, object_string, db_config);
 
 
     Console.WriteLine("{0} Export Finished.", System.DateTime.Now);

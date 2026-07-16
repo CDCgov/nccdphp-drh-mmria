@@ -4,6 +4,8 @@ using System.Linq;
 using mmria.common.getset;
 using mmria.common.SharedLibraries.Case;
 using mmria.common.SharedLibraries.Case.DAL;
+using mmria.common.SharedLibraries.MetadataVersion;
+using mmria.common.SharedLibraries.MetadataVersion.DAL;
 using mmria.services.Models;
 
 namespace mmria.services.Utilities.Exporter;
@@ -63,6 +65,7 @@ private ScheduleInfoMessage Configuration;
 
 mmria.common.couchdb.DBConfigurationDetail db_config;
 private mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+private readonly IMetadataRepository _metadataRepository;
 private ICaseRepository _caseRepository;
 
 public exporter(ScheduleInfoMessage configuration, mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
@@ -70,6 +73,7 @@ public exporter(ScheduleInfoMessage configuration, mmria.common.getset.CouchDbHt
     this.Configuration = configuration;
     _couchDbHttpClient = couchDbHttpClient;
     _caseRepository = new CaseDAL(_couchDbHttpClient);
+    _metadataRepository = new MetadataVersionDAL(_couchDbHttpClient);
 
     db_config = new()
     {
@@ -154,8 +158,7 @@ public async System.Threading.Tasks.Task<bool> Execute(export_queue_item queue_i
     this.qualitativeStreamWriter[2] = new System.IO.StreamWriter(System.IO.Path.Combine(export_directory, "informant-interview.txt"), true);
 
 
-    string metadata_url = this.database_url + $"/metadata/version_specification-{this.Configuration.version_number}/metadata";
-    mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, this.user_name, this.value_string));
+    mmria.common.metadata.app metadata = await _metadataRepository.GetAppDocumentAsync(this.Configuration.version_number, db_config);
     this.current_metadata = metadata;
 
 

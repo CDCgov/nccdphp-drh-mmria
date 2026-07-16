@@ -1,8 +1,12 @@
+---
+baseline_commit: 237f8451bf01bf0edc07b8fdd4528f4000759805
+---
+
 # Story 19.4 — Route Out-of-DAL Application CRUD Through `IJurisdictionRepository`
 
 **Epic:** 19 — `jurisdiction` Consolidation (SQL Migration Foundation)
 **Story ID:** 19.4
-**Status:** ready-for-dev
+**Status:** done
 **Date added:** 2026-07-15
 **Depends on:** 19.2
 **Source requirements:** epics.md §Epic 19 Story 19.4; project-context.md §2.2

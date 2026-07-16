@@ -2,7 +2,7 @@
 
 **Epic:** 21 — `audit` Consolidation (SQL Migration Foundation)
 **Story ID:** 21.2
-**Status:** ready-for-dev
+**Status:** done
 **Date added:** 2026-07-15
 **Depends on:** 21.1
 **Source requirements:** epics.md §Epic 21 Story 21.2; project-context.md §2.2

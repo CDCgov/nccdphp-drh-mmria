@@ -69,13 +69,15 @@ public sealed class JurisdictionSummary
     mmria.common.couchdb.ConfigurationSet ConfigDB;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly mmria.common.SharedLibraries.Account.IUserRepository _userRepository;
+    private readonly mmria.common.SharedLibraries.Jurisdiction.IJurisdictionRepository _jurisdictionRepository;
 
-    public JurisdictionSummary(mmria.common.couchdb.ConfigurationSet p_config_db, mmria.common.getset.CouchDbHttpClient couchDbHttpClient, mmria.common.SharedLibraries.Account.IUserRepository userRepository)
+    public JurisdictionSummary(mmria.common.couchdb.ConfigurationSet p_config_db, mmria.common.getset.CouchDbHttpClient couchDbHttpClient, mmria.common.SharedLibraries.Account.IUserRepository userRepository, mmria.common.SharedLibraries.Jurisdiction.IJurisdictionRepository jurisdictionRepository)
     {
 
         ConfigDB = p_config_db;
         _couchDbHttpClient = couchDbHttpClient;
         _userRepository = userRepository;
+        _jurisdictionRepository = jurisdictionRepository;
     }
 
     public async Task<List<JurisdictionSummaryItem>> execute
@@ -416,61 +418,14 @@ public sealed class JurisdictionSummary
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     ) 
     {
-        //string sort = "by_date_created";
-        string search_key = null;
-        bool descending = false;
-        int skip = 0;
-        int take = 20000;
-        search_key = "";
-        string sort_view = "by_date_created";
-
         try
         {
-            System.Text.StringBuilder request_builder = new System.Text.StringBuilder ();
-            request_builder.Append (p_config_detail.url);
-            request_builder.Append ($"/{p_config_detail.prefix}jurisdiction/_design/sortable/_view/{sort_view}?");
-
-
-            if (string.IsNullOrWhiteSpace (search_key))
-            {
-                if (skip > -1) 
-                {
-                    request_builder.Append ($"skip={skip}");
-                } 
-                else 
-                {
-
-                    request_builder.Append ("skip=0");
-                }
-
-
-                if (take > -1) 
-                {
-                    request_builder.Append ($"&limit={take}");
-                }
-
-                if (descending) 
-                {
-                    request_builder.Append ("&descending=true");
-                }
-            } 
-            else 
-            {
-                request_builder.Append ("skip=0");
-
-                if (descending) 
-                {
-                    request_builder.Append ("&descending=true");
-                }
-            }
-
             cancellationToken.ThrowIfCancellationRequested();
 
-            string response_from_server = await couchDbHttpClient.ExecuteAsync("GET", request_builder.ToString(), null, p_config_detail.user_name, p_config_detail.user_value, "application/json");
+            var case_view_response = await _jurisdictionRepository.GetUserRoleJurisdictionSortableViewByParamsAsync(
+                skip: 0, take: 20000, sortView: "by_date_created", hasSearchKey: false, descending: false, p_config_detail);
 
             cancellationToken.ThrowIfCancellationRequested();
-
-            var case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.user_role_jurisdiction>>(response_from_server);
 
             HashSet<string> Jurisdictin_User_Set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var Jurisdictin_Role_Dictionary = new Dictionary<string,HashSet<string>>(StringComparer.OrdinalIgnoreCase)

@@ -15,7 +15,8 @@ using System.Security.Claims;
 
 using Microsoft.AspNetCore.Http;
 
-using  mmria.server.extension; 
+using  mmria.server.extension;
+using mmria.common.SharedLibraries.Report;
 namespace mmria.server;
 
 [Authorize(Roles  = "abstractor, data_analyst")]
@@ -41,16 +42,16 @@ public sealed class dqrReportController: ControllerBase
     mmria.common.couchdb.OverridableConfiguration configuration;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IReportRepository _reportRepository;
 
     public dqrReportController
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        IReportRepository reportRepository
     )
     {
-        _couchDbHttpClient = couchDbHttpClient;
+        _reportRepository = reportRepository;
         host_prefix = tenantRuntime.EffectiveHostPrefix;
 
         configuration = tenantRuntime.RequireConfiguration();
@@ -60,11 +61,6 @@ public sealed class dqrReportController: ControllerBase
     public async Task<Result_Struct> Get(string quarter_string)
     {
         var result = new Result_Struct();
-        
-        var config_couchdb_url = db_config.url;
-        var config_timer_user_name = db_config.user_name;
-        var config_timer_value = db_config.user_value;
-        var config_db_prefix = db_config.prefix;
         
         try
         {
@@ -87,14 +83,7 @@ public sealed class dqrReportController: ControllerBase
             settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
             string selector_struc_string = Newtonsoft.Json.JsonConvert.SerializeObject (selector_struc, settings);
 
-            string find_url = $"{config_couchdb_url}/{config_db_prefix}report/_find";
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                "POST",
-                find_url,
-                selector_struc_string,
-                config_timer_user_name,
-                config_timer_value
-            );
+            string responseFromServer = await _reportRepository.FindReportDocumentsAsync(selector_struc_string, db_config);
 
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<Result_Struct>(responseFromServer);
             

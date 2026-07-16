@@ -51,22 +51,6 @@ public sealed class Audit_Detail_View
 public sealed class _auditController : Controller
 {
 
-    public struct Change_Stack_Result_Struct
-    {
-        public mmria.common.model.couchdb.Change_Stack[] docs;
-    }
-
-    struct Selector_Struc
-    {
-        //public System.Dynamic.ExpandoObject selector;
-        public System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, string>> selector;
-        public string[] fields;
-
-        public string use_index;
-
-        public int limit;
-    }
-
 
     mmria.common.couchdb.OverridableConfiguration configuration;
     common.couchdb.DBConfigurationDetail db_config;
@@ -86,26 +70,6 @@ public sealed class _auditController : Controller
         configuration = tenantRuntime.RequireConfiguration();
 
         db_config = tenantRuntime.RequireDbConfig();
-    }
-
-    (string url, string post) get_find_url(string p_id)
-    {
-        var selector_struc = new Selector_Struc();
-        selector_struc.selector = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
-        // Hard cap audit history fetch (was 1_000_000). Audit results are not paginated
-        // downstream, so this needs to cover a full per-case audit chain. 10,000 is well
-        // above realistic chains while still bounding worst-case memory/CPU.
-        selector_struc.limit = 10_000;
-        selector_struc.selector.Add("case_id", new System.Collections.Generic.Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
-        selector_struc.selector["case_id"].Add("$eq", p_id);
-        selector_struc.use_index = "case-id-date-last-updated-index";
-
-        Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings();
-        settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-        string selector_struc_string = Newtonsoft.Json.JsonConvert.SerializeObject(selector_struc, settings);
-
-        string result = $"{db_config.url}/{db_config.prefix}audit/_find";
-        return (result, selector_struc_string);
     }
 
     [Route("_audit/{p_id}/{page?}")]
@@ -500,25 +464,15 @@ public sealed class _auditController : Controller
             }
 
             // Save the updated master document to CouchDB
-            var db_save_result = await SaveAuditDocument(sanitizedAuditDocument);
+            await SaveAuditDocument(sanitizedAuditDocument);
 
-            if (db_save_result.ok)
+            // Return success response
+            var response = new
             {
-                // Return success response
-                var response = new
-                {
-                    ok = true,
-                    _id = sanitizedAuditDocument._id,
-                    _rev = db_save_result.rev
-                };
-                return Ok(response);
-            }
-            else
-            {
-                Console.WriteLine(
-                    $"Audit master save failed for {sanitizedAuditDocument._id}: rev={revisionHandling}; response={db_save_result?.error_description}");
-                return StatusCode(500, "Failed to save audit history to database");
-            }
+                ok = true,
+                _id = sanitizedAuditDocument._id
+            };
+            return Ok(response);
         }
         catch (Exception ex)
         {
@@ -542,18 +496,9 @@ public sealed class _auditController : Controller
         }
     }
 
-    private async Task<mmria.common.model.couchdb.document_put_response> SaveAuditDocument(mmria.common.model.couchdb.audit.Audit_Manage_User auditDocument)
+    private async Task SaveAuditDocument(mmria.common.model.couchdb.audit.Audit_Manage_User auditDocument)
     {
-        try
-        {
-            return await _auditRecoveryManager.SaveAuditDocumentAsync(auditDocument, db_config);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error in SaveAuditDocument: {ex.Message}");
-            Console.WriteLine($"Stack Trace: {ex.StackTrace}");
-            return new mmria.common.model.couchdb.document_put_response { ok = false };
-        }
+        await _auditRecoveryManager.SaveAuditDocumentAsync(auditDocument, db_config);
     }
 
 }

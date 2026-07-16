@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using Microsoft.AspNetCore.Http;
+using mmria.common.SharedLibraries.Jurisdiction;
 
 using  mmria.server.extension; 
 
@@ -20,13 +21,15 @@ public sealed class jurisdictionSummaryController : Controller
     mmria.common.couchdb.ConfigurationSet ConfigDB;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly mmria.common.SharedLibraries.Account.IUserRepository _userRepository;
+    private readonly IJurisdictionRepository _jurisdictionRepository;
 
     public jurisdictionSummaryController
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
-        mmria.common.SharedLibraries.Account.IUserRepository userRepository
+        mmria.common.SharedLibraries.Account.IUserRepository userRepository,
+        IJurisdictionRepository jurisdictionRepository
     )
     {
         ConfigDB = tenantRuntime.RequireConfigurationSet();
@@ -36,12 +39,13 @@ public sealed class jurisdictionSummaryController : Controller
         db_config = tenantRuntime.RequireDbConfig();
         _couchDbHttpClient = couchDbHttpClient;
         _userRepository = userRepository;
+        _jurisdictionRepository = jurisdictionRepository;
     }
 
     public async Task<IActionResult> Index(System.Threading.CancellationToken cancellationToken)
     {
 
-        var result = new mmria.server.utils.JurisdictionSummary(ConfigDB, _couchDbHttpClient, _userRepository);
+        var result = new mmria.server.utils.JurisdictionSummary(ConfigDB, _couchDbHttpClient, _userRepository, _jurisdictionRepository);
 
         return View(await result.execute(cancellationToken));
     }
@@ -50,7 +54,7 @@ public sealed class jurisdictionSummaryController : Controller
     public async Task<IActionResult> GenerateReport(System.Threading.CancellationToken cancellationToken)
     {
 
-        var summary_list = new mmria.server.utils.JurisdictionSummary(ConfigDB, _couchDbHttpClient, _userRepository);
+        var summary_list = new mmria.server.utils.JurisdictionSummary(ConfigDB, _couchDbHttpClient, _userRepository, _jurisdictionRepository);
 
         var summary_row_list = await summary_list.execute(cancellationToken);
 

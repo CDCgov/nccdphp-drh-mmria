@@ -26,7 +26,6 @@ public sealed class CaseController : Controller
     mmria.common.couchdb.OverridableConfiguration configuration;
     mmria.common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly CaseValidationManager _caseValidationManager;
     private readonly MetadataVersionManager _metadataVersionManager;
 
@@ -34,12 +33,10 @@ public sealed class CaseController : Controller
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
         CaseValidationManager caseValidationManager,
         MetadataVersionManager metadataVersionManager
     )
     {
-        _couchDbHttpClient = couchDbHttpClient;
         _caseValidationManager = caseValidationManager;
         _metadataVersionManager = metadataVersionManager;
         
@@ -138,9 +135,7 @@ public sealed class CaseController : Controller
 
         try
         {
-            string request_string = $"{db_config.url}/metadata/duplicate-multiform-list";
-
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
+            string responseFromServer = await _metadataVersionManager.GetDuplicateMultiFormListAsync(db_config);
 
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<DuplicateMultiformResult>(responseFromServer);
 

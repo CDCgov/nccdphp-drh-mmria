@@ -5,18 +5,17 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using mmria.common.couchdb;
 using mmria.common.model.couchdb;
-using mmria.common.SharedLibraries.Session.DAL;
 using mmria.common.SharedLibraries.Session.Model;
 
 namespace mmria.common.SharedLibraries.Session.Manager;
 
 public sealed class SessionManager
 {
-    private readonly SessionDAL _dal;
+    private readonly ISessionRepository _dal;
 
     public SessionManager
     (
-        SessionDAL dal
+        ISessionRepository dal
     )
     {
         _dal = dal;
@@ -57,7 +56,6 @@ public sealed class SessionManager
     public async Task PostSessionAsync(Session_Message session_message, mmria.common.couchdb.DBConfigurationDetail db_config)
     {
         mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response ();
-            string request_string = db_config.url + $"/{db_config.prefix}session/{session_message._id}";
 
             try 
             {
@@ -198,9 +196,7 @@ public sealed class SessionManager
     public async Task<document_put_response> PostSessionDocumentAsync(session post_request, ClaimsPrincipal user, DBConfigurationDetail db_config)
     {
         document_put_response result = new document_put_response();
-        string request_string = db_config.url + $"/{db_config.prefix}session/{post_request._id}";
         _ = result;
-        _ = request_string;
 
         try
         {

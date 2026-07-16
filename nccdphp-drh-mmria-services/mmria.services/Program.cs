@@ -86,6 +86,15 @@ public sealed class Program
         builder.Services.AddScoped<mmria.common.SharedLibraries.SystemConfig.DAL.SystemConfigDAL>();
         builder.Services.AddScoped<mmria.common.SharedLibraries.SystemConfig.IConfigurationRepository>(
             sp => sp.GetRequiredService<mmria.common.SharedLibraries.SystemConfig.DAL.SystemConfigDAL>());
+        builder.Services.AddScoped<mmria.common.SharedLibraries.MetadataVersion.DAL.MetadataVersionDAL>();
+        builder.Services.AddScoped<mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository>(
+            sp => sp.GetRequiredService<mmria.common.SharedLibraries.MetadataVersion.DAL.MetadataVersionDAL>());
+        builder.Services.AddScoped<mmria.common.SharedLibraries.Case.DAL.CaseDAL>();
+        builder.Services.AddScoped<mmria.common.SharedLibraries.Case.ICaseRepository>(
+            sp => sp.GetRequiredService<mmria.common.SharedLibraries.Case.DAL.CaseDAL>());
+        builder.Services.AddScoped<mmria.common.SharedLibraries.VitalImport.DAL.VitalImportDAL>();
+        builder.Services.AddScoped<mmria.common.SharedLibraries.VitalImport.IVitalImportRepository>(
+            sp => sp.GetRequiredService<mmria.common.SharedLibraries.VitalImport.DAL.VitalImportDAL>());
         builder.Services.AddScoped<MMRIAServicesDAL>();
         builder.Services.AddScoped<MMRIAServicesManager>();
         builder.Services.AddScoped<MMRIARebuildDAL>();

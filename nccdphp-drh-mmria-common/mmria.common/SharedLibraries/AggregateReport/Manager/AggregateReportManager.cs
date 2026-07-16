@@ -6,16 +6,17 @@ using System.Threading.Tasks;
 using mmria.common.couchdb;
 using mmria.common.getset;
 using mmria.common.Model.AggregateReport;
+using mmria.common.SharedLibraries.Report;
 
 namespace mmria.common.Manager;
 
 public sealed class AggregateReportManager
 {
-    private readonly CouchDbHttpClient _couchDbHttpClient;
+    private readonly IReportRepository _reportRepository;
 
-    public AggregateReportManager(CouchDbHttpClient couchDbHttpClient)
+    public AggregateReportManager(IReportRepository reportRepository)
     {
-        _couchDbHttpClient = couchDbHttpClient;
+        _reportRepository = reportRepository;
     }
 
     /// <summary>
@@ -32,12 +33,9 @@ public sealed class AggregateReportManager
     {
         var result = new List<c_report_object>();
 
-        string request_string = dbConfig.Get_Prefix_DB_Url("report/_all_docs?include_docs=true");
+        string responseFromServer = await _reportRepository.GetAllReportDocumentsAsync(dbConfig);
 
-        using JsonDocument doc = await _couchDbHttpClient.ExecuteForJsonDocumentAsync(
-            request_string,
-            dbConfig.user_name,
-            dbConfig.user_value);
+        using JsonDocument doc = JsonDocument.Parse(responseFromServer);
 
         var root = doc.RootElement;
 

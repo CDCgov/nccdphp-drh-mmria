@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using mmria.common.SharedLibraries.MetadataVersion;
+using mmria.common.SharedLibraries.MetadataVersion.DAL;
 
 namespace mmria.server.utils;
 
@@ -19,6 +21,7 @@ public sealed class c_convert_to_dqr_detail
 
     private int blank_value = 9999;
     mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IMetadataRepository _metadataRepository;
     private readonly System.Dynamic.ExpandoObject _source_object;
     private readonly mmria.common.metadata.app _metadata;
 
@@ -39,6 +42,7 @@ public sealed class c_convert_to_dqr_detail
         metadata_release_version_name = p_metadata_release_version_name;
         this.data_type = p_type;
         _couchDbHttpClient = couchDbHttpClient;
+        _metadataRepository = new MetadataVersionDAL(couchDbHttpClient);
         _source_object = p_source_object;
         _metadata = p_metadata;
     }
@@ -52,9 +56,7 @@ public sealed class c_convert_to_dqr_detail
         var metadata = _metadata;
         if(metadata == null)
         {
-            string metadata_url = connection.url + $"/metadata/version_specification-{metadata_release_version_name}/metadata";
-            var metadata_response = await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, connection.user_name, connection.user_value);
-            metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_response);
+            metadata = await _metadataRepository.GetAppDocumentAsync(metadata_release_version_name, connection);
         }
 
 

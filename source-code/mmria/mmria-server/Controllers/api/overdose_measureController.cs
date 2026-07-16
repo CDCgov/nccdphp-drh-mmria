@@ -8,13 +8,13 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 
 using  mmria.server.extension;
+using mmria.common.SharedLibraries.Report;
 
 namespace mmria.server;
 
 [Route("api/overdose-measures")]
 public sealed class overdose_measureController: ControllerBase
 { 
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     public struct Result_Struct
     {
         public System.Dynamic.ExpandoObject[] docs;
@@ -34,14 +34,16 @@ public sealed class overdose_measureController: ControllerBase
     mmria.common.couchdb.OverridableConfiguration configuration;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly IReportRepository _reportRepository;
+
     public overdose_measureController
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        IReportRepository reportRepository
     )
     {
-        _couchDbHttpClient = couchDbHttpClient;
+        _reportRepository = reportRepository;
         host_prefix = tenantRuntime.EffectiveHostPrefix;
 
         configuration = tenantRuntime.RequireConfiguration();
@@ -54,11 +56,6 @@ public sealed class overdose_measureController: ControllerBase
     public async Task<Result_Struct> Get()
     {
         Result_Struct result = new Result_Struct();
-        
-        var config_couchdb_url = db_config.url;
-        var config_timer_user_name = db_config.user_name;
-        var config_timer_value = db_config.user_value;
-        var config_db_prefix = db_config.prefix;
         
         try
         {
@@ -75,9 +72,7 @@ public sealed class overdose_measureController: ControllerBase
             System.Console.WriteLine(selector_struc_string);
 
 
-            string find_url = $"{config_couchdb_url}/{config_db_prefix}report/_find";
-
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("POST", find_url, selector_struc_string, config_timer_user_name, config_timer_value);
+            string responseFromServer = await _reportRepository.FindReportDocumentsAsync(selector_struc_string, db_config);
             
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<Result_Struct>(responseFromServer);
 

@@ -12,9 +12,10 @@ using Newtonsoft.Json.Linq;
 
 namespace mmria.common.SharedLibraries.OfflineCase.DAL;
 
-public class OfflineCaseDAL
+public class OfflineCaseDAL : IOfflineCaseRepository
 {
     private const string OfflineCasesByCreatedByViewPath = "offline_cases/_design/sortable/_view/by-created-by";
+    private const string LightweightStatusOnlyViewPath = "offline_cases/_design/sortable/_view/lightweight-status-only";
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private static readonly JsonSerializerSettings CaseAwareSerializerSettings = CaseJsonSerialization.CreateNewtonsoftSerializerSettings();
     private static readonly JsonSerializerSettings CaseAwareSerializerSettingsIgnoreNulls = CaseJsonSerialization.CreateNewtonsoftSerializerSettings(ignoreNulls: true);
@@ -43,7 +44,7 @@ public class OfflineCaseDAL
         };
 
         string objectString = JsonConvert.SerializeObject(doc, CaseAwareSerializerSettingsIgnoreNulls);
-        string requestUrl = $"{dbConfig.url}/{dbConfig.prefix}offline_cases/{documentId}";
+        string requestUrl = dbConfig.Get_Prefix_DB_Url($"offline_cases/{documentId}");
 
         string response = await _couchDbHttpClient.ExecuteAsync("PUT", requestUrl, objectString, dbConfig.user_name, dbConfig.user_value, "application/json");
         var result = JsonConvert.DeserializeObject<document_put_response>(response);
@@ -52,7 +53,7 @@ public class OfflineCaseDAL
 
     public async Task<OfflineCaseResponse> GetOfflineCaseAsync(string id, DBConfigurationDetail dbConfig)
     {
-        string requestUrl = $"{dbConfig.url}/{dbConfig.prefix}offline_cases/{id}";
+        string requestUrl = dbConfig.Get_Prefix_DB_Url($"offline_cases/{id}");
 
         string response = await _couchDbHttpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value, "application/json");
         var result = JsonConvert.DeserializeObject<OfflineCaseResponse>(response, CaseAwareSerializerSettings);
@@ -194,7 +195,7 @@ public class OfflineCaseDAL
     public async Task<document_put_response> UpdateOfflineCaseAsync(string id, OfflineCaseResponse updatedDoc, DBConfigurationDetail dbConfig)
     {
         string objectString = JsonConvert.SerializeObject(updatedDoc, CaseAwareSerializerSettingsIgnoreNulls);
-        string requestUrl = $"{dbConfig.url}/{dbConfig.prefix}offline_cases/{id}";
+        string requestUrl = dbConfig.Get_Prefix_DB_Url($"offline_cases/{id}");
 
         string response = await _couchDbHttpClient.ExecuteAsync("PUT", requestUrl, objectString, dbConfig.user_name, dbConfig.user_value, "application/json");
         var result = JsonConvert.DeserializeObject<document_put_response>(response);
@@ -203,11 +204,18 @@ public class OfflineCaseDAL
 
     public async Task<document_put_response> DeleteOfflineCaseAsync(string id, string rev, DBConfigurationDetail dbConfig)
     {
-        string requestUrl = $"{dbConfig.url}/{dbConfig.prefix}offline_cases/{id}?rev={rev}";
+        string requestUrl = dbConfig.Get_Prefix_DB_Url($"offline_cases/{id}?rev={rev}");
 
         string response = await _couchDbHttpClient.ExecuteAsync("DELETE", requestUrl, null, dbConfig.user_name, dbConfig.user_value, "application/json");
         var result = JsonConvert.DeserializeObject<document_put_response>(response);
         return result;
+    }
+
+    public async Task<LightweightOfflineCaseListResponse> GetAllLightweightOfflineCasesAsync(DBConfigurationDetail dbConfig)
+    {
+        string requestUrl = dbConfig.Get_Prefix_DB_Url(LightweightStatusOnlyViewPath);
+        string response = await _couchDbHttpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value, "application/json");
+        return JsonConvert.DeserializeObject<LightweightOfflineCaseListResponse>(response) ?? new LightweightOfflineCaseListResponse();
     }
 
     private static string BuildOfflineCasesByCreatedByUserUrl(string userId, DBConfigurationDetail dbConfig)

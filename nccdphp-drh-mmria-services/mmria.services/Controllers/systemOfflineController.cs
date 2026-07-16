@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using mmria.common.utils;
+using mmria.common.SharedLibraries.MetadataVersion;
 
 namespace mmria.services.vitalsimport.Controllers;
 
@@ -12,14 +13,14 @@ namespace mmria.services.vitalsimport.Controllers;
 public sealed class systemOfflineController : Controller
 {
     private readonly mmria.common.couchdb.ConfigurationSet ConfigDB;
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IMetadataRepository _metadataRepository;
 
     public systemOfflineController(
         mmria.common.couchdb.ConfigurationSet configDB,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+        IMetadataRepository metadataRepository)
     {
         ConfigDB = configDB;
-        _couchDbHttpClient = couchDbHttpClient;
+        _metadataRepository = metadataRepository;
     }
 
     [HttpGet]
@@ -30,22 +31,7 @@ public sealed class systemOfflineController : Controller
         try
         {
             var cdcConfig = GetCdcConfig();
-            var url = GetCdcMetadataDocUrl(cdcConfig);
-
-            var response = await _couchDbHttpClient.ExecuteForResponseAsync(
-                "GET",
-                url,
-                payload: null,
-                userName: cdcConfig.user_name,
-                password: cdcConfig.user_value);
-
-            if (response.StatusCode == 404)
-                return Ok(result);
-
-            if (response.StatusCode < 200 || response.StatusCode >= 300)
-                return Ok(result);
-
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.SystemOfflineConfig>(response.Body)
+            result = await _metadataRepository.GetSystemOfflineConfigAsync(cdcConfig)
                 ?? new mmria.common.metadata.SystemOfflineConfig();
         }
         catch (Exception ex)
@@ -65,23 +51,12 @@ public sealed class systemOfflineController : Controller
         try
         {
             var cdcConfig = GetCdcConfig();
-            var url = GetCdcMetadataDocUrl(cdcConfig);
 
             // Read current revision from the server-side document.
             mmria.common.metadata.SystemOfflineConfig existing = null;
             try
             {
-                var getResponse = await _couchDbHttpClient.ExecuteForResponseAsync(
-                    "GET",
-                    url,
-                    payload: null,
-                    userName: cdcConfig.user_name,
-                    password: cdcConfig.user_value);
-
-                if (getResponse.StatusCode >= 200 && getResponse.StatusCode < 300)
-                {
-                    existing = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.SystemOfflineConfig>(getResponse.Body);
-                }
+                existing = await _metadataRepository.GetSystemOfflineConfigAsync(cdcConfig);
             }
             catch (Exception)
             {
@@ -109,15 +84,7 @@ public sealed class systemOfflineController : Controller
             };
             var json = Newtonsoft.Json.JsonConvert.SerializeObject(payload, settings);
 
-            var responseBody = await _couchDbHttpClient.ExecuteAsync(
-                "PUT",
-                url,
-                json,
-                cdcConfig.user_name,
-                cdcConfig.user_value);
-
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseBody)
-                ?? result;
+            result = await _metadataRepository.SaveSystemOfflineConfigAsync(json, cdcConfig) ?? result;
         }
         catch (Exception ex)
         {
@@ -136,10 +103,5 @@ public sealed class systemOfflineController : Controller
             return ConfigDB.detail_list["cdcqa"];
 
         throw new InvalidOperationException("No CDC instance found in configuration (expected key 'cdc' or 'cdcqa').");
-    }
-
-    private static string GetCdcMetadataDocUrl(mmria.common.couchdb.DBConfigurationDetail cdcConfig)
-    {
-        return $"{cdcConfig.url}/{cdcConfig.prefix}metadata/system-offline-config";
     }
 }

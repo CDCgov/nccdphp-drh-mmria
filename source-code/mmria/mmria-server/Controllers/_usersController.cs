@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using Microsoft.AspNetCore.Http;
 using  mmria.server.extension;
 using mmria.server.util;
+using mmria.common.SharedLibraries.ManageUsers.Model;
 
 namespace mmria.server.Controllers;
     
@@ -20,19 +21,25 @@ public sealed class _usersController : Controller
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly mmria.server.util.RequestTenantRuntime _tenantRuntime;
     private readonly mmria.common.SharedLibraries.Account.IUserRepository _userRepository;
+    private readonly mmria.common.SharedLibraries.Jurisdiction.IJurisdictionRepository _jurisdictionRepository;
+    private readonly mmria.common.SharedLibraries.Audit.IAuditRepository _auditRepository;
 
     public _usersController
     ( 
         IHttpContextAccessor p_httpContextAccessor,
         mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
-        mmria.common.SharedLibraries.Account.IUserRepository userRepository
+        mmria.common.SharedLibraries.Account.IUserRepository userRepository,
+        mmria.common.SharedLibraries.Jurisdiction.IJurisdictionRepository jurisdictionRepository,
+        mmria.common.SharedLibraries.Audit.IAuditRepository auditRepository
     )
     {
         httpContextAccessor = p_httpContextAccessor;
         _couchDbHttpClient = couchDbHttpClient;
         _tenantRuntime = tenantRuntime;
         _userRepository = userRepository;
+        _jurisdictionRepository = jurisdictionRepository;
+        _auditRepository = auditRepository;
         host_prefix = tenantRuntime.EffectiveHostPrefix;
 
         configuration = tenantRuntime.RequireConfiguration();
@@ -51,13 +58,13 @@ public sealed class _usersController : Controller
     {
         var result = new Dictionary<string,object>();
         var manageUsersManager = new mmria.common.SharedLibraries.ManageUsers.Manager.ManageUsersManager(
-            new mmria.common.SharedLibraries.ManageUsers.DAL.ManageUsersDAL(_couchDbHttpClient, _userRepository),
+            new mmria.common.SharedLibraries.ManageUsers.DAL.ManageUsersDAL(_couchDbHttpClient, _userRepository, _jurisdictionRepository, _auditRepository),
             _couchDbHttpClient
         );
 
         var policyValues = new policyValuesController(httpContextAccessor, _tenantRuntime);
         var user_role_jurisdiction_view = new user_role_jurisdiction_viewController(httpContextAccessor, _tenantRuntime, manageUsersManager);
-        var jurisdiction_treeController = new jurisdiction_treeController(httpContextAccessor, _tenantRuntime, _couchDbHttpClient);
+        var jurisdiction_treeController = new jurisdiction_treeController(httpContextAccessor, _tenantRuntime, _couchDbHttpClient, _jurisdictionRepository);
         var user_role_jurisdictionController = new user_role_jurisdictionController(httpContextAccessor, _tenantRuntime, manageUsersManager, _couchDbHttpClient);
         var userController = new userController(httpContextAccessor, _tenantRuntime, manageUsersManager);
         /*
@@ -133,23 +140,9 @@ public sealed class _usersController : Controller
         var existingRequest = await LoadFormAccessSpecificationAsync();
         var sanitizedRequest = CreateSanitizedFormAccessSpecification(request, existingRequest, userName);
 
-
-        Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-        settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-        var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(sanitizedRequest, settings);
-
-        string metadata_url = db_config.Get_Prefix_DB_Url($"jurisdiction/form-access-list");
-        string save_response_from_server = null;
         try
         {
-            save_response_from_server = await _couchDbHttpClient.ExecuteAsync(
-                "PUT",
-                metadata_url,
-                object_string,
-                db_config.user_name,
-                db_config.user_value
-            );
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(save_response_from_server);
+            result = await _jurisdictionRepository.SaveFormAccessAsync(sanitizedRequest, db_config);
         }
         catch(Exception ex)
         {
@@ -162,17 +155,6 @@ public sealed class _usersController : Controller
 
     }
 
-    public sealed class FormAccess
-    {
-        public FormAccess(){}
-
-        public string form_path { get; set; }
-        public string abstractor { get; set; }
-        public string data_analyst { get; set; }
-        public string committee_member { get; set; }
-        public string vro { get; set; }
-    }
-
     public sealed class FormAccessSaveRequest
     {
         public string _id { get; set; }
@@ -180,42 +162,13 @@ public sealed class _usersController : Controller
         public List<FormAccess> access_list { get; set; }
     }
 
-    public sealed class FormAccessSpecification
-    {
-
-        public FormAccessSpecification()
-        {
-            access_list = new List<FormAccess>();
-        }
-
-        public string _id { get; set;}
-        public string _rev { get; set; }
-        public string data_type { get; } = "form-access-specification";
-
-        public DateTime date_created { get; set; } 
-        public string created_by { get; set; } 
-        public DateTime date_last_updated { get; set; } 
-        public string last_updated_by { get; set; } 
-
-        public List<FormAccess> access_list { get; set;}
-    }
-
     private async Task<FormAccessSpecification> LoadFormAccessSpecificationAsync()
     {
         var result = new FormAccessSpecification();
 
-        string metadata_url = db_config.Get_Prefix_DB_Url($"jurisdiction/form-access-list");
-        string save_response_from_server = null;
         try
         {
-            save_response_from_server = await _couchDbHttpClient.ExecuteAsync(
-                "GET",
-                metadata_url,
-                null,
-                db_config.user_name,
-                db_config.user_value
-            );
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<FormAccessSpecification>(save_response_from_server) ?? new FormAccessSpecification();
+            result = await _jurisdictionRepository.GetFormAccessAsync(db_config) ?? new FormAccessSpecification();
         }
         catch(System.Net.WebException ex)
         {

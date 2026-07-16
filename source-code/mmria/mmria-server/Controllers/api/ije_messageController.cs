@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Http;
 
 
 using  mmria.server.extension;
+using mmria.common.SharedLibraries.VitalImport;
 using Akka.Streams.Implementation.Fusing;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
@@ -42,12 +43,14 @@ public sealed class ije_messageController: ControllerBase
     mmria.common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IVitalImportRepository _vitalImportRepository;
 
     public ije_messageController
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        IVitalImportRepository vitalImportRepository
     )
     {
         host_prefix = tenantRuntime.EffectiveHostPrefix;
@@ -55,6 +58,7 @@ public sealed class ije_messageController: ControllerBase
 
         db_config = tenantRuntime.RequireDbConfig();
         _couchDbHttpClient = couchDbHttpClient;
+        _vitalImportRepository = vitalImportRepository;
     }
     
     [Authorize(Roles  = "abstractor,jurisdiction_admin,data_analyst,vital_importer,vital_importer_state")]
@@ -68,12 +72,7 @@ public sealed class ije_messageController: ControllerBase
         {
             mmria.common.couchdb.DBConfigurationDetail config = configuration.GetDBConfig("vital_import");
 
-            //mmria.common.couchdb.DBConfigurationDetail config =  config_id_configuration.detail_list["vital_import"];
-            
-            string url = $"{config.url}/vital_import/_all_docs?include_docs=true";
-
-            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", url, null, config.user_name, config.user_value);
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.alldocs_response<mmria.common.ije.Batch>>(responseFromServer);
+            result = await _vitalImportRepository.GetAllBatchesAsync(config);
 
         }
         catch(Exception ex) 

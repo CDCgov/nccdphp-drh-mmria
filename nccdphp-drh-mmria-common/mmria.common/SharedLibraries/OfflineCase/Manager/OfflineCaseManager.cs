@@ -25,19 +25,22 @@ public class OfflineCaseManager : IOfflineCaseManager
     private readonly SessionDAL _sessionDal;
     private readonly SessionManager _sessionManager;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.Audit.IAuditRepository _auditRepository;
 
     public OfflineCaseManager(
         OfflineCaseDAL offlineCaseDal,
         ICaseRepository caseRepository,
         SessionDAL sessionDal,
         SessionManager sessionManager,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.Audit.IAuditRepository auditRepository)
     {
         _offlineCaseDal = offlineCaseDal;
         _caseRepository = caseRepository;
         _sessionDal = sessionDal;
         _sessionManager = sessionManager;
         _couchDbHttpClient = couchDbHttpClient;
+        _auditRepository = auditRepository;
     }
 
     public Task<CacheVersionResponse> GetCacheVersionAsync()
@@ -653,7 +656,7 @@ public class OfflineCaseManager : IOfflineCaseManager
             note = $"Offline sync: Document modified offline and synced from session {request.OfflineSessionId}"
         };
 
-        var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient, _caseRepository);
+        var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient, _caseRepository, _auditRepository);
         var saveResult = await caseManager.SaveCaseAsync(
             modifiedDocument,
             changeStack,

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using System.Collections.Generic;
 using Microsoft.AspNetCore.Http;
+using mmria.common.SharedLibraries.Session;
 
 using  mmria.server.extension; 
 
@@ -18,12 +19,14 @@ public sealed class sessionSummaryController : Controller
 
     mmria.common.couchdb.ConfigurationSet ConfigDB;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly ISessionRepository _sessionRepository;
 
     public sessionSummaryController
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        ISessionRepository sessionRepository
     )
     {
         host_prefix = tenantRuntime.EffectiveHostPrefix;
@@ -33,12 +36,13 @@ public sealed class sessionSummaryController : Controller
         
         ConfigDB = tenantRuntime.RequireConfigurationSet();
         _couchDbHttpClient = couchDbHttpClient;
+        _sessionRepository = sessionRepository;
     }
 
     public async Task<IActionResult> Index(System.Threading.CancellationToken cancellationToken)
     {
 
-        var result = new mmria.server.utils.SessionSummary(ConfigDB, _couchDbHttpClient);
+        var result = new mmria.server.utils.SessionSummary(ConfigDB, _couchDbHttpClient, _sessionRepository);
 
         return View(await result.execute(cancellationToken));
     }
@@ -47,7 +51,7 @@ public sealed class sessionSummaryController : Controller
     public async Task<IActionResult> GenerateReport(System.Threading.CancellationToken cancellationToken)
     {
 
-        var summary_list = new mmria.server.utils.SessionSummary(ConfigDB, _couchDbHttpClient);
+        var summary_list = new mmria.server.utils.SessionSummary(ConfigDB, _couchDbHttpClient, _sessionRepository);
 
         var summary_row_list = await summary_list.execute(cancellationToken);
 

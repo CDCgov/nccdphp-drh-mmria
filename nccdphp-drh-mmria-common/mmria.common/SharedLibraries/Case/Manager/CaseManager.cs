@@ -111,11 +111,13 @@ public class CaseManager
 {
     private readonly CouchDbHttpClient _couchDbHttpClient;
     private readonly ICaseRepository _caseRepository;
+    private readonly mmria.common.SharedLibraries.Audit.IAuditRepository _auditRepository;
 
-    public CaseManager(CouchDbHttpClient couchDbHttpClient, ICaseRepository caseRepository)
+    public CaseManager(CouchDbHttpClient couchDbHttpClient, ICaseRepository caseRepository, mmria.common.SharedLibraries.Audit.IAuditRepository auditRepository)
     {
         _couchDbHttpClient = couchDbHttpClient;
         _caseRepository = caseRepository;
+        _auditRepository = auditRepository;
     }
 
     public async Task<UpdateYearOfDeathResult> UpdateYearOfDeathAsync(
@@ -312,23 +314,7 @@ public class CaseManager
                         }
                     }
                 };
-                JsonSerializerSettings auditSettings = new JsonSerializerSettings();
-                auditSettings.NullValueHandling = NullValueHandling.Ignore;
-                var audit_string = JsonConvert.SerializeObject(changeStack, auditSettings);
-                string audit_url = auditDbConfig.Get_Prefix_DB_Url($"audit/{changeStack._id}");
-                try
-                {
-                    string auditResponse = await _couchDbHttpClient.ExecuteAsync(
-                        "PUT", audit_url, audit_string,
-                        auditDbConfig.user_name, auditDbConfig.user_value);
-                    var audit_result = JsonConvert.DeserializeObject<document_put_response>(auditResponse);
-                    if (audit_result == null || !audit_result.ok)
-                        Console.WriteLine($"Audit save failed for case {caseId}, audit {changeStack._id}");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Audit save threw for case {caseId}, audit {changeStack._id}: {ex.Message}");
-                }
+                await _auditRepository.WriteAuditEntryAsync(changeStack, auditDbConfig);
             }
         }
         else
@@ -531,23 +517,7 @@ public class CaseManager
                                     }
                                 }
                             };
-                            JsonSerializerSettings auditSettings = new JsonSerializerSettings();
-                            auditSettings.NullValueHandling = NullValueHandling.Ignore;
-                            var audit_string = JsonConvert.SerializeObject(changeStack, auditSettings);
-                            string audit_url = auditDbConfig.Get_Prefix_DB_Url($"audit/{changeStack._id}");
-                            try
-                            {
-                                string auditResponse = await _couchDbHttpClient.ExecuteAsync(
-                                    "PUT", audit_url, audit_string,
-                                    auditDbConfig.user_name, auditDbConfig.user_value);
-                                var audit_result = JsonConvert.DeserializeObject<document_put_response>(auditResponse);
-                                if (audit_result == null || !audit_result.ok)
-                                    Console.WriteLine($"Audit save failed for case {caseId}, audit {changeStack._id}");
-                            }
-                            catch (Exception ex)
-                            {
-                                Console.WriteLine($"Audit save threw for case {caseId}, audit {changeStack._id}: {ex.Message}");
-                            }
+                            await _auditRepository.WriteAuditEntryAsync(changeStack, auditDbConfig);
                         }
                         else
                         {
@@ -1173,32 +1143,7 @@ public class CaseManager
                 changeStack.record_id = mmria_record_id;
                 changeStack.metadata_version = configuration.GetString("metadata_version", hostPrefix);
 
-                JsonSerializerSettings auditSettings = new JsonSerializerSettings();
-                auditSettings.NullValueHandling = NullValueHandling.Ignore;
-                var audit_string = JsonConvert.SerializeObject(changeStack, auditSettings);
-
-                string audit_url = dbConfig.Get_Prefix_DB_Url($"audit/{changeStack._id}");
-                try
-                {
-                    string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                        "PUT",
-                        audit_url,
-                        audit_string,
-                        dbConfig.user_name,
-                        dbConfig.user_value
-                    );
-                    var audit_result = JsonConvert.DeserializeObject<document_put_response>(responseFromServer);
-                    if (audit_result == null || !audit_result.ok)
-                    {
-                        Console.WriteLine(
-                            $"Audit save failed for case {id_val}, audit {changeStack._id}: rev={changeStackRevisionHandling}; response={responseFromServer}");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine(
-                        $"Audit save threw for case {id_val}, audit {changeStack._id}: {ex.Message}");
-                }
+                await _auditRepository.WriteAuditEntryAsync(changeStack, dbConfig);
 
                 // Store the case ID and serialized case for the controller to dispatch sync message
                 result.CaseId = id_val;
@@ -1324,23 +1269,7 @@ public class CaseManager
                         }
                     }
                 };
-                JsonSerializerSettings auditSettings = new JsonSerializerSettings();
-                auditSettings.NullValueHandling = NullValueHandling.Ignore;
-                var auditJson = JsonConvert.SerializeObject(changeStack, auditSettings);
-                string auditUrl = dbConfig.Get_Prefix_DB_Url($"audit/{changeStack._id}");
-                try
-                {
-                    string auditResponse = await _couchDbHttpClient.ExecuteAsync(
-                        "PUT", auditUrl, auditJson,
-                        dbConfig.user_name, dbConfig.user_value);
-                    var auditResult = JsonConvert.DeserializeObject<document_put_response>(auditResponse);
-                    if (auditResult == null || !auditResult.ok)
-                        Console.WriteLine($"Audit save failed for case {caseId}, audit {changeStack._id}");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Audit save threw for case {caseId}, audit {changeStack._id}: {ex.Message}");
-                }
+                await _auditRepository.WriteAuditEntryAsync(changeStack, dbConfig);
 
                 return result;
             }
@@ -1825,23 +1754,7 @@ public class CaseManager
                 doc_type = "Change_Stack",
                 items = auditItems
             };
-            JsonSerializerSettings auditSettings = new JsonSerializerSettings();
-            auditSettings.NullValueHandling = NullValueHandling.Ignore;
-            var auditJson = JsonConvert.SerializeObject(changeStack, auditSettings);
-            string auditUrl = dbConfig.Get_Prefix_DB_Url($"audit/{changeStack._id}");
-            try
-            {
-                string auditResponse = await _couchDbHttpClient.ExecuteAsync(
-                    "PUT", auditUrl, auditJson,
-                    dbConfig.user_name, dbConfig.user_value);
-                var auditResult = JsonConvert.DeserializeObject<document_put_response>(auditResponse);
-                if (auditResult == null || !auditResult.ok)
-                    Console.WriteLine($"Audit save failed for case {caseId}, audit {changeStack._id}");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Audit save threw for case {caseId}, audit {changeStack._id}: {ex.Message}");
-            }
+            await _auditRepository.WriteAuditEntryAsync(changeStack, dbConfig);
         }
 
         return result;
@@ -2322,28 +2235,7 @@ public class CaseManager
                 date_created = DateTime.UtcNow,
             };
 
-            JsonSerializerSettings settings = new JsonSerializerSettings();
-            settings.NullValueHandling = NullValueHandling.Ignore;
-
-            var audit_string = JsonConvert.SerializeObject(audit_data, settings);
-
-            string audit_url = dbConfig.Get_Prefix_DB_Url($"audit/{audit_data._id}");
-
-            try
-            {
-                string save_delete_audit_response = await _couchDbHttpClient.ExecuteAsync(
-                    "PUT",
-                    audit_url,
-                    audit_string,
-                    dbConfig.user_name,
-                    dbConfig.user_value
-                );
-                var audit_result = JsonConvert.DeserializeObject<document_put_response>(save_delete_audit_response);
-            }
-            catch(Exception ex)
-            {
-                Console.Write($"problem saving audit\n{ex}");
-            }
+            await _auditRepository.WriteAuditEntryAsync(audit_data, dbConfig);
 
             result.IsSuccessful = true;
             result.StatusCode = 200;

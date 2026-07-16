@@ -589,7 +589,7 @@ dev this story _bmad-output/implementation-artifacts/18-5-iconfiguration-bootstr
 |-------|------|--------|
 | 19.1 — `jurisdiction` Operation Catalog | [19-1-jurisdiction-operation-catalog.md](19-1-jurisdiction-operation-catalog.md) | done |
 | 19.2 — Define `IJurisdictionRepository` and Create `JurisdictionDAL` | [19-2-ijurisdiction-repository-jurisdictiondal.md](19-2-ijurisdiction-repository-jurisdictiondal.md) | ready-for-dev |
-| 19.3 — Define `IJurisdictionAuthorizationReader` and Route Auth Middleware | [19-3-ijurisdiction-authorization-reader.md](19-3-ijurisdiction-authorization-reader.md) | ready-for-dev |
+| 19.3 — Define `IJurisdictionAuthorizationReader` and Route Auth Middleware | [19-3-ijurisdiction-authorization-reader.md](19-3-ijurisdiction-authorization-reader.md) | done |
 | 19.4 — Route Out-of-DAL Application CRUD Through `IJurisdictionRepository` | [19-4-route-out-of-dal-jurisdiction-crud.md](19-4-route-out-of-dal-jurisdiction-crud.md) | ready-for-dev |
 
 **Sequencing:** 19.1 first (discovery). 19.2 and 19.3 depend on 19.1 and can run in parallel. 19.4 depends on 19.2.
@@ -626,12 +626,12 @@ dev this story _bmad-output/implementation-artifacts/19-4-route-out-of-dal-juris
 
 | Story | File | Status |
 |-------|------|--------|
-| 20.1 — `metadata` Operation Catalog | [20-1-metadata-operation-catalog.md](20-1-metadata-operation-catalog.md) | ready-for-dev |
+| 20.1 — `metadata` Operation Catalog | [20-1-metadata-operation-catalog.md](20-1-metadata-operation-catalog.md) | done |
 | 20.2 — Define `IMetadataRepository` and Canonicalize `MetadataVersionDAL` | [20-2-imetadata-repository-metadataversiondal.md](20-2-imetadata-repository-metadataversiondal.md) | ready-for-dev |
 | 20.3 — Route SharedLibraries DAL Files Through `IMetadataRepository` | [20-3-sharedlibraries-dal-metadata-calls.md](20-3-sharedlibraries-dal-metadata-calls.md) | ready-for-dev |
 | 20.4 — Route Controller Direct `metadata` Calls Through `IMetadataRepository` | [20-4-controller-metadata-calls.md](20-4-controller-metadata-calls.md) | ready-for-dev |
-| 20.5 — Route `mmria.services` Read-Only `metadata` Calls Through `IMetadataRepository` | [20-5-mmria-services-metadata-reads.md](20-5-mmria-services-metadata-reads.md) | ready-for-dev |
-| 20.6 — `metadata` Boundary Decision — Bulk `_all_docs` and Sync | [20-6-metadata-boundary-decision.md](20-6-metadata-boundary-decision.md) | ready-for-dev |
+| 20.5 — Route `mmria.services` Read-Only `metadata` Calls Through `IMetadataRepository` | [20-5-mmria-services-metadata-reads.md](20-5-mmria-services-metadata-reads.md) | done |
+| 20.6 — `metadata` Boundary Decision — Bulk `_all_docs` and Sync | [20-6-metadata-boundary-decision.md](20-6-metadata-boundary-decision.md) | done |
 
 **Sequencing:** 20.1 first (discovery). 20.6 can run in parallel with 20.1. 20.2 depends on 20.1. Stories 20.3, 20.4, and 20.5 depend on 20.2 and can run in parallel.
 
@@ -679,8 +679,8 @@ dev this story _bmad-output/implementation-artifacts/20-6-metadata-boundary-deci
 
 | Story | File | Status |
 |-------|------|--------|
-| 21.1 — `audit` Operation Catalog | [21-1-audit-operation-catalog.md](21-1-audit-operation-catalog.md) | ready-for-dev |
-| 21.2 — Create `AuditDAL` and Extract `IAuditRepository` | [21-2-iaudit-repository-auditdal.md](21-2-iaudit-repository-auditdal.md) | ready-for-dev |
+| 21.1 — `audit` Operation Catalog | [21-1-audit-operation-catalog.md](21-1-audit-operation-catalog.md) | done |
+| 21.2 — Create `AuditDAL` and Extract `IAuditRepository` | [21-2-iaudit-repository-auditdal.md](21-2-iaudit-repository-auditdal.md) | done |
 | 21.3 — Route CaseManager Audit Writes Through `IAuditRepository` | [21-3-casemanager-audit-writes.md](21-3-casemanager-audit-writes.md) | ready-for-dev |
 | 21.4 — Route CaseWorkflowAdminDAL Audit Calls Through `IAuditRepository` | [21-4-caseworkflowadmindal-audit-calls.md](21-4-caseworkflowadmindal-audit-calls.md) | ready-for-dev |
 | 21.5 — Route Controller-Level Audit Calls Through `IAuditRepository` | [21-5-controller-audit-calls.md](21-5-controller-audit-calls.md) | ready-for-dev |
@@ -751,6 +751,167 @@ dev this story _bmad-output/implementation-artifacts/22-1-net-10-compatibility-a
 
 ```
 dev this story _bmad-output/implementation-artifacts/22-2-net-10-upgrade-execution.md
+```
+
+---
+
+## Epic 23 — Remaining Database Consolidation Gap Analysis (SQL Migration Foundation) _(2026-07-16)_
+
+| Story | File | Status |
+|-------|------|--------|
+| 23.1 — Remaining Database Gap Scan | [23-1-remaining-database-gap-scan.md](23-1-remaining-database-gap-scan.md) | done |
+| 23.2 — `ISessionRepository` over `SessionDAL` | [23-2-isession-repository-sessiondal.md](23-2-isession-repository-sessiondal.md) | ready-for-dev |
+| 23.3 — `IOfflineCaseRepository` over `OfflineCaseDAL` | [23-3-iofflinecase-repository-offlinecasedal.md](23-3-iofflinecase-repository-offlinecasedal.md) | ready-for-dev |
+| 23.4 — `IExportQueueRepository` over `ExportQueueDAL` | [23-4-iexportqueue-repository-exportqueuedal.md](23-4-iexportqueue-repository-exportqueuedal.md) | ready-for-dev |
+| 23.5 — Canonicalize `VitalImportDAL` + `IVitalImportRepository` | [23-5-ivitalimport-repository-vitalimportdal-canonicalize.md](23-5-ivitalimport-repository-vitalimportdal-canonicalize.md) | ready-for-dev |
+| 23.6 — `IReportRepository` + `ReportDAL` | [23-6-ireport-repository-reportdal.md](23-6-ireport-repository-reportdal.md) | ready-for-dev |
+| 23.7 — Route Report Read Calls Through `IReportRepository` | [23-7-route-report-read-calls.md](23-7-route-report-read-calls.md) | ready-for-dev |
+| 23.8 — `ILoggingRepository` + `LoggingDAL` | [23-8-ilogging-repository-loggingdal.md](23-8-ilogging-repository-loggingdal.md) | ready-for-dev |
+
+**Sequencing:** 23.1 must run first (gap scan catalog). Once complete, 23.2–23.6 and 23.8 can all proceed in parallel. 23.7 depends on 23.6. Recommend sequencing 23.8 after 23.3 to avoid a `loggerController.cs` file conflict.
+
+> ⚠️ **23.2 carries highest risk** — 10 files touched including Akka.NET actors and a cross-feature DAL injection (`AccountDAL` → `ISessionRepository`).
+>
+> ⚠️ **23.8 file conflict** — both 23.3 and 23.8 modify `loggerController.cs`. Run 23.3 first, then 23.8 adds `ILoggingRepository` on top.
+>
+> ℹ️ **`vital_import` URL exception (23.5)** — This database does not use the tenant prefix separator. All `VitalImportDAL` methods must use `config.url/vital_import/...` directly — never `Get_Prefix_DB_Url`. Document this as a deliberate exception.
+>
+> ℹ️ **`report` write side (23.6/23.7)** — Sync/rebuild actors that write to the `report` database are declared infrastructure out-of-scope. `IReportRepository` covers read operations only.
+>
+> ℹ️ **Migration readiness gate** — When Epic 23 is complete, every CouchDB database access routes through a repository interface. SQL DAL implementation work can begin immediately after.
+
+**Story 23.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/23-1-remaining-database-gap-scan.md
+```
+
+**Story 23.2 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/23-2-isession-repository-sessiondal.md
+```
+
+**Story 23.3 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/23-3-iofflinecase-repository-offlinecasedal.md
+```
+
+**Story 23.4 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/23-4-iexportqueue-repository-exportqueuedal.md
+```
+
+**Story 23.5 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/23-5-ivitalimport-repository-vitalimportdal-canonicalize.md
+```
+
+**Story 23.6 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/23-6-ireport-repository-reportdal.md
+```
+
+**Story 23.7 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/23-7-route-report-read-calls.md
+```
+
+**Story 23.8 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/23-8-ilogging-repository-loggingdal.md
+```
+
+---
+
+## Epic 24 — Infrastructure Sync and Database Lifecycle Consolidation (SQL Migration Foundation) _(2026-07-16)_
+
+| Story | File | Status |
+|-------|------|--------|
+| 24.1 — Infra Operations Catalog | [24-1-infra-operations-catalog.md](24-1-infra-operations-catalog.md) | not-started |
+| 24.2 — `IDeIdentifiedRepository` + `IReportRepository` write/lifecycle ext. | [24-2-ideidentified-repository-ireport-write-extension.md](24-2-ideidentified-repository-ireport-write-extension.md) | not-started |
+| 24.3 — `ICaseRepository` paged bulk read + change stream | [24-3-icase-repository-sync-extensions.md](24-3-icase-repository-sync-extensions.md) | not-started |
+| 24.4 — Route export queue rebuild actors | [24-4-export-queue-rebuild-routing.md](24-4-export-queue-rebuild-routing.md) | not-started |
+| 24.5 — `IDatabaseLifecycleService` over `c_db_setup` | [24-5-idatabase-lifecycle-service.md](24-5-idatabase-lifecycle-service.md) | not-started |
+| 24.6 — Route `c_sync_document.pmss.cs` | [24-6-c-sync-document-pmss-routing.md](24-6-c-sync-document-pmss-routing.md) | not-started |
+| 24.7 — Route `c_document_sync_all` variants | [24-7-c-document-sync-all-routing.md](24-7-c-document-sync-all-routing.md) | not-started |
+| 24.8 — Route `Process_DB_Synchronization_Set` | [24-8-process-db-synchronization-set-routing.md](24-8-process-db-synchronization-set-routing.md) | not-started |
+| 24.9 — Route `Process_Central_Pull_list` + CDC `c_document_sync_all` | [24-9-process-central-pull-list-cdc-routing.md](24-9-process-central-pull-list-cdc-routing.md) | not-started |
+
+**Sequencing:** 24.1 must run first (infra ops catalog). Once complete, 24.2–24.5 can all proceed in parallel. 24.6 depends on 24.2. 24.7 and 24.8 can proceed in parallel once 24.2, 24.3, and 24.6 are complete. 24.9 must wait for 24.7.
+
+> ⚠️ **24.9 carries highest risk** — CDC data integration is multi-source, cross-tenant, and runs through the de-identification pipeline. Requires full CDC integration test before marking complete.
+>
+> ⚠️ **Lift-and-shift constraint** — Orchestration logic, actor hierarchies, Quartz schedules, rebuild pipelines, and the CDC data flow are NOT restructured. Only CouchDB URL construction and `CouchDbHttpClient.ExecuteAsync` calls are replaced at each call site.
+>
+> ⚠️ **24.4 prerequisite** — Story 24.4 depends on Epic 23 Story 23.4 being complete (`IExportQueueRepository` must exist before it can be extended with `PurgeAndReinitializeAsync`).
+>
+> ⚠️ **24.2 supersedes 23.6 boundary decision** — Story 23.6 declared `report` write operations "infrastructure out-of-scope." Story 24.2 supersedes that decision by adding write and lifecycle methods to `IReportRepository`. Update the catalog accordingly when implementing 24.2.
+>
+> ℹ️ **`c_db_setup.cs` (24.5)** — Interface extraction only. Zero internal changes to `c_db_setup`. The SQL migration seam is the interface; `c_db_setup` remains the complete CouchDB implementation.
+>
+> ℹ️ **Non-PMSS `c_sync_document.cs`** — Story 24.1 should confirm whether the non-PMSS `c_sync_document.cs` also has direct de_id/report CouchDB calls. If yes, scope it into 24.6.
+>
+> ℹ️ **Final migration readiness gate** — When Epic 24 is complete, every CouchDB HTTP call in the entire codebase routes through a typed repository interface. SQL migration requires only swapping DAL implementations and replacing `IDatabaseLifecycleService` with schema-migration tooling.
+
+**Story 24.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/24-1-infra-operations-catalog.md
+```
+
+**Story 24.2 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/24-2-ideidentified-repository-ireport-write-extension.md
+```
+
+**Story 24.3 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/24-3-icase-repository-sync-extensions.md
+```
+
+**Story 24.4 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/24-4-export-queue-rebuild-routing.md
+```
+
+**Story 24.5 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/24-5-idatabase-lifecycle-service.md
+```
+
+**Story 24.6 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/24-6-c-sync-document-pmss-routing.md
+```
+
+**Story 24.7 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/24-7-c-document-sync-all-routing.md
+```
+
+**Story 24.8 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/24-8-process-db-synchronization-set-routing.md
+```
+
+**Story 24.9 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/24-9-process-central-pull-list-cdc-routing.md
 ```
 
 ---

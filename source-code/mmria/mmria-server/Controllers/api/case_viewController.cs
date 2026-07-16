@@ -16,6 +16,7 @@ using System.Security.Claims;
 using Microsoft.Extensions.Configuration;
 
 using  mmria.server.extension;
+using mmria.common.SharedLibraries.Jurisdiction;
 
 namespace mmria.server;
 
@@ -28,14 +29,17 @@ public sealed class case_viewController: ControllerBase
     common.couchdb.DBConfigurationDetail db_config;
 
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IJurisdictionRepository _jurisdictionRepository;
     string host_prefix = null;
 
     public case_viewController  (
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        IJurisdictionRepository jurisdictionRepository
     )
     {
         _couchDbHttpClient = couchDbHttpClient;
+        _jurisdictionRepository = jurisdictionRepository;
         configuration = tenantRuntime.RequireConfiguration();
         db_config = tenantRuntime.RequireDbConfig();
         host_prefix = tenantRuntime.EffectiveHostPrefix;
@@ -68,7 +72,8 @@ public sealed class case_viewController: ControllerBase
             User,
             is_identefied_case,
             include_pinned_cases,
-            _couchDbHttpClient
+            _couchDbHttpClient,
+            _jurisdictionRepository
         );
 
         var result = await cvs.execute
