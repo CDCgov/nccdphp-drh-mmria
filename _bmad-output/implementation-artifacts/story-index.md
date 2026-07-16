@@ -834,7 +834,7 @@ dev this story _bmad-output/implementation-artifacts/23-8-ilogging-repository-lo
 
 | Story | File | Status |
 |-------|------|--------|
-| 24.1 — Infra Operations Catalog | [24-1-infra-operations-catalog.md](24-1-infra-operations-catalog.md) | not-started |
+| 24.1 — Infra Operations Catalog | [24-1-infra-operations-catalog.md](24-1-infra-operations-catalog.md) | done |
 | 24.2 — `IDeIdentifiedRepository` + `IReportRepository` write/lifecycle ext. | [24-2-ideidentified-repository-ireport-write-extension.md](24-2-ideidentified-repository-ireport-write-extension.md) | not-started |
 | 24.3 — `ICaseRepository` paged bulk read + change stream | [24-3-icase-repository-sync-extensions.md](24-3-icase-repository-sync-extensions.md) | not-started |
 | 24.4 — Route export queue rebuild actors | [24-4-export-queue-rebuild-routing.md](24-4-export-queue-rebuild-routing.md) | not-started |

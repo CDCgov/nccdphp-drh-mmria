@@ -219,3 +219,16 @@ development_status:
   23-7-route-report-read-calls: ready-for-dev
   23-8-ilogging-repository-loggingdal: ready-for-dev
   epic-23-retrospective: optional
+
+  # ── Epic 24: Infrastructure Sync and Database Lifecycle Consolidation ────
+  epic-24: in-progress
+  24-1-infra-operations-catalog: done
+  24-2-ideidentified-repository-ireport-write-extension: ready-for-dev
+  24-3-icase-repository-sync-extensions: ready-for-dev
+  24-4-export-queue-rebuild-routing: ready-for-dev
+  24-5-idatabase-lifecycle-service: ready-for-dev
+  24-6-c-sync-document-pmss-routing: ready-for-dev
+  24-7-c-document-sync-all-routing: ready-for-dev
+  24-8-process-db-synchronization-set-routing: ready-for-dev
+  24-9-process-central-pull-list-cdc-routing: ready-for-dev
+  epic-24-retrospective: optional
