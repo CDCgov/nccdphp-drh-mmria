@@ -7,7 +7,7 @@ using mmria.common.model.couchdb;
 
 namespace mmria.common.SharedLibraries.ExportQueue.DAL;
 
-public sealed class ExportQueueDAL
+public sealed class ExportQueueDAL : IExportQueueRepository
 {
     private readonly CouchDbHttpClient _httpClient;
 

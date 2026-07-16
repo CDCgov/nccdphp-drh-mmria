@@ -2,7 +2,7 @@
 
 **Epic:** 23 — Remaining Database Consolidation Gap Analysis (SQL Migration Foundation)
 **Story ID:** 23.3
-**Status:** ready-for-dev
+**Status:** done
 **Date added:** 2026-07-16
 **Depends on:** 23.1
 **Source requirements:** epics.md §Epic 23 Story 23.3; project-context.md §2.2
@@ -65,3 +65,26 @@ Then all three projects build with zero errors
 ## Sequencing
 
 Depends on 23.1. Can proceed in parallel with 23.2, 23.4, 23.5, 23.6, 23.8. Note: `loggerController.cs` is also touched by Story 23.8 — coordinate or sequence 23.8 after 23.3 to avoid file conflicts.
+
+---
+
+## Dev Agent Record
+
+**Completed:** 2026-07-16  
+**Agent:** Amelia (bmad-agent-dev)
+
+### Changes Made
+
+| File | Change |
+|------|--------|
+| `mmria.common/SharedLibraries/OfflineCase/IOfflineCaseRepository.cs` | CREATED — 9-method interface including new `GetAllLightweightOfflineCasesAsync` |
+| `mmria.common/SharedLibraries/OfflineCase/DAL/OfflineCaseDAL.cs` | Updated — added `: IOfflineCaseRepository`; fixed 4 Pattern A URLs to Pattern B; added `LightweightStatusOnlyViewPath` constant; added `GetAllLightweightOfflineCasesAsync` method |
+| `mmria-server/Controllers/loggerController.cs` | Updated — added `IOfflineCaseRepository` field + constructor parameter; replaced `LoadOfflineSessionsAsync` direct HTTP call with `_offlineCaseRepository.GetAllLightweightOfflineCasesAsync(db_config)` |
+| `mmria-server/Program.cs` | Updated — added `IOfflineCaseRepository` → `OfflineCaseDAL` scoped registration |
+
+### Notes
+
+- `OfflineCaseDAL` was already registered as a concrete type in Program.cs (line ~404); only the interface resolution alias was missing.
+- The `lightweight-status-only` view was called directly in `loggerController` but had no corresponding DAL method; `GetAllLightweightOfflineCasesAsync` was added to both the DAL and the interface.
+- All pre-existing `_couchDbHttpClient` usages in `loggerController` (for the `logging` view and log-write endpoints) remain unchanged.
+- Build: `dotnet build mmria-server.csproj` → **0 errors**, warnings pre-existing.

@@ -21,15 +21,21 @@ public sealed class loggerController : Controller
     mmria.common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.OfflineCase.IOfflineCaseRepository _offlineCaseRepository;
+    private readonly mmria.common.SharedLibraries.Logging.ILoggingRepository _loggingRepository;
 
     public loggerController
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.OfflineCase.IOfflineCaseRepository offlineCaseRepository,
+        mmria.common.SharedLibraries.Logging.ILoggingRepository loggingRepository
     )
     {
         _couchDbHttpClient = couchDbHttpClient;
+        _offlineCaseRepository = offlineCaseRepository;
+        _loggingRepository = loggingRepository;
         host_prefix = tenantRuntime.EffectiveHostPrefix;
 
         configuration = tenantRuntime.RequireConfiguration();
@@ -90,17 +96,12 @@ public sealed class loggerController : Controller
 
     private async Task<dynamic> LoadLoggingByOfflineSessionAsync()
     {
-        string dbUrl = $"{db_config.url}/{db_config.prefix}logging";
-        var modulesUrl = $"{dbUrl}/_design/sortable/_view/by-offline-session";
-        var response = await _couchDbHttpClient.ExecuteAsync("GET", modulesUrl, null, db_config.user_name, db_config.user_value);
-        return Newtonsoft.Json.JsonConvert.DeserializeObject<dynamic>(response);
+        return await _loggingRepository.GetLoggingModulesAsync(db_config);
     }
 
     private async Task<dynamic> LoadOfflineSessionsAsync()
     {
-        string url = db_config.Get_Prefix_DB_Url("offline_cases/_design/sortable/_view/lightweight-status-only");
-        var response = await _couchDbHttpClient.ExecuteAsync("GET", url, null, db_config.user_name, db_config.user_value);
-        return Newtonsoft.Json.JsonConvert.DeserializeObject<dynamic>(response);
+        return await _offlineCaseRepository.GetAllLightweightOfflineCasesAsync(db_config);
     }
 
     private static HashSet<string> ExtractModules(dynamic modulesData, bool restrictToCurrentUser, string currentUserName)
@@ -280,8 +281,7 @@ public sealed class loggerController : Controller
                 }
             }
 
-            string dbUrl = $"{db_config.url}/{db_config.prefix}logging";
-            string viewUrl;
+            string viewPath;
             
             // Select the most appropriate view based on filters (priority order for performance)
             // If date range is provided, prefer the by-timestamp view (most appropriate for date queries)
@@ -328,40 +328,40 @@ public sealed class loggerController : Controller
                 var encodedEnd = System.Web.HttpUtility.UrlEncode($"\"{endKeyIso}\"");
 
                 // Query by-timestamp with startkey/endkey (descending=true) and limit
-                viewUrl = $"{dbUrl}/_design/sortable/_view/by-timestamp?include_docs=true&startkey={encodedStart}&endkey={encodedEnd}&descending=true&limit={limit}";
+                viewPath = $"_design/sortable/_view/by-timestamp?include_docs=true&startkey={encodedStart}&endkey={encodedEnd}&descending=true&limit={limit}";
             }
             // Query the most selective filter first to minimize data transfer
             else if (!string.IsNullOrWhiteSpace(sessionId) && sessionId.ToLower() != "all")
             {
                 // Use by-offline-session view - most selective, returns exact session
                 var encodedKey = System.Web.HttpUtility.UrlEncode($"\"{sessionId}\"");
-                viewUrl = $"{dbUrl}/_design/sortable/_view/by-offline-session?key={encodedKey}&include_docs=true&descending=true";
+                viewPath = $"_design/sortable/_view/by-offline-session?key={encodedKey}&include_docs=true&descending=true";
             }
             else if (!restrictToCurrentUser && !string.IsNullOrWhiteSpace(userName) && userName.ToLower() != "all")
             {
                 // Use by-user view - selective by user
                 var encodedKey = System.Web.HttpUtility.UrlEncode($"\"{userName}\"");
-                viewUrl = $"{dbUrl}/_design/sortable/_view/by-user?key={encodedKey}&include_docs=true&descending=true";
+                viewPath = $"_design/sortable/_view/by-user?key={encodedKey}&include_docs=true&descending=true";
             }
             else if (!string.IsNullOrWhiteSpace(context) && context.ToLower() != "all")
             {
                 // Use by-context view - selective by module
                 var encodedKey = System.Web.HttpUtility.UrlEncode($"\"{context}\"");
-                viewUrl = $"{dbUrl}/_design/sortable/_view/by-context?key={encodedKey}&include_docs=true&descending=true";
+                viewPath = $"_design/sortable/_view/by-context?key={encodedKey}&include_docs=true&descending=true";
             }
             else if (!string.IsNullOrWhiteSpace(level) && level.ToLower() != "all")
             {
                 // Use by-level view - selective by log level
                 var encodedKey = System.Web.HttpUtility.UrlEncode($"\"{level.ToLower()}\"");
-                viewUrl = $"{dbUrl}/_design/sortable/_view/by-level?key={encodedKey}&include_docs=true&descending=true";
+                viewPath = $"_design/sortable/_view/by-level?key={encodedKey}&include_docs=true&descending=true";
             }
             else
             {
                 // No specific filter - use all-fields view with limit
-                viewUrl = $"{dbUrl}/_design/sortable/_view/all-fields?include_docs=true&limit={limit}&skip={skip}&descending=true";
+                viewPath = $"_design/sortable/_view/all-fields?include_docs=true&limit={limit}&skip={skip}&descending=true";
             }
             
-            var response = await _couchDbHttpClient.ExecuteAsync("GET", viewUrl, null, db_config.user_name, db_config.user_value);
+            var response = await _loggingRepository.GetFilteredLoggingAsync(viewPath, db_config);
             var data = Newtonsoft.Json.JsonConvert.DeserializeObject<dynamic>(response);
             
             var logs = new List<object>();
@@ -650,15 +650,11 @@ public async Task<IActionResult> Post()
 
         try
         {
-            string url = $"{db_config.url}/{db_config.prefix}logging";
-            
             var settings = new Newtonsoft.Json.JsonSerializerSettings();
             settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
             var json = Newtonsoft.Json.JsonConvert.SerializeObject(logEntry, settings);
 
-            string response = await _couchDbHttpClient.ExecuteAsync("POST", url, json, db_config.user_name, db_config.user_value);
-            result = Newtonsoft.Json.JsonConvert
-                .DeserializeObject<mmria.common.model.couchdb.document_put_response>(response);
+            result = await _loggingRepository.PostLoggingDocumentAsync(json, db_config);
         }
         catch (Exception ex)
         {

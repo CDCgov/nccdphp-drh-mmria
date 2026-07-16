@@ -1579,6 +1579,22 @@ All write operations against `{prefix}report` are sync/rebuild infrastructure an
 
 ---
 
+### Boundary Decisions (report)
+
+**Story:** 23.6
+**Date:** 2026-07-16
+
+`IReportRepository` covers **read operations only**. The following write/rebuild operations against the `report` database are declared **infrastructure out-of-scope** and are intentionally excluded from this interface:
+
+- **DROP DB / CREATE DB** — performed by rebuild actors (`c_document_sync_all.cs` variants, `c_document_sync_all.pmss.cs`, `Process_Central_Pull_list.cs`)
+- **Bulk PUT report documents** — performed by sync actors (`c_sync_document.cs` variants, rebuild manager classes)
+- **`_index` creation** — performed by `c_document_sync_all_legacy.cs`, `c_document_sync_all.cs`
+- **Design document PUT** — performed by `c_document_sync_all_legacy.cs`, `c_db_setup.cs`
+
+These are sync/rebuild infrastructure concerns. A SQL migration of the `report` read path requires only a new `IReportRepository` implementation — sync/rebuild actors are addressed separately as part of the SQL migration infrastructure work.
+
+---
+
 ## `logging` Operations
 
 **Epic:** 23 — Remaining Database Consolidation Gap Analysis (SQL Migration Foundation)

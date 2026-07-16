@@ -2,7 +2,7 @@
 
 **Epic:** 23 — Remaining Database Consolidation Gap Analysis (SQL Migration Foundation)
 **Story ID:** 23.4
-**Status:** ready-for-dev
+**Status:** done
 **Date added:** 2026-07-16
 **Depends on:** 23.1
 **Source requirements:** epics.md §Epic 23 Story 23.4; project-context.md §2.2
@@ -64,3 +64,25 @@ Then all three projects build with zero errors
 ## Sequencing
 
 Depends on 23.1. Lowest risk story in Epic 23 — can be implemented quickly. Can proceed in parallel with 23.2, 23.3, 23.5, 23.6, 23.8.
+
+---
+
+## Dev Agent Record
+
+**Completed:** 2026-07-16
+**Agent:** Amelia (bmad-agent-dev)
+
+### Changes Made
+| File | Action |
+|------|--------|
+| `mmria.common/SharedLibraries/ExportQueue/IExportQueueRepository.cs` | CREATED — interface with 4 async method signatures matching all `ExportQueueDAL` public methods |
+| `mmria.common/SharedLibraries/ExportQueue/DAL/ExportQueueDAL.cs` | UPDATED — added `: IExportQueueRepository` (no URL changes; already Pattern B throughout) |
+| `mmria-server/util/core_element_export/core_element_exporter.cs` | UPDATED — added `IExportQueueRepository` field + constructor param; replaced Pattern A GET (`_couchDbHttpClient.ExecuteAsync("GET", db_config.url + ...)`) and adjacent Pattern A PUT with `GetQueueDocumentAsync` / `SaveQueueDocumentAsync` |
+| `mmria-server/Program.cs` | UPDATED — added `AddScoped<IExportQueueRepository>` forwarding to `ExportQueueDAL` |
+
+### AC Verification
+- **AC-1**: `IExportQueueRepository` created; `ExportQueueDAL : IExportQueueRepository` ✓
+- **AC-2**: DI registration added in `Program.cs` ✓
+- **AC-3**: Pattern A GET at ~line 804 replaced with `GetQueueDocumentAsync`; adjacent Pattern A PUT replaced with `SaveQueueDocumentAsync`; `IExportQueueRepository` injected via constructor ✓
+- **AC-4**: `Rebuild_Export_Queue.cs` and `rebuild_export_queue_job.cs` confirmed untouched ✓
+- **AC-5**: `mmria.common` — 0 errors; `mmria-server` — 0 errors ✓

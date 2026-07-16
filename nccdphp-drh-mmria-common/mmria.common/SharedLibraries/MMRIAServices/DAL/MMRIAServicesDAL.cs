@@ -10,6 +10,7 @@ using mmria.common.getset;
 using mmria.common.model.couchdb;
 using mmria.common.SharedLibraries.MMRIAServices.Model;
 using mmria.common.SharedLibraries.MetadataVersion;
+using mmria.common.SharedLibraries.VitalImport;
 using Newtonsoft.Json.Linq;
 
 namespace mmria.common.SharedLibraries.MMRIAServices.DAL;
@@ -19,15 +20,18 @@ public sealed class MMRIAServicesDAL
     private readonly CouchDbHttpClient _couchDbHttpClient;
     private readonly mmria.common.SharedLibraries.SystemConfig.IConfigurationRepository _configRepository;
     private readonly IMetadataRepository _metadataRepository;
+    private readonly IVitalImportRepository _vitalImportRepository;
 
     public MMRIAServicesDAL(
         CouchDbHttpClient couchDbHttpClient,
         mmria.common.SharedLibraries.SystemConfig.IConfigurationRepository configRepository,
-        IMetadataRepository metadataRepository)
+        IMetadataRepository metadataRepository,
+        IVitalImportRepository vitalImportRepository)
     {
         _couchDbHttpClient = couchDbHttpClient ?? throw new ArgumentNullException(nameof(couchDbHttpClient));
         _configRepository = configRepository ?? throw new ArgumentNullException(nameof(configRepository));
         _metadataRepository = metadataRepository ?? throw new ArgumentNullException(nameof(metadataRepository));
+        _vitalImportRepository = vitalImportRepository ?? throw new ArgumentNullException(nameof(vitalImportRepository));
     }
 
     public async Task<case_view_response> GetCaseView(DBConfigurationDetail db_info, string search_key)
@@ -115,12 +119,10 @@ public sealed class MMRIAServicesDAL
     {
         var result = new alldocs_response<mmria.common.ije.Batch>();
 
-        string url = $"{couchdb_url}/vital_import/_all_docs?include_docs=true";
         try
         {
-            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", url, null, timer_user_name, timer_value);
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<alldocs_response<mmria.common.ije.Batch>>(responseFromServer);
-
+            var dbConfig = new DBConfigurationDetail { url = couchdb_url, user_name = timer_user_name, user_value = timer_value };
+            result = await _vitalImportRepository.GetAllBatchesAsync(dbConfig);
         }
         catch(Exception ex)
         {
@@ -138,10 +140,8 @@ public sealed class MMRIAServicesDAL
         string timer_value
     )
     {
-        string put_url = $"{couchdb_url}/vital_import/{batch_id}";
-        var responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", put_url, object_string, timer_user_name, timer_value);
-        var put_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
-        return put_result;
+        var dbConfig = new DBConfigurationDetail { url = couchdb_url, user_name = timer_user_name, user_value = timer_value };
+        return await _vitalImportRepository.PutBatchDocumentAsync(batch_id, object_string, dbConfig);
     }
 
     public async Task<mmria.common.ije.Batch> Get_batch(

@@ -318,8 +318,12 @@ public sealed partial class Program
             builder.Services.AddScoped<mmria.common.SharedLibraries.Audit.IAuditRepository>(
                 sp => sp.GetRequiredService<mmria.common.SharedLibraries.Audit.DAL.AuditDAL>());
             builder.Services.AddScoped<mmria.common.SharedLibraries.ExportQueue.DAL.ExportQueueDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.ExportQueue.IExportQueueRepository>(
+                sp => sp.GetRequiredService<mmria.common.SharedLibraries.ExportQueue.DAL.ExportQueueDAL>());
             builder.Services.AddScoped<mmria.common.SharedLibraries.ExportQueue.Manager.ExportQueueManager>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.VitalImport.DAL.VitalImportDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.VitalImport.IVitalImportRepository>(
+                sp => sp.GetRequiredService<mmria.common.SharedLibraries.VitalImport.DAL.VitalImportDAL>());
             builder.Services.AddScoped<mmria.common.SharedLibraries.VitalImport.Manager.VitalImportManager>();
             // Register SystemConfig repository (SQL migration seam for configuration database)
             builder.Services.AddScoped<mmria.common.SharedLibraries.SystemConfig.DAL.SystemConfigDAL>();
@@ -402,10 +406,14 @@ public sealed partial class Program
 
             // Register SharedLibraries services
             builder.Services.AddScoped<mmria.common.SharedLibraries.OfflineCase.DAL.OfflineCaseDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.OfflineCase.IOfflineCaseRepository>(
+                sp => sp.GetRequiredService<mmria.common.SharedLibraries.OfflineCase.DAL.OfflineCaseDAL>());
             builder.Services.AddScoped<mmria.common.SharedLibraries.Case.ICaseRepository, mmria.common.SharedLibraries.Case.DAL.CaseDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.Case.DAL.CaseDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.Session.DAL.SessionDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.Session.ISessionRepository, mmria.common.SharedLibraries.Session.DAL.SessionDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.Report.IReportRepository, mmria.common.SharedLibraries.Report.DAL.ReportDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.Logging.ILoggingRepository, mmria.common.SharedLibraries.Logging.DAL.LoggingDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.OfflineCase.Manager.IOfflineCaseManager, mmria.common.SharedLibraries.OfflineCase.Manager.OfflineCaseManager>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.Case.Manager.CaseManager>();
             

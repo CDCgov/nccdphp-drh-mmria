@@ -2,7 +2,7 @@
 
 **Epic:** 23 — Remaining Database Consolidation Gap Analysis (SQL Migration Foundation)
 **Story ID:** 23.5
-**Status:** ready-for-dev
+**Status:** done
 **Date added:** 2026-07-16
 **Depends on:** 23.1
 **Source requirements:** epics.md §Epic 23 Story 23.5; project-context.md §2.2

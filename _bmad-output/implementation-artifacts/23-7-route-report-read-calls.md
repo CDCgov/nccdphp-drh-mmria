@@ -2,7 +2,7 @@
 
 **Epic:** 23 — Remaining Database Consolidation Gap Analysis (SQL Migration Foundation)
 **Story ID:** 23.7
-**Status:** ready-for-dev
+**Status:** done
 **Date added:** 2026-07-16
 **Depends on:** 23.6
 **Source requirements:** epics.md §Epic 23 Story 23.7; project-context.md §2.2
@@ -72,3 +72,23 @@ Then all three projects build with zero errors and no route, action signature, o
 ## Sequencing
 
 Depends on 23.6. All 6 file changes in this story are independent of each other and can be done in any order within the story.
+
+---
+
+## Dev Agent Record
+
+**Completed:** 2026-07-16
+**Agent:** Amelia (bmad-agent-dev)
+
+### Changes Made
+| File | Change |
+|------|--------|
+| `mmria.common/SharedLibraries/AggregateReport/Manager/AggregateReportManager.cs` | Injected `IReportRepository`; replaced `ExecuteForJsonDocumentAsync` pattern-B call with `_reportRepository.GetAllReportDocumentsAsync(dbConfig)` + `JsonDocument.Parse()`; removed unused `CouchDbHttpClient` dependency |
+| `mmria.common/SharedLibraries/InteractiveReport/Manager/InteractiveReportManager.cs` | Injected `IReportRepository`; replaced pattern-A view URL + `ExecuteAsync` with `_reportRepository.GetIndicatorByIdAsync(indicator_id, db_config)`; removed unused `CouchDbHttpClient` and 4 local URL vars |
+| `mmria-server/Controllers/api/data_summary_viewController.cs` | Added `IReportRepository` constructor param; replaced pattern-A view URL + `ExecuteAsync` with `_reportRepository.GetDataSummaryViewAsync(skip_number, take, db_config)`; kept `_couchDbHttpClient` (still used for authorization) |
+| `mmria-server/Controllers/api/dqrReportController.cs` | Replaced `CouchDbHttpClient` with `IReportRepository`; replaced `report/_find` URL + `ExecuteAsync` with `_reportRepository.FindReportDocumentsAsync(selector_struc_string, db_config)` |
+| `mmria-server/Controllers/api/overdose_measureController.cs` | Replaced `CouchDbHttpClient` with `IReportRepository`; replaced `report/_find` URL + `ExecuteAsync` with `_reportRepository.FindReportDocumentsAsync(selector_struc_string, db_config)` |
+| `mmria-server/Controllers/api/powerbi_measureController.cs` | Replaced `CouchDbHttpClient` with `IReportRepository`; replaced `report/_find` URL + `ExecuteAsync` with `_reportRepository.FindReportDocumentsAsync(selector_struc_string, db_config)` |
+
+### Build Result
+`dotnet build mmria-server.csproj` — **0 errors**, 138 warnings (all pre-existing)
