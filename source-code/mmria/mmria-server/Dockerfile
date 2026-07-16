@@ -29,8 +29,12 @@ USER 1001
 # https://console-openshift-console.apps.ecpaas-dev.cdc.gov/k8s/ns/trusted-images/imagestreamtags/dotnet-100-aspnet%3A9.7-1776776188
 FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100-aspnet:9.8-1782852054@sha256:7fc17f23a65f125bca69a08c39bccb5074d20a5246247844898c2008d1c9c494 AS runtime
 
-# Switch to root temporarily to create directories
+# Switch to root temporarily to create directories and apply OS updates
 USER root
+
+# Apply latest OS package updates so any patches released after the base-image
+# digest was pinned are included in every build.
+RUN dnf update -y --nodocs && dnf clean all
 
 WORKDIR /app
 COPY --from=publish /app/publish .

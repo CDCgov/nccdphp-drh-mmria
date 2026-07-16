@@ -36,6 +36,13 @@ USER 1001
 # ----- Stage 3: Runtime -----
 # https://console-openshift-console.apps.ecpaas-dev.cdc.gov/k8s/ns/trusted-images/imagestreamtags/dotnet-100-aspnet%3A9.7-1776776188
 FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100-aspnet:9.7-1776776188@sha256:a3c1786ae2647dd9c285e701ae5f8cccf50607fad8e6d2f92c294ead6823937a AS runtime
+
+# Apply latest OS package updates so any patches released after the base-image
+# digest was pinned are included in every build.
+USER root
+RUN dnf update -y --nodocs && dnf clean all
+USER 1001
+
 WORKDIR /app
 
 # Copy published output from build image
