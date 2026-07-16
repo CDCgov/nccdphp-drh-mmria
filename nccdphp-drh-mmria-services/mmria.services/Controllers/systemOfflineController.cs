@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using mmria.common.utils;
 using mmria.common.SharedLibraries.MetadataVersion;
+using mmria.services.Models;
 
 namespace mmria.services.vitalsimport.Controllers;
 
@@ -44,7 +45,7 @@ public sealed class systemOfflineController : Controller
 
     [HttpPost]
     public async Task<IActionResult> SaveSystemOfflineConfig(
-        [FromBody] mmria.common.metadata.SystemOfflineConfig request)
+        [FromBody] SaveSystemOfflineConfigRequest request)
     {
         var result = new mmria.common.model.couchdb.document_put_response { ok = false };
 
@@ -63,10 +64,11 @@ public sealed class systemOfflineController : Controller
                 // Treat as non-existent; PUT will create a new document.
             }
 
-            // Sanitize: always use server-owned revision; never trust client-supplied _rev.
+            // Sanitize: always use server-owned revision; the DTO does not expose _rev
+            // to prevent clients from injecting a revision token.
             var payload = new mmria.common.metadata.SystemOfflineConfig
             {
-                _rev = CouchDbRevisionHelper.ResolveServerOwnedRevision(request?._rev, existing?._rev),
+                _rev = CouchDbRevisionHelper.ResolveServerOwnedRevision(null, existing?._rev),
                 warn_date = request?.warn_date,
                 warn_message = request?.warn_message,
                 offline_date = request?.offline_date,
