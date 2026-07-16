@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
@@ -19,13 +20,8 @@ public static class EscapedJsonResultFactory
         TypeNameHandling = TypeNameHandling.None
     };
 
-    public static ContentResult Create(object value) =>
-        new SecureEscapedJsonResult
-        {
-            Content = Serialize(value),
-            ContentType = JsonContentType,
-            StatusCode = 200
-        };
+    public static ActionResult Create(object value) =>
+        new SecureEscapedJsonResult(SerializeToUtf8Bytes(value), JsonContentType);
 
     public static string Serialize(object value)
     {
@@ -42,8 +38,16 @@ public static class EscapedJsonResultFactory
         return stringWriter.ToString();
     }
 
-    private sealed class SecureEscapedJsonResult : ContentResult
+    public static byte[] SerializeToUtf8Bytes(object value) =>
+        Encoding.UTF8.GetBytes(Serialize(value));
+
+    private sealed class SecureEscapedJsonResult : FileContentResult
     {
+        public SecureEscapedJsonResult(byte[] payload, string contentType)
+            : base(payload, contentType)
+        {
+        }
+
         public override Task ExecuteResultAsync(ActionContext context)
         {
             context.HttpContext.Response.Headers[NoSniffHeaderName] = NoSniffHeaderValue;
