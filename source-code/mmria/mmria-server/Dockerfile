@@ -27,7 +27,7 @@ USER 1001
 
 # ----- Stage 3: Runtime -----
 # https://console-openshift-console.apps.ecpaas-dev.cdc.gov/k8s/ns/trusted-images/imagestreamtags/dotnet-100-aspnet%3A9.7-1776776188
-FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100-aspnet:9.8-1782852054@sha256:7fc17f23a65f125bca69a08c39bccb5074d20a5246247844898c2008d1c9c494 AS runtime
+FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100-aspnet:9.8-1784176949@sha256:05b9c57ecbce6dcc11b8e2a82184e3d8063508618bd616fc713e0f953816bfd1 AS runtime
 
 # Switch to root temporarily to create directories
 USER root
