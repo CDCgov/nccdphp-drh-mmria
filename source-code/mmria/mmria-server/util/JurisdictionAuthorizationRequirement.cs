@@ -13,13 +13,15 @@ public sealed class JurisdictionAuthorizationRequirement : IAuthorizationRequire
 
 public sealed class HasJurisdictionAuthorizationHandler : AuthorizationHandler<JurisdictionAuthorizationRequirement, System.Dynamic.ExpandoObject>
 {
-    mmria.common.couchdb.DBConfigurationDetail db_config;
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.server.util.RequestTenantRuntime _tenantRuntime;
+    private readonly mmria.common.SharedLibraries.Jurisdiction.IJurisdictionAuthorizationReader _jurisdictionAuthorizationReader;
 
-    public HasJurisdictionAuthorizationHandler(mmria.common.couchdb.DBConfigurationDetail _db_config, mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+    public HasJurisdictionAuthorizationHandler(
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        mmria.common.SharedLibraries.Jurisdiction.IJurisdictionAuthorizationReader jurisdictionAuthorizationReader)
     {
-        db_config = _db_config;
-        _couchDbHttpClient = couchDbHttpClient;
+        _tenantRuntime = tenantRuntime;
+        _jurisdictionAuthorizationReader = jurisdictionAuthorizationReader;
     }
 
     protected override async Task HandleRequirementAsync
@@ -36,22 +38,19 @@ public sealed class HasJurisdictionAuthorizationHandler : AuthorizationHandler<J
             return;
         }
 
-
-
-        string jurisdicion_view_url = $"{db_config.url}/{db_config.prefix}jurisdiction/_design/sortable/_view/by_user_id?";
-        string jurisdicion_result_string = null;
+        var db_config = _tenantRuntime.DbConfig;
+        System.Collections.Generic.IReadOnlyList<mmria.common.SharedLibraries.Jurisdiction.Model.JurisdictionRoleEntry> jurisdiction_roles = null;
         try
         {
-            jurisdicion_result_string = await _couchDbHttpClient.ExecuteAsync("POST", jurisdicion_view_url, null, db_config.user_name, db_config.user_value, "application/json");
+            jurisdiction_roles = await _jurisdictionAuthorizationReader.GetRolesByUserIdAsync(null, db_config);
         }
         catch(Exception ex)
         {
             System.Console.WriteLine(ex);
         }
         
-        var jurisdiction_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_response_header<mmria.common.model.couchdb.jurisdiction_view_sortable_item>>(jurisdicion_result_string);
         //IDictionary<string, object> jurisdicion_result_dictionary = jurisdicion_result_data[0] as IDictionary<string, object>;
-        foreach(mmria.common.model.couchdb.get_response_item<mmria.common.model.couchdb.jurisdiction_view_sortable_item> jvi in jurisdiction_view_response.rows)
+        foreach(var jvi in jurisdiction_roles ?? System.Array.Empty<mmria.common.SharedLibraries.Jurisdiction.Model.JurisdictionRoleEntry>())
         {
             
             

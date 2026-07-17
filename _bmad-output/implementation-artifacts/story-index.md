@@ -1027,9 +1027,9 @@ dev this story _bmad-output/implementation-artifacts/27-2-batchprocessor-migrati
 
 | Story | File | Status |
 |-------|------|--------|
-| 28.1 — `VROSummary.cs` Case Reads | [28-1-vrosummary-case-reads.md](28-1-vrosummary-case-reads.md) | backlog |
-| 28.2 — Auth Middleware Session and Jurisdiction Wiring | [28-2-auth-middleware-session-jurisdiction-wiring.md](28-2-auth-middleware-session-jurisdiction-wiring.md) | backlog |
-| 28.3 — mmria-server `core_element_exporter.cs` Remaining Calls | [28-3-server-core-element-exporter-remaining-calls.md](28-3-server-core-element-exporter-remaining-calls.md) | backlog |
+| 28.1 — `VROSummary.cs` Case Reads | [28-1-vrosummary-case-reads.md](28-1-vrosummary-case-reads.md) | done |
+| 28.2 — Auth Middleware Session and Jurisdiction Wiring | [28-2-auth-middleware-session-jurisdiction-wiring.md](28-2-auth-middleware-session-jurisdiction-wiring.md) | done |
+| 28.3 — mmria-server `core_element_exporter.cs` Remaining Calls | [28-3-server-core-element-exporter-remaining-calls.md](28-3-server-core-element-exporter-remaining-calls.md) | done |
 
 > ℹ️ Goal: close the four remaining non-DAL `CouchDbHttpClient.ExecuteAsync` calls in mmria-server that were missed in Epics 17–27. All required repository interfaces exist. This is a pure wiring pass. After this epic, zero unclassified application-layer CouchDB calls remain in the codebase.
 

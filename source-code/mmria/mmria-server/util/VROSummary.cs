@@ -107,7 +107,7 @@ public sealed class VROSummary
     mmria.common.couchdb.DBConfigurationDetail db_config;
 
     string host_prefix;
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.Case.ICaseRepository _caseRepository;
     private readonly mmria.common.SharedLibraries.Account.IUserRepository _userRepository;
     private readonly mmria.common.SharedLibraries.Jurisdiction.IJurisdictionRepository _jurisdictionRepository;
 
@@ -117,14 +117,14 @@ public sealed class VROSummary
 
         mmria.common.couchdb.OverridableConfiguration _configuration,
         string _host_prefix,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.Case.ICaseRepository caseRepository,
         mmria.common.SharedLibraries.Account.IUserRepository userRepository,
         mmria.common.SharedLibraries.Jurisdiction.IJurisdictionRepository jurisdictionRepository
     )
     {
         configuration = _configuration;
         host_prefix = _host_prefix;
-        _couchDbHttpClient = couchDbHttpClient;
+        _caseRepository = caseRepository;
         _userRepository = userRepository;
         _jurisdictionRepository = jurisdictionRepository;
 
@@ -184,8 +184,7 @@ public sealed class VROSummary
             var item = new VROSummaryItem();
 			try
 			{
-				string URL = $"{db_config.url}/{db_config.prefix}mmrds/{id}";
-var curl_result = await _couchDbHttpClient.ExecuteAsync("GET", URL, null, db_config.user_name, db_config.user_value, "application/json");
+				var curl_result = await _caseRepository.GetCaseDocumentJsonAsync(id, db_config);
 
 				System.Dynamic.ExpandoObject case_row = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(curl_result);
 
@@ -263,7 +262,6 @@ var curl_result = await _couchDbHttpClient.ExecuteAsync("GET", URL, null, db_con
         ItemCount p_result, 
         VROSummaryItem p_SummaryItem,
         string exclude_jurisdiction,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
         mmria.common.SharedLibraries.Account.IUserRepository userRepository
     ) 
     { 
@@ -309,8 +307,7 @@ var curl_result = await _couchDbHttpClient.ExecuteAsync("GET", URL, null, db_con
                 p_config_detail, 
                 p_SummaryItem, 
                 user_id_set,
-                exclude_jurisdiction,
-                couchDbHttpClient
+                exclude_jurisdiction
             );
 
             p_result.total = user_id_set.Count;
@@ -328,17 +325,13 @@ var curl_result = await _couchDbHttpClient.ExecuteAsync("GET", URL, null, db_con
         string p_id, 
         mmria.common.couchdb.DBConfigurationDetail p_config_detail, 
         ItemCount p_result,
-        string exclude_jurisdiction,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        string exclude_jurisdiction
     ) 
     { 
         try
         {
-            string request_string = $"{p_config_detail.url}/{p_config_detail.prefix}mmrds/_design/sortable/_view/by_jurisdiction_id?skip=0&take=100000";
-
-
             cancellationToken.ThrowIfCancellationRequested();
-            string responseFromServer = await couchDbHttpClient.ExecuteAsync("GET", request_string, null, p_config_detail.user_name, p_config_detail.user_value, "application/json");
+            string responseFromServer = await _caseRepository.GetCasesByJurisdictionIdViewJsonAsync(p_config_detail);
 
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -413,8 +406,7 @@ var curl_result = await _couchDbHttpClient.ExecuteAsync("GET", URL, null, db_con
         mmria.common.couchdb.DBConfigurationDetail p_config_detail, 
         VROSummaryItem p_result, 
         HashSet<string> p_user_id_set,
-        string exclude_jurisdiction,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        string exclude_jurisdiction
     ) 
     {
         try
@@ -498,15 +490,14 @@ async Task<HashSet<string>> GetIdList ()
 
 		try
 		{
-			string URL = $"{db_config.url}/{db_config.prefix}mmrds/_all_docs";
-			var curl_result = await _couchDbHttpClient.ExecuteAsync("GET", URL, null, db_config.user_name, db_config.user_value, "application/json");
+			var casePage = await _caseRepository.GetCasesPagedAsync(null, int.MaxValue, db_config);
 
-			var all_cases = System.Text.Json.JsonSerializer.Deserialize<mmria.common.model.couchdb.alldocs_response<System.Dynamic.ExpandoObject>> (curl_result);
-			var all_cases_rows = all_cases.rows;
-
-			foreach (var row in all_cases_rows) 
+			foreach (var doc in casePage.Documents) 
 			{
-				result.Add(row.id);
+				var _id = doc["_id"]?.ToString();
+				if(_id == null) continue;
+				if(_id.IndexOf("_design") > -1) continue;
+				result.Add(_id);
 			}
 		}
 		catch(Exception)

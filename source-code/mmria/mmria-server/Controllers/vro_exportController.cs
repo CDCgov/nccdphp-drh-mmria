@@ -7,6 +7,7 @@ using System.Linq;
 using System.Net;
 using Microsoft.AspNetCore.Http;
 using mmria.common.SharedLibraries.Jurisdiction;
+using mmria.common.SharedLibraries.Case;
 
 using  mmria.server.extension; 
 
@@ -18,7 +19,7 @@ public sealed class vro_exportController : Controller
     mmria.common.couchdb.OverridableConfiguration configuration;
     mmria.common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly ICaseRepository _caseRepository;
     private readonly mmria.common.SharedLibraries.Account.IUserRepository _userRepository;
     private readonly IJurisdictionRepository _jurisdictionRepository;
 
@@ -26,7 +27,7 @@ public sealed class vro_exportController : Controller
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        ICaseRepository caseRepository,
         mmria.common.SharedLibraries.Account.IUserRepository userRepository,
         IJurisdictionRepository jurisdictionRepository
     )
@@ -35,7 +36,7 @@ public sealed class vro_exportController : Controller
         configuration = tenantRuntime.RequireConfiguration();
 
         db_config = tenantRuntime.RequireDbConfig();
-        _couchDbHttpClient = couchDbHttpClient;
+        _caseRepository = caseRepository;
         _userRepository = userRepository;
         _jurisdictionRepository = jurisdictionRepository;
     }
@@ -43,7 +44,7 @@ public sealed class vro_exportController : Controller
     public async Task<IActionResult> Index(System.Threading.CancellationToken cancellationToken)
     {
 
-        var result = new mmria.server.utils.VROSummary(configuration, host_prefix, _couchDbHttpClient, _userRepository, _jurisdictionRepository);
+        var result = new mmria.server.utils.VROSummary(configuration, host_prefix, _caseRepository, _userRepository, _jurisdictionRepository);
 
         return View(await result.execute(cancellationToken));
     }
@@ -52,7 +53,7 @@ public sealed class vro_exportController : Controller
     public async Task<IActionResult> GenerateReport(System.Threading.CancellationToken cancellationToken)
     {
 
-        var summary_list = new mmria.server.utils.VROSummary(configuration, host_prefix, _couchDbHttpClient, _userRepository, _jurisdictionRepository);
+        var summary_list = new mmria.server.utils.VROSummary(configuration, host_prefix, _caseRepository, _userRepository, _jurisdictionRepository);
 
         var summary_row_list = await summary_list.execute(cancellationToken);
 

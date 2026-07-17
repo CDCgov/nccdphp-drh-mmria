@@ -166,12 +166,8 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
                     string session_message_json = Newtonsoft.Json.JsonConvert.SerializeObject(session_message);
                     try
                     {
-                        string request_string = db_config.Get_Prefix_DB_Url($"session/{Request.Cookies["sid"]}");
-                        
-                        var responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", request_string, session_message_json, db_config.user_name, db_config.user_value);
-
-                        var response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer); 
-                        if(!response.ok)
+                        var response = await _sessionRepository.SaveSessionRawAsync(Request.Cookies["sid"], session_message_json, db_config);
+                        if(response is null || !response.ok)
                         {
                             System.Console.WriteLine ("problem saving session update.");
                         }

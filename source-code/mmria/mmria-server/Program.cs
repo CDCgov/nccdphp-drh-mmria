@@ -305,6 +305,8 @@ public sealed partial class Program
             builder.Services.AddScoped<mmria.common.SharedLibraries.Jurisdiction.DAL.JurisdictionAuthorizationDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.Jurisdiction.IJurisdictionAuthorizationReader>(
                 sp => sp.GetRequiredService<mmria.common.SharedLibraries.Jurisdiction.DAL.JurisdictionAuthorizationDAL>());
+            // HasJurisdictionAuthorizationHandler registered as IAuthorizationHandler (Scoped, lifetime-compatible with IJurisdictionAuthorizationReader)
+            builder.Services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, mmria.server.utils.HasJurisdictionAuthorizationHandler>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.ManageUsers.DAL.ManageUsersDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.ManageUsers.Manager.ManageUsersManager>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.MetadataVersion.DAL.MetadataVersionDAL>();
