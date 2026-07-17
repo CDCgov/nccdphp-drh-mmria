@@ -1000,6 +1000,59 @@ dev this story _bmad-output/implementation-artifacts/26-4-jurisdiction-summary-u
 
 ---
 
+## Epic 27 — Services Utility Repository Activation _(2026-07-17)_
+
+| Story | File | Status |
+|-------|------|--------|
+| 27.1 — Activate Export Utility Repository Wiring | [27-1-activate-export-utility-wiring.md](27-1-activate-export-utility-wiring.md) | done |
+| 27.2 — BatchProcessor Assessment + Migration Actor Classification | [27-2-batchprocessor-migration-actor-classification.md](27-2-batchprocessor-migration-actor-classification.md) | done |
+
+> ℹ️ Goal: activate the null-fallback repository wiring in the three export utility classes, replace the raw BatchProcessor DELETE call with `ICaseRepository.DeleteCaseAsync`, and formally classify the two data-migration actors as intentional non-DAL exceptions. Zero unclassified non-DAL `CouchDbHttpClient.ExecuteAsync` calls remain in the codebase.
+
+**Story 27.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/27-1-activate-export-utility-wiring.md
+```
+
+**Story 27.2 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/27-2-batchprocessor-migration-actor-classification.md
+```
+
+---
+
+## Epic 28 — mmria-server Non-DAL Remnants _(2026-07-17)_
+
+| Story | File | Status |
+|-------|------|--------|
+| 28.1 — `VROSummary.cs` Case Reads | [28-1-vrosummary-case-reads.md](28-1-vrosummary-case-reads.md) | backlog |
+| 28.2 — Auth Middleware Session and Jurisdiction Wiring | [28-2-auth-middleware-session-jurisdiction-wiring.md](28-2-auth-middleware-session-jurisdiction-wiring.md) | backlog |
+| 28.3 — mmria-server `core_element_exporter.cs` Remaining Calls | [28-3-server-core-element-exporter-remaining-calls.md](28-3-server-core-element-exporter-remaining-calls.md) | backlog |
+
+> ℹ️ Goal: close the four remaining non-DAL `CouchDbHttpClient.ExecuteAsync` calls in mmria-server that were missed in Epics 17–27. All required repository interfaces exist. This is a pure wiring pass. After this epic, zero unclassified application-layer CouchDB calls remain in the codebase.
+
+**Story 28.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/28-1-vrosummary-case-reads.md
+```
+
+**Story 28.2 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/28-2-auth-middleware-session-jurisdiction-wiring.md
+```
+
+**Story 28.3 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/28-3-server-core-element-exporter-remaining-calls.md
+```
+
+---
+
 ## Open Items — Resolve Before Affected Story
 
 | OI       | Affects               | What to resolve                                                                                                                                                                                                                                                                                                                                                                                        |

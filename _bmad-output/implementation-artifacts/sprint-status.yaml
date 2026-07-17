@@ -250,7 +250,14 @@ development_status:
   epic-26-retrospective: optional
 
   # ── Epic 27: Services Utility Repository Activation ───────────────────────
-  epic-27: in-progress
-  27-1-activate-export-utility-wiring: ready-for-dev
-  27-2-batchprocessor-migration-actor-classification: ready-for-dev
+  epic-27: done
+  27-1-activate-export-utility-wiring: done
+  27-2-batchprocessor-migration-actor-classification: done
   epic-27-retrospective: optional
+
+  # ── Epic 28: mmria-server Non-DAL Remnants ────────────────────────────────
+  epic-28: backlog
+  28-1-vrosummary-case-reads: backlog
+  28-2-auth-middleware-session-jurisdiction-wiring: backlog
+  28-3-server-core-element-exporter-remaining-calls: backlog
+  epic-28-retrospective: optional
