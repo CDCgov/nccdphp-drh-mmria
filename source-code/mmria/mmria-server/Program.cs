@@ -595,6 +595,7 @@ public sealed partial class Program
             var app = builder.Build();
             var couchDbHttpClient = app.Services.GetRequiredService<mmria.common.getset.CouchDbHttpClient>();
             var exportQueueRepository = new mmria.common.SharedLibraries.ExportQueue.DAL.ExportQueueDAL(couchDbHttpClient);
+            var metadataRepository = new mmria.common.SharedLibraries.MetadataVersion.DAL.MetadataVersionDAL(couchDbHttpClient);
             var startupRebuildManager = app.Services.GetRequiredService<mmria.common.SharedLibraries.MMRIARebuild.Manager.MMRIARebuildManager>();
 
             // Create QuartzSupervisor for each tenant
@@ -612,7 +613,8 @@ public sealed partial class Program
                         tenant,
                         dbConfigSets[i],
                         couchDbHttpClient,
-                        exportQueueRepository
+                        exportQueueRepository,
+                        metadataRepository
                     ), 
                     $"QuartzSupervisor-{tenant}"
                 );

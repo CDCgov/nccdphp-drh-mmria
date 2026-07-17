@@ -17,11 +17,13 @@ public sealed class MMRIAServicesManager
     private readonly MMRIAServicesDAL _mmriaServicesDal;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly System.Net.Http.HttpClient _externalHttpClient;
+    private readonly mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository _metadataRepository;
 
-    public MMRIAServicesManager(MMRIAServicesDAL mmriaServicesDal, mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+    public MMRIAServicesManager(MMRIAServicesDAL mmriaServicesDal, mmria.common.getset.CouchDbHttpClient couchDbHttpClient, mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository metadataRepository = null)
     {
         _mmriaServicesDal = mmriaServicesDal ?? throw new ArgumentNullException(nameof(mmriaServicesDal));
         _couchDbHttpClient = couchDbHttpClient ?? throw new ArgumentNullException(nameof(couchDbHttpClient));
+        _metadataRepository = metadataRepository;
         var httpClientFactory = new mmria.common.SimpleHttpClientFactory();
         _externalHttpClient = httpClientFactory.CreateClient("external");
     }
@@ -935,6 +937,7 @@ public sealed class MMRIAServicesManager
             cdcConnection,
             metadataReleaseVersionName,
             _couchDbHttpClient,
+            _metadataRepository,
             deIdentifiedPaths
         );
 

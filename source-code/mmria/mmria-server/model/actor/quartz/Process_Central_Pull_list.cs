@@ -24,6 +24,7 @@ public sealed class Process_Central_Pull_list : ReceiveActor
     private readonly ICaseRepository _caseRepository;
     private readonly IDeIdentifiedRepository _deIdentifiedRepository;
     private readonly IReportRepository _reportRepository;
+    private readonly mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository _metadataRepository;
 
     public Process_Central_Pull_list
     (
@@ -34,7 +35,8 @@ public sealed class Process_Central_Pull_list : ReceiveActor
         string host_prefix = null,
         ICaseRepository caseRepository = null,
         IDeIdentifiedRepository deIdentifiedRepository = null,
-        IReportRepository reportRepository = null
+        IReportRepository reportRepository = null,
+        mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository metadataRepository = null
     )
     {
         config_db = _configuration_set;
@@ -45,6 +47,7 @@ public sealed class Process_Central_Pull_list : ReceiveActor
         _caseRepository = caseRepository;
         _deIdentifiedRepository = deIdentifiedRepository;
         _reportRepository = reportRepository;
+        _metadataRepository = metadataRepository;
         
         ReceiveAsync<ScheduleInfoMessage>(async scheduleInfo => await Process_Schedule(scheduleInfo));
     }
@@ -277,7 +280,7 @@ public sealed class Process_Central_Pull_list : ReceiveActor
                                     var  target_url = $"{scheduleInfo.couch_db_url}/{scheduleInfo.db_prefix}mmrds/{_id}";
 
                                     var document_json = Newtonsoft.Json.JsonConvert.SerializeObject(case_item);
-                                    var de_identified_json = await new mmria.server.utils.c_cdc_de_identifier(document_json, instance_name, scheduleInfo, null).executeAsync();
+                                    var de_identified_json = await new mmria.server.utils.c_cdc_de_identifier(document_json, instance_name, scheduleInfo, _couchDbHttpClient, _metadataRepository).executeAsync();
                                     
                                     var de_identified_case = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(de_identified_json);
 

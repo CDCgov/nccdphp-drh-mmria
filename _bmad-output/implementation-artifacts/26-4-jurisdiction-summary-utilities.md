@@ -71,4 +71,4 @@ Confirm which method matches the URL pattern used in `JurisdictionSummary.cs` an
 **`ICaseRepository` view method note for `CaseViewSearch.pmss.cs`:**
 The PMSS case view search likely queries a PMSS-specific case view. Check if the view query (`GET {prefix}mmrds/_design/.../_view/...`) is already covered by an existing `ICaseRepository` method. If not, add `GetCasesByCustomViewAsync(string viewUrl, DBConfigurationDetail dbConfig)` → `string` (raw JSON) to the interface and implement in `CaseDAL`.
 
-**Null-fallback pattern:** Follow the same optional-parameter + null-guard pattern established in Epic 24 for all four files. No callers need to be updated in this story.
+**Null-fallback pattern:** Do NOT use the optional-parameter + null-guard pattern. Follow the same required-parameter pattern established in Epics 17–24 for all four files. Pass a real `IMetadataRepository` instance via constructor. No null-guard or fallback branch.

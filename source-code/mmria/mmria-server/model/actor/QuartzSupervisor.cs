@@ -62,6 +62,7 @@ public sealed class QuartzSupervisor : UntypedActor
     mmria.common.couchdb.ConfigurationSet configuration_set;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly IExportQueueRepository _exportQueueRepository;
+    private readonly mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository _metadataRepository;
 
     string host_prefix;
 
@@ -71,7 +72,8 @@ public sealed class QuartzSupervisor : UntypedActor
         string _host_prefix,
         mmria.common.couchdb.ConfigurationSet _configuration_set,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
-        IExportQueueRepository exportQueueRepository
+        IExportQueueRepository exportQueueRepository,
+        mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository metadataRepository = null
     )
     {
  
@@ -81,6 +83,7 @@ public sealed class QuartzSupervisor : UntypedActor
         configuration_set = _configuration_set;
         _couchDbHttpClient = couchDbHttpClient;
         _exportQueueRepository = exportQueueRepository;
+        _metadataRepository = metadataRepository;
     }
 
     protected override void PostStop()
@@ -164,7 +167,7 @@ public sealed class QuartzSupervisor : UntypedActor
                 else if(!string.IsNullOrWhiteSpace(cdcInstancePullList))
                 {
                     Console.WriteLine($"[CDC-DEBUG] Launching Process_Central_Pull_list for host_prefix='{host_prefix}'");
-                    Context.ActorOf(Props.Create<Process_Central_Pull_list>(configuration_set, db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(new_scheduleInfo);
+                    Context.ActorOf(Props.Create<Process_Central_Pull_list>(configuration_set, db_config, _couchDbHttpClient, configuration, host_prefix, (mmria.common.SharedLibraries.Case.ICaseRepository)null, (mmria.common.SharedLibraries.DeIdentified.IDeIdentifiedRepository)null, (mmria.common.SharedLibraries.Report.IReportRepository)null, _metadataRepository)).Tell(new_scheduleInfo);
                 }
                 else
                 {

@@ -86,7 +86,7 @@ public sealed class Synchronize_Deleted_Case_Records : ReceiveActor
                         try
                         {
                             #if !IS_PMSS_ENHANCED
-                            mmria.server.utils.c_sync_document sync_document = new mmria.server.utils.c_sync_document(kvp.Key, null, "DELETE", scheduleInfo.version_number, db_config, _couchDbHttpClient, _deIdentifiedRepository, _reportRepository);
+                            mmria.server.utils.c_sync_document sync_document = new mmria.server.utils.c_sync_document(kvp.Key, null, "DELETE", scheduleInfo.version_number, db_config, _couchDbHttpClient, deIdentifiedRepository: _deIdentifiedRepository, reportRepository: _reportRepository);
                             await sync_document.executeAsync();
                             #endif
                             #if IS_PMSS_ENHANCED
@@ -110,7 +110,7 @@ public sealed class Synchronize_Deleted_Case_Records : ReceiveActor
                             if (!string.IsNullOrEmpty(document_json) && document_json.IndexOf("\"_id\":\"_design/\"") < 0)
                             {
                                 #if !IS_PMSS_ENHANCED
-                                mmria.server.utils.c_sync_document sync_document = new mmria.server.utils.c_sync_document(kvp.Key, document_json, "PUT", scheduleInfo.version_number, db_config, _couchDbHttpClient, _deIdentifiedRepository, _reportRepository);
+                                mmria.server.utils.c_sync_document sync_document = new mmria.server.utils.c_sync_document(kvp.Key, document_json, "PUT", scheduleInfo.version_number, db_config, _couchDbHttpClient, deIdentifiedRepository: _deIdentifiedRepository, reportRepository: _reportRepository);
                                 await sync_document.executeAsync();
                                 #endif
                                 #if IS_PMSS_ENHANCED

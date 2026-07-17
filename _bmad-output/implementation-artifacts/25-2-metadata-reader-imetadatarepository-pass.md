@@ -2,7 +2,7 @@
 
 **Epic:** 25 — Async Safety + Metadata Reader Consolidation
 **Story ID:** 25.2
-**Status:** ready-for-dev
+**Status:** done
 **Date added:** 2026-07-17
 **Depends on:** None (can proceed in parallel with 25.1)
 **Source requirements:** epics.md §Epic 25 Story 25.2; project-context.md §2.2
@@ -39,10 +39,10 @@ Given `c_cdc_de_identifier.cs` (server: `mmria-server/util/c_cdc_de_identifier.c
 When this story is complete
 Then each direct call is replaced with `await _metadataRepository.GetDeIdentifiedExportListAsync(db_config)` when `_metadataRepository != null`; fallback preserved when null
 
-**AC-5 — Null-fallback pattern used throughout**
-Given callers of these transform helpers that do not yet pass an `IMetadataRepository` instance
+**AC-5 — Required repository pattern used throughout**
+Given callers of these transform helpers must always provide a real `IMetadataRepository` instance
 When this story is complete
-Then the null-fallback (use direct `_couchDbHttpClient.ExecuteAsync`) preserves existing behavior for those callers; no caller changes are required in this story
+Then `IMetadataRepository` is a required (non-optional) constructor parameter in all 12 files; the direct `_couchDbHttpClient.ExecuteAsync` fallback branch is removed; actor-level callers that did not have `IMetadataRepository` were updated to inject and pass a real instance through the actor hierarchy (QuartzSupervisor → Process_Central_Pull_list)
 
 **AC-6 — Build passes with zero errors**
 Given the changes above

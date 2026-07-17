@@ -49,7 +49,6 @@ When this story closes
 Then the developer runs a scan of all `CouchDbHttpClient.ExecuteAsync` calls across `mmria-server`, `mmria.common`, and `mmria.services` (excluding utilities repo, `_bmad-output`, `obj/`, `bin/`) and confirms every call is one of:
 - Inside a `DAL/` file (expected) ✓
 - Inside an intentional infrastructure exception (`c_db_setup.cs`, `Check_DB_Install.cs`, `MultiTenantSetupService.cs`, `MMRIARebuildWorker.cs`) ✓
-- A null-fallback branch that is never exercised at runtime ✓
 - A service-endpoint call using `CouchDbHttpClient` as a general HTTP transport (not a database call) ✓
 - Formally documented as an intentional exception per ACs 2 and 3 ✓
 The scan result (file count, call count, and disposition summary) is recorded in the story completion notes
@@ -78,6 +77,6 @@ Get-ChildItem -Recurse -Path "c:\repos\nccdphp-drh-mmria" -Include "*.cs" |
   Select-Object Path, LineNumber, Line |
   Format-Table -AutoSize
 ```
-After completing Epics 25–27, the output should contain only: infrastructure files, null-fallback branches, service-endpoint calls, and the two formally classified migration actors.
+After completing Epics 25–27, the output should contain only: infrastructure files, service-endpoint calls, and the two formally classified migration actors.
 
 **`rebuild_export_queue_job.cs` note:** This file already has a superseded-dead-code comment added in Story 24.4. It does not need classification in this story.

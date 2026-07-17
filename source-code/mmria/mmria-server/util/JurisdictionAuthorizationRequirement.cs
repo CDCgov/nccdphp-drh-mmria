@@ -22,7 +22,7 @@ public sealed class HasJurisdictionAuthorizationHandler : AuthorizationHandler<J
         _couchDbHttpClient = couchDbHttpClient;
     }
 
-    protected override Task HandleRequirementAsync
+    protected override async Task HandleRequirementAsync
     (
         AuthorizationHandlerContext context, 
         JurisdictionAuthorizationRequirement requirement,
@@ -33,7 +33,7 @@ public sealed class HasJurisdictionAuthorizationHandler : AuthorizationHandler<J
         if (!context.User.HasClaim(c => c.Type == "JurisdictionList" && 
                                         c.Issuer == "https://contoso.com"))
         {
-            return Task.CompletedTask;
+            return;
         }
 
 
@@ -42,7 +42,7 @@ public sealed class HasJurisdictionAuthorizationHandler : AuthorizationHandler<J
         string jurisdicion_result_string = null;
         try
         {
-            jurisdicion_result_string = _couchDbHttpClient.ExecuteAsync("POST", jurisdicion_view_url, null, db_config.user_name, db_config.user_value, "application/json").Result;
+            jurisdicion_result_string = await _couchDbHttpClient.ExecuteAsync("POST", jurisdicion_view_url, null, db_config.user_name, db_config.user_value, "application/json");
         }
         catch(Exception ex)
         {
@@ -59,6 +59,6 @@ public sealed class HasJurisdictionAuthorizationHandler : AuthorizationHandler<J
 
         context.Succeed(requirement);
 
-        return Task.CompletedTask;
+        return;
     }
 }

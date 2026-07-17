@@ -21,6 +21,7 @@ public sealed partial class c_convert_to_opioid_report_object
     private readonly bool _isShowSyncDocumentStatus;
     private readonly System.Dynamic.ExpandoObject _source_object;
     private readonly mmria.common.metadata.app _metadata;
+    private readonly mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository _metadataRepository;
 
     private System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, string>> List_Look_Up;
 
@@ -122,6 +123,7 @@ public sealed partial class c_convert_to_opioid_report_object
         string p_metadata_version,
         mmria.common.couchdb.DBConfigurationDetail _db_config,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository metadataRepository,
         mmria.common.couchdb.OverridableConfiguration configuration = null,
         string host_prefix = null,
         System.Dynamic.ExpandoObject p_source_object = null,
@@ -137,6 +139,7 @@ public sealed partial class c_convert_to_opioid_report_object
         _isShowSyncDocumentStatus = configuration?.GetBoolean("is_show_sync_document_status", host_prefix ?? "shared") ?? true;
         _source_object = p_source_object;
         _metadata = p_metadata;
+        _metadataRepository = metadataRepository;
     }
 
 
@@ -332,13 +335,7 @@ mDeathbyRace  MDeathbyRace17 17
         string result = null;
 
 
-        var metadata = _metadata;
-        if(metadata == null)
-        {
-            string metadata_url = db_config.url + $"/metadata/version_specification-{metadata_version}/metadata";
-            string metadata_response = await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, db_config.user_name, db_config.user_value);
-            metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_response);
-        }
+        var metadata = await _metadataRepository.GetAppDocumentAsync(metadata_version, db_config);
 
 
         List_Look_Up = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);

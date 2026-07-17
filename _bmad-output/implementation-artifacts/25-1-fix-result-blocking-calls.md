@@ -2,7 +2,7 @@
 
 **Epic:** 25 — Async Safety + Metadata Reader Consolidation
 **Story ID:** 25.1
-**Status:** ready-for-dev
+**Status:** done
 **Date added:** 2026-07-17
 **Depends on:** None
 **Source requirements:** epics.md §Epic 25 Story 25.1; non-DAL boundary analysis 2026-07-16

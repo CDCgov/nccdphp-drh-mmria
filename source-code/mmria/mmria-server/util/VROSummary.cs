@@ -173,7 +173,7 @@ public sealed class VROSummary
 
         var result = new List<VROSummaryItem>();
 
-        var id_list = GetIdList();
+        var id_list = await GetIdList();
             
         var gs = new C_Get_Set_Value(new ());
         C_Get_Set_Value.get_value_result value_result = null;
@@ -185,7 +185,7 @@ public sealed class VROSummary
 			try
 			{
 				string URL = $"{db_config.url}/{db_config.prefix}mmrds/{id}";
-				var curl_result = _couchDbHttpClient.ExecuteAsync("GET", URL, null, db_config.user_name, db_config.user_value, "application/json").Result;
+var curl_result = await _couchDbHttpClient.ExecuteAsync("GET", URL, null, db_config.user_name, db_config.user_value, "application/json");
 
 				System.Dynamic.ExpandoObject case_row = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(curl_result);
 
@@ -491,7 +491,7 @@ public sealed class VROSummary
     }
 
 
-    HashSet<string> GetIdList ()
+async Task<HashSet<string>> GetIdList ()
 	{
 
 		var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -499,7 +499,7 @@ public sealed class VROSummary
 		try
 		{
 			string URL = $"{db_config.url}/{db_config.prefix}mmrds/_all_docs";
-			var curl_result = _couchDbHttpClient.ExecuteAsync("GET", URL, null, db_config.user_name, db_config.user_value, "application/json").Result;
+			var curl_result = await _couchDbHttpClient.ExecuteAsync("GET", URL, null, db_config.user_name, db_config.user_value, "application/json");
 
 			var all_cases = System.Text.Json.JsonSerializer.Deserialize<mmria.common.model.couchdb.alldocs_response<System.Dynamic.ExpandoObject>> (curl_result);
 			var all_cases_rows = all_cases.rows;

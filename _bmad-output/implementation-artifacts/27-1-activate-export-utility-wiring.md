@@ -39,10 +39,10 @@ Given export jobs may also write report data via utility helpers
 When this story begins
 Then the developer confirms whether `IReportRepository` null-fallbacks exist in any of the three utility files; if they exist, those are activated with real instances from the supervisor's scope; if no such fallbacks exist, this AC is marked not-applicable
 
-**AC-5 — Null-fallback code paths retained**
-Given the null-fallback branches in each utility file serve as a safety net
+**AC-5 — Null-fallback code paths removed**
+Given the null-fallback branches in each utility file are inconsistent with the required-repository pattern
 When this story is complete
-Then the null-fallback code is NOT removed — it is retained as a defensive fallback in case of future injection failures; only the instantiation sites are updated to pass real repos
+Then the null-fallback code IS removed — repositories are required, not optional; instantiation sites pass real repo instances; if a caller does not have the repo injected, thread it through from the supervisor's DI scope
 
 **AC-6 — Build passes with zero errors**
 Given the changes above

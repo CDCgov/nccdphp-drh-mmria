@@ -96,6 +96,7 @@ public sealed class c_document_sync_all_legacy
     private readonly ICaseRepository _caseRepository;
     private readonly IDeIdentifiedRepository _deIdentifiedRepository;
     private readonly IReportRepository _reportRepository;
+    private readonly mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository _metadataRepository;
 
     public c_document_sync_all_legacy
     (
@@ -115,7 +116,8 @@ public sealed class c_document_sync_all_legacy
         Func<legacy_progress, Task> progress_callback = null,
         ICaseRepository caseRepository = null,
         IDeIdentifiedRepository deIdentifiedRepository = null,
-        IReportRepository reportRepository = null
+        IReportRepository reportRepository = null,
+        mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository metadataRepository = null
     )
     {
         couchdb_url = p_couchdb_url;
@@ -135,6 +137,7 @@ public sealed class c_document_sync_all_legacy
         _caseRepository = caseRepository;
         _deIdentifiedRepository = deIdentifiedRepository;
         _reportRepository = reportRepository;
+        _metadataRepository = metadataRepository;
     }
 
     private string get_database_scripts_directory()
@@ -742,6 +745,7 @@ public sealed class c_document_sync_all_legacy
                             metadata_version,
                             db_config,
                             _couchDbHttpClient,
+                            _metadataRepository,
                             deIdentifiedRepository: null,
                             reportRepository: null,
                             configuration: _configuration,

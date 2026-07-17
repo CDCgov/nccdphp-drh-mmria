@@ -236,9 +236,9 @@ development_status:
   epic-24-retrospective: optional
 
   # ── Epic 25: Async Safety + Metadata Reader Consolidation ─────────────────
-  epic-25: in-progress
-  25-1-fix-result-blocking-calls: ready-for-dev
-  25-2-metadata-reader-imetadatarepository-pass: ready-for-dev
+  epic-25: done
+  25-1-fix-result-blocking-calls: done
+  25-2-metadata-reader-imetadatarepository-pass: done
   epic-25-retrospective: optional
 
   # ── Epic 26: Controller API Direct-Call Remediation ───────────────────────

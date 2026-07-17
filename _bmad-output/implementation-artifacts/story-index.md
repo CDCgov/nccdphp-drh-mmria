@@ -938,6 +938,29 @@ dev this story _bmad-output/implementation-artifacts/24-11-mmria-services-vital-
 
 ---
 
+## Epic 25 — Async Safety + Metadata Reader Consolidation _(2026-07-17)_
+
+| Story | File | Status |
+|-------|------|--------|
+| 25.1 — Fix `.Result` Blocking Calls | [25-1-fix-result-blocking-calls.md](25-1-fix-result-blocking-calls.md) | done |
+| 25.2 — Metadata Reader `IMetadataRepository` Injection Pass | [25-2-metadata-reader-imetadatarepository-pass.md](25-2-metadata-reader-imetadatarepository-pass.md) | done |
+
+**Sequencing:** 25.1 and 25.2 are independent and can proceed in parallel.
+
+**Story 25.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/25-1-fix-result-blocking-calls.md
+```
+
+**Story 25.2 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/25-2-metadata-reader-imetadatarepository-pass.md
+```
+
+---
+
 ## Open Items — Resolve Before Affected Story
 
 | OI       | Affects               | What to resolve                                                                                                                                                                                                                                                                                                                                                                                        |
