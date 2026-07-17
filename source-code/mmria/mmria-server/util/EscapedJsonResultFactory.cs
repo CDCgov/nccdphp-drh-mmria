@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
+using NjSerializer = Newtonsoft.Json.JsonSerializer;
 
 namespace mmria.server.util;
 
@@ -42,7 +43,7 @@ public static class EscapedJsonResultFactory
             StringEscapeHandling = StringEscapeHandling.EscapeHtml
         };
 
-        Newtonsoft.Json.JsonSerializer.Create(HtmlEscapingSerializerSettings).Serialize(jsonWriter, value);
+        NjSerializer.Create(HtmlEscapingSerializerSettings).Serialize(jsonWriter, value);
         jsonWriter.Flush();
         return stringWriter.ToString();
     }

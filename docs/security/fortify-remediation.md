@@ -25,7 +25,7 @@
 public static ContentResult Create(object value) =>
     new SecureEscapedJsonResult
     {
-        Content = Serialize(value),   // ← tainted string assigned to ContentResult.Content
+        Content = Serialize(value),   // tainted string assigned to ContentResult.Content
         ContentType = JsonContentType,
         StatusCode = 200
     };
