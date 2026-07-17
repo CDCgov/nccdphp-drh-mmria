@@ -938,6 +938,121 @@ dev this story _bmad-output/implementation-artifacts/24-11-mmria-services-vital-
 
 ---
 
+## Epic 25 — Async Safety + Metadata Reader Consolidation _(2026-07-17)_
+
+| Story | File | Status |
+|-------|------|--------|
+| 25.1 — Fix `.Result` Blocking Calls | [25-1-fix-result-blocking-calls.md](25-1-fix-result-blocking-calls.md) | done |
+| 25.2 — Metadata Reader `IMetadataRepository` Injection Pass | [25-2-metadata-reader-imetadatarepository-pass.md](25-2-metadata-reader-imetadatarepository-pass.md) | done |
+
+**Sequencing:** 25.1 and 25.2 are independent and can proceed in parallel.
+
+**Story 25.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/25-1-fix-result-blocking-calls.md
+```
+
+**Story 25.2 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/25-2-metadata-reader-imetadatarepository-pass.md
+```
+
+---
+
+## Epic 26 — Controller API Direct-Call Remediation _(2026-07-17)_
+
+| Story | File | Status |
+|-------|------|--------|
+| 26.1 — Case API Controllers | [26-1-case-api-controllers.md](26-1-case-api-controllers.md) | done |
+| 26.2 — Auth and Session Controllers | [26-2-auth-session-controllers.md](26-2-auth-session-controllers.md) | done |
+| 26.3 — Export Queue and Broadcast Controllers | [26-3-export-broadcast-controllers.md](26-3-export-broadcast-controllers.md) | done |
+| 26.4 — Jurisdiction, Summary, and Remaining Utility Leakers | [26-4-jurisdiction-summary-utilities.md](26-4-jurisdiction-summary-utilities.md) | done |
+
+**Sequencing:** All four stories are independent and can be worked in any order. They share no file conflicts with each other.
+
+> ℹ️ Goal: every remaining controller and utility that calls `CouchDbHttpClient.ExecuteAsync` directly against CouchDB is routed through an existing repository interface. No new interfaces are created (except possibly `IQueueRepository` in 26.3 if `queue` DB has no coverage yet).
+
+**Story 26.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/26-1-case-api-controllers.md
+```
+
+**Story 26.2 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/26-2-auth-session-controllers.md
+```
+
+**Story 26.3 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/26-3-export-broadcast-controllers.md
+```
+
+**Story 26.4 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/26-4-jurisdiction-summary-utilities.md
+```
+
+---
+
+## Epic 27 — Services Utility Repository Activation _(2026-07-17)_
+
+| Story | File | Status |
+|-------|------|--------|
+| 27.1 — Activate Export Utility Repository Wiring | [27-1-activate-export-utility-wiring.md](27-1-activate-export-utility-wiring.md) | done |
+| 27.2 — BatchProcessor Assessment + Migration Actor Classification | [27-2-batchprocessor-migration-actor-classification.md](27-2-batchprocessor-migration-actor-classification.md) | done |
+
+> ℹ️ Goal: activate the null-fallback repository wiring in the three export utility classes, replace the raw BatchProcessor DELETE call with `ICaseRepository.DeleteCaseAsync`, and formally classify the two data-migration actors as intentional non-DAL exceptions. Zero unclassified non-DAL `CouchDbHttpClient.ExecuteAsync` calls remain in the codebase.
+
+**Story 27.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/27-1-activate-export-utility-wiring.md
+```
+
+**Story 27.2 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/27-2-batchprocessor-migration-actor-classification.md
+```
+
+---
+
+## Epic 28 — mmria-server Non-DAL Remnants _(2026-07-17)_
+
+| Story | File | Status |
+|-------|------|--------|
+| 28.1 — `VROSummary.cs` Case Reads | [28-1-vrosummary-case-reads.md](28-1-vrosummary-case-reads.md) | done |
+| 28.2 — Auth Middleware Session and Jurisdiction Wiring | [28-2-auth-middleware-session-jurisdiction-wiring.md](28-2-auth-middleware-session-jurisdiction-wiring.md) | done |
+| 28.3 — mmria-server `core_element_exporter.cs` Remaining Calls | [28-3-server-core-element-exporter-remaining-calls.md](28-3-server-core-element-exporter-remaining-calls.md) | done |
+
+> ℹ️ Goal: close the four remaining non-DAL `CouchDbHttpClient.ExecuteAsync` calls in mmria-server that were missed in Epics 17–27. All required repository interfaces exist. This is a pure wiring pass. After this epic, zero unclassified application-layer CouchDB calls remain in the codebase.
+
+**Story 28.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/28-1-vrosummary-case-reads.md
+```
+
+**Story 28.2 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/28-2-auth-middleware-session-jurisdiction-wiring.md
+```
+
+**Story 28.3 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/28-3-server-core-element-exporter-remaining-calls.md
+```
+
+---
+
 ## Open Items — Resolve Before Affected Story
 
 | OI       | Affects               | What to resolve                                                                                                                                                                                                                                                                                                                                                                                        |

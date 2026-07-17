@@ -3,6 +3,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Akka.Actor;
+using mmria.common.SharedLibraries.Case;
+using mmria.common.SharedLibraries.DeIdentified;
+using mmria.common.SharedLibraries.Report;
 using mmria.server.model.actor;
 
 namespace mmria.server.model.actor.quartz;
@@ -18,6 +21,10 @@ public sealed class Process_Central_Pull_list : ReceiveActor
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly mmria.common.couchdb.OverridableConfiguration _configuration;
     private readonly string _host_prefix;
+    private readonly ICaseRepository _caseRepository;
+    private readonly IDeIdentifiedRepository _deIdentifiedRepository;
+    private readonly IReportRepository _reportRepository;
+    private readonly mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository _metadataRepository;
 
     public Process_Central_Pull_list
     (
@@ -25,7 +32,11 @@ public sealed class Process_Central_Pull_list : ReceiveActor
         mmria.common.couchdb.DBConfigurationDetail _db_config,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
         mmria.common.couchdb.OverridableConfiguration configuration = null,
-        string host_prefix = null
+        string host_prefix = null,
+        ICaseRepository caseRepository = null,
+        IDeIdentifiedRepository deIdentifiedRepository = null,
+        IReportRepository reportRepository = null,
+        mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository metadataRepository = null
     )
     {
         config_db = _configuration_set;
@@ -33,6 +44,10 @@ public sealed class Process_Central_Pull_list : ReceiveActor
         _couchDbHttpClient = couchDbHttpClient;
         _configuration = configuration;
         _host_prefix = host_prefix;
+        _caseRepository = caseRepository;
+        _deIdentifiedRepository = deIdentifiedRepository;
+        _reportRepository = reportRepository;
+        _metadataRepository = metadataRepository;
         
         ReceiveAsync<ScheduleInfoMessage>(async scheduleInfo => await Process_Schedule(scheduleInfo));
     }
@@ -71,23 +86,39 @@ public sealed class Process_Central_Pull_list : ReceiveActor
         
             try
             {
-                var db_url = $"{scheduleInfo.couch_db_url}/{scheduleInfo.db_prefix}mmrds";
-                Console.WriteLine($"[CDC-DEBUG] Rebuilding target mmrds database at '{db_url}'");
-                await _couchDbHttpClient.ExecuteAsync("DELETE", db_url, null, scheduleInfo.user_name, scheduleInfo.user_value);
+                // Build target DBConfigurationDetail from scheduleInfo
+                var targetDbConfig = new mmria.common.couchdb.DBConfigurationDetail
+                {
+                    url = scheduleInfo.couch_db_url,
+                    prefix = scheduleInfo.db_prefix,
+                    user_name = scheduleInfo.user_name,
+                    user_value = scheduleInfo.user_value
+                };
+
+                // Drop and recreate target mmrds
+                Console.WriteLine($"[CDC-DEBUG] Rebuilding target mmrds database at '{scheduleInfo.couch_db_url}/{scheduleInfo.db_prefix}mmrds'");
+                if(_caseRepository != null)
+                {
+                    await _caseRepository.DropAndResetAsync(targetDbConfig);
+                }
+                else
+                {
+                    var db_url = $"{scheduleInfo.couch_db_url}/{scheduleInfo.db_prefix}mmrds";
+                    await _couchDbHttpClient.ExecuteAsync("DELETE", db_url, null, scheduleInfo.user_name, scheduleInfo.user_value);
+                    System.Console.WriteLine("mmrds_curl\n{0}", await _couchDbHttpClient.ExecuteAsync("PUT", scheduleInfo.couch_db_url + $"/{scheduleInfo.db_prefix}mmrds", null, scheduleInfo.user_name, scheduleInfo.user_value));
+                }
+
+                // mmrds security + design docs have no interface method — keep direct
+                await _couchDbHttpClient.ExecuteAsync("PUT", scheduleInfo.couch_db_url + $"/{scheduleInfo.db_prefix}mmrds/_security", "{\"admins\":{\"names\":[],\"roles\":[\"form_designer\"]},\"members\":{\"names\":[],\"roles\":[\"abstractor\",\"data_analyst\",\"timer\"]}}", scheduleInfo.user_name, scheduleInfo.user_value);
+                System.Console.WriteLine("mmrds/_security completed successfully");
 
                         string current_directory = AppContext.BaseDirectory;
                         Console.WriteLine($"[CDC-DEBUG] Using current_directory='{current_directory}' for database scripts");
-
-                        System.Console.WriteLine("mmrds_curl\n{0}", await _couchDbHttpClient.ExecuteAsync("PUT", scheduleInfo.couch_db_url + $"/{scheduleInfo.db_prefix}mmrds", null, scheduleInfo.user_name, scheduleInfo.user_value));
-
-                        await _couchDbHttpClient.ExecuteAsync("PUT", scheduleInfo.couch_db_url + $"/{scheduleInfo.db_prefix}mmrds/_security", "{\"admins\":{\"names\":[],\"roles\":[\"form_designer\"]},\"members\":{\"names\":[],\"roles\":[\"abstractor\",\"data_analyst\",\"timer\"]}}", scheduleInfo.user_name, scheduleInfo.user_value);
-                        System.Console.WriteLine("mmrds/_security completed successfully");
 
                         try 
                         {
                             using (var  sr = new System.IO.StreamReader(System.IO.Path.Combine (current_directory, "database-scripts/case_design_sortable.json")))
                             {
-
                                 string case_design_sortable = await sr.ReadToEndAsync();
                                 await _couchDbHttpClient.ExecuteAsync("PUT", scheduleInfo.couch_db_url + $"/{scheduleInfo.db_prefix}mmrds/_design/sortable", case_design_sortable, scheduleInfo.user_name, scheduleInfo.user_value);
                             }
@@ -97,90 +128,72 @@ public sealed class Process_Central_Pull_list : ReceiveActor
                                 string case_store_design_auth = await sr.ReadToEndAsync();
                                 await _couchDbHttpClient.ExecuteAsync("PUT", scheduleInfo.couch_db_url + $"/{scheduleInfo.db_prefix}mmrds/_design/auth", case_store_design_auth, scheduleInfo.user_name, scheduleInfo.user_value);
                             }
-                                                            
                         }
                         catch (Exception ex) 
                         {
                             System.Console.WriteLine($"unable to configure mmrds database:\n{ex}");
                         }
 
-
-                    try
+                    // Drop and recreate target de_id
+                    if(_deIdentifiedRepository != null)
                     {
-                        Console.WriteLine($"[CDC-DEBUG] Deleting target de_id database '{scheduleInfo.couch_db_url}/{scheduleInfo.db_prefix}de_id'");
-                        await _couchDbHttpClient.ExecuteAsync("DELETE", scheduleInfo.couch_db_url + $"/{scheduleInfo.db_prefix}de_id", null, scheduleInfo.user_name, scheduleInfo.user_value);
+                        try
+                        {
+                            Console.WriteLine($"[CDC-DEBUG] Rebuilding target de_id via IDeIdentifiedRepository");
+                            await _deIdentifiedRepository.DropAndResetAsync(targetDbConfig);
+                        }
+                        catch (Exception) { }
                     }
-                    catch (Exception)
+                    else
                     {
-                    
-                    }
-                    
-
-                    try
-                    {
-                        Console.WriteLine($"[CDC-DEBUG] Deleting target report database '{scheduleInfo.couch_db_url}/{scheduleInfo.db_prefix}report'");
-                        await _couchDbHttpClient.ExecuteAsync("DELETE", scheduleInfo.couch_db_url + $"/{scheduleInfo.db_prefix}report", null, scheduleInfo.user_name, scheduleInfo.user_value);
-                    }
-                    catch (Exception)
-                    {
-                    
+                        try { await _couchDbHttpClient.ExecuteAsync("DELETE", scheduleInfo.couch_db_url + $"/{scheduleInfo.db_prefix}de_id", null, scheduleInfo.user_name, scheduleInfo.user_value); } catch (Exception) { }
+                        try { await _couchDbHttpClient.ExecuteAsync("PUT", scheduleInfo.couch_db_url + $"/{scheduleInfo.db_prefix}de_id", null, scheduleInfo.user_name, scheduleInfo.user_value); } catch (Exception) { }
                     }
 
-
-                    try
+                    // Drop and recreate target report
+                    if(_reportRepository != null)
                     {
-                        Console.WriteLine($"[CDC-DEBUG] Creating target de_id database '{scheduleInfo.couch_db_url}/{scheduleInfo.db_prefix}de_id'");
-                        await _couchDbHttpClient.ExecuteAsync("PUT", scheduleInfo.couch_db_url + $"/{scheduleInfo.db_prefix}de_id", null, scheduleInfo.user_name, scheduleInfo.user_value);
+                        try
+                        {
+                            Console.WriteLine($"[CDC-DEBUG] Rebuilding target report via IReportRepository");
+                            await _reportRepository.DropAndResetWithSystemDocPreservationAsync(targetDbConfig);
+                        }
+                        catch (Exception) { }
                     }
-                    catch (Exception)
+                    else
                     {
-                    
+                        try { await _couchDbHttpClient.ExecuteAsync("DELETE", scheduleInfo.couch_db_url + $"/{scheduleInfo.db_prefix}report", null, scheduleInfo.user_name, scheduleInfo.user_value); } catch (Exception) { }
+                        try { await _couchDbHttpClient.ExecuteAsync("PUT", scheduleInfo.couch_db_url + $"/{scheduleInfo.db_prefix}report", null, scheduleInfo.user_name, scheduleInfo.user_value); } catch (Exception) { }
                     }
 
+                    // Restore de_id sortable design
                     try 
                     {
-                        
                         if(!System.IO.Directory.Exists(System.IO.Path.Combine(current_directory, "database-scripts")))
-                        {
                             current_directory = System.IO.Directory.GetCurrentDirectory();
-                        }
 
-                        using (var  sr = new System.IO.StreamReader(System.IO.Path.Combine( current_directory,  "database-scripts/case_design_sortable.json")))
+                        using (var sr = new System.IO.StreamReader(System.IO.Path.Combine(current_directory, "database-scripts/case_design_sortable.json")))
                         {
                             string result = await sr.ReadToEndAsync();
-                            await _couchDbHttpClient.ExecuteAsync("PUT", scheduleInfo.couch_db_url + $"/{scheduleInfo.db_prefix}de_id/_design/sortable", result, scheduleInfo.user_name, scheduleInfo.user_value);
+                            if(_deIdentifiedRepository != null)
+                                await _deIdentifiedRepository.EnsureDesignDocumentAsync("sortable", result, targetDbConfig);
+                            else
+                                await _couchDbHttpClient.ExecuteAsync("PUT", scheduleInfo.couch_db_url + $"/{scheduleInfo.db_prefix}de_id/_design/sortable", result, scheduleInfo.user_name, scheduleInfo.user_value);
                         }
-
-        
                     } 
-                    catch (Exception) 
-                    {
+                    catch (Exception) { }
 
-                    }
-
-
-
-                    try
-                    {
-                        Console.WriteLine($"[CDC-DEBUG] Creating target report database '{scheduleInfo.couch_db_url}/{scheduleInfo.db_prefix}report'");
-                        await _couchDbHttpClient.ExecuteAsync("PUT", scheduleInfo.couch_db_url + $"/{scheduleInfo.db_prefix}report", null, scheduleInfo.user_name, scheduleInfo.user_value);
-                    }
-                    catch (Exception)
-                    {
-                    
-                    }
-
-
+                    // Restore report opioid index
                     try
                     {
                         var Report_Opioid_Index = new mmria.server.utils.c_document_sync_all.Report_Opioid_Index_Struct();
-                        string index_json = Newtonsoft.Json.JsonConvert.SerializeObject (Report_Opioid_Index);
-                        await _couchDbHttpClient.ExecuteAsync("POST", scheduleInfo.couch_db_url + $"/{scheduleInfo.db_prefix}report/_index", index_json, scheduleInfo.user_name, scheduleInfo.user_value);
+                        string index_json = Newtonsoft.Json.JsonConvert.SerializeObject(Report_Opioid_Index);
+                        if(_reportRepository != null)
+                            await _reportRepository.EnsureIndexAsync(index_json, targetDbConfig);
+                        else
+                            await _couchDbHttpClient.ExecuteAsync("POST", scheduleInfo.couch_db_url + $"/{scheduleInfo.db_prefix}report/_index", index_json, scheduleInfo.user_name, scheduleInfo.user_value);
                     }
-                    catch (Exception)
-                    {
-                    
-                    }
+                    catch (Exception) { }
 
                 
                     var config_cdc_instance_pull_list = scheduleInfo.cdc_instance_pull_list;
@@ -197,20 +210,46 @@ public sealed class Process_Central_Pull_list : ReceiveActor
                             {
                                 var db_info = config_db.detail_list[instance_name];
 
-                                string url = $"{db_info.url}/{db_info.prefix}mmrds/_all_docs?include_docs=true";
-                                Console.WriteLine($"[CDC-DEBUG] Reading source docs from '{url}'");
-                                string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", url, null, db_info.user_name, db_info.user_value);
-                                Console.WriteLine($"[CDC-DEBUG] Source response length: {responseFromServer?.Length ?? 0}");
-                                var case_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_response_header<System.Dynamic.ExpandoObject>>(responseFromServer);
-                                Console.WriteLine($"[CDC-DEBUG] Source row count for '{instance_name}': {case_response?.rows?.Count ?? -1}");
+                                // Collect all source docs (paged through ICaseRepository if available)
+                                var allSourceDocs = new System.Collections.Generic.List<System.Dynamic.ExpandoObject>();
+                                if(_caseRepository != null)
+                                {
+                                    string? pageStartKey = null;
+                                    const int pageSize = 200;
+                                    while(true)
+                                    {
+                                        var page = await _caseRepository.GetCasesPagedAsync(pageStartKey, pageSize, db_info);
+                                        foreach(var doc in page.Documents)
+                                        {
+                                            var expando = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(doc.ToString(Newtonsoft.Json.Formatting.None));
+                                            allSourceDocs.Add(expando);
+                                        }
+                                        if(page.Documents.Count < pageSize) break;
+                                        pageStartKey = page.LastId;
+                                    }
+                                    Console.WriteLine($"[CDC-DEBUG] Source row count for '{instance_name}': {allSourceDocs.Count}");
+                                }
+                                else
+                                {
+                                    string url = $"{db_info.url}/{db_info.prefix}mmrds/_all_docs?include_docs=true";
+                                    Console.WriteLine($"[CDC-DEBUG] Reading source docs from '{url}'");
+                                    string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", url, null, db_info.user_name, db_info.user_value);
+                                    Console.WriteLine($"[CDC-DEBUG] Source response length: {responseFromServer?.Length ?? 0}");
+                                    var case_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_response_header<System.Dynamic.ExpandoObject>>(responseFromServer);
+                                    Console.WriteLine($"[CDC-DEBUG] Source row count for '{instance_name}': {case_response?.rows?.Count ?? -1}");
+                                    foreach(var row in case_response?.rows ?? new System.Collections.Generic.List<mmria.common.model.couchdb.get_response_item<System.Dynamic.ExpandoObject>>())
+                                    {
+                                        if(row?.doc != null) allSourceDocs.Add(row.doc);
+                                    }
+                                }
 
                                 Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
                                 settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
                                 var debugCount = 0;
 
-                                foreach(var case_response_item in case_response.rows)
+                                foreach(var case_response_item in allSourceDocs)
                                 {
-                                    var case_item = case_response_item.doc as IDictionary<string,object>;
+                                    var case_item = case_response_item as IDictionary<string,object>;
 
                                     string _id = "";
 
@@ -241,7 +280,7 @@ public sealed class Process_Central_Pull_list : ReceiveActor
                                     var  target_url = $"{scheduleInfo.couch_db_url}/{scheduleInfo.db_prefix}mmrds/{_id}";
 
                                     var document_json = Newtonsoft.Json.JsonConvert.SerializeObject(case_item);
-                                    var de_identified_json = await new mmria.server.utils.c_cdc_de_identifier(document_json, instance_name, scheduleInfo, null).executeAsync();
+                                    var de_identified_json = await new mmria.server.utils.c_cdc_de_identifier(document_json, instance_name, scheduleInfo, _couchDbHttpClient, _metadataRepository).executeAsync();
                                     
                                     var de_identified_case = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(de_identified_json);
 
@@ -256,7 +295,8 @@ public sealed class Process_Central_Pull_list : ReceiveActor
                                     (
                                         target_url,
                                         scheduleInfo.user_name,
-                                        scheduleInfo.user_value
+                                        scheduleInfo.user_value,
+                                        targetDbConfig
                                     );
                                     
                                     if(!string.IsNullOrWhiteSpace(revision))
@@ -265,8 +305,16 @@ public sealed class Process_Central_Pull_list : ReceiveActor
                                     }                                    
                                     
                                     var save_json = document_json = Newtonsoft.Json.JsonConvert.SerializeObject(de_identified_dictionary);
-                                    
-                                    var put_result_string = await Put_Document(save_json, _id, target_url, scheduleInfo.user_name, scheduleInfo.user_value);
+
+                                    string put_result_string;
+                                    if(_caseRepository != null)
+                                    {
+                                        put_result_string = await _caseRepository.PutCaseDocumentJsonAsync(_id, save_json, targetDbConfig);
+                                    }
+                                    else
+                                    {
+                                        put_result_string = await Put_Document(save_json, _id, target_url, scheduleInfo.user_name, scheduleInfo.user_value);
+                                    }
 
                                     var result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(put_result_string);
                                     Console.WriteLine($"[CDC-DEBUG] Saved case '{_id}' to target '{target_url}' ok={result?.ok}");
@@ -375,32 +423,40 @@ public sealed class Process_Central_Pull_list : ReceiveActor
     (
         string p_document_url,
         string p_user_name,
-        string p_user_value
-
+        string p_user_value,
+        mmria.common.couchdb.DBConfigurationDetail targetDbConfig = null
     )
     {
-
         string result = null;
-
-        string temp_document_json = null;
 
         try
         {
-            
-            temp_document_json = await _couchDbHttpClient.ExecuteAsync("GET", p_document_url, null, p_user_name, p_user_value);
-            var request_result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(temp_document_json);
-            IDictionary<string, object> updater = request_result as IDictionary<string, object>;
-            if(updater != null && updater.ContainsKey("_rev"))
+            if(_caseRepository != null && targetDbConfig != null)
             {
-                result = updater ["_rev"].ToString ();
+                // Extract case ID from URL: last segment
+                string case_id = p_document_url.Split('/').Last();
+                string doc_json = await _caseRepository.GetCaseDocumentJsonAsync(case_id, targetDbConfig);
+                if(!string.IsNullOrWhiteSpace(doc_json))
+                {
+                    var parsed = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(doc_json);
+                    IDictionary<string, object> updater = parsed as IDictionary<string, object>;
+                    if(updater != null && updater.ContainsKey("_rev"))
+                        result = updater["_rev"].ToString();
+                }
+                return result;
             }
+
+            string temp_document_json = await _couchDbHttpClient.ExecuteAsync("GET", p_document_url, null, p_user_name, p_user_value);
+            var request_result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(temp_document_json);
+            IDictionary<string, object> updater2 = request_result as IDictionary<string, object>;
+            if(updater2 != null && updater2.ContainsKey("_rev"))
+                result = updater2["_rev"].ToString();
         }
         catch(Exception ex) 
         {
-            if (!(ex.Message.IndexOf ("(404) Object Not Found") > -1)) 
+            if (!(ex.Message.IndexOf("(404) Object Not Found") > -1)) 
             {
-                //System.Console.WriteLine ("c_sync_document.get_revision");
-                //System.Console.WriteLine (ex);
+                // swallow 404s
             }
         }
 

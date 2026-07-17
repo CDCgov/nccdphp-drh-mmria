@@ -305,6 +305,8 @@ public sealed partial class Program
             builder.Services.AddScoped<mmria.common.SharedLibraries.Jurisdiction.DAL.JurisdictionAuthorizationDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.Jurisdiction.IJurisdictionAuthorizationReader>(
                 sp => sp.GetRequiredService<mmria.common.SharedLibraries.Jurisdiction.DAL.JurisdictionAuthorizationDAL>());
+            // HasJurisdictionAuthorizationHandler registered as IAuthorizationHandler (Scoped, lifetime-compatible with IJurisdictionAuthorizationReader)
+            builder.Services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, mmria.server.utils.HasJurisdictionAuthorizationHandler>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.ManageUsers.DAL.ManageUsersDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.ManageUsers.Manager.ManageUsersManager>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.MetadataVersion.DAL.MetadataVersionDAL>();
@@ -321,6 +323,10 @@ public sealed partial class Program
             builder.Services.AddScoped<mmria.common.SharedLibraries.ExportQueue.IExportQueueRepository>(
                 sp => sp.GetRequiredService<mmria.common.SharedLibraries.ExportQueue.DAL.ExportQueueDAL>());
             builder.Services.AddScoped<mmria.common.SharedLibraries.ExportQueue.Manager.ExportQueueManager>();
+            // QueueDAL registered as IQueueRepository (SQL migration seam for global queue database — Pattern A, no tenant prefix)
+            builder.Services.AddScoped<mmria.common.SharedLibraries.Queue.DAL.QueueDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.Queue.IQueueRepository>(
+                sp => sp.GetRequiredService<mmria.common.SharedLibraries.Queue.DAL.QueueDAL>());
             builder.Services.AddScoped<mmria.common.SharedLibraries.VitalImport.DAL.VitalImportDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.VitalImport.IVitalImportRepository>(
                 sp => sp.GetRequiredService<mmria.common.SharedLibraries.VitalImport.DAL.VitalImportDAL>());
@@ -353,6 +359,11 @@ public sealed partial class Program
             builder.Services.AddScoped<mmria.common.SharedLibraries.SystemOffline.Manager.SystemOfflineManager>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.CaseWorkflowAdmin.DAL.CaseWorkflowAdminDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.CaseWorkflowAdmin.Manager.CaseWorkflowAdminManager>();
+            // IDatabaseLifecycleService SQL migration seam: c_db_setup is the CouchDB implementation of startup
+            // database initialization. A future SQL implementation substitutes here without touching Program.cs startup logic.
+            // Note: resolved via direct instantiation in startup Task.Run (per-tenant parameters);
+            // the DI registration is present for architectural documentation and future injection scenarios.
+            builder.Services.AddScoped<mmria.server.IDatabaseLifecycleService, mmria.server.utils.c_db_setup>();
 
             //var hosted_service_prefix = new HostedServicePrefix(host_prefix);
 
@@ -413,6 +424,7 @@ public sealed partial class Program
             builder.Services.AddScoped<mmria.common.SharedLibraries.Session.DAL.SessionDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.Session.ISessionRepository, mmria.common.SharedLibraries.Session.DAL.SessionDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.Report.IReportRepository, mmria.common.SharedLibraries.Report.DAL.ReportDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.DeIdentified.IDeIdentifiedRepository, mmria.common.SharedLibraries.DeIdentified.DAL.DeIdentifiedDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.Logging.ILoggingRepository, mmria.common.SharedLibraries.Logging.DAL.LoggingDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.OfflineCase.Manager.IOfflineCaseManager, mmria.common.SharedLibraries.OfflineCase.Manager.OfflineCaseManager>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.Case.Manager.CaseManager>();
@@ -588,6 +600,8 @@ public sealed partial class Program
 
             var app = builder.Build();
             var couchDbHttpClient = app.Services.GetRequiredService<mmria.common.getset.CouchDbHttpClient>();
+            var exportQueueRepository = new mmria.common.SharedLibraries.ExportQueue.DAL.ExportQueueDAL(couchDbHttpClient);
+            var metadataRepository = new mmria.common.SharedLibraries.MetadataVersion.DAL.MetadataVersionDAL(couchDbHttpClient);
             var startupRebuildManager = app.Services.GetRequiredService<mmria.common.SharedLibraries.MMRIARebuild.Manager.MMRIARebuildManager>();
 
             // Create QuartzSupervisor for each tenant
@@ -604,7 +618,9 @@ public sealed partial class Program
                         overridableConfigSets[i],
                         tenant,
                         dbConfigSets[i],
-                        couchDbHttpClient
+                        couchDbHttpClient,
+                        exportQueueRepository,
+                        metadataRepository
                     ), 
                     $"QuartzSupervisor-{tenant}"
                 );
@@ -633,14 +649,15 @@ public sealed partial class Program
                                 config_id,
                                 startup_db_rebuild_enabled);
 
-                            await new mmria.server.utils.c_db_setup
+                            IDatabaseLifecycleService singleTenantDbLifecycle = new mmria.server.utils.c_db_setup
                             (
                                 actorSystem,
                                 overridableConfigSets[0],
                                 config_id, // No tenant name in single-tenant mode
                                 couchDbHttpClient,
                                 startupRebuildManager
-                            ).Setup(
+                            );
+                            await singleTenantDbLifecycle.Setup(
                                 triggerStartupRebuild: startup_db_rebuild_enabled,
                                 configuredStartupTenants: startupConfiguredTenants,
                                 summaryHostPrefix: startupSummaryHostPrefix);
@@ -669,14 +686,15 @@ public sealed partial class Program
                                     startup_db_rebuild_enabled,
                                     startupRebuildTenantsCsv);
                                 
-                                await new mmria.server.utils.c_db_setup
+                                IDatabaseLifecycleService tenantDbLifecycle = new mmria.server.utils.c_db_setup
                                 (
                                     actorSystem,
                                     overridableConfigSets[i],
                                     tenant,
                                     couchDbHttpClient,
                                     startupRebuildManager
-                                ).Setup(
+                                );
+                                await tenantDbLifecycle.Setup(
                                     triggerStartupRebuild: triggerStartupRebuild,
                                     configuredStartupTenants: startupConfiguredTenants,
                                     summaryHostPrefix: startupSummaryHostPrefix);

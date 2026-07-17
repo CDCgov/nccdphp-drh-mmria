@@ -10,6 +10,8 @@ using mmria.common.SharedLibraries.MMRIAServices.DAL;
 using mmria.common.SharedLibraries.MMRIAServices.Helper;
 using mmria.common.SharedLibraries.MMRIAServices.Manager;
 using mmria.common.SharedLibraries.MetadataVersion.DAL;
+using mmria.common.SharedLibraries.Case;
+using mmria.common.SharedLibraries.Case.DAL;
 
 namespace RecordsProcessor_Worker.Actors;
 
@@ -54,6 +56,7 @@ public sealed class BatchProcessor : ReceiveActor
     ILogger logger;
     mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     MMRIAServicesManager _mmriaServicesManager;
+    private ICaseRepository _caseRepository;
 
     mmria.common.couchdb.DBConfigurationDetail item_db_info;
 
@@ -91,6 +94,7 @@ public sealed class BatchProcessor : ReceiveActor
     public BatchProcessor(mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
         _couchDbHttpClient = couchDbHttpClient;
+        _caseRepository = new CaseDAL(_couchDbHttpClient);
         _mmriaServicesManager = new MMRIAServicesManager(new MMRIAServicesDAL(_couchDbHttpClient, new mmria.common.SharedLibraries.SystemConfig.DAL.SystemConfigDAL(_couchDbHttpClient), new MetadataVersionDAL(_couchDbHttpClient), new mmria.common.SharedLibraries.VitalImport.DAL.VitalImportDAL(_couchDbHttpClient, new mmria.common.SharedLibraries.Case.DAL.CaseDAL(_couchDbHttpClient))), _couchDbHttpClient);
         // Create router pool with 5 workers for bounded parallelism
         batchItemRouter = Context.ActorOf(
@@ -508,8 +512,7 @@ public sealed class BatchProcessor : ReceiveActor
 
                     if (!string.IsNullOrWhiteSpace (case_id) && !string.IsNullOrWhiteSpace(rev)) 
                     {
-                        string request_string = $"{item_db_info.url}/{item_db_info.prefix}mmrds/{case_id}?rev={rev}";
-                        string responseFromServer = await _couchDbHttpClient.ExecuteAsync("DELETE", request_string, null, item_db_info.user_name, item_db_info.user_value);
+                        await _caseRepository.DeleteCaseAsync(case_id, rev, item_db_info);
 
                         // to do synchronize
                     } 

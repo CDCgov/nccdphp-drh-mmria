@@ -5,6 +5,9 @@ using System.Diagnostics;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
+using mmria.common.SharedLibraries.Case;
+using mmria.common.SharedLibraries.DeIdentified;
+using mmria.common.SharedLibraries.Report;
 using Newtonsoft.Json.Linq;
 
 namespace mmria.server.utils;
@@ -87,6 +90,9 @@ public sealed class c_document_sync_all_legacy
     private readonly int _write_retry_count;
     private readonly int _write_retry_delay_ms;
     private readonly Func<legacy_progress, Task> _progress_callback;
+    private readonly ICaseRepository _caseRepository;
+    private readonly IDeIdentifiedRepository _deIdentifiedRepository;
+    private readonly IReportRepository _reportRepository;
 
     public c_document_sync_all_legacy
     (
@@ -102,7 +108,10 @@ public sealed class c_document_sync_all_legacy
         int batch_delay_ms = 0,
         int write_retry_count = 0,
         int write_retry_delay_ms = 0,
-        Func<legacy_progress, Task> progress_callback = null
+        Func<legacy_progress, Task> progress_callback = null,
+        ICaseRepository caseRepository = null,
+        IDeIdentifiedRepository deIdentifiedRepository = null,
+        IReportRepository reportRepository = null
     )
     {
         couchdb_url = p_couchdb_url;
@@ -118,6 +127,9 @@ public sealed class c_document_sync_all_legacy
         _write_retry_count = Math.Max(0, write_retry_count);
         _write_retry_delay_ms = Math.Max(0, write_retry_delay_ms);
         _progress_callback = progress_callback;
+        _caseRepository = caseRepository;
+        _deIdentifiedRepository = deIdentifiedRepository;
+        _reportRepository = reportRepository;
     }
 
     private string get_database_scripts_directory()
@@ -203,8 +215,25 @@ public sealed class c_document_sync_all_legacy
 
     private async Task reset_target_databases_async()
     {
-        await reset_database_async("de_id");
-        await reset_database_async("report");
+        if(_deIdentifiedRepository != null)
+        {
+            await _deIdentifiedRepository.DropAndResetAsync(db_config);
+            System.Console.WriteLine($">>> DELETED+CREATED {db_config.prefix}de_id database via IDeIdentifiedRepository at {DateTime.Now:HH:mm:ss.fff} <<<");
+        }
+        else
+        {
+            await reset_database_async("de_id");
+        }
+
+        if(_reportRepository != null)
+        {
+            await _reportRepository.DropAndResetWithSystemDocPreservationAsync(db_config);
+            System.Console.WriteLine($">>> DELETED+CREATED {db_config.prefix}report database via IReportRepository at {DateTime.Now:HH:mm:ss.fff} <<<");
+        }
+        else
+        {
+            await reset_database_async("report");
+        }
     }
 
     private async Task restore_target_designs_async()
@@ -243,10 +272,17 @@ public sealed class c_document_sync_all_legacy
         try
         {
             string sortable_design = await read_database_script_async("case_design_sortable.json");
-            await execute_rebuild_request_async(
-                "PUT",
-                couchdb_url + $"/{db_config.prefix}de_id/_design/sortable",
-                sortable_design);
+            if(_deIdentifiedRepository != null)
+            {
+                await _deIdentifiedRepository.EnsureDesignDocumentAsync("sortable", sortable_design, db_config);
+            }
+            else
+            {
+                await execute_rebuild_request_async(
+                    "PUT",
+                    couchdb_url + $"/{db_config.prefix}de_id/_design/sortable",
+                    sortable_design);
+            }
             System.Console.WriteLine($">>> RESTORED {db_config.prefix}de_id/_design/sortable at {DateTime.Now:HH:mm:ss.fff} <<<");
         }
         catch (Exception ex)
@@ -268,7 +304,10 @@ public sealed class c_document_sync_all_legacy
         {
             var report_opioid_index = new Report_Opioid_Index_Struct();
             string index_json = Newtonsoft.Json.JsonConvert.SerializeObject(report_opioid_index);
-            await execute_rebuild_request_async("POST", couchdb_url + $"/{db_config.prefix}report/_index", index_json);
+            if(_reportRepository != null)
+                await _reportRepository.EnsureIndexAsync(index_json, db_config);
+            else
+                await execute_rebuild_request_async("POST", couchdb_url + $"/{db_config.prefix}report/_index", index_json);
         }
         catch (Exception ex)
         {
@@ -279,7 +318,10 @@ public sealed class c_document_sync_all_legacy
         {
             var report_powerbi_index = new Report_PowerBI_Index_Struct();
             string index_json = Newtonsoft.Json.JsonConvert.SerializeObject(report_powerbi_index);
-            await execute_rebuild_request_async("POST", couchdb_url + $"/{db_config.prefix}report/_index", index_json);
+            if(_reportRepository != null)
+                await _reportRepository.EnsureIndexAsync(index_json, db_config);
+            else
+                await execute_rebuild_request_async("POST", couchdb_url + $"/{db_config.prefix}report/_index", index_json);
         }
         catch (Exception ex)
         {
@@ -289,10 +331,13 @@ public sealed class c_document_sync_all_legacy
         try
         {
             string interactive_report_view = await read_database_script_async("interactive-aggregate-report-view.json");
-            await execute_rebuild_request_async(
-                "PUT",
-                couchdb_url + $"/{db_config.prefix}report/_design/interactive_aggregate_report",
-                interactive_report_view);
+            if(_reportRepository != null)
+                await _reportRepository.EnsureDesignDocumentAsync("interactive_aggregate_report", interactive_report_view, db_config);
+            else
+                await execute_rebuild_request_async(
+                    "PUT",
+                    couchdb_url + $"/{db_config.prefix}report/_design/interactive_aggregate_report",
+                    interactive_report_view);
         }
         catch (Exception ex)
         {
@@ -302,10 +347,13 @@ public sealed class c_document_sync_all_legacy
         try
         {
             string data_summary_view = await read_database_script_async("data-summary-view.json");
-            await execute_rebuild_request_async(
-                "PUT",
-                couchdb_url + $"/{db_config.prefix}report/_design/data_summary_view_report",
-                data_summary_view);
+            if(_reportRepository != null)
+                await _reportRepository.EnsureDesignDocumentAsync("data_summary_view_report", data_summary_view, db_config);
+            else
+                await execute_rebuild_request_async(
+                    "PUT",
+                    couchdb_url + $"/{db_config.prefix}report/_design/data_summary_view_report",
+                    data_summary_view);
         }
         catch (Exception ex)
         {
@@ -346,6 +394,17 @@ public sealed class c_document_sync_all_legacy
         {
             try
             {
+                if(string.Equals(database_name, "de_id", StringComparison.OrdinalIgnoreCase) && _deIdentifiedRepository != null)
+                {
+                    var repo_result = await _deIdentifiedRepository.UpsertDocumentAsync(document_id, document, db_config);
+                    return repo_result?.ok == true;
+                }
+                if(string.Equals(database_name, "report", StringComparison.OrdinalIgnoreCase) && _reportRepository != null)
+                {
+                    var repo_result = await _reportRepository.UpsertDocumentAsync(document_id, document, db_config);
+                    return repo_result?.ok == true;
+                }
+
                 string response = await execute_rebuild_request_async("PUT", url, payload);
                 if(string.IsNullOrWhiteSpace(response))
                 {
@@ -475,8 +534,10 @@ public sealed class c_document_sync_all_legacy
                             metadata_version,
                             db_config,
                             _couchDbHttpClient,
-                            _configuration,
-                            _host_prefix,
+                            deIdentifiedRepository: null,
+                            reportRepository: null,
+                            configuration: _configuration,
+                            host_prefix: _host_prefix,
                             rebuild_context: null,
                             skip_revision_lookup: true);
                         var build_result = await sync_document.build_documents_async();

@@ -392,6 +392,18 @@ public sealed class MetadataVersionDAL : IMetadataRepository
 
     // ── Private Helpers ───────────────────────────────────────────────────────
 
+    // ── App Document by Raw ID ────────────────────────────────────────────────
+
+    /// <inheritdoc />
+    public async Task<mmria.common.metadata.app> GetAppDocumentByRawIdAsync(string documentId, DBConfigurationDetail dbConfig)
+    {
+        string url = $"{dbConfig.url}/metadata/{documentId}/metadata";
+        string response = await _couchDbHttpClient.ExecuteAsync("GET", url, null, null, null);
+        return JsonConvert.DeserializeObject<mmria.common.metadata.app>(response, IgnoreNullSettings);
+    }
+
+    // ── Private Helpers ───────────────────────────────────────────────────────
+
     private async Task<string?> FetchRevisionOrNullAsync(string documentUrl, string userName, string userValue)
     {
         try

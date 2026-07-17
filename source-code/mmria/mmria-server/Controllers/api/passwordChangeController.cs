@@ -26,6 +26,7 @@ public sealed class passwordChangeController: ControllerBase
 { 
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly mmria.common.SharedLibraries.Account.IUserRepository _userRepository;
+    private readonly mmria.common.SharedLibraries.Session.ISessionRepository _sessionRepository;
     mmria.common.SharedLibraries.Session.Manager.SessionManager _sessionManager;
     IHttpContextAccessor accessor;
     
@@ -39,11 +40,13 @@ public sealed class passwordChangeController: ControllerBase
         IHttpContextAccessor _accessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
-        mmria.common.SharedLibraries.Account.IUserRepository userRepository
+        mmria.common.SharedLibraries.Account.IUserRepository userRepository,
+        mmria.common.SharedLibraries.Session.ISessionRepository sessionRepository
     )
     {
         _couchDbHttpClient = couchDbHttpClient;
         _userRepository = userRepository;
+        _sessionRepository = sessionRepository;
 
         _sessionManager = sessionManager;
         accessor = _accessor;
@@ -75,12 +78,9 @@ public sealed class passwordChangeController: ControllerBase
                     u => u.IsAuthenticated && 
                     u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
 
-                var session_event_request_url = db_config.Get_Prefix_DB_Url($"session/_design/session_event_sortable/_view/by_user_id?startkey=\"{userName}\"&endkey=\"{userName}\"");
-
-                string response_from_server = await _couchDbHttpClient.ExecuteAsync("GET", session_event_request_url, null, db_config.user_name, db_config.user_value);
+                var session_event_response = await _sessionRepository.GetSessionEventsByUserIdAsync(userName, db_config);
 
                 //var session_event_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_object_key_header<mmria.common.model.couchdb.session_event>>(response_from_server);
-                var session_event_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.session_event>>(response_from_server);
 
                 DateTime first_item_date = DateTime.Now;
                 DateTime last_item_date = DateTime.Now;

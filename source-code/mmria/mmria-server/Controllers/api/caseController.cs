@@ -27,6 +27,7 @@ public sealed class caseController: ControllerBase
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly mmria.common.SharedLibraries.Case.Manager.CaseManager _caseManager;
+    private readonly mmria.common.SharedLibraries.Case.ICaseRepository _caseRepository;
 
     private readonly IAuthorizationService _authorizationService;
     //private readonly IDocumentRepository _documentRepository;
@@ -37,7 +38,8 @@ public sealed class caseController: ControllerBase
         ActorSystem actorSystem, 
         IAuthorizationService authorizationService,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
-        mmria.common.SharedLibraries.Case.Manager.CaseManager caseManager
+        mmria.common.SharedLibraries.Case.Manager.CaseManager caseManager,
+        mmria.common.SharedLibraries.Case.ICaseRepository caseRepository
     )
     {
         configuration = tenantRuntime.RequireConfiguration();
@@ -46,6 +48,7 @@ public sealed class caseController: ControllerBase
         _authorizationService = authorizationService;
         _couchDbHttpClient = couchDbHttpClient;
         _caseManager = caseManager;
+        _caseRepository = caseRepository;
 
         host_prefix = tenantRuntime.EffectiveHostPrefix;
     }
@@ -111,8 +114,7 @@ public sealed class caseController: ControllerBase
                 return mmria.server.util.EscapedJsonResultFactory.Create(headResult);
             }
 
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                "GET", url, null, db_config.user_name, db_config.user_value);
+            string responseFromServer = await _caseRepository.GetCaseDocumentJsonAsync(sanitizedId, db_config);
 
             if (string.IsNullOrWhiteSpace(responseFromServer) || responseFromServer.Contains("\"not_found\""))
                 return NotFound();

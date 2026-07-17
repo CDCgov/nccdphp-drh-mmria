@@ -17,6 +17,7 @@ public sealed class c_convert_to_dqr_detail
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly System.Dynamic.ExpandoObject _source_object;
     private readonly mmria.common.metadata.app _metadata;
+    private readonly mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository _metadataRepository;
 
     private System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, string>> List_Look_Up;
 
@@ -29,6 +30,7 @@ public sealed class c_convert_to_dqr_detail
         string p_metadata_version,
         mmria.common.couchdb.DBConfigurationDetail _db_config,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository metadataRepository,
         System.Dynamic.ExpandoObject p_source_object = null,
         mmria.common.metadata.app p_metadata = null
     )
@@ -41,6 +43,7 @@ public sealed class c_convert_to_dqr_detail
         _couchDbHttpClient = couchDbHttpClient;
         _source_object = p_source_object;
         _metadata = p_metadata;
+        _metadataRepository = metadataRepository;
     }
 
     public async System.Threading.Tasks.Task<string> executeAsync ()
@@ -49,13 +52,7 @@ public sealed class c_convert_to_dqr_detail
 
         var gs = new migrate.C_Get_Set_Value(new ());
         
-        var metadata = _metadata;
-        if(metadata == null)
-        {
-            string metadata_url = db_config.url + $"/metadata/version_specification-{metadata_version}/metadata";
-            string metadata_response = await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, db_config.user_name, db_config.user_value);
-            metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_response);
-        }
+        var metadata = await _metadataRepository.GetAppDocumentAsync(metadata_version, db_config);
 
 
         List_Look_Up = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);

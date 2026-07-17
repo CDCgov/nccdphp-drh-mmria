@@ -92,6 +92,9 @@ public sealed class Program
         builder.Services.AddScoped<mmria.common.SharedLibraries.Case.DAL.CaseDAL>();
         builder.Services.AddScoped<mmria.common.SharedLibraries.Case.ICaseRepository>(
             sp => sp.GetRequiredService<mmria.common.SharedLibraries.Case.DAL.CaseDAL>());
+        builder.Services.AddScoped<mmria.common.SharedLibraries.ExportQueue.DAL.ExportQueueDAL>();
+        builder.Services.AddScoped<mmria.common.SharedLibraries.ExportQueue.IExportQueueRepository>(
+            sp => sp.GetRequiredService<mmria.common.SharedLibraries.ExportQueue.DAL.ExportQueueDAL>());
         builder.Services.AddScoped<mmria.common.SharedLibraries.VitalImport.DAL.VitalImportDAL>();
         builder.Services.AddScoped<mmria.common.SharedLibraries.VitalImport.IVitalImportRepository>(
             sp => sp.GetRequiredService<mmria.common.SharedLibraries.VitalImport.DAL.VitalImportDAL>());
@@ -116,10 +119,13 @@ public sealed class Program
             var actorSystem = Akka.Actor.ActorSystem.Create("mmria-actor-system");
             actorSystem.ActorOf(Akka.Actor.Props.Create<RecordsProcessor_Worker.Actors.BatchSupervisor>(couchDbHttpClient), "batch-supervisor");
             actorSystem.ActorOf(Akka.Actor.Props.Create<mmria.services.backup.BackupSupervisor>(couchDbHttpClient), "backup-supervisor");
+            var caseDAL = new mmria.common.SharedLibraries.Case.DAL.CaseDAL(couchDbHttpClient);
+            var vitalImportRepository = new mmria.common.SharedLibraries.VitalImport.DAL.VitalImportDAL(couchDbHttpClient, caseDAL);
             actorSystem.ActorOf(
                 Akka.Actor.Props.Create<mmria.services.populate_cdc_instance.PopulateCDCInstanceSupervisor>(
                     couchDbHttpClient,
-                    populateCdcThrottleSettings),
+                    populateCdcThrottleSettings,
+                    vitalImportRepository),
                 "populate-cdc-instance-supervisor");
 
             Program.ActorSystem = actorSystem;

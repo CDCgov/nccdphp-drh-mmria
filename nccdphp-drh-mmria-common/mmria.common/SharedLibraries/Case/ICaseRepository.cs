@@ -28,4 +28,28 @@ public interface ICaseRepository
     Task<(int StatusCode, string Body)> GetCaseDocumentWithStatusAsync(string caseId, DBConfigurationDetail dbConfig);
     Task<string> GetAllCaseDocsAsync(bool includeDocs, DBConfigurationDetail dbConfig);
     Task<string> GetCasesByDateCreatedPagedAsync(int skip, int pageSize, DBConfigurationDetail dbConfig);
+
+    // Paged bulk read for rebuild orchestrators
+    Task<CasePage> GetCasesPagedAsync(string? startKey, int limit, DBConfigurationDetail dbConfig);
+
+    // Change-stream polling for real-time sync
+    Task<CaseChangeFeedResult> GetCaseChangesSinceAsync(string sinceSeq, DBConfigurationDetail dbConfig);
+
+    /// <summary>
+    /// Drops and recreates the tenant-prefixed mmrds database empty.
+    /// Used exclusively by the CDC populate path (Process_Central_Pull_list). SQL equivalent: TRUNCATE TABLE cases.
+    /// </summary>
+    Task DropAndResetAsync(DBConfigurationDetail dbConfig);
+
+    // CDC services: total case count probe (SQL equivalent: SELECT COUNT(*) FROM cases)
+    Task<int> GetCaseTotalCountAsync(DBConfigurationDetail dbConfig);
+
+    // CDC services: design-doc count probe
+    Task<int> GetDesignDocCountAsync(DBConfigurationDetail dbConfig);
+
+    /// <summary>
+    /// GET a pre-built view URL and return the raw JSON response string.
+    /// Used by callers that construct complex view URLs with custom parameters (e.g. PMSS sort views).
+    /// </summary>
+    Task<string> GetCasesByCustomViewAsync(string viewUrl, DBConfigurationDetail dbConfig);
 }

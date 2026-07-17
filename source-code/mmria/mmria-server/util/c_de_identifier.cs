@@ -13,6 +13,7 @@ public sealed class c_de_identifier
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly System.Dynamic.ExpandoObject _case_item_object;
     private readonly c_document_sync_rebuild_context _rebuild_context;
+    private readonly mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository _metadataRepository;
     HashSet<string> de_identified_set = new HashSet<string>();
     HashSet<string> date_offset_set = new HashSet<string>()
     {
@@ -27,6 +28,7 @@ public sealed class c_de_identifier
         string p_metadata_version,
         mmria.common.couchdb.DBConfigurationDetail _db_config,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository metadataRepository,
         System.Dynamic.ExpandoObject p_case_item_object = null,
         c_document_sync_rebuild_context p_rebuild_context = null
     )
@@ -37,6 +39,7 @@ public sealed class c_de_identifier
         _couchDbHttpClient = couchDbHttpClient;
         _case_item_object = p_case_item_object;
         _rebuild_context = p_rebuild_context;
+        _metadataRepository = metadataRepository;
 
         using var cryptoRNG = System.Security.Cryptography.RandomNumberGenerator.Create();
 
@@ -71,8 +74,7 @@ public sealed class c_de_identifier
         }
         else
         {
-            string de_identified_response = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + "/metadata/de-identified-list", null, db_config.user_name, db_config.user_value);
-            System.Dynamic.ExpandoObject de_identified_ExpandoObject = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(de_identified_response);
+            System.Dynamic.ExpandoObject de_identified_ExpandoObject = await _metadataRepository.GetDeIdentifiedListAsync(db_config);
             de_identified_set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach(string path in (IList<object>)(((IDictionary<string, object>)de_identified_ExpandoObject) ["paths"]))
             {

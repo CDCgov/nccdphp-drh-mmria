@@ -165,6 +165,24 @@ The eight files classified "infra out-of-scope" across Epics 17–23 — `c_db_s
 **Architecture rule:** project-context.md §2.2 SharedLibraries pattern + SQL migration readiness. Lift-and-shift: orchestration logic, actor hierarchies, Quartz schedules, and rebuild pipelines are not restructured.
 **Stories:** 23.1 — Remaining Database Gap Scan, 23.2 — `ISessionRepository`, 23.3 — `IOfflineCaseRepository`, 23.4 — `IExportQueueRepository`, 23.5 — `IVitalImportRepository`, 23.6 — `IReportRepository` + `ReportDAL`, 23.7 — Route report reads, 23.8 — `ILoggingRepository` + `LoggingDAL`
 
+### Epic 25: Async Safety + Metadata Reader Consolidation
+
+Two fast-payoff passes that eliminate a production deadlock risk and reduce direct CouchDB call count by ~12 in a single mechanical injection. Story 25.1 fixes two files that call `CouchDbHttpClient.ExecuteAsync(...).Result` (synchronous blocking in an async context) — a thread-pool deadlock risk under load on ASP.NET. Story 25.2 injects `IMetadataRepository` (established in Epic 20) into the six transform-helper classes — in both `mmria-server/util/` and `mmria.common/SharedLibraries/MMRIARebuild/Manager/` — that still read metadata directly.
+**Architecture rule:** project-context.md §2.2 SharedLibraries pattern
+**Stories:** 25.1 — Fix `.Result` blocking calls, 25.2 — Metadata reader `IMetadataRepository` injection pass
+
+### Epic 26: Controller API Direct-Call Remediation
+
+Four stories completing the controller migration started in Epics 17–21. The fifteen controllers and utility files that still call `CouchDbHttpClient.ExecuteAsync` directly are grouped by repository and addressed in waves: Case API controllers (26.1), Auth and Session controllers (26.2), Export and Broadcast controllers (26.3), Jurisdiction and Summary utilities (26.4). Each story injects an already-existing repository interface — no new interfaces are introduced in this epic.
+**Architecture rule:** project-context.md §2.2 SharedLibraries pattern
+**Stories:** 26.1 — Case API controllers, 26.2 — Auth/Session controllers, 26.3 — Export/Broadcast controllers, 26.4 — Jurisdiction/Summary utilities
+
+### Epic 27: Services Utility Repository Activation
+
+The null-fallback scaffolding placed in `exporter.cs`, `mmrds_exporter.cs`, and `core_element_exporter.cs` during Epic 24 (Stories 24.10–24.11) is activated by wiring real repository instances from actor supervisors down through the export-utility pipeline. Story 27.2 classifies the remaining `BatchProcessor.cs` DELETE call and formally documents the `Process_Migrate_*` actors as intentional direct-access paths excluded from the repository pattern by design.
+**Architecture rule:** project-context.md §2.2 SharedLibraries pattern
+**Stories:** 27.1 — Activate export-utility repository wiring, 27.2 — BatchProcessor assessment + migration actor classification
+
 ---
 
 ## Epic 1: Case Narrative Editor Fidelity
@@ -3031,5 +3049,617 @@ So that the CDC data integration path — the most complex infra flow — has no
 24.9 must wait for 24.7 due to shared struct definitions and file proximity.
 
 **Final migration readiness gate:** When Epic 24 is complete, every CouchDB HTTP call in the entire mmria codebase — application, infrastructure, sync, rebuild, and lifecycle — routes through a typed repository interface. SQL migration is reduced to: swap each DAL implementation, replace `IDatabaseLifecycleService` with schema-migration tooling, and update the SQL `GetCaseChangesSinceAsync` to use SQL change-tracking instead of `_changes`. No orchestration code, no actor logic, no controller code, and no rebuild pipelines require modification during SQL migration.
+
+---
+
+## Epic 25: Async Safety + Metadata Reader Consolidation
+
+**Architecture rule:** project-context.md §2.2 SharedLibraries pattern
+
+**Summary:** Two targeted cleanup passes. Story 25.1 fixes a production correctness bug: two files call `CouchDbHttpClient.ExecuteAsync(...).Result` inside what is ultimately an async ASP.NET request context, which can deadlock the thread pool under load. Story 25.2 routes the remaining direct `metadata` database reads in six transform-helper classes through the `IMetadataRepository` interface (established in Epic 20) — eliminating ~12 non-DAL call sites in a single low-risk injection pass.
+
+**Non-DAL files remediated:**
+
+| File | Call type | Story |
+|---|---|---|
+| `mmria-server/util/JurisdictionAuthorizationRequirement.cs` | `.Result` blocking call | 25.1 |
+| `mmria-server/util/VROSummary.cs` | `.Result` blocking call | 25.1 |
+| `mmria-server/util/c_convert_to_dqr_detail.cs` | `metadata/version_specification-{v}/metadata` GET | 25.2 |
+| `mmria-server/util/c_convert_to_opioid_report_object.cs` | `metadata/version_specification-{v}/metadata` GET | 25.2 |
+| `mmria-server/util/c_convert_to_report_object.cs` | `metadata/version_specification-{v}/metadata` GET | 25.2 |
+| `mmria-server/util/c_generate_frequency_summary_report.cs` | `metadata/version_specification-{v}/metadata` GET | 25.2 |
+| `mmria-server/util/c_de_identifier.cs` | `metadata/de-identified-list` GET | 25.2 |
+| `mmria-server/util/c_cdc_de_identifier.cs` | `metadata/de-identified-export-list` GET | 25.2 |
+| `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_convert_to_dqr_detail.cs` | same as server variant | 25.2 |
+| `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_convert_to_opioid_report_object.cs` | same as server variant | 25.2 |
+| `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_convert_to_report_object.cs` | same as server variant | 25.2 |
+| `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_generate_frequency_summary_report.cs` | same as server variant | 25.2 |
+| `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_de_identifier.cs` | `metadata/de-identified-list` GET | 25.2 |
+| `mmria.common/SharedLibraries/MMRIAServices/Helper/c_cdc_de_identifier.cs` | `metadata/de-identified-export-list` GET | 25.2 |
+
+---
+
+### Story 25.1: Fix `.Result` Blocking Calls
+
+**Story ID:** 25.1
+**Depends on:** None
+**Source requirements:** Non-DAL analysis; project-context.md §2.2
+
+As a developer,
+I want `JurisdictionAuthorizationRequirement.cs` and `VROSummary.cs` to use `await` instead of `.Result` for CouchDB calls,
+So that these request-path methods cannot deadlock the ASP.NET thread pool under concurrent load.
+
+**Acceptance Criteria:**
+
+**AC-1 — `JurisdictionAuthorizationRequirement.cs` made async**
+Given `JurisdictionAuthorizationRequirement.cs` calls `_couchDbHttpClient.ExecuteAsync(...).Result` at approximately line 45
+When this story is complete
+Then the call site uses `await _couchDbHttpClient.ExecuteAsync(...)` and the enclosing method is `async Task` or `async Task<bool>`; the behavior (read jurisdiction view, evaluate result) is identical; no exception-handling patterns are added or removed
+
+**AC-2 — `VROSummary.cs` blocking calls removed**
+Given `VROSummary.cs` calls `_couchDbHttpClient.ExecuteAsync(...).Result` at multiple lines (~188, ~190)
+When this story is complete
+Then every `.Result` call is replaced with `await`; the enclosing method(s) are made `async`; callers are updated to `await` as needed to propagate async correctly up the call chain; no behavior change occurs
+
+**AC-3 — Build passes**
+Given the changes above
+When the build runs
+Then `mmria-server` builds with zero errors; no other call sites are changed
+
+**Dev Notes:**
+- `.Result` on a Task inside an async-context method causes a deadlock on ASP.NET's synchronized context under certain thread-pool contention conditions. Making the method `async` and using `await` is the correct fix — not `Task.Run(() => ...)`.
+- The enclosing types may implement interfaces that constrain the method signature (e.g., `IAuthorizationHandler`). Check the interface — ASP.NET Core authorization handlers use `Task HandleRequirementAsync(...)` which already returns `Task`, so the async change should propagate cleanly.
+- Do NOT add `ConfigureAwait(false)` — the project does not use it elsewhere.
+
+---
+
+### Story 25.2: Metadata Reader `IMetadataRepository` Injection Pass
+
+**Story ID:** 25.2
+**Depends on:** 25.1 (can proceed in parallel)
+**Source requirements:** Non-DAL analysis; Epic 20 establishes `IMetadataRepository`
+
+As a developer,
+I want the six transform-helper classes in `mmria-server/util/` and `mmria.common/.../MMRIARebuild/Manager/` to read metadata through `IMetadataRepository` instead of calling `CouchDbHttpClient.ExecuteAsync` directly,
+So that the metadata database access in the rebuild and de-identification pipeline has a SQL migration seam.
+
+**Acceptance Criteria:**
+
+**AC-1 — `IMetadataRepository` injected into all target files**
+Given each target file currently constructs a metadata URL and calls `_couchDbHttpClient.ExecuteAsync("GET", metadata_url, ...)` to read one of two documents (`version_specification-{version}/metadata` or `de-identified-list`)
+When this story is complete
+Then `IMetadataRepository` is injected via constructor parameter (optional with null fallback) into each of the fourteen target files
+
+**AC-2 — `version_specification` reads replaced**
+Given `c_convert_to_dqr_detail`, `c_convert_to_opioid_report_object`, `c_convert_to_report_object`, and `c_generate_frequency_summary_report` each call `GET metadata/version_specification-{version}/metadata`
+When this story is complete
+Then each is replaced with `IMetadataRepository.GetAppDocumentAsync(metadata_version, db_config)` (or the equivalent method that returns `mmria.common.metadata.app`); if the existing call returns raw JSON and the caller deserializes it, the caller is updated to use the typed return value from the repository method
+
+**AC-3 — `de-identified-list` reads replaced**
+Given `c_de_identifier` (server + common) calls `GET metadata/de-identified-list`
+When this story is complete
+Then each is replaced with the appropriate `IMetadataRepository` method for the de-identified list (confirm whether `GetDeIdentifiedListAsync` exists in `IMetadataRepository`; if not, add it to the interface and implement it in `MetadataVersionDAL` before replacing call sites)
+
+**AC-4 — `de-identified-export-list` reads replaced**
+Given `c_cdc_de_identifier` (server + common) calls `GET metadata/de-identified-export-list`
+When this story is complete
+Then each is replaced with the appropriate `IMetadataRepository` method (confirm whether `GetDeIdentifiedExportListAsync` exists; add to interface and DAL if needed, following AC-3 approach)
+
+**AC-5 — Null fallback preserved**
+Given callers of the transform helpers that do not yet pass an `IMetadataRepository`
+When this story is complete
+Then the null fallback (use direct `_couchDbHttpClient.ExecuteAsync`) preserves existing behavior; no caller changes are required in this story
+
+**AC-6 — Build passes**
+Given the changes above
+When the build runs
+Then `mmria-server`, `mmria.common`, and `mmria.services` all build with zero errors
+
+**Dev Notes:**
+
+| File group | Method on `IMetadataRepository` |
+|---|---|
+| `c_convert_to_*`, `c_generate_frequency_summary_report` | `GetAppDocumentAsync(version, dbConfig)` → `mmria.common.metadata.app` |
+| `c_de_identifier` | `GetDeIdentifiedListAsync(dbConfig)` → `ExpandoObject` (add if absent) |
+| `c_cdc_de_identifier` | `GetDeIdentifiedExportListAsync(dbConfig)` → `ExpandoObject` (add if absent) |
+
+Note: `mmria.services/Actors/populate-cdc-instance/c_document_sync_all.cs` already uses `_metadataRepository.GetDeIdentifiedListAsync(connection)` — confirm that method signature before adding to the interface to avoid duplication.
+
+---
+
+## Epic 25 — Story Sequencing
+
+| Story | Risk | Dependencies |
+|---|---|---|
+| 25.1 — Fix `.Result` blocking calls | Low | None |
+| 25.2 — Metadata reader injection pass | Low | Epic 20 complete (already done) |
+
+25.1 and 25.2 are independent and can proceed in parallel.
+
+---
+
+## Epic 26: Controller API Direct-Call Remediation
+
+**Architecture rule:** project-context.md §2.2 SharedLibraries pattern
+
+**Summary:** Fifteen controllers and utility files in `mmria-server` and `mmria.services` still call `CouchDbHttpClient.ExecuteAsync` directly. All target repository interfaces were established in Epics 17–23. This epic is entirely a wiring pass — no new interfaces, no new DALs. Stories are grouped by the repository each batch of files needs, enabling parallel execution once the group's repo is confirmed available.
+
+**Non-DAL files remediated:**
+
+| Story | File | Repository needed |
+|---|---|---|
+| 26.1 | `mmria-server/Controllers/api/caseController.cs` | `ICaseRepository` (Epic 17 story 17.2) |
+| 26.1 | `mmria-server/Controllers/api/case_viewController.pmss.cs` | `ICaseRepository` |
+| 26.1 | `mmria-server/Controllers/api/caseRevisionListController.cs` | `ICaseRepository` |
+| 26.1 | `mmria-server/Controllers/api/de_idController.cs` | `IDeIdentifiedRepository` (Epic 24 story 24.2) |
+| 26.1 | `mmria-server/Controllers/api/record_idController.cs` | `ICaseRepository` |
+| 26.2 | `mmria-server/Controllers/AccountController.cs` | `IUserRepository` (Epic 18 story 18.2) |
+| 26.2 | `mmria-server/CustomAuthHandler.cs` | `ISessionRepository` (Epic 23 story 23.2) |
+| 26.2 | `mmria-server/Controllers/api/passwordChangeController.cs` | `ISessionRepository` |
+| 26.2 | `mmria-server/util/OfflineSessionHelper.cs` | `ISessionRepository` |
+| 26.3 | `mmria-server/Controllers/api/queueController.cs` | `IExportQueueRepository` (Epic 23 story 23.4) |
+| 26.3 | `mmria.services/Controllers/ExportQueueController.cs` | `IExportQueueRepository` |
+| 26.3 | `mmria-server/Controllers/broadcast_messageController.cs` | `IBroadcastMessageRepository` or direct via `mmria.services` — confirm pattern |
+| 26.3 | `mmria.services/Controllers/broadcastMessageController.cs` | same |
+| 26.3 | `mmria-server/Controllers/api/ije_messageController.cs` | `ICaseRepository` or `IOfflineCaseRepository` — confirm DB target |
+| 26.4 | `mmria-server/util/JurisdictionSummary.cs` | `IJurisdictionRepository` (Epic 19 story 19.2) |
+| 26.4 | `mmria.services/Utilities/authorization.cs` | `IJurisdictionRepository` |
+| 26.4 | `mmria-server/util/CaseViewSearch.pmss.cs` | `ICaseRepository` (PMSS path) |
+| 26.4 | `mmria-server/util/exporter/export_all_generate_name_map.cs` | `IMetadataRepository` (Epic 20) |
+
+**Not in scope:** `mmria-server/Controllers/api/nioshController.cs` — the `CouchDbHttpClient.ExecuteAsync` call at line 72 targets an external NIOSH URL with null credentials, not a CouchDB database. This is a general-purpose HTTP call that happens to use `CouchDbHttpClient` as a transport. No repository routing required.
+
+---
+
+### Story 26.1: Case API Controllers
+
+**Story ID:** 26.1
+**Depends on:** Epic 17 story 17.2 (ICaseRepository), Epic 24 story 24.2 (IDeIdentifiedRepository)
+
+As a developer,
+I want the five case-data API controllers to call `ICaseRepository` or `IDeIdentifiedRepository` instead of constructing CouchDB URLs directly,
+So that the remaining case-data controller layer has the same SQL migration seam as the managers.
+
+**Acceptance Criteria:**
+
+**AC-1 — `caseController.cs` direct call replaced**
+Given `caseController.cs` calls `_couchDbHttpClient.ExecuteAsync` directly at approximately line 114 (a GET on `mmrds/{id}`)
+When this story is complete
+Then that call is replaced with `ICaseRepository.GetCaseDocumentJsonAsync(id, dbConfig)` or equivalent; `ICaseRepository` is injected via the existing DI pattern
+
+**AC-2 — `case_viewController.pmss.cs` direct call replaced**
+Given `case_viewController.pmss.cs` (PMSS-guarded) calls `_couchDbHttpClient.ExecuteAsync` at approximately lines 113–114
+When this story is complete
+Then each is replaced with the corresponding `ICaseRepository` method; the `#if IS_PMSS_ENHANCED` guard is preserved unchanged
+
+**AC-3 — `caseRevisionListController.cs`, `de_idController.cs`, `record_idController.cs` calls replaced**
+Given each of these controllers has one direct call (revision list, de_id read, and record_id check respectively)
+When this story is complete
+Then `caseRevisionListController` uses `ICaseRepository.GetCaseRevisionsAsync`; `de_idController` uses `IDeIdentifiedRepository.GetRevisionAsync` (or equivalent read method); `record_idController` uses `ICaseRepository.RecordIdExistsAsync`
+
+**AC-4 — No response shape or route changes**
+Given the controllers' existing HTTP method attributes, route paths, and response shapes
+When this story is implemented
+Then none are changed — only the internal CouchDB call site is replaced
+
+**AC-5 — Build passes**
+Given the changes above
+When the build runs
+Then `mmria-server` builds with zero errors
+
+**Dev Notes:**
+- `de_idController.cs` reads a de_id document. If `IDeIdentifiedRepository` does not yet have a read method for individual de_id documents (it has `GetRevisionAsync` but may not have a full `GetDocumentAsync`), add `GetDocumentAsync(string id, DBConfigurationDetail dbConfig)` → `JObject?` to the interface and implement it in `DeIdentifiedDAL` before replacing the call site.
+- All five controllers already have `ICaseRepository` or DAL injection available via DI — confirm the existing DI wiring before adding new registrations.
+
+---
+
+### Story 26.2: Auth and Session Controllers
+
+**Story ID:** 26.2
+**Depends on:** Epic 23 story 23.2 (ISessionRepository), Epic 18 story 18.2 (IUserRepository)
+
+As a developer,
+I want auth and session-related controllers to call `ISessionRepository` and `IUserRepository` instead of constructing CouchDB URLs directly,
+So that authentication-path database access has the same SQL migration seam as other features.
+
+**Acceptance Criteria:**
+
+**AC-1 — `CustomAuthHandler.cs` session reads replaced**
+Given `CustomAuthHandler.cs` reads from the session database directly at approximately lines 86+
+When this story is complete
+Then each session GET is replaced with `ISessionRepository.GetSessionAsync(sessionId, dbConfig)` or equivalent; `ISessionRepository` is injected into the auth handler
+
+**AC-2 — `AccountController.cs` call replaced**
+Given `AccountController.cs` calls `_couchDbHttpClient.ExecuteAsync` at approximately line 664 (a user-record read)
+When this story is complete
+Then the call is replaced with the appropriate `IUserRepository` method; the existing behavior — including error handling and response shape — is unchanged
+
+**AC-3 — `passwordChangeController.cs` session lookup replaced**
+Given `passwordChangeController.cs` reads session state at approximately line 80 to validate the session before allowing a password change
+When this story is complete
+Then the read is replaced with `ISessionRepository.GetSessionAsync(...)` or equivalent
+
+**AC-4 — `OfflineSessionHelper.cs` call replaced**
+Given `OfflineSessionHelper.cs` at approximately line 42 reads session state to determine offline eligibility
+When this story is complete
+Then the read is replaced with `ISessionRepository.GetSessionAsync(...)` or equivalent; `ISessionRepository` is injected via the helper's constructor
+
+**AC-5 — Build passes**
+Given the changes above
+When the build runs
+Then `mmria-server` builds with zero errors
+
+**Dev Notes:**
+- `CustomAuthHandler.cs` registers with ASP.NET Core's authorization pipeline — its constructor injection must be compatible with the DI lifetime of the handler. Confirm lifetime (usually `Scoped`) before injecting a scoped repository.
+- The session database uses `_users`-style access with credentials different from application databases on some tenants — confirm `ISessionRepository.GetSessionAsync` uses the correct dbConfig for the session database, not the main application dbConfig.
+
+---
+
+### Story 26.3: Export Queue and Broadcast Controllers
+
+**Story ID:** 26.3
+**Depends on:** Epic 23 story 23.4 (IExportQueueRepository); confirm broadcast message DB target
+
+As a developer,
+I want export queue and broadcast message controllers to call repository interfaces instead of constructing CouchDB URLs directly,
+So that these controller-layer database accesses have SQL migration seams.
+
+**Acceptance Criteria:**
+
+**AC-1 — `queueController.cs` export_queue write replaced**
+Given `queueController.cs` constructs an export_queue URL and calls `_couchDbHttpClient.ExecuteAsync("PUT", ...)` at approximately line 78
+When this story is complete
+Then the PUT is replaced with the appropriate `IExportQueueRepository` save method
+
+**AC-2 — `mmria.services/Controllers/ExportQueueController.cs` call replaced**
+Given `ExportQueueController.cs` in `mmria.services` calls `_couchDbHttpClient.ExecuteAsync` at approximately line 112
+When this story is complete
+Then that call is replaced with `IExportQueueRepository`; the repository is injected via the services DI registration established in Story 24.10
+
+**AC-3 — `broadcast_messageController.cs` calls assessed and replaced**
+Given both `mmria-server/Controllers/broadcast_messageController.cs` and `mmria.services/Controllers/broadcastMessageController.cs` call `_couchDbHttpClient.ExecuteAsync` for broadcast message writes
+When this story begins
+Then the developer first confirms which database the broadcast message data is written to (check the URL construction in both files); if a `IBroadcastMessageRepository` exists, use it; if not, assess whether to add the method to an existing interface or create `IBroadcastMessageRepository`; document the decision in the story completion notes
+
+**AC-4 — `ije_messageController.cs` call assessed and replaced**
+Given `ije_messageController.cs` at approximately line 106 calls `_couchDbHttpClient.ExecuteAsync`
+When this story begins
+Then the developer confirms which database the IJE message is read from (mmrds, offline_cases, or other); the call is replaced with the appropriate existing repository method; no new interface is created unless no suitable method exists
+
+**AC-5 — Build passes**
+Given the changes above
+When the build runs
+Then `mmria-server` and `mmria.services` both build with zero errors
+
+---
+
+### Story 26.4: Jurisdiction, Summary, and Remaining Utility Leakers
+
+**Story ID:** 26.4
+**Depends on:** Epic 19 story 19.2 (IJurisdictionRepository), Epic 20 IMetadataRepository
+
+As a developer,
+I want the remaining utility files that read jurisdiction, VRO summary, or metadata data directly to route through existing repository interfaces,
+So that these non-controller call sites complete the controller migration wave.
+
+**Acceptance Criteria:**
+
+**AC-1 — `JurisdictionSummary.cs` call replaced**
+Given `JurisdictionSummary.cs` reads a jurisdiction view directly at approximately line 342
+When this story is complete
+Then the call is replaced with `IJurisdictionRepository.GetJurisdictionSummaryAsync(...)` or equivalent existing method; `IJurisdictionRepository` is injected
+
+**AC-2 — `mmria.services/Utilities/authorization.cs` call replaced**
+Given `authorization.cs` in mmria.services reads a jurisdiction view at approximately line 61 (and possibly 63+)
+When this story is complete
+Then each call is replaced with the appropriate `IJurisdictionRepository` method; injection follows the services DI pattern
+
+**AC-3 — `CaseViewSearch.pmss.cs` PMSS call replaced**
+Given `CaseViewSearch.pmss.cs` (PMSS-guarded) constructs an mmrds view URL and calls `_couchDbHttpClient.ExecuteAsync` at approximately line 1998
+When this story is complete
+Then the call is replaced with the appropriate `ICaseRepository` view method; if no suitable view query method exists on `ICaseRepository`, one is added; the `#if IS_PMSS_ENHANCED` guard is preserved
+
+**AC-4 — `export_all_generate_name_map.cs` metadata call replaced**
+Given `export_all_generate_name_map.cs` reads a metadata document at approximately line 53 to build an export name map
+When this story is complete
+Then the call is replaced with `IMetadataRepository.GetAppDocumentAsync(...)` or equivalent; `IMetadataRepository` is injected
+
+**AC-5 — Build passes**
+Given the changes above
+When the build runs
+Then `mmria-server` and `mmria.services` both build with zero errors
+
+---
+
+## Epic 26 — Story Sequencing
+
+| Story | Risk | Dependencies |
+|---|---|---|
+| 26.1 — Case API controllers | Low | Epic 17 story 17.2, Epic 24 story 24.2 |
+| 26.2 — Auth/Session controllers | Low | Epic 23 story 23.2, Epic 18 story 18.2 |
+| 26.3 — Export/Broadcast controllers | Low-Medium | Epic 23 story 23.4; broadcast DB assessment |
+| 26.4 — Jurisdiction/Summary utilities | Low | Epic 19 story 19.2, Epic 20 |
+
+All four stories are independent and can proceed in parallel. 26.3 has a minor assessment gate (broadcast message DB target) that should be resolved at the start of the story.
+
+---
+
+## Epic 27: Services Utility Repository Activation
+
+**Architecture rule:** project-context.md §2.2 SharedLibraries pattern
+
+**Summary:** Epics 24, 25, and 26 establish all repository interfaces and inject null-fallback scaffolding into the export-utility pipeline. This epic activates those null-fallbacks by wiring real repository instances from the Akka actor supervisors into `exporter.cs`, `mmrds_exporter.cs`, and `core_element_exporter.cs`. Story 27.2 closes the analysis loop: classifies the `BatchProcessor.cs` DELETE call and formally designates the `Process_Migrate_*` actors as intentional out-of-scope direct-access paths.
+
+**Files in scope:**
+
+| Story | File | Action |
+|---|---|---|
+| 27.1 | `mmria.services/Utilities/Exporter/exporter.cs` | Activate null-fallback: pass real `IExportQueueRepository` + `IReportRepository` from supervisor |
+| 27.1 | `mmria.services/Utilities/Exporter/mmrds_exporter.cs` | Activate null-fallback: same repos |
+| 27.1 | `mmria.services/Utilities/CoreElementExport/core_element_exporter.cs` (services) | Activate null-fallback: `IExportQueueRepository` |
+| 27.2 | `mmria.services/Actors/BatchProcessor.cs` | Classify DELETE target; replace with repo method or document as intentional |
+| 27.2 | `mmria-server/model/actor/quartz/Process_Migrate_Charactor_to_Numeric.cs` | Formal classification as intentional out-of-scope migration actor |
+| 27.2 | `mmria-server/model/actor/quartz/Process_Migrate_Data.cs` | Formal classification as intentional out-of-scope migration actor |
+
+---
+
+### Story 27.1: Activate Export Utility Repository Wiring
+
+**Story ID:** 27.1
+**Depends on:** Epic 24 stories 24.10, 24.11; Epic 26 story 26.3
+
+As a developer,
+I want the export-utility classes in `mmria.services` to receive real repository instances from their supervisors instead of using null fallbacks,
+So that the export pipeline's database access routes fully through repository interfaces rather than falling back to direct HTTP calls.
+
+**Acceptance Criteria:**
+
+**AC-1 — `exporter.cs` receives real `IExportQueueRepository`**
+Given `exporter.cs` was given a null-fallback constructor param in Story 24.10
+When this story is complete
+Then the actor or supervisor that instantiates `exporter.cs` passes a real `IExportQueueRepository` instance resolved from DI; the null-fallback branch is no longer exercised at runtime
+
+**AC-2 — `mmrds_exporter.cs` receives real `IExportQueueRepository`**
+Given `mmrds_exporter.cs` was given a null-fallback constructor param in Story 24.10
+When this story is complete
+Then its instantiation site passes a real `IExportQueueRepository`; null-fallback not exercised at runtime
+
+**AC-3 — `core_element_exporter.cs` (services) receives real `IExportQueueRepository`**
+Given `core_element_exporter.cs` in mmria.services was given a null-fallback param in Story 24.10
+When this story is complete
+Then its instantiation site passes a real `IExportQueueRepository`; null-fallback not exercised at runtime
+
+**AC-4 — IReportRepository wired where applicable**
+Given export jobs may also write to the report database via utility helpers
+When this story begins
+Then the developer confirms whether `IReportRepository` null-fallbacks exist in any of the three utility files; if yes, those are also activated; if no, this AC is marked not-applicable
+
+**AC-5 — Build passes and export queue job runs end-to-end**
+Given the wiring changes
+When the build runs and a CVS export job is triggered in the multi-tenant test environment
+Then the build succeeds with zero errors and the export job completes normally without falling back to the direct HTTP path
+
+**Dev Notes:**
+- Trace the instantiation chain: `PopulateCDCInstanceSupervisor` → CDC actor → exporter utilities. The supervisor already has access to repos from its own DI injection (Story 24.11). Follow the chain and pass repos through.
+- The null-fallback (direct HTTP) path is still valid as a safety net — do not remove it. The goal is that runtime code always reaches the repo branch.
+
+---
+
+### Story 27.2: BatchProcessor Assessment + Migration Actor Classification
+
+**Story ID:** 27.2
+**Depends on:** None (assessment story; can proceed in parallel with 27.1)
+
+As a developer,
+I want to understand and classify the remaining three direct-call sites not covered by earlier stories,
+So that every non-DAL CouchDB call in the codebase has an explicit disposition — either routed through a repository or formally documented as an intentional exception.
+
+**Acceptance Criteria:**
+
+**AC-1 — `BatchProcessor.cs` DELETE call classified and resolved**
+Given `BatchProcessor.cs` in `mmria.services/Actors/` calls `_couchDbHttpClient.ExecuteAsync("DELETE", ...)` at approximately line 512
+When this story begins
+Then the developer reads the file to identify the target database (check the URL construction); the call is either replaced with the appropriate existing repository method, or documented as an intentional exception with a rationale comment if it targets a lifecycle/admin database with no interface coverage
+
+**AC-2 — `Process_Migrate_Charactor_to_Numeric.cs` classified**
+Given `Process_Migrate_Charactor_to_Numeric.cs` calls `_couchDbHttpClient.ExecuteAsync` for case data migration operations
+When this story is complete
+Then a comment is added at the top of the class: `// Data migration actor. Direct CouchDB access is intentional — migration actors read and write raw case data in bulk and are excluded from the repository pattern by design. These actors are not used in production case-management flows.`; no other changes are made
+
+**AC-3 — `Process_Migrate_Data.cs` classified**
+Given `Process_Migrate_Data.cs` similarly contains migration-purpose direct CouchDB calls
+When this story is complete
+Then the same classification comment is added; no other changes are made
+
+**AC-4 — Non-DAL call count confirmed zero (excluding documented exceptions)**
+Given all previous stories in Epics 25–27 have been completed
+When this story closes
+Then a final scan confirms that every `CouchDbHttpClient.ExecuteAsync` call in `mmria-server`, `mmria.common`, and `mmria.services` (excluding utilities repo) is one of: (a) inside a DAL file, (b) inside an infrastructure exception file (`c_db_setup.cs`, `Check_DB_Install.cs`, `MultiTenantSetupService.cs`, `MMRIARebuildWorker.cs`), (c) a null-fallback path that is never exercised at runtime, or (d) formally documented as an intentional exception per ACs 2 and 3; the scan result is recorded in the story completion notes
+
+**AC-5 — Build passes**
+Given any changes in AC-1
+When the build runs
+Then all three projects build with zero errors
+
+---
+
+## Epic 27 — Story Sequencing
+
+| Story | Risk | Dependencies |
+|---|---|---|
+| 27.1 — Activate export utility wiring | Low | Epics 24.10, 24.11, 26.3 |
+| 27.2 — BatchProcessor + migration actor classification | Low | None |
+
+27.1 and 27.2 are independent and can proceed in parallel.
+
+---
+
+## Epic 28: mmria-server Non-DAL Remnants (SQL Migration Foundation)
+
+**Architecture rule:** project-context.md §2.2 SharedLibraries pattern + SQL migration readiness.
+
+**Summary:** Post-Epic-27 scan identified four files in `mmria-server` that still call `CouchDbHttpClient.ExecuteAsync` directly against CouchDB databases for which repository interfaces were established in Epics 17–23. All required interfaces already exist; this epic is a pure wiring pass. After this epic, the only remaining non-DAL CouchDB calls in the entire codebase are formally classified infrastructure exceptions (sync utilities, rebuild actors, `c_db_setup.cs`, migration actors) — zero unclassified application calls remain.
+
+**Non-DAL files remediated:**
+
+| File | Calls | Database | Repository needed | Story |
+|---|---|---|---|---|
+| `mmria-server/util/VROSummary.cs` | 3 | `mmrds` (2 per-doc GETs + 1 `_all_docs` for ID list) | `ICaseRepository` (Epic 17) | 28.1 |
+| `mmria-server/util/JurisdictionAuthorizationRequirement.cs` | 1 | `jurisdiction/_design/sortable/_view/by_user_id` | `IJurisdictionAuthorizationReader` (Epic 19 story 19.3) | 28.2 |
+| `mmria-server/CustomAuthHandler.cs` | 1 | `session/{sid}` PUT (refresh session expiration) | `ISessionRepository` (Epic 23 story 23.2) | 28.2 |
+| `mmria-server/util/core_element_export/core_element_exporter.cs` | 4 | `metadata` (2 GETs) + `mmrds` (2 GETs) | `IMetadataRepository` (Epic 20) + `ICaseRepository` (Epic 17) | 28.3 |
+
+**Note:** This is the mmria-server copy of `core_element_exporter.cs` at `mmria-server/util/core_element_export/`. The `mmria.services` copy was fully remediated in Epics 24 and 27. The server copy was not in scope for those epics.
+
+---
+
+### Story 28.1: `VROSummary.cs` Case Reads Through `ICaseRepository`
+
+As a developer,
+I want `VROSummary.cs` to read case documents through `ICaseRepository` instead of constructing `mmrds` URLs directly,
+So that the VRO summary actor has the same SQL migration seam as all other case-data consumers.
+
+**Acceptance Criteria:**
+
+**AC-1 — Per-document case GET replaced**
+Given `VROSummary.cs` at approximately line 188 calls `_couchDbHttpClient.ExecuteAsync("GET", $"{db_config.url}/{db_config.prefix}mmrds/{id}", ...)` inside a `foreach` loop over `id_list`
+When this story is complete
+Then that call is replaced with `ICaseRepository.GetCaseDocumentJsonAsync(id, db_config)` (or equivalent method returning raw JSON); `ICaseRepository` is injected into `VROSummary` via constructor injection
+
+**AC-2 — Case count GET replaced**
+Given `VROSummary.cs` at approximately line 341 calls `_couchDbHttpClient.ExecuteAsync("GET", request_string, ...)` to read a case document in the `GetUserCount`/`GetCaseCount` methods
+When this story is complete
+Then that call is replaced with the corresponding `ICaseRepository` method; `ICaseRepository` is passed to or injected into the method that owns that call
+
+**AC-3 — `_all_docs` ID-list call replaced**
+Given `VROSummary.cs` `GetIdList()` at approximately line 502 calls `_couchDbHttpClient.ExecuteAsync("GET", $"{db_config.url}/{db_config.prefix}mmrds/_all_docs", ...)` to build the case ID set
+When this story is complete
+Then that call is replaced with `ICaseRepository.GetCasesPagedAsync(null, int.MaxValue, db_config)` (or a dedicated `GetAllCaseIdsAsync` if that already exists on the interface); the resulting ID set is assembled from the returned page's document IDs as before; if paging is needed for large datasets, a loop is added using the cursor pattern — but for the VRO summary use case, a single large-page call matching the existing behavior is acceptable
+
+**AC-4 — `_couchDbHttpClient` removed from `VROSummary` if no other calls remain**
+Given `VROSummary.cs` currently injects `CouchDbHttpClient` alongside `IUserRepository` and `IJurisdictionRepository`
+When this story is complete
+Then if all three CouchDB call sites are replaced with repository calls, `CouchDbHttpClient _couchDbHttpClient` is removed from the constructor and the field; the constructor signature is updated and all callers that instantiate `VROSummary` are updated accordingly
+
+**AC-5 — Build passes**
+Given the changes above
+When the build runs
+Then `mmria-server` builds with zero errors
+
+**Dev Notes — Files to Change:**
+
+| File | Change |
+|------|--------|
+| `source-code/mmria/mmria-server/util/VROSummary.cs` | **UPDATE** — inject `ICaseRepository`; replace 3 direct calls; remove `_couchDbHttpClient` if no calls remain |
+| Caller(s) that instantiate `VROSummary` | **UPDATE** — pass `ICaseRepository` instance from DI scope; remove `CouchDbHttpClient` arg if removed from ctor |
+
+**`ICaseRepository` note:** Check `GetCasesPagedAsync` signature from Epic 24 Story 24.3 before implementing AC-3. If the method returns `JObject` documents, extract IDs from the `_id` field. If `VROSummary` uses a `_design` filter (line 505: `if(_id.IndexOf("_design") > -1) continue`), preserve that filter in the loop.
+
+---
+
+### Story 28.2: Auth Middleware Session and Jurisdiction Wiring
+
+As a developer,
+I want `JurisdictionAuthorizationRequirement.cs` and `CustomAuthHandler.cs` to read and write through existing repository interfaces instead of constructing CouchDB URLs directly,
+So that the auth middleware pipeline has the same SQL migration seam as all other database-touching code.
+
+**Acceptance Criteria:**
+
+**AC-1 — `JurisdictionAuthorizationRequirement.cs` jurisdiction view call replaced**
+Given `JurisdictionAuthorizationRequirement.cs` at approximately line 45 calls `_couchDbHttpClient.ExecuteAsync("POST", jurisdicion_view_url, ...)` to query the `jurisdiction/_design/sortable/_view/by_user_id` view
+When this story is complete
+Then that call is replaced with `IJurisdictionAuthorizationReader.GetRolesByUserIdAsync(userId, dbConfig)` (the interface established in Epic 19 Story 19.3); `IJurisdictionAuthorizationReader` is injected into the requirement handler via constructor injection; the handler uses the returned role entries to populate the claim as before
+
+**AC-2 — `IJurisdictionAuthorizationReader` injection is DI-lifetime-safe**
+Given `JurisdictionAuthorizationRequirement.cs` is registered in the ASP.NET Core authorization pipeline
+When the service lifetime is chosen
+Then `IJurisdictionAuthorizationReader` is injected with a lifetime compatible with the handler's registration (confirm `Scoped` or `Transient` per the existing `JurisdictionAuthorizationDAL` registration from Epic 19.3)
+
+**AC-3 — `CustomAuthHandler.cs` session PUT replaced**
+Given `CustomAuthHandler.cs` at approximately line 171 calls `_couchDbHttpClient.ExecuteAsync("PUT", request_string, session_message_json, ...)` to write a refreshed session expiration back to `session/{sid}`
+When this story is complete
+Then that PUT is replaced with `ISessionRepository.UpdateSessionAsync(sid, session_message, dbConfig)` (or the equivalent write method on `ISessionRepository`); `ISessionRepository` is injected into `CustomAuthHandler` via constructor injection
+
+**AC-4 — No behavioral change in auth pipeline**
+Given the auth middleware executes on every authorized request
+When this story is implemented
+Then the observable behavior of jurisdiction-role validation and session-expiration refresh is identical to pre-change; no new error-handling paths are added; the existing `try/catch` structure is preserved
+
+**AC-5 — Build passes**
+Given the changes above
+When the build runs
+Then `mmria-server` builds with zero errors
+
+**Dev Notes — Files to Change:**
+
+| File | Change |
+|------|--------|
+| `source-code/mmria/mmria-server/util/JurisdictionAuthorizationRequirement.cs` | **UPDATE** — inject `IJurisdictionAuthorizationReader`; replace `ExecuteAsync` POST with `GetRolesByUserIdAsync` |
+| `source-code/mmria/mmria-server/CustomAuthHandler.cs` | **UPDATE** — inject `ISessionRepository`; replace `ExecuteAsync` PUT with `UpdateSessionAsync` (or equivalent) |
+
+**`ISessionRepository` write method note:** Story 23.2 established `ISessionRepository` with session CRUD. Confirm the exact method name for writing/updating a session document. If a write method that accepts `session_message` exists, use it directly. If it only accepts raw JSON, use the raw-JSON PUT overload. Do NOT create a new interface method if an existing write method covers the operation.
+
+---
+
+### Story 28.3: mmria-server `core_element_exporter.cs` Remaining Calls
+
+As a developer,
+I want the mmria-server copy of `core_element_exporter.cs` to read metadata and case data through `IMetadataRepository` and `ICaseRepository` instead of constructing CouchDB URLs directly,
+So that the server-side core-element export path has the same SQL migration seam as its mmria.services counterpart (which was remediated in Epics 24–27).
+
+**Acceptance Criteria:**
+
+**AC-1 — Metadata version-spec read replaced**
+Given `mmria-server/util/core_element_export/core_element_exporter.cs` at approximately line 132 calls `_couchDbHttpClient.ExecuteAsync("GET", metadata_url, ...)` where `metadata_url = db_config.url + $"/metadata/version_specification-{version}/metadata"`
+When this story is complete
+Then that call is replaced with `IMetadataRepository.GetAppDocumentAsync(version, db_config)` (the same method used by the `c_convert_to_*` files in Epic 25 Story 25.2); `IMetadataRepository` is injected via constructor injection
+
+**AC-2 — De-identified list read replaced**
+Given the same file at approximately line 213 calls `_couchDbHttpClient.ExecuteAsync("GET", db_config.url + "/metadata/de-identified-list", ...)` to load the de-identification field list
+When this story is complete
+Then that call is replaced with `IMetadataRepository.GetDeIdentifiedListAsync(db_config)` (the same method used by `c_de_identifier` in Story 25.2)
+
+**AC-3 — Case view read replaced**
+Given the same file at approximately line 246 calls `_couchDbHttpClient.ExecuteAsync("GET", request_string, ...)` where `request_string` is a `mmrds` view query URL (case view for export filtering)
+When this story is complete
+Then that call is replaced with the appropriate `ICaseRepository` view query method; if no view query method covering this specific view exists on `ICaseRepository`, one is added to the interface and implemented in `CaseDAL` before replacing the call site (following the same pattern as Story 26.1 AC-2)
+
+**AC-4 — Per-case document GET replaced**
+Given the same file at approximately line 265 calls `_couchDbHttpClient.ExecuteAsync("GET", URL, ...)` where `URL = $"{db_config.url}/{db_config.prefix}mmrds/{id}"` to fetch the full case document for export
+When this story is complete
+Then that call is replaced with `ICaseRepository.GetCaseDocumentJsonAsync(id, db_config)` or equivalent
+
+**AC-5 — `_couchDbHttpClient` removed from `core_element_exporter` (server copy) if no calls remain**
+Given the server copy currently injects `CouchDbHttpClient` as `_couchDbHttpClient`
+When this story is complete
+Then if all four call sites are replaced, `_couchDbHttpClient` is removed from the constructor and the field; callers that pass `CouchDbHttpClient` to this constructor are updated
+
+**AC-6 — Build passes**
+Given the changes above
+When the build runs
+Then `mmria-server` builds with zero errors
+
+**Dev Notes — Files to Change:**
+
+| File | Change |
+|------|--------|
+| `source-code/mmria/mmria-server/util/core_element_export/core_element_exporter.cs` | **UPDATE** — inject `IMetadataRepository` + `ICaseRepository`; replace 4 direct calls; remove `_couchDbHttpClient` if no calls remain |
+| Caller(s) that instantiate this exporter | **UPDATE** — resolve and pass repo instances from DI scope |
+
+**mmria.services comparison note:** The `mmria.services` version of `core_element_exporter.cs` was remediated across Epics 24–27. The server copy lives at `mmria-server/util/core_element_export/core_element_exporter.cs` and is a separate file. Verify method signatures match what is now available on `ICaseRepository` and `IMetadataRepository` before implementing — they should match exactly what the services copy now uses.
+
+---
+
+## Epic 28 — Story Sequencing
+
+| Story | Risk | Dependencies |
+|---|---|---|
+| 28.1 — `VROSummary.cs` case reads | Low | Epic 17 story 17.2 (ICaseRepository), Epic 24 story 24.3 (GetCasesPagedAsync) |
+| 28.2 — Auth middleware session and jurisdiction wiring | Low | Epic 23 story 23.2 (ISessionRepository), Epic 19 story 19.3 (IJurisdictionAuthorizationReader) |
+| 28.3 — mmria-server `core_element_exporter.cs` remaining calls | Low | Epic 17 story 17.2 (ICaseRepository), Epic 20 story 20.2 (IMetadataRepository) |
+
+All three stories are independent and can proceed in parallel.
+
+**Final non-DAL gate:** When Epic 28 is complete, every `CouchDbHttpClient.ExecuteAsync` call in `mmria-server` and `mmria.services` that touches a CouchDB application database routes through a repository interface. The only remaining non-DAL calls are in formally classified infrastructure files (sync utilities, rebuild actors, `c_db_setup.cs`, migration actors) which are addressed as a unit when SQL migration implementation begins.
 
 

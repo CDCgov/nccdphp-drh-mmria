@@ -14,6 +14,7 @@ public sealed class c_cdc_de_identifier
     common.couchdb.DBConfigurationDetail connection;
     string metadata_release_version_name;
     mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository _metadataRepository;
 
     public c_cdc_de_identifier(
         string p_case_item_json,
@@ -21,6 +22,7 @@ public sealed class c_cdc_de_identifier
         common.couchdb.DBConfigurationDetail p_connection,
         string p_metadata_release_version_name,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository metadataRepository,
         IEnumerable<string> p_de_identified_paths = null)
     {
         this.case_item_json = p_case_item_json;
@@ -28,6 +30,7 @@ public sealed class c_cdc_de_identifier
         this.connection = p_connection;
         metadata_release_version_name = p_metadata_release_version_name;
         _couchDbHttpClient = couchDbHttpClient;
+        _metadataRepository = metadataRepository;
         if (p_de_identified_paths != null)
         {
             de_identified_set = new HashSet<string>(p_de_identified_paths, StringComparer.OrdinalIgnoreCase);
@@ -39,8 +42,7 @@ public sealed class c_cdc_de_identifier
 
         if (de_identified_set.Count == 0)
         {
-            var de_identified_list_response = await _couchDbHttpClient.ExecuteAsync("GET", connection.url + "/metadata/de-identified-export-list", null, connection.user_name, connection.user_value);
-            System.Dynamic.ExpandoObject de_identified_ExpandoObject = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(de_identified_list_response);
+            System.Dynamic.ExpandoObject de_identified_ExpandoObject = await _metadataRepository.GetDeIdentifiedExportListAsync(connection);
             IDictionary<string, object> idictionary = de_identified_ExpandoObject as IDictionary<string, object>;
             if (idictionary != null)
             {

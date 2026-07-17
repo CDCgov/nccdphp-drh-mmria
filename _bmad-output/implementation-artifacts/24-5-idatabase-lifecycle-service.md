@@ -2,7 +2,7 @@
 
 **Epic:** 24 — Infrastructure Sync and Database Lifecycle Consolidation (SQL Migration Foundation)
 **Story ID:** 24.5
-**Status:** not-started
+**Status:** done
 **Date added:** 2026-07-16
 **Depends on:** 24.1
 **Source requirements:** epics.md §Epic 24 Story 24.5; project-context.md §2.2

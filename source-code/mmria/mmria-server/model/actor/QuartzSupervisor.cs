@@ -4,6 +4,7 @@ using System.Linq;
 using Akka.Actor;
 using Akka.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using mmria.common.SharedLibraries.ExportQueue;
 using mmria.server.model.actor.quartz;
 
 namespace mmria.server.model.actor;
@@ -60,6 +61,8 @@ public sealed class QuartzSupervisor : UntypedActor
     mmria.common.couchdb.OverridableConfiguration configuration = null;
     mmria.common.couchdb.ConfigurationSet configuration_set;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IExportQueueRepository _exportQueueRepository;
+    private readonly mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository _metadataRepository;
 
     string host_prefix;
 
@@ -68,7 +71,9 @@ public sealed class QuartzSupervisor : UntypedActor
         mmria.common.couchdb.OverridableConfiguration _configuration,
         string _host_prefix,
         mmria.common.couchdb.ConfigurationSet _configuration_set,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        IExportQueueRepository exportQueueRepository,
+        mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository metadataRepository = null
     )
     {
  
@@ -77,6 +82,8 @@ public sealed class QuartzSupervisor : UntypedActor
         host_prefix = _host_prefix;
         configuration_set = _configuration_set;
         _couchDbHttpClient = couchDbHttpClient;
+        _exportQueueRepository = exportQueueRepository;
+        _metadataRepository = metadataRepository;
     }
 
     protected override void PostStop()
@@ -155,12 +162,12 @@ public sealed class QuartzSupervisor : UntypedActor
                 if(is_rebuild_queue)
                 {
                     Console.WriteLine($"[CDC-DEBUG] Launching Rebuild_Export_Queue for host_prefix='{host_prefix}'");
-                    Context.ActorOf(Props.Create<Rebuild_Export_Queue>(db_config, _couchDbHttpClient)).Tell(new_scheduleInfo);
+                    Context.ActorOf(Props.Create<Rebuild_Export_Queue>(db_config, _exportQueueRepository)).Tell(new_scheduleInfo);
                 }
                 else if(!string.IsNullOrWhiteSpace(cdcInstancePullList))
                 {
                     Console.WriteLine($"[CDC-DEBUG] Launching Process_Central_Pull_list for host_prefix='{host_prefix}'");
-                    Context.ActorOf(Props.Create<Process_Central_Pull_list>(configuration_set, db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(new_scheduleInfo);
+                    Context.ActorOf(Props.Create<Process_Central_Pull_list>(configuration_set, db_config, _couchDbHttpClient, configuration, host_prefix, (mmria.common.SharedLibraries.Case.ICaseRepository)null, (mmria.common.SharedLibraries.DeIdentified.IDeIdentifiedRepository)null, (mmria.common.SharedLibraries.Report.IReportRepository)null, _metadataRepository)).Tell(new_scheduleInfo);
                 }
                 else
                 {

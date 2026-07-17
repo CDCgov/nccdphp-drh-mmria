@@ -708,12 +708,15 @@ public sealed class MultiTenantSetupService
 
         try
         {
+            var metadataRepository = new mmria.common.SharedLibraries.MetadataVersion.DAL.MetadataVersionDAL(_couchDbHttpClient);
             var actorRef = _actorSystem.ActorOf(
                 Props.Create<QuartzSupervisor>(
                     overridableConfiguration,
                     tenant,
                     configurationSet,
-                    _couchDbHttpClient),
+                    _couchDbHttpClient,
+                    (mmria.common.SharedLibraries.ExportQueue.IExportQueueRepository)null,
+                    metadataRepository),
                 actorName);
 
             actorRef.Tell("init");

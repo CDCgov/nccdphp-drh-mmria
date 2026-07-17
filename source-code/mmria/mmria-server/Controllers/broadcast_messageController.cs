@@ -179,6 +179,7 @@ public sealed class broadcast_messageController : Controller
 
         try
         {
+            // Service endpoint call — not a direct CouchDB write. No repository routing needed.
             var responseContent = await _couchDbHttpClient.ExecuteAsync("POST", base_url, object_json, "application/json", requestOptions);
 
            var response = System.Text.Json.JsonSerializer.Deserialize<mmria.common.model.couchdb.document_put_response>(responseContent);

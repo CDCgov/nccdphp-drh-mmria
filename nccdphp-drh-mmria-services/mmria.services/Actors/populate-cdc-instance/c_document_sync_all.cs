@@ -5,9 +5,12 @@ using System.Diagnostics;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
+using mmria.common.SharedLibraries.Case;
+using mmria.common.SharedLibraries.DeIdentified;
 using mmria.common.SharedLibraries.MMRIAServices.Model;
 using mmria.common.SharedLibraries.MetadataVersion;
 using mmria.common.SharedLibraries.MetadataVersion.DAL;
+using mmria.common.SharedLibraries.Report;
 using Newtonsoft.Json.Linq;
 
 namespace mmria.server.utils;
@@ -102,6 +105,9 @@ public sealed class Report_PowerBI_Index_Struct
     private readonly string _host_prefix;
     private readonly Action<string> _progressCallback;
     private readonly PopulateCdcThrottleSettings _throttleSettings;
+    private readonly ICaseRepository _caseRepository;
+    private readonly IDeIdentifiedRepository _deIdentifiedRepository;
+    private readonly IReportRepository _reportRepository;
 
     public c_document_sync_all (
         common.couchdb.DBConfigurationDetail p_connection, 
@@ -110,7 +116,10 @@ public sealed class Report_PowerBI_Index_Struct
         mmria.common.couchdb.OverridableConfiguration configuration = null,
         string host_prefix = null,
         Action<string> progressCallback = null,
-        PopulateCdcThrottleSettings throttleSettings = null
+        PopulateCdcThrottleSettings throttleSettings = null,
+        ICaseRepository caseRepository = null,
+        IDeIdentifiedRepository deIdentifiedRepository = null,
+        IReportRepository reportRepository = null
     )
     {
         this.connection = p_connection;
@@ -125,6 +134,9 @@ public sealed class Report_PowerBI_Index_Struct
         _host_prefix = host_prefix;
         _progressCallback = progressCallback;
         _throttleSettings = throttleSettings ?? PopulateCdcThrottleSettings.CreateDefaults();
+        _caseRepository = caseRepository;
+        _deIdentifiedRepository = deIdentifiedRepository;
+        _reportRepository = reportRepository;
     }
 
     private void ReportProgress(string message)
@@ -180,6 +192,19 @@ public sealed class Report_PowerBI_Index_Struct
 
     private async Task<List<case_batch_document>> get_case_batch_async(string start_after_id, int take)
     {
+        // Route through ICaseRepository when available
+        if(_caseRepository != null)
+        {
+            var page = await _caseRepository.GetCasesPagedAsync(start_after_id, take, connection);
+            return page.Documents
+                .Select(doc => new case_batch_document
+                {
+                    id = doc.Value<string>("_id"),
+                    document_json = doc.ToString(Newtonsoft.Json.Formatting.None)
+                })
+                .ToList();
+        }
+
         var result = new List<case_batch_document>();
         string next_start_key = start_after_id;
 
@@ -264,6 +289,13 @@ public sealed class Report_PowerBI_Index_Struct
 
     private async Task<int> get_total_case_document_count_async()
     {
+        if(_caseRepository != null)
+        {
+            int total = await _caseRepository.GetCaseTotalCountAsync(connection);
+            int designCount = await _caseRepository.GetDesignDocCountAsync(connection);
+            return Math.Max(0, total - designCount);
+        }
+
         // Out of scope per Epic 17 — infrastructure/CDC sync
         string total_rows_url = this.couchdb_url + $"/{this.prefix}mmrds/_all_docs?limit=0";
         string total_rows_response = await _couchDbHttpClient.ExecuteAsync("GET", total_rows_url, null, this.user_name, this.user_value);
@@ -316,6 +348,22 @@ public sealed class Report_PowerBI_Index_Struct
             return (0, 0);
         }
 
+        // Route through repository when available
+        if(string.Equals(database_name, "de_id", StringComparison.OrdinalIgnoreCase) && _deIdentifiedRepository != null)
+        {
+            var docs = document_json_list.Select(d => JObject.Parse(d));
+            var results = await _deIdentifiedRepository.BulkUpsertAsync(docs, connection);
+            int errors = results.Count(r => r == null || r.ok == false);
+            return (results.Count(), errors);
+        }
+        if(string.Equals(database_name, "report", StringComparison.OrdinalIgnoreCase) && _reportRepository != null)
+        {
+            var docs = document_json_list.Select(d => JObject.Parse(d));
+            var results = await _reportRepository.BulkUpsertAsync(docs, connection);
+            int errors = results.Count(r => r == null || r.ok == false);
+            return (results.Count(), errors);
+        }
+
         // Issue H: avoid the JObject/JArray graph that was being built and torn down
         // once per chunk. Concatenate the already-serialized doc JSONs directly.
         string payload = BulkDocumentPayloadBuilder.BuildBulkDocsPayload(document_json_list);
@@ -328,9 +376,9 @@ public sealed class Report_PowerBI_Index_Struct
             return (0, document_json_list.Count);
         }
 
-        var results = Newtonsoft.Json.JsonConvert.DeserializeObject<List<mmria.common.model.couchdb.document_put_response>>(response) ?? new();
-        int error_count = results.Count(item => item == null || item.ok == false);
-        return (results.Count, error_count);
+        var doc_results = Newtonsoft.Json.JsonConvert.DeserializeObject<List<mmria.common.model.couchdb.document_put_response>>(response) ?? new();
+        int error_count = doc_results.Count(item => item == null || item.ok == false);
+        return (doc_results.Count, error_count);
     }
 
     private async Task<(int success_count, int error_count)> bulk_write_async(
@@ -419,7 +467,15 @@ public sealed class Report_PowerBI_Index_Struct
             rebuild_context = await load_rebuild_context_async();
             System.Console.WriteLine($"[PopulateCDC] CDC rebuild case count: {total_case_document_count}.");
 
-            await _couchDbHttpClient.ExecuteAsync("DELETE", this.couchdb_url + $"/{this.prefix}de_id", null, this.user_name, this.user_value);
+            // Drop and recreate de_id
+            if(_deIdentifiedRepository != null)
+            {
+                await _deIdentifiedRepository.DropAndResetAsync(connection);
+            }
+            else
+            {
+                await _couchDbHttpClient.ExecuteAsync("DELETE", this.couchdb_url + $"/{this.prefix}de_id", null, this.user_name, this.user_value);
+            }
         }
         catch (Exception)
         {
@@ -430,15 +486,24 @@ public sealed class Report_PowerBI_Index_Struct
         bool report_database_exists = false;
         try
         {
-            report_database_exists = await mmria.common.SharedLibraries.MMRIAServices.Helper.MMRIAServicesHelper.ClearDatabaseDocumentsPreservingSystemDocsAsync(
-                _couchDbHttpClient,
-                this.couchdb_url + $"/{this.prefix}report",
-                this.user_name,
-                this.user_value);
-
-            if(report_database_exists)
+            if(_reportRepository != null)
             {
-                System.Console.WriteLine($"[PopulateCDC] Cleared existing report data docs while preserving design docs for '{this.couchdb_url}/{this.prefix}report'.");
+                await _reportRepository.DropAndResetWithSystemDocPreservationAsync(connection);
+                report_database_exists = false; // always freshly created by repo method
+                System.Console.WriteLine($"[PopulateCDC] Cleared/recreated report via IReportRepository for '{this.couchdb_url}/{this.prefix}report'.");
+            }
+            else
+            {
+                report_database_exists = await mmria.common.SharedLibraries.MMRIAServices.Helper.MMRIAServicesHelper.ClearDatabaseDocumentsPreservingSystemDocsAsync(
+                    _couchDbHttpClient,
+                    this.couchdb_url + $"/{this.prefix}report",
+                    this.user_name,
+                    this.user_value);
+
+                if(report_database_exists)
+                {
+                    System.Console.WriteLine($"[PopulateCDC] Cleared existing report data docs while preserving design docs for '{this.couchdb_url}/{this.prefix}report'.");
+                }
             }
         }
         catch (Exception ex)
@@ -448,46 +513,31 @@ public sealed class Report_PowerBI_Index_Struct
         }
 
 
-        try
+        // Create de_id and install design doc
+        if(_deIdentifiedRepository == null)
         {
-            await _couchDbHttpClient.ExecuteAsync("PUT", this.couchdb_url + $"/{this.prefix}de_id", null, this.user_name, this.user_value);
-        }
-        catch (Exception)
-        {
-        
+            try { await _couchDbHttpClient.ExecuteAsync("PUT", this.couchdb_url + $"/{this.prefix}de_id", null, this.user_name, this.user_value); } catch (Exception) { }
         }
 
         try 
         {
-            
             var case_design_sortable_path = mmria.common.SharedLibraries.MMRIAServices.Helper.MMRIAServicesHelper.ResolveDatabaseScriptPath("case_design_sortable_de_id.json");
-
-            using (var  sr = new System.IO.StreamReader(case_design_sortable_path))
+            using (var sr = new System.IO.StreamReader(case_design_sortable_path))
             {
-                string result = await sr.ReadToEndAsync ();
-                await _couchDbHttpClient.ExecuteAsync("PUT", this.couchdb_url + $"/{this.prefix}de_id/_design/sortable", result, this.user_name, this.user_value);
+                string result = await sr.ReadToEndAsync();
+                if(_deIdentifiedRepository != null)
+                    await _deIdentifiedRepository.EnsureDesignDocumentAsync("sortable", result, connection);
+                else
+                    await _couchDbHttpClient.ExecuteAsync("PUT", this.couchdb_url + $"/{this.prefix}de_id/_design/sortable", result, this.user_name, this.user_value);
             }
-
-
         } 
-        catch (Exception) 
+        catch (Exception) { }
+
+        // Create report if needed and install indexes/designs
+        if(!report_database_exists && _reportRepository == null)
         {
-
-        }
-
-
-
-        if(!report_database_exists)
-        {
-            try
-            {
-                await _couchDbHttpClient.ExecuteAsync("PUT", this.couchdb_url + $"/{this.prefix}report", null, this.user_name, this.user_value);
-            }
-            catch (Exception ex)
-            {
-                System.Console.WriteLine($"[PopulateCDC] Unable to create report database.\n{ex}");
-                throw;
-            }
+            try { await _couchDbHttpClient.ExecuteAsync("PUT", this.couchdb_url + $"/{this.prefix}report", null, this.user_name, this.user_value); }
+            catch (Exception ex) { System.Console.WriteLine($"[PopulateCDC] Unable to create report database.\n{ex}"); throw; }
         }
 
 
@@ -503,8 +553,11 @@ public sealed class Report_PowerBI_Index_Struct
             if(!opioid_index_exists)
             {
                 var Report_Opioid_Index = new Report_Opioid_Index_Struct();
-                string index_json = Newtonsoft.Json.JsonConvert.SerializeObject (Report_Opioid_Index);
-                await _couchDbHttpClient.ExecuteAsync("POST", this.couchdb_url + $"/{this.prefix}report/_index", index_json, this.user_name, this.user_value);
+                string index_json = Newtonsoft.Json.JsonConvert.SerializeObject(Report_Opioid_Index);
+                if(_reportRepository != null)
+                    await _reportRepository.EnsureIndexAsync(index_json, connection);
+                else
+                    await _couchDbHttpClient.ExecuteAsync("POST", this.couchdb_url + $"/{this.prefix}report/_index", index_json, this.user_name, this.user_value);
             }
         }
         catch (Exception ex)
@@ -524,9 +577,11 @@ public sealed class Report_PowerBI_Index_Struct
             if(!powerbi_index_exists)
             {
                 var Report_PowerBI_Index = new Report_PowerBI_Index_Struct();
-                
-                string index_json = Newtonsoft.Json.JsonConvert.SerializeObject (Report_PowerBI_Index);
-                await _couchDbHttpClient.ExecuteAsync("POST", this.couchdb_url + $"/{this.prefix}report/_index", index_json, this.user_name, this.user_value);
+                string index_json = Newtonsoft.Json.JsonConvert.SerializeObject(Report_PowerBI_Index);
+                if(_reportRepository != null)
+                    await _reportRepository.EnsureIndexAsync(index_json, connection);
+                else
+                    await _couchDbHttpClient.ExecuteAsync("POST", this.couchdb_url + $"/{this.prefix}report/_index", index_json, this.user_name, this.user_value);
             }
         }
         catch (Exception ex)
@@ -537,35 +592,30 @@ public sealed class Report_PowerBI_Index_Struct
         try
         {
             var interactive_aggregate_report_path = mmria.common.SharedLibraries.MMRIAServices.Helper.MMRIAServicesHelper.ResolveDatabaseScriptPath("interactive-aggregate-report-view.json");
-
-            using (var  sr = new System.IO.StreamReader(interactive_aggregate_report_path))
+            using (var sr = new System.IO.StreamReader(interactive_aggregate_report_path))
             {
-                string result = await sr.ReadToEndAsync ();
-                await _couchDbHttpClient.ExecuteAsync("PUT", this.couchdb_url + $"/{this.prefix}report/_design/interactive_aggregate_report", result, this.user_name, this.user_value);
+                string result = await sr.ReadToEndAsync();
+                if(_reportRepository != null)
+                    await _reportRepository.EnsureDesignDocumentAsync("interactive_aggregate_report", result, connection);
+                else
+                    await _couchDbHttpClient.ExecuteAsync("PUT", this.couchdb_url + $"/{this.prefix}report/_design/interactive_aggregate_report", result, this.user_name, this.user_value);
             }
-
         }
-        catch (Exception)
-        {
-        
-        }
-
+        catch (Exception) { }
 
         try
         {
             var data_summary_view_path = mmria.common.SharedLibraries.MMRIAServices.Helper.MMRIAServicesHelper.ResolveDatabaseScriptPath("data-summary-view.json");
-
-            using (var  sr = new System.IO.StreamReader(data_summary_view_path))
+            using (var sr = new System.IO.StreamReader(data_summary_view_path))
             {
-                string result = await sr.ReadToEndAsync ();
-                await _couchDbHttpClient.ExecuteAsync("PUT", this.couchdb_url + $"/{this.prefix}report/_design/data_summary_view_report", result, this.user_name, this.user_value);
+                string result = await sr.ReadToEndAsync();
+                if(_reportRepository != null)
+                    await _reportRepository.EnsureDesignDocumentAsync("data_summary_view_report", result, connection);
+                else
+                    await _couchDbHttpClient.ExecuteAsync("PUT", this.couchdb_url + $"/{this.prefix}report/_design/data_summary_view_report", result, this.user_name, this.user_value);
             }
-
         }
-        catch (Exception)
-        {
-        
-        }
+        catch (Exception) { }
 
         string last_processed_case_id = null;
 

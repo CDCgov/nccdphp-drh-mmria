@@ -5,6 +5,9 @@ using System.Diagnostics;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
+using mmria.common.SharedLibraries.Case;
+using mmria.common.SharedLibraries.DeIdentified;
+using mmria.common.SharedLibraries.Report;
 using Newtonsoft.Json.Linq;
 
 namespace mmria.common.SharedLibraries.MMRIARebuild.Manager;
@@ -90,6 +93,10 @@ public sealed class c_document_sync_all_legacy
     private readonly int _write_retry_delay_ms;
     private readonly bool _add_indexes_at_beginning;
     private readonly Func<legacy_progress, Task> _progress_callback;
+    private readonly ICaseRepository _caseRepository;
+    private readonly IDeIdentifiedRepository _deIdentifiedRepository;
+    private readonly IReportRepository _reportRepository;
+    private readonly mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository _metadataRepository;
 
     public c_document_sync_all_legacy
     (
@@ -106,7 +113,11 @@ public sealed class c_document_sync_all_legacy
         int write_retry_count = 0,
         int write_retry_delay_ms = 0,
         bool add_indexes_at_beginning = true,
-        Func<legacy_progress, Task> progress_callback = null
+        Func<legacy_progress, Task> progress_callback = null,
+        ICaseRepository caseRepository = null,
+        IDeIdentifiedRepository deIdentifiedRepository = null,
+        IReportRepository reportRepository = null,
+        mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository metadataRepository = null
     )
     {
         couchdb_url = p_couchdb_url;
@@ -123,6 +134,10 @@ public sealed class c_document_sync_all_legacy
         _write_retry_delay_ms = Math.Max(0, write_retry_delay_ms);
         _add_indexes_at_beginning = add_indexes_at_beginning;
         _progress_callback = progress_callback;
+        _caseRepository = caseRepository;
+        _deIdentifiedRepository = deIdentifiedRepository;
+        _reportRepository = reportRepository;
+        _metadataRepository = metadataRepository;
     }
 
     private string get_database_scripts_directory()
@@ -291,6 +306,20 @@ public sealed class c_document_sync_all_legacy
 
     private async Task reset_database_async(string database_name)
     {
+        if(string.Equals(database_name, "de_id", StringComparison.OrdinalIgnoreCase) && _deIdentifiedRepository != null)
+        {
+            await _deIdentifiedRepository.DropAndResetAsync(db_config);
+            System.Console.WriteLine($">>> DELETED+CREATED {db_config.prefix}de_id via IDeIdentifiedRepository at {DateTime.Now:HH:mm:ss.fff} <<<");
+            return;
+        }
+
+        if(string.Equals(database_name, "report", StringComparison.OrdinalIgnoreCase) && _reportRepository != null)
+        {
+            await _reportRepository.DropAndResetWithSystemDocPreservationAsync(db_config);
+            System.Console.WriteLine($">>> DELETED+CREATED {db_config.prefix}report via IReportRepository at {DateTime.Now:HH:mm:ss.fff} <<<");
+            return;
+        }
+
         string database_url = couchdb_url + $"/{db_config.prefix}{database_name}";
 
         try
@@ -319,10 +348,17 @@ public sealed class c_document_sync_all_legacy
         try
         {
             string sortable_design = await read_database_script_async("case_design_sortable_de_id.json");
-            await execute_rebuild_request_async(
-                "PUT",
-                couchdb_url + $"/{db_config.prefix}de_id/_design/sortable",
-                sortable_design);
+            if(_deIdentifiedRepository != null)
+            {
+                await _deIdentifiedRepository.EnsureDesignDocumentAsync("sortable", sortable_design, db_config);
+            }
+            else
+            {
+                await execute_rebuild_request_async(
+                    "PUT",
+                    couchdb_url + $"/{db_config.prefix}de_id/_design/sortable",
+                    sortable_design);
+            }
             System.Console.WriteLine($">>> RESTORED {db_config.prefix}de_id/_design/sortable at {DateTime.Now:HH:mm:ss.fff} <<<");
         }
         catch (Exception ex)
@@ -347,7 +383,10 @@ public sealed class c_document_sync_all_legacy
             {
                 var report_powerbi_index = new Report_PowerBI_Index_Struct();
                 string index_json = Newtonsoft.Json.JsonConvert.SerializeObject(report_powerbi_index);
-                await execute_rebuild_request_async("POST", couchdb_url + $"/{db_config.prefix}report/_index", index_json);
+                if(_reportRepository != null)
+                    await _reportRepository.EnsureIndexAsync(index_json, db_config);
+                else
+                    await execute_rebuild_request_async("POST", couchdb_url + $"/{db_config.prefix}report/_index", index_json);
             });
     }
 
@@ -359,7 +398,10 @@ public sealed class c_document_sync_all_legacy
             {
                 var report_opioid_index = new Report_Opioid_Index_Struct();
                 string index_json = Newtonsoft.Json.JsonConvert.SerializeObject(report_opioid_index);
-                await execute_rebuild_request_async("POST", couchdb_url + $"/{db_config.prefix}report/_index", index_json);
+                if(_reportRepository != null)
+                    await _reportRepository.EnsureIndexAsync(index_json, db_config);
+                else
+                    await execute_rebuild_request_async("POST", couchdb_url + $"/{db_config.prefix}report/_index", index_json);
             });
     }
 
@@ -370,10 +412,13 @@ public sealed class c_document_sync_all_legacy
             async () =>
             {
                 string interactive_report_view = await read_database_script_async("interactive-aggregate-report-view.json");
-                await execute_rebuild_request_async(
-                    "PUT",
-                    couchdb_url + $"/{db_config.prefix}report/_design/interactive_aggregate_report",
-                    interactive_report_view);
+                if(_reportRepository != null)
+                    await _reportRepository.EnsureDesignDocumentAsync("interactive_aggregate_report", interactive_report_view, db_config);
+                else
+                    await execute_rebuild_request_async(
+                        "PUT",
+                        couchdb_url + $"/{db_config.prefix}report/_design/interactive_aggregate_report",
+                        interactive_report_view);
             });
     }
 
@@ -384,10 +429,13 @@ public sealed class c_document_sync_all_legacy
             async () =>
             {
                 string data_summary_view = await read_database_script_async("data-summary-view.json");
-                await execute_rebuild_request_async(
-                    "PUT",
-                    couchdb_url + $"/{db_config.prefix}report/_design/data_summary_view_report",
-                    data_summary_view);
+                if(_reportRepository != null)
+                    await _reportRepository.EnsureDesignDocumentAsync("data_summary_view_report", data_summary_view, db_config);
+                else
+                    await execute_rebuild_request_async(
+                        "PUT",
+                        couchdb_url + $"/{db_config.prefix}report/_design/data_summary_view_report",
+                        data_summary_view);
             });
     }
 
@@ -462,6 +510,8 @@ public sealed class c_document_sync_all_legacy
 
     private Task ensure_de_id_sortable_ready_async()
     {
+        if(_deIdentifiedRepository != null)
+            return _deIdentifiedRepository.WaitForIndexReadyAsync(db_config);
         return execute_rebuild_request_async(
             "GET",
             couchdb_url + $"/{db_config.prefix}de_id/_design/sortable/_view/by_date_created?limit=1&update=true");
@@ -469,11 +519,15 @@ public sealed class c_document_sync_all_legacy
 
     private Task ensure_report_powerbi_index_ready_async()
     {
+        if(_reportRepository != null)
+            return _reportRepository.WaitForIndexReadyAsync(db_config);
         return ensure_report_index_ready_async("^powerbi-", "powerbi-report-index");
     }
 
     private Task ensure_report_opioid_index_ready_async()
     {
+        if(_reportRepository != null)
+            return _reportRepository.WaitForIndexReadyAsync(db_config);
         return ensure_report_index_ready_async("^opioid-", "opioid-report-index");
     }
 
@@ -500,6 +554,8 @@ public sealed class c_document_sync_all_legacy
 
     private Task ensure_interactive_report_view_ready_async()
     {
+        if(_reportRepository != null)
+            return _reportRepository.WaitForIndexReadyAsync(db_config);
         return execute_rebuild_request_async(
             "GET",
             couchdb_url + $"/{db_config.prefix}report/_design/interactive_aggregate_report/_view/indicator_id?limit=1&update=true");
@@ -507,6 +563,8 @@ public sealed class c_document_sync_all_legacy
 
     private Task ensure_data_summary_view_ready_async()
     {
+        if(_reportRepository != null)
+            return _reportRepository.WaitForIndexReadyAsync(db_config);
         return execute_rebuild_request_async(
             "GET",
             couchdb_url + $"/{db_config.prefix}report/_design/data_summary_view_report/_view/year_of_death?limit=1&update=true");
@@ -538,6 +596,19 @@ public sealed class c_document_sync_all_legacy
         }
 
         document.Remove("_rev");
+
+        // Route through repository when available
+        if(string.Equals(database_name, "de_id", StringComparison.OrdinalIgnoreCase) && _deIdentifiedRepository != null)
+        {
+            var put_result = await _deIdentifiedRepository.UpsertDocumentAsync(document_id, document, db_config);
+            return put_result?.ok == true;
+        }
+        if(string.Equals(database_name, "report", StringComparison.OrdinalIgnoreCase) && _reportRepository != null)
+        {
+            var put_result = await _reportRepository.UpsertDocumentAsync(document_id, document, db_config);
+            return put_result?.ok == true;
+        }
+
         string payload = document.ToString(Newtonsoft.Json.Formatting.None);
         string url = couchdb_url + $"/{db_config.prefix}{database_name}/{Uri.EscapeDataString(document_id)}";
 
@@ -674,8 +745,11 @@ public sealed class c_document_sync_all_legacy
                             metadata_version,
                             db_config,
                             _couchDbHttpClient,
-                            _configuration,
-                            _host_prefix,
+                            _metadataRepository,
+                            deIdentifiedRepository: null,
+                            reportRepository: null,
+                            configuration: _configuration,
+                            host_prefix: _host_prefix,
                             rebuild_context: rebuild_context,
                             skip_revision_lookup: true);
                         var build_result = await sync_document.build_documents_async();

@@ -13,6 +13,7 @@ using System.Net.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Authorization;
 using System.Net;
+using mmria.common.SharedLibraries.MetadataVersion;
 
 namespace mmria.services.vitalsimport.Controllers;
 
@@ -23,16 +24,19 @@ public sealed class broadcastMessageController : Controller
 {
      private mmria.common.couchdb.ConfigurationSet ConfigDB;
      private mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+     private readonly IMetadataRepository _metadataRepository;
 
     public broadcastMessageController
     (
         mmria.common.couchdb.ConfigurationSet _ConfigDB,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        IMetadataRepository metadataRepository
     )
     {
         ConfigDB = _ConfigDB;
         _couchDbHttpClient = couchDbHttpClient;
         ConfigDB = _ConfigDB;
+        _metadataRepository = metadataRepository;
     }
 
     [HttpPost]
@@ -103,15 +107,14 @@ public sealed class broadcastMessageController : Controller
         System.DateTime current_date
     ) 
     { 
-        string url = $"{p_config_detail.url}/{p_config_detail.prefix}metadata/broadcast-message-list";
         mmria.common.metadata.BroadcastMessageList existing = null;
         try
         {
-            existing = await get_existing_document(url, p_config_detail);
+            existing = await _metadataRepository.GetBroadcastMessageListAsync(p_config_detail);
         }
         catch(System.Exception)
         {
-            //System.Console.WriteLine($"mmria.services.broadcastMessageController.UpdateBroadcastMessage error\n{url}");
+            //System.Console.WriteLine($"mmria.services.broadcastMessageController.UpdateBroadcastMessage error\n{p_id}");
         }
 
         try
@@ -135,7 +138,7 @@ public sealed class broadcastMessageController : Controller
 
             try
             {
-                var result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(await _couchDbHttpClient.ExecuteAsync("PUT", url, object_string, null, null));
+                var result = await _metadataRepository.SaveBroadcastMessageListAsync(object_string, p_config_detail);
             }
             catch(Exception ex)
             {
@@ -148,46 +151,4 @@ public sealed class broadcastMessageController : Controller
         }
     }
 
-    async System.Threading.Tasks.Task<mmria.common.metadata.BroadcastMessageList> get_existing_document
-    (
-        string p_document_url,
-        mmria.common.couchdb.DBConfigurationDetail config
-    )
-    {
-        try
-        {
-            var response = await _couchDbHttpClient.ExecuteForResponseAsync(
-                "GET",
-                p_document_url,
-                payload: null,
-                userName: config.user_name,
-                password: config.user_value);
-
-            // CouchDbHttpClient.ExecuteAsync does not throw on non-2xx by default;
-            // it returns the raw error body (e.g. {"error":"not_found",...}).
-            // Deserializing that into BroadcastMessageList would yield a default
-            // instance and silently bypass the "does this doc already exist?"
-            // check, so inspect the status code explicitly.
-            if (response.StatusCode == 404)
-            {
-                return null;
-            }
-
-            if (response.StatusCode < 200 || response.StatusCode >= 300)
-            {
-                // Non-success, non-404 (e.g. 401/500). Treat as "existence unknown"
-                // and let the caller fall through without overwriting audit fields
-                // based on a bogus default object.
-                return null;
-            }
-
-            return Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.BroadcastMessageList>(response.Body);
-        }
-        catch(Exception)
-        {
-            // Network/serialization failure - behave the same as non-success above.
-        }
-
-        return null;
-    }
 }
