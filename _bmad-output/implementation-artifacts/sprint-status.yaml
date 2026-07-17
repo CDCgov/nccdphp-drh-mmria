@@ -175,11 +175,11 @@ development_status:
   epic-18-retrospective: optional
 
   # ── Epic 19: jurisdiction Consolidation ───────────────────────────────────
-  epic-19: in-progress
+  epic-19: done
   19-1-jurisdiction-operation-catalog: done
-  19-2-ijurisdiction-repository-jurisdictiondal: ready-for-dev
-  19-3-ijurisdiction-authorization-reader: ready-for-dev
-  19-4-route-out-of-dal-jurisdiction-crud: ready-for-dev
+  19-2-ijurisdiction-repository-jurisdictiondal: done
+  19-3-ijurisdiction-authorization-reader: done
+  19-4-route-out-of-dal-jurisdiction-crud: done
   epic-19-retrospective: optional
 
   # ── Epic 20: metadata Consolidation ───────────────────────────────────────
@@ -193,13 +193,13 @@ development_status:
   epic-20-retrospective: optional
 
   # ── Epic 21: audit Consolidation ──────────────────────────────────────────
-  epic-21: in-progress
-  21-1-audit-operation-catalog: ready-for-dev
-  21-2-iaudit-repository-auditdal: ready-for-dev
-  21-3-casemanager-audit-writes: ready-for-dev
-  21-4-caseworkflowadmindal-audit-calls: ready-for-dev
-  21-5-controller-audit-calls: ready-for-dev
-  21-6-manageusers-auditrecovery-audit-calls: ready-for-dev
+  epic-21: done
+  21-1-audit-operation-catalog: done
+  21-2-iaudit-repository-auditdal: done
+  21-3-casemanager-audit-writes: done
+  21-4-caseworkflowadmindal-audit-calls: done
+  21-5-controller-audit-calls: done
+  21-6-manageusers-auditrecovery-audit-calls: done
   epic-21-retrospective: optional
 
   # ── Epic 22: .NET 10 Upgrade ─────────────────────────────────────────────
@@ -209,19 +209,19 @@ development_status:
   epic-22-retrospective: optional
 
   # ── Epic 23: Remaining Database Consolidation Gap Analysis (SQL Migration Foundation) ──
-  epic-23: in-progress
-  23-1-remaining-database-gap-scan: ready-for-dev
-  23-2-isession-repository-sessiondal: ready-for-dev
-  23-3-iofflinecase-repository-offlinecasedal: ready-for-dev
-  23-4-iexportqueue-repository-exportqueuedal: ready-for-dev
-  23-5-ivitalimport-repository-vitalimportdal-canonicalize: ready-for-dev
-  23-6-ireport-repository-reportdal: ready-for-dev
-  23-7-route-report-read-calls: ready-for-dev
-  23-8-ilogging-repository-loggingdal: ready-for-dev
+  epic-23: done
+  23-1-remaining-database-gap-scan: done
+  23-2-isession-repository-sessiondal: done
+  23-3-iofflinecase-repository-offlinecasedal: done
+  23-4-iexportqueue-repository-exportqueuedal: done
+  23-5-ivitalimport-repository-vitalimportdal-canonicalize: done
+  23-6-ireport-repository-reportdal: done
+  23-7-route-report-read-calls: done
+  23-8-ilogging-repository-loggingdal: done
   epic-23-retrospective: optional
 
   # ── Epic 24: Infrastructure Sync and Database Lifecycle Consolidation ────
-  epic-24: in-progress
+  epic-24: done
   24-1-infra-operations-catalog: done
   24-2-ideidentified-repository-ireport-write-extension: done
   24-3-icase-repository-sync-extensions: done
@@ -234,3 +234,23 @@ development_status:
   24-10-mmria-services-export-queue-routing: done
   24-11-mmria-services-vital-import-routing: done
   epic-24-retrospective: optional
+
+  # ── Epic 25: Async Safety + Metadata Reader Consolidation ─────────────────
+  epic-25: in-progress
+  25-1-fix-result-blocking-calls: ready-for-dev
+  25-2-metadata-reader-imetadatarepository-pass: ready-for-dev
+  epic-25-retrospective: optional
+
+  # ── Epic 26: Controller API Direct-Call Remediation ───────────────────────
+  epic-26: in-progress
+  26-1-case-api-controllers: ready-for-dev
+  26-2-auth-session-controllers: ready-for-dev
+  26-3-export-broadcast-controllers: ready-for-dev
+  26-4-jurisdiction-summary-utilities: ready-for-dev
+  epic-26-retrospective: optional
+
+  # ── Epic 27: Services Utility Repository Activation ───────────────────────
+  epic-27: in-progress
+  27-1-activate-export-utility-wiring: ready-for-dev
+  27-2-batchprocessor-migration-actor-classification: ready-for-dev
+  epic-27-retrospective: optional
