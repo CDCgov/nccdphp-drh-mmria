@@ -1,0 +1,15 @@
+# CODEOWNERS
+
+# These owners will be automatically requested for review on pull requests
+
+# that modify matching files, and (when branch protection requires code
+
+# owner review) must approve before a PR can be merged.
+
+#
+
+# Order matters: the LAST matching pattern in this file takes precedence.
+
+# See https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+- @tyd7 @nchap8 @SridharBodapati
