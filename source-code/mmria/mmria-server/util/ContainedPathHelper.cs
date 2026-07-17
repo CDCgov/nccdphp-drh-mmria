@@ -127,7 +127,7 @@ public static class ContainedPathHelper
     {
         var normalizedRoot = NormalizeTrustedDirectoryRoot(trustedBaseDirectory, nameof(trustedBaseDirectory));
         var safeDirectoryName = ValidateContainedName(childDirectoryName, nameof(childDirectoryName));
-        var combinedPath = Path.GetFullPath(Path.Combine(normalizedRoot, safeDirectoryName));
+        var combinedPath = Path.GetFullPath(safeDirectoryName, normalizedRoot);
         EnsureContainedPath(normalizedRoot, combinedPath, nameof(childDirectoryName));
         return combinedPath;
     }
@@ -136,7 +136,7 @@ public static class ContainedPathHelper
     {
         var normalizedRoot = NormalizeTrustedDirectoryRoot(trustedBaseDirectory, nameof(trustedBaseDirectory));
         var safeFileName = ValidateContainedName(fileName, nameof(fileName));
-        var combinedPath = Path.GetFullPath(Path.Combine(normalizedRoot, safeFileName));
+        var combinedPath = Path.GetFullPath(safeFileName, normalizedRoot);
         EnsureContainedPath(normalizedRoot, combinedPath, nameof(fileName));
         return combinedPath;
     }

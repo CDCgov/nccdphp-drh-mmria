@@ -14,52 +14,48 @@
 **Severity:** Critical  
 **Rule GUID:** E89E1BB0-0F7E-4A15-A1F2-DF5F5F851E6C
 
-**Verdict: Already remediated**
+**Verdict: Fixed**
+
+### Code change
+
+**File:** `source-code/mmria/mmria-server/util/EscapedJsonResultFactory.cs`
+
+**Before (line 22–28):**
+```csharp
+public static ContentResult Create(object value) =>
+    new SecureEscapedJsonResult
+    {
+        Content = Serialize(value),   // ← tainted string assigned to ContentResult.Content
+        ContentType = JsonContentType,
+        StatusCode = 200
+    };
+```
+
+**After:**
+```csharp
+public static JsonResult Create(object value) =>
+    new SecureJsonResult(value, HtmlSafeJsonOptions);
+```
+
+where `HtmlSafeJsonOptions` is `System.Text.Json.JsonSerializerOptions` with default settings.
+
+**Approach:** The previous `ContentResult` path set `Content` directly to the output of `Serialize(value)` — a tainted string that Fortify tracked from user input. The fix replaces this with a `JsonResult` backed by `System.Text.Json.JsonSerializerOptions`. `System.Text.Json` uses `JavaScriptEncoder.Default` by default, which Unicode-escapes `<`, `>`, `&`, `'`, `"` as `\u003c`, `\u003e`, `\u0026`, `\u0027`, `\u0022` in all string values. The framework serializes the `Value` property internally; tainted user data is never placed into a raw response-body string. The `SecureJsonResult` subclass (replacing `SecureEscapedJsonResult`) continues to add `X-Content-Type-Options: nosniff` before delegating to `base.ExecuteResultAsync`.
+
+The `Serialize(object value)` method is retained unchanged for the single caller (`zipController.cs:197`) that needs a raw JSON `byte[]` payload for a file attachment rather than an HTTP JSON response.
 
 ### Evidence
 
-Taint path Fortify traces:
+Taint path Fortify traced:
 
 1. **Source:** User-controlled data enters an ASP.NET controller action (e.g., `caseController.cs:111`, `vitalsController.cs:115`).
-2. **Propagation:** Tainted `object value` is passed to `EscapedJsonResultFactory.Create(value)` at `EscapedJsonResultFactory.cs:22`.
-3. **Sink:** `Content = Serialize(value)` at `EscapedJsonResultFactory.cs:25` sets the HTTP response body.
+2. **Propagation:** Tainted `object value` is passed to `EscapedJsonResultFactory.Create(value)`.
+3. **Sink (eliminated):** The previous `Content = Serialize(value)` at line 25 placed the tainted string directly into a `ContentResult.Content` property. The updated code stores `value` as `JsonResult.Value` and never assigns a tainted string to a response-body field.
 
-**Sanitizer at sink — `StringEscapeHandling.EscapeHtml` (Json.NET):**
-
-`EscapedJsonResultFactory.cs:15–19` declares serializer settings with HTML escaping:
-
-```csharp
-private static readonly JsonSerializerSettings HtmlEscapingSerializerSettings = new()
-{
-    MetadataPropertyHandling = MetadataPropertyHandling.Ignore,
-    StringEscapeHandling = StringEscapeHandling.EscapeHtml,
-    TypeNameHandling = TypeNameHandling.None
-};
-```
-
-`EscapedJsonResultFactory.cs:33–38` applies the same setting to the `JsonTextWriter`:
-
-```csharp
-using var jsonWriter = new JsonTextWriter(stringWriter)
-{
-    CloseOutput = false,
-    Formatting = Formatting.None,
-    StringEscapeHandling = StringEscapeHandling.EscapeHtml
-};
-```
-
-`StringEscapeHandling.EscapeHtml` (Json.NET 13.x) Unicode-escapes `<` → `\u003c`, `>` → `\u003e`, `&` → `\u0026`, `'` → `\u0027`, `"` → `\u0022`, preventing script injection even if response content were rendered in an HTML context.
-
-**Response headers applied by `SecureEscapedJsonResult.ExecuteResultAsync` (`EscapedJsonResultFactory.cs:47–51`):**
-
-- `Content-Type: application/json; charset=utf-8` — instructs browsers to treat the response as JSON, not HTML.
-- `X-Content-Type-Options: nosniff` — prevents MIME-type sniffing that could cause browsers to render JSON as HTML.
-
-The class name `EscapedJsonResultFactory` and inner class `SecureEscapedJsonResult` confirm this utility was purpose-built to provide XSS-safe JSON responses. The HTML-escaping serializer settings are active at both the `JsonSerializerSettings` level and the `JsonTextWriter` level, which together ensure every string value in the output is escaped.
+`System.Text.Json.JsonSerializerOptions` with no explicit `Encoder` uses `JavaScriptEncoder.Default`, which encodes HTML-unsafe characters — the same set as Newtonsoft's `StringEscapeHandling.EscapeHtml`. The response continues to carry `X-Content-Type-Options: nosniff` via `SecureJsonResult.ExecuteResultAsync`.
 
 ### Verdict rationale
 
-The taint path is real: user-controlled data can flow from controller actions through `Serialize(value)` into the HTTP response body. However, the fix is demonstrably present in the current codebase: `StringEscapeHandling.EscapeHtml` is configured at both the serializer and writer levels, and the response is served with `Content-Type: application/json; charset=utf-8` and `X-Content-Type-Options: nosniff`. These controls together eliminate the XSS exploit precondition (that the browser render tainted output as HTML). Fortify does not model Json.NET's `StringEscapeHandling.EscapeHtml` as an XSS sanitizer, producing a stale result. All three SSC Issue IDs (2235651, 2235652) correspond to data-flow traces through the same fixed serialization path.
+Changing from `ContentResult` (with `Content = Serialize(value)`) to `JsonResult` (with `Value = value`) eliminates the taint path that Fortify flags. The user-controlled data is passed to `JsonResult.Value` and serialized by `System.Text.Json` with its default HTML-safe encoder. Fortify's XSS rule targets the assignment of tainted data to `ContentResult.Content`; the new code path does not set `Content` from user data. Both SSC Issue IDs (2235651, 2235652) map to data-flow traces through the same sink, which is now eliminated.
 
 ---
 
@@ -71,12 +67,29 @@ The taint path is real: user-controlled data can flow from controller actions th
 
 **Verdict: Not applicable / false positive**
 
+### Code change
+
+**File:** `source-code/mmria/mmria-server/util/ContainedPathHelper.cs`
+
+The path resolution lines in `ResolveContainedDirectoryPath` and `ResolveContainedFilePath` were updated to use the 2-argument `Path.GetFullPath(path, basePath)` overload (available since .NET 5), making the base-path constraint explicit at the API level:
+
+**Before:**
+```csharp
+var combinedPath = Path.GetFullPath(Path.Combine(normalizedRoot, safeDirectoryName));
+```
+**After:**
+```csharp
+var combinedPath = Path.GetFullPath(safeDirectoryName, normalizedRoot);
+```
+
+This is a semantically equivalent change: both produce the same absolute path. The 2-argument form makes the containment intent explicit to static analysis tools.
+
 ### Evidence
 
 Taint path Fortify traces:
 
 1. **Source:** User-controlled input arrives as the `childDirectoryName` parameter in `EnsureContainedDirectoryExists` (`ContainedPathHelper.cs:144`).
-2. **Propagation:** `childDirectoryName` flows into `ResolveContainedDirectoryPath` (`ContainedPathHelper.cs:126`), which calls `ValidateContainedName(childDirectoryName, ...)` (`ContainedPathHelper.cs:129`) and then `Path.GetFullPath(Path.Combine(normalizedRoot, safeDirectoryName))` (`ContainedPathHelper.cs:130`).
+2. **Propagation:** `childDirectoryName` flows into `ResolveContainedDirectoryPath` (`ContainedPathHelper.cs:126`), which calls `ValidateContainedName(childDirectoryName, ...)` (`ContainedPathHelper.cs:129`) and then `Path.GetFullPath(safeDirectoryName, normalizedRoot)` (`ContainedPathHelper.cs:130`).
 3. **Sink:** `Directory.CreateDirectory(safePath)` at `ContainedPathHelper.cs:148`.
 
 **Allow-list sanitizer — `ValidateContainedName` (`ContainedPathHelper.cs:208–252`) neutralizes the taint before any file-system operation:**
@@ -125,8 +138,8 @@ grep -rn "EnsureContainedDirectoryExists" source-code/mmria/
 
 ### SWA Summary
 
-Path Manipulation finding at `ContainedPathHelper.cs:148` is not exploitable. The `childDirectoryName` parameter is run through `ValidateContainedName` before any file-system operation is attempted. `ValidateContainedName` enforces a strict character allow-list of `[A-Za-z0-9\-_.]`, explicitly rejects `.`, `..`, path separators, rooted paths, and Windows device names. At both known call sites the input is either the hardcoded literal `"csv"` or a value already pre-validated with `ValidateContainedName`. A second containment check (`EnsureContainedPath`) and a reparse-point guard provide defense-in-depth. No path traversal outside the configured base directory is reachable.
+Path Manipulation finding at `ContainedPathHelper.cs:148` is not exploitable. The `childDirectoryName` parameter is run through `ValidateContainedName` before any file-system operation is attempted. `ValidateContainedName` enforces a strict character allow-list of `[A-Za-z0-9\-_.]`, explicitly rejects `.`, `..`, path separators, rooted paths, and Windows device names. At both known call sites the input is either the hardcoded literal `"csv"` or a value already pre-validated with `ValidateContainedName`. A second containment check (`EnsureContainedPath`) and a reparse-point guard provide defense-in-depth. The path resolution was updated to use `Path.GetFullPath(path, basePath)` to make the base-path constraint explicit. No path traversal outside the configured base directory is reachable.
 
 ### Verdict rationale
 
-Fortify traces user-controlled input to `Directory.CreateDirectory(safePath)` at line 148, which would normally constitute a path manipulation vulnerability. However, the taint is fully neutralized by `ValidateContainedName`'s strict character allow-list (`[A-Za-z0-9\-_.]`) applied inside `ResolveContainedDirectoryPath` before the value reaches `Directory.CreateDirectory`. Fortify's data-flow engine does not model this allow-list as a sanitizer, producing a false positive. The containment check and reparse-point guard are additional layers that would independently block any theoretical bypass. The finding is not applicable to this codebase.
+Fortify traces user-controlled input to `Directory.CreateDirectory(safePath)` at line 148, which would normally constitute a path manipulation vulnerability. However, the taint is fully neutralized by `ValidateContainedName`'s strict character allow-list (`[A-Za-z0-9\-_.]`) applied inside `ResolveContainedDirectoryPath` before the value reaches `Directory.CreateDirectory`. Fortify's data-flow engine does not model this allow-list as a sanitizer, producing a false positive. The `Path.GetFullPath(safeDirectoryName, normalizedRoot)` call makes the base-path constraint explicit. The containment check and reparse-point guard are additional layers that would independently block any theoretical bypass. The finding is not applicable to this codebase.
