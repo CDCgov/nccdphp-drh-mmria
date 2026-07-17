@@ -661,6 +661,7 @@ public AccountController
             {
                 VitalServiceKey = _configuration.GetString("vital_service_key", host_prefix)
             };
+            // Service endpoint call — not a CouchDB direct access. No repository routing needed.
             var responseBody = await _couchDbHttpClient.ExecuteAsync(
                 "GET", getUrl, null, "application/json", requestOptions);
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.SystemOfflineConfig>(responseBody)

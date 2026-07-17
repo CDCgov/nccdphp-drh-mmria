@@ -8,6 +8,8 @@ using mmria.common.getset;
 using mmria.common.SharedLibraries.Case;
 using mmria.common.SharedLibraries.Case.DAL;
 using mmria.common.SharedLibraries.ExportQueue;
+using mmria.common.SharedLibraries.Jurisdiction;
+using mmria.common.SharedLibraries.Jurisdiction.DAL;
 using mmria.common.SharedLibraries.MetadataVersion;
 using mmria.common.SharedLibraries.MetadataVersion.DAL;
 using mmria.services.Models;
@@ -62,6 +64,7 @@ public sealed class mmrds_exporter
     private mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly IMetadataRepository _metadataRepository;
     private ICaseRepository _caseRepository;
+    private readonly IJurisdictionRepository _jurisdictionRepository;
     private IExportQueueRepository? _exportQueueRepository;
 
     public mmrds_exporter
@@ -76,6 +79,7 @@ public sealed class mmrds_exporter
         _exportQueueRepository = exportQueueRepository;
         _caseRepository = new CaseDAL(_couchDbHttpClient);
         _metadataRepository = new MetadataVersionDAL(_couchDbHttpClient);
+        _jurisdictionRepository = new JurisdictionDAL(_couchDbHttpClient);
 
         db_config = new()
         {
@@ -259,7 +263,7 @@ public sealed class mmrds_exporter
             }
         }
         #if !IS_PMSS_ENHANCED
-        var jurisdiction_hashset = await mmria.services.authorization.get_current_jurisdiction_id_set_for(db_config, this.juris_user_name, _couchDbHttpClient);
+        var jurisdiction_hashset = await mmria.services.authorization.get_current_jurisdiction_id_set_for(db_config, this.juris_user_name, _jurisdictionRepository);
         #endif
         #if IS_PMSS_ENHANCED
         var jurisdiction_hashset = await mmria.pmss.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, this.juris_user_name, _couchDbHttpClient);

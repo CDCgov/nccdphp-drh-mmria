@@ -2,7 +2,7 @@
 
 **Epic:** 26 — Controller API Direct-Call Remediation
 **Story ID:** 26.4
-**Status:** ready-for-dev
+**Status:** done
 **Date added:** 2026-07-17
 **Depends on:** Epic 19 story 19.2 (IJurisdictionRepository), Epic 20 (IMetadataRepository), Epic 17 story 17.2 (ICaseRepository)
 **Source requirements:** epics.md §Epic 26 Story 26.4; project-context.md §2.2

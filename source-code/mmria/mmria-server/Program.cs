@@ -321,6 +321,10 @@ public sealed partial class Program
             builder.Services.AddScoped<mmria.common.SharedLibraries.ExportQueue.IExportQueueRepository>(
                 sp => sp.GetRequiredService<mmria.common.SharedLibraries.ExportQueue.DAL.ExportQueueDAL>());
             builder.Services.AddScoped<mmria.common.SharedLibraries.ExportQueue.Manager.ExportQueueManager>();
+            // QueueDAL registered as IQueueRepository (SQL migration seam for global queue database — Pattern A, no tenant prefix)
+            builder.Services.AddScoped<mmria.common.SharedLibraries.Queue.DAL.QueueDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.Queue.IQueueRepository>(
+                sp => sp.GetRequiredService<mmria.common.SharedLibraries.Queue.DAL.QueueDAL>());
             builder.Services.AddScoped<mmria.common.SharedLibraries.VitalImport.DAL.VitalImportDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.VitalImport.IVitalImportRepository>(
                 sp => sp.GetRequiredService<mmria.common.SharedLibraries.VitalImport.DAL.VitalImportDAL>());

@@ -19,12 +19,14 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
     private const string SuppressSessionSlideHeaderName = "X-MMRIA-Suppress-Session-Slide";
     private readonly mmria.server.util.RequestTenantRuntime _tenantRuntime;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.Session.ISessionRepository _sessionRepository;
 
 
     public CustomAuthHandler
     (
         mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.Session.ISessionRepository sessionRepository,
         IOptionsMonitor<CustomAuthOptions> options, 
         ILoggerFactory logger, 
         UrlEncoder encoder, 
@@ -34,6 +36,7 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
     {
         _tenantRuntime = tenantRuntime;
         _couchDbHttpClient = couchDbHttpClient;
+        _sessionRepository = sessionRepository;
     }
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
@@ -82,8 +85,7 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
             mmria.common.SharedLibraries.Session.Model.Session_MessageDTO session_message = null;
             try
             {
-                string request_string = db_config.Get_Prefix_DB_Url($"session/{Request.Cookies["sid"]}");
-                var responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
+                var responseFromServer = await _sessionRepository.GetSessionDocumentRawAsync(Request.Cookies["sid"], db_config);
 
                 session_message = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.SharedLibraries.Session.Model.Session_MessageDTO>(responseFromServer);
 

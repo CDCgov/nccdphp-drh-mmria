@@ -961,6 +961,45 @@ dev this story _bmad-output/implementation-artifacts/25-2-metadata-reader-imetad
 
 ---
 
+## Epic 26 — Controller API Direct-Call Remediation _(2026-07-17)_
+
+| Story | File | Status |
+|-------|------|--------|
+| 26.1 — Case API Controllers | [26-1-case-api-controllers.md](26-1-case-api-controllers.md) | done |
+| 26.2 — Auth and Session Controllers | [26-2-auth-session-controllers.md](26-2-auth-session-controllers.md) | done |
+| 26.3 — Export Queue and Broadcast Controllers | [26-3-export-broadcast-controllers.md](26-3-export-broadcast-controllers.md) | done |
+| 26.4 — Jurisdiction, Summary, and Remaining Utility Leakers | [26-4-jurisdiction-summary-utilities.md](26-4-jurisdiction-summary-utilities.md) | done |
+
+**Sequencing:** All four stories are independent and can be worked in any order. They share no file conflicts with each other.
+
+> ℹ️ Goal: every remaining controller and utility that calls `CouchDbHttpClient.ExecuteAsync` directly against CouchDB is routed through an existing repository interface. No new interfaces are created (except possibly `IQueueRepository` in 26.3 if `queue` DB has no coverage yet).
+
+**Story 26.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/26-1-case-api-controllers.md
+```
+
+**Story 26.2 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/26-2-auth-session-controllers.md
+```
+
+**Story 26.3 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/26-3-export-broadcast-controllers.md
+```
+
+**Story 26.4 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/26-4-jurisdiction-summary-utilities.md
+```
+
+---
+
 ## Open Items — Resolve Before Affected Story
 
 | OI       | Affects               | What to resolve                                                                                                                                                                                                                                                                                                                                                                                        |

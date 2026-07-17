@@ -67,17 +67,17 @@ public sealed class JurisdictionSummary
 {
 
     mmria.common.couchdb.ConfigurationSet ConfigDB;
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly mmria.common.SharedLibraries.Account.IUserRepository _userRepository;
     private readonly mmria.common.SharedLibraries.Jurisdiction.IJurisdictionRepository _jurisdictionRepository;
+    private readonly mmria.common.SharedLibraries.Case.ICaseRepository _caseRepository;
 
-    public JurisdictionSummary(mmria.common.couchdb.ConfigurationSet p_config_db, mmria.common.getset.CouchDbHttpClient couchDbHttpClient, mmria.common.SharedLibraries.Account.IUserRepository userRepository, mmria.common.SharedLibraries.Jurisdiction.IJurisdictionRepository jurisdictionRepository)
+    public JurisdictionSummary(mmria.common.couchdb.ConfigurationSet p_config_db, mmria.common.SharedLibraries.Account.IUserRepository userRepository, mmria.common.SharedLibraries.Jurisdiction.IJurisdictionRepository jurisdictionRepository, mmria.common.SharedLibraries.Case.ICaseRepository caseRepository)
     {
 
         ConfigDB = p_config_db;
-        _couchDbHttpClient = couchDbHttpClient;
         _userRepository = userRepository;
         _jurisdictionRepository = jurisdictionRepository;
+        _caseRepository = caseRepository;
     }
 
     public async Task<List<JurisdictionSummaryItem>> execute
@@ -144,8 +144,8 @@ public sealed class JurisdictionSummary
                     
                     record_count_result.Add(prefix, record_count);
 
-                    user_count_task_list.Add(() => GetUserCount(cancellationToken, prefix, config.Value, usr_count, jsi, exclude_jurisdiction, _couchDbHttpClient, _userRepository));
-                    record_count_task_list.Add(() => GetCaseCount(cancellationToken, prefix, config.Value, record_count, exclude_jurisdiction, _couchDbHttpClient));
+                    user_count_task_list.Add(() => GetUserCount(cancellationToken, prefix, config.Value, usr_count, jsi, exclude_jurisdiction, _userRepository));
+                    record_count_task_list.Add(() => GetCaseCount(cancellationToken, prefix, config.Value, record_count, exclude_jurisdiction));
                 }
                 
                 {
@@ -181,8 +181,8 @@ public sealed class JurisdictionSummary
                     record_count.folder_name = folder_name;
                     record_count_result.Add(key_name, record_count);
 
-                    user_count_task_list.Add(() => GetUserCount(cancellationToken, prefix, config.Value, usr_count, jsi, exclude_jurisdiction, _couchDbHttpClient, _userRepository));
-                    record_count_task_list.Add(() => GetCaseCount(cancellationToken, prefix, config.Value, record_count, exclude_jurisdiction, _couchDbHttpClient));
+                    user_count_task_list.Add(() => GetUserCount(cancellationToken, prefix, config.Value, usr_count, jsi, exclude_jurisdiction, _userRepository));
+                    record_count_task_list.Add(() => GetCaseCount(cancellationToken, prefix, config.Value, record_count, exclude_jurisdiction));
                     //jurisdiction_count_task_list.Add(GetJurisdictions(cancellationToken, prefix, config.Value, jsi));
                 }
 
@@ -204,8 +204,8 @@ public sealed class JurisdictionSummary
                 record_count.host_name = prefix;
                 record_count_result.Add(prefix, record_count);
 
-                user_count_task_list.Add(() => GetUserCount(cancellationToken, prefix, config.Value, usr_count, jsi, exclude_jurisdiction, _couchDbHttpClient, _userRepository));
-                record_count_task_list.Add(() => GetCaseCount(cancellationToken, prefix, config.Value, record_count, exclude_jurisdiction, _couchDbHttpClient));
+                user_count_task_list.Add(() => GetUserCount(cancellationToken, prefix, config.Value, usr_count, jsi, exclude_jurisdiction, _userRepository));
+                record_count_task_list.Add(() => GetCaseCount(cancellationToken, prefix, config.Value, record_count, exclude_jurisdiction));
                 //jurisdiction_count_task_list.Add(GetJurisdictions(cancellationToken, prefix, config.Value, jsi));
             }
         }
@@ -264,7 +264,6 @@ public sealed class JurisdictionSummary
         ItemCount p_result, 
         JurisdictionSummaryItem p_SummaryItem,
         string exclude_jurisdiction,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
         mmria.common.SharedLibraries.Account.IUserRepository userRepository
     ) 
     { 
@@ -310,8 +309,7 @@ public sealed class JurisdictionSummary
                 p_config_detail, 
                 p_SummaryItem, 
                 user_id_set,
-                exclude_jurisdiction,
-                couchDbHttpClient
+                exclude_jurisdiction
             );
 
             p_result.total = user_id_set.Count;
@@ -329,17 +327,13 @@ public sealed class JurisdictionSummary
         string p_id, 
         mmria.common.couchdb.DBConfigurationDetail p_config_detail, 
         ItemCount p_result,
-        string exclude_jurisdiction,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        string exclude_jurisdiction
     ) 
     { 
         try
         {
-            string request_string = $"{p_config_detail.url}/{p_config_detail.prefix}mmrds/_design/sortable/_view/by_jurisdiction_id?skip=0&take=100000";
-
-
             cancellationToken.ThrowIfCancellationRequested();
-            string responseFromServer = await couchDbHttpClient.ExecuteAsync("GET", request_string, null, p_config_detail.user_name, p_config_detail.user_value, "application/json");
+            string responseFromServer = await _caseRepository.GetCasesByJurisdictionIdViewJsonAsync(p_config_detail);
 
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -414,8 +408,7 @@ public sealed class JurisdictionSummary
         mmria.common.couchdb.DBConfigurationDetail p_config_detail, 
         JurisdictionSummaryItem p_result, 
         HashSet<string> p_user_id_set,
-        string exclude_jurisdiction,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        string exclude_jurisdiction
     ) 
     {
         try

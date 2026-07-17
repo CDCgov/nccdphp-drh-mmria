@@ -103,6 +103,7 @@ public sealed class ije_messageController: ControllerBase
 
             string user_db_url = configuration.GetString("vitals_url",host_prefix).Replace("Message/IJESet", "VitalNotification");
 
+            // Service endpoint call — not a direct CouchDB write.
             var responseFromServer = await _couchDbHttpClient.ExecuteAsync(
                 "DELETE",
                 user_db_url,
@@ -146,6 +147,7 @@ public sealed class ije_messageController: ControllerBase
 
             string user_db_url = configuration.GetString("vitals_url",host_prefix);
 
+            // Service endpoint call — not a direct CouchDB write.
             var responseFromServer = await _couchDbHttpClient.ExecuteAsync(
                 "PUT",
                 user_db_url,

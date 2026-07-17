@@ -430,4 +430,16 @@ public class CaseDAL : ICaseRepository
         var rows = parsed["rows"] as JArray;
         return rows?.Count ?? 0;
     }
+
+    public async Task<string> GetCasesByCustomViewAsync(string viewUrl, DBConfigurationDetail dbConfig)
+    {
+        return await _couchDbHttpClient.ExecuteAsync(
+            "GET",
+            viewUrl,
+            null,
+            dbConfig.user_name,
+            dbConfig.user_value,
+            "application/json"
+        );
+    }
 }

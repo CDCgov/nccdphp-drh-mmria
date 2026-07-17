@@ -5,6 +5,8 @@ using mmria.common.getset;
 using mmria.common.SharedLibraries.Case;
 using mmria.common.SharedLibraries.Case.DAL;
 using mmria.common.SharedLibraries.ExportQueue;
+using mmria.common.SharedLibraries.Jurisdiction;
+using mmria.common.SharedLibraries.Jurisdiction.DAL;
 using mmria.common.SharedLibraries.MetadataVersion;
 using mmria.common.SharedLibraries.MetadataVersion.DAL;
 using mmria.services.Models;
@@ -68,7 +70,8 @@ mmria.common.couchdb.DBConfigurationDetail db_config;
 private mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 private readonly IMetadataRepository _metadataRepository;
 private ICaseRepository _caseRepository;
-private IExportQueueRepository? _exportQueueRepository;
+    private readonly IJurisdictionRepository _jurisdictionRepository;
+    private IExportQueueRepository? _exportQueueRepository;
 
 public exporter(ScheduleInfoMessage configuration, mmria.common.getset.CouchDbHttpClient couchDbHttpClient, IExportQueueRepository? exportQueueRepository = null)
 {
@@ -77,8 +80,8 @@ public exporter(ScheduleInfoMessage configuration, mmria.common.getset.CouchDbHt
     _exportQueueRepository = exportQueueRepository;
     _caseRepository = new CaseDAL(_couchDbHttpClient);
     _metadataRepository = new MetadataVersionDAL(_couchDbHttpClient);
-
-    db_config = new()
+    _jurisdictionRepository = new JurisdictionDAL(_couchDbHttpClient);
+    db_config = new mmria.common.couchdb.DBConfigurationDetail
     {
         url = configuration.couch_db_url,
         prefix = configuration.db_prefix,
@@ -390,7 +393,7 @@ if(multiform_field_list.Count > 0)
         this.clearTextStreamWriter[1] = new System.IO.StreamWriter(System.IO.Path.Combine(export_root_directory, "informant-interview-plaintext.txt"), true);
     }
     #if !IS_PMSS_ENHANCED
-    var jurisdiction_hashset = await mmria.services.authorization.get_current_jurisdiction_id_set_for(db_config, this.juris_user_name, _couchDbHttpClient);
+    var jurisdiction_hashset = await mmria.services.authorization.get_current_jurisdiction_id_set_for(db_config, this.juris_user_name, _jurisdictionRepository);
     #endif
     #if IS_PMSS_ENHANCED
     var jurisdiction_hashset = await mmria.pmss.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, this.juris_user_name, _couchDbHttpClient);

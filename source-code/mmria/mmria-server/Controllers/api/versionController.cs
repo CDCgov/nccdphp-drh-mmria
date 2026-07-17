@@ -25,17 +25,20 @@ public sealed class versionController: ControllerBase
     string host_prefix = null;
     private readonly mmria.common.SharedLibraries.MetadataVersion.Manager.MetadataVersionManager _metadataVersionManager;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository _metadataRepository;
     public Dictionary<string, string> formName = new Dictionary<string, string>();
     public versionController
 (
         IHttpContextAccessor httpContextAccessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
-        mmria.common.SharedLibraries.MetadataVersion.Manager.MetadataVersionManager metadataVersionManager
+        mmria.common.SharedLibraries.MetadataVersion.Manager.MetadataVersionManager metadataVersionManager,
+        mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository metadataRepository
     )
     {
         _couchDbHttpClient = couchDbHttpClient;
         _metadataVersionManager = metadataVersionManager;
+        _metadataRepository = metadataRepository;
         host_prefix = tenantRuntime.EffectiveHostPrefix;
 
         configuration = tenantRuntime.RequireConfiguration();
@@ -139,7 +142,7 @@ public sealed class versionController: ControllerBase
     )
     {
 
-        var export_all_generate_name_map = new mmria.server.utils.export_all_generate_name_map(db_config, _couchDbHttpClient);
+        var export_all_generate_name_map = new mmria.server.utils.export_all_generate_name_map(db_config, _metadataRepository);
 
         var result = await export_all_generate_name_map.ExecuteAsync(version_specification_id, type);
 

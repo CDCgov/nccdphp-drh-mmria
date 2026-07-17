@@ -108,15 +108,7 @@ public sealed class ExportQueueController : ControllerBase
                 user_value = item_db_info.user_value
             };
 
-            string request_string = db_config.Get_Prefix_DB_Url("export_queue/" + id);
-            string response_from_server = await _couchDbHttpClient.ExecuteAsync(
-                "GET",
-                request_string,
-                null,
-                db_config.user_name,
-                db_config.user_value);
-
-            var queue_item = Newtonsoft.Json.JsonConvert.DeserializeObject<export_queue_item>(response_from_server);
+            var queue_item = await _exportQueueRepository.GetQueueDocumentAsync<export_queue_item>(id, db_config);
             if (queue_item == null || string.IsNullOrWhiteSpace(queue_item.file_name))
             {
                 return NotFound(new { success = false, message = $"The export '{id}' is missing file metadata or is no longer available." });

@@ -66,4 +66,14 @@ public interface IDeIdentifiedRepository
     /// to populate _rev before bulk writes to avoid 409 conflicts.
     /// </summary>
     Task<IDictionary<string, string>> GetRevisionBulkAsync(IEnumerable<string> ids, DBConfigurationDetail dbConfig);
+
+    /// <summary>
+    /// GET de_id/{id} — returns the full document JSON, or null if not found.
+    /// </summary>
+    Task<string?> GetDocumentJsonAsync(string id, DBConfigurationDetail dbConfig);
+
+    /// <summary>
+    /// GET de_id/_all_docs?include_docs={includeDocs} — returns all documents as raw JSON.
+    /// </summary>
+    Task<string> GetAllDocumentsJsonAsync(bool includeDocs, DBConfigurationDetail dbConfig);
 }

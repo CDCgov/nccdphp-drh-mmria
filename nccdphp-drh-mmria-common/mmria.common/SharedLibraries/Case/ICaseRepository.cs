@@ -46,4 +46,10 @@ public interface ICaseRepository
 
     // CDC services: design-doc count probe
     Task<int> GetDesignDocCountAsync(DBConfigurationDetail dbConfig);
+
+    /// <summary>
+    /// GET a pre-built view URL and return the raw JSON response string.
+    /// Used by callers that construct complex view URLs with custom parameters (e.g. PMSS sort views).
+    /// </summary>
+    Task<string> GetCasesByCustomViewAsync(string viewUrl, DBConfigurationDetail dbConfig);
 }

@@ -92,4 +92,20 @@ public sealed class DeIdentifiedDAL : IDeIdentifiedRepository
         }
         return result;
     }
+
+    public async Task<string?> GetDocumentJsonAsync(string id, DBConfigurationDetail dbConfig)
+    {
+        string requestUrl = dbConfig.Get_Prefix_DB_Url($"de_id/{id}");
+        string response = await _httpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value);
+        if (response.Contains("\"error\":\"not_found\""))
+            return null;
+        return response;
+    }
+
+    public async Task<string> GetAllDocumentsJsonAsync(bool includeDocs, DBConfigurationDetail dbConfig)
+    {
+        string query = includeDocs ? "?include_docs=true" : string.Empty;
+        string requestUrl = dbConfig.Get_Prefix_DB_Url($"de_id/_all_docs{query}");
+        return await _httpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value);
+    }
 }

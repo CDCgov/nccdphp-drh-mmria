@@ -147,6 +147,15 @@ public interface IMetadataRepository
     /// <summary>PUT {prefix}metadata/system-offline-config.</summary>
     Task<document_put_response> SaveSystemOfflineConfigAsync(string json, DBConfigurationDetail dbConfig);
 
+    // ── App Document by Raw ID ────────────────────────────────────────────────
+
+    /// <summary>
+    /// GET metadata/{documentId}/metadata — returns the app document using the raw document _id
+    /// (e.g. "version_specification-3.0.0"). Unlike <see cref="GetAppDocumentAsync"/>, this method
+    /// does not prepend "version_specification-" to the supplied ID.
+    /// </summary>
+    Task<mmria.common.metadata.app> GetAppDocumentByRawIdAsync(string documentId, DBConfigurationDetail dbConfig);
+
     // ── Case Validation Rules ─────────────────────────────────────────────────
 
     /// <summary>GET metadata/case-validation-rules. Returns null if the document does not exist (404).</summary>

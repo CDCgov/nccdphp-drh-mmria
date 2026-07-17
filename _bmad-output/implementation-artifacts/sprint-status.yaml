@@ -1,5 +1,5 @@
 # generated: 2026-07-14
-last_updated: 2026-07-16
+last_updated: 2026-07-17
 # project: mmria
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@ last_updated: 2026-07-16
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-07-14
-last_updated: 2026-07-16
+last_updated: 2026-07-17
 project: mmria
 project_key: NOKEY
 tracking_system: file-system
@@ -242,11 +242,11 @@ development_status:
   epic-25-retrospective: optional
 
   # ── Epic 26: Controller API Direct-Call Remediation ───────────────────────
-  epic-26: in-progress
-  26-1-case-api-controllers: ready-for-dev
-  26-2-auth-session-controllers: ready-for-dev
-  26-3-export-broadcast-controllers: ready-for-dev
-  26-4-jurisdiction-summary-utilities: ready-for-dev
+  epic-26: done
+  26-1-case-api-controllers: done
+  26-2-auth-session-controllers: done
+  26-3-export-broadcast-controllers: done
+  26-4-jurisdiction-summary-utilities: done
   epic-26-retrospective: optional
 
   # ── Epic 27: Services Utility Repository Activation ───────────────────────
