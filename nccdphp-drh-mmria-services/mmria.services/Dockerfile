@@ -34,7 +34,7 @@ RUN dotnet publish -c Release -f net10.0 -o /app/publish
 USER 1001
 
 # ----- Stage 3: Runtime -----
-# https://console-openshift-console.apps.ecpaas-dev.cdc.gov/k8s/ns/trusted-images/imagestreamtags/dotnet-100-aspnet%3A9.7-1776776188
+# https://console-openshift-console.apps.ecpaas-dev.cdc.gov/k8s/ns/trusted-images/imagestreamtags/dotnet-100-aspnet%3A9.8-1784176949
 FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100-aspnet:9.8-1784176949@sha256:05b9c57ecbce6dcc11b8e2a82184e3d8063508618bd616fc713e0f953816bfd1 AS runtime
 WORKDIR /app
 
