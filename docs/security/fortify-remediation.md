@@ -7,7 +7,7 @@
 
 **SSC Issue ID:** 2236287
 **Rule GUID:** 7AA165DE-F8D9-471F-A1E4-562BB552146D
-**Verdict:** Already remediated
+**Verdict:** Not applicable / false positive
 
 ### Evidence
 - Source (request binding): `SaveSystemOfflineConfig([FromBody] SaveSystemOfflineConfigRequest request)` in `/nccdphp-drh-mmria-services/mmria.services/Controllers/systemOfflineController.cs:46-47`.
@@ -16,3 +16,6 @@
 
 ### Verdict rationale
 The Fortify path is neutralized in the current codebase because the endpoint does not bind directly to the persisted document type and does not pass client payload directly to persistence. Instead, it bind-limits input to a dedicated request DTO and then rebuilds a server-owned payload through explicit per-field assignment before serialization and save. This eliminates mass-assignment of protected document identity/revision fields.
+
+### SWA Summary
+False Positive: request binding is limited to a dedicated allow-listed DTO and the persisted document is reconstructed server-side with explicit field assignment, so protected fields are not mass-assignable from client input.
