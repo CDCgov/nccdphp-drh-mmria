@@ -167,8 +167,15 @@ if (top !== self) top.location.replace(self.location.href);
         })
         .then(function (config) {
           if (!config) return;
-          var result = window.checkOfflineStatus(config);
-          window.handleOfflineState(result, config);
+          // On initial page load/refresh: if the app is already offline, redirect
+          // immediately rather than relying on the modal gate (which blocks re-show).
+          var initialResult = window.checkOfflineStatus(config);
+          if (initialResult.state === 'offline') {
+            window.location.href = '/Account/AppOffline';
+            return;
+          }
+          // runOfflineCheck stores config as last-known fallback and applies state.
+          window.runOfflineCheck(config);
         })
         .catch(function () { /* silently ignore network / parse errors */ });
       // Poll every 2 minutes while the user is on the page.

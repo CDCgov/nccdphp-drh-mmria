@@ -103,7 +103,12 @@ FR-8.4: Epic 8 â€” Login page offline state (hide form, show message)
 FR-8.5: Epic 8 â€” Periodic status check (2-minute client poll)
 FR-8.6: Epic 8 â€” Login page server-side offline check
 FR-8.7: Epic 8 â€” Installation admin page for offline config
-FR-9.1: Standalone Bug Fix â€” Data Summary Checks "ALL" toggle scoped to selected Form
+FR-8.8: Epic 8 Story 8.5 - SAMS-aware offline entry points (SignIn/Login/Logout guard; AppOffline redirect)
+FR-8.9: Epic 8 Story 8.5 - Dedicated AppOffline page + anonymous /api/account/offline-status endpoint
+FR-8.10: Epic 8 Story 8.6 - Precision offline detection (setTimeout at exact offline_date/warn_date)
+FR-8.11: Epic 8 Story 8.6 - Countdown/OK re-check and date-change recovery UX
+FR-8.12: Epic 8 Story 8.6 - mmria-services resilience (_lastKnownConfig fallback; assume online on no data)
+FR-8.13: Epic 8 Story 8.6 - Page-refresh redirect to AppOffline (bypasses localStorage modal gate)FR-9.1: Standalone Bug Fix â€” Data Summary Checks "ALL" toggle scoped to selected Form
 FR-10.1: Standalone Bug Fix â€” Manage Users Export scoped to active filter
 FR-11.1: Epic 10 â€” Fix BatchSupervisor busy-wait CPU spin (mmria-services)
 FR-11.2: Epic 10 â€” Server-side CVS structured error handling (CVSManager, CVSDAL, CVSModels, cvsAPIController)
@@ -134,8 +139,9 @@ Admin actions that modify case data or case lifecycle state are fully captured i
 
 ### Epic 8: System Going Offline
 
-Installation administrators can schedule a planned system outage. Logged-in users receive advance warning, are guided to save their work and sign out before the system goes offline, and are prevented from logging in once the offline date is reached.
-**FRs covered:** FR-8.1, FR-8.2, FR-8.3, FR-8.4, FR-8.5, FR-8.6, FR-8.7
+Installation administrators can schedule a planned system outage. Logged-in users receive advance warning, are guided to save their work and sign out before the system goes offline, and are prevented from logging in once the offline date is reached. SAMS-enabled deployments redirect to AppOffline during an outage. Offline detection fires at the exact scheduled time and is resilient to mmria-services downtime.
+**FRs covered:** FR-8.1 through FR-8.13
+**Stories:** 8.1 — Config/services/admin page, 8.2 — Login offline state, 8.3 — Warn/offline modals, 8.4 — Periodic poll, 8.5 — SAMS-aware offline entry points, 8.6 — Precision detection and resilience
 
 ### Epic 10: CVS PDF Export Tool Reliability
 
@@ -695,6 +701,74 @@ So that I receive warning and going-offline notifications without needing to rel
 **Given** the poll request fails (network error, server unavailable)
 **When** the error is received
 **Then** the failure is silently swallowed â€” no error is surfaced to the user and polling continues on the next interval
+
+---
+
+### Story 8.5: SAMS-Aware App Offline Entry Points
+
+As a user whose only login path is SAMS,
+I want to see a clear offline page instead of being redirected to the SAMS login service,
+So that I understand the system is unavailable without being bounced to an external identity provider.
+
+**Acceptance Criteria:**
+
+**Given** `sams_is_enabled = true` and `now >= offline_date`
+**When** any unauthenticated request reaches `GET /Account/SignIn`
+**Then** the server checks the offline state before building the SAMS redirect URL; if offline for this tenant, the user is redirected to `/Account/AppOffline` instead of SAMS
+
+**Given** `sams_is_enabled = true` and `now >= offline_date`
+**When** a user's auto-logout countdown completes and `POST /Account/Logout` runs
+**Then** the logout action checks offline state before issuing the SAMS logout redirect; if offline, the user is sent to `/Account/AppOffline` instead of `sams:logout_url`
+
+**Given** `sams_is_enabled = true` and `now >= offline_date`
+**When** a user navigates directly to `GET /Account/Login`
+**Then** the server checks offline state first; if offline, redirects to `/Account/AppOffline`; if not offline, redirects to `/Account/SignIn` (SAMS)
+
+**Given** a dedicated `/Account/AppOffline` page (`[AllowAnonymous]`)
+**When** the page is rendered
+**Then** it shows `offline_page_message` using the same purple-panel styling as the Login page offline state; CDC conditions-of-use footer is included
+
+**Given** the server reaches `/Account/AppOffline` but the app is no longer offline (admin cleared dates)
+**When** the action evaluates offline state
+**Then** it immediately redirects to `/Account/AutoLogin`
+
+**Given** a new anonymous API endpoint `GET /api/account/offline-status`
+**When** called without authentication
+**Then** it returns `{ "is_offline": bool }` for this tenant; used by the AppOffline page polling loop
+
+---
+
+### Story 8.6: Offline Detection Precision, Resilience, and Recovery UX
+
+As a logged-in user,
+I want the offline modal to fire at exactly the scheduled offline time and the system to handle mmria-services outages gracefully,
+So that the offline transition is predictable and a services restart does not cause false sign-outs.
+
+**Acceptance Criteria:**
+
+**Given** the client receives a config with a future `offline_date` or `warn_date`
+**When** `runOfflineCheck` stores the config
+**Then** a `setTimeout` fires at exactly `new Date(offline_date) - Date.now()` ms; a separate `setTimeout` fires at `warn_date` if future
+
+**Given** the 2-minute poll returns an updated config with a changed `offline_date`
+**When** the poll handler runs
+**Then** any previously scheduled precision `setTimeout` is cleared and rescheduled for the new date
+
+**Given** a user is on `/Account/AppOffline`
+**When** the page loads or the user refreshes
+**Then** the page immediately calls `/api/account/offline-status`; if `is_offline: false`, redirects to `/Account/AutoLogin`; otherwise starts a 30-second polling loop
+
+**Given** the offline modal countdown reaches zero OR the user clicks OK
+**When** the re-check fires before sign-out
+**Then** (a) still offline: sign out proceeds; (b) date pushed to future: modal closes, warn modal re-shown, precision timer rescheduled; (c) dates cleared: modal closes silently
+
+**Given** the status fetch fails (mmria-services down) during countdown or OK handling
+**When** the failure is caught
+**Then** the handler uses `_lastKnownConfig` (last successful fetch); if that indicates offline, sign out proceeds; if online or no prior data, logout is cancelled and user remains in session
+
+**Given** a logged-in user refreshes any page while `now >= offline_date`
+**When** the `_LayoutBase` initial status check returns `state: offline`
+**Then** the browser immediately redirects to `/Account/AppOffline` -- the localStorage modal gate is not consulted for page-load/refresh
 
 ---
 
@@ -2271,7 +2345,18 @@ FROM .../trusted-images/dotnet-90-runtime:9.0-<tag>@sha256:<digest> AS runtime
 
 ---
 
-## Epic 22 — Story Sequencing
+#### Story 22.2 — Bugs Discovered and Fixed During Testing (2026-07-18)
+
+The following defects were found during the first full local test run after the `.vscode/launch.json` paths were corrected to `net10.0`. All are considered part of the 22.2 execution scope.
+
+| # | Location | Defect | Fix Applied |
+|---|---|---|---|
+| 22.2-B1 | `.vscode/launch.json` | All six `program` paths referenced `net9.0` DLL paths; `.NET 10` builds output to `net10.0`. The debugger launched the stale `net9.0` binary silently, so all breakpoints missed and all code changes since the TFM upgrade went untested locally. | All `net9.0` path segments replaced with `net10.0`. |
+| 22.2-B2 | `Controllers/_config.cs` | `sams_is_enabled` was read from `configuration["mmria_settings:sams:is_enabled"]` (nested colon path that does not exist in `appsettings.json`) instead of `configuration["mmria_settings:sams_is_enabled"]`. The key resolved to null, `sams_is_enabled` defaulted to `false`, and `OverridableConfiguration.boolean_keys["shared"]["sams:is_enabled"]` was stored as `false` — making `AccountController.use_sams` always `false` regardless of appsettings value. | Corrected key to `mmria_settings:sams_is_enabled`. |
+| 22.2-B3 | `Controllers/AccountController.cs` `GET Login` | The `GET /Account/Login` action had no SAMS guard. The `POST` handler correctly redirected to `SignIn` when `use_sams == true`, but the `GET` rendered the login form unconditionally, allowing SAMS-only deployments to display and submit the password form. | Added `if (use_sams.HasValue && use_sams.Value) return RedirectToAction("SignIn");` at the top of the `GET` action (offline check first, then SAMS check). |
+| 22.2-B4 | `Program.cs` | `builder.Services.AddScoped<IDatabaseLifecycleService, c_db_setup>()` was registered but unresolvable — `c_db_setup` requires `OverridableConfiguration` (not a DI-registered type) and a raw `string` host prefix. .NET 10's stricter `ValidateOnBuild` rejects this at startup. The registration was flagged in a comment as "for architectural documentation only"; actual usage is always direct `new c_db_setup(...)` instantiation. | Registration removed. The `IDatabaseLifecycleService` interface and both `new c_db_setup(...)` call sites are unchanged. |
+
+---
 
 | Wave | Story | Risk | Dependencies |
 |---|---|---|---|

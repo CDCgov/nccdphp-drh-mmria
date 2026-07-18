@@ -1,0 +1,94 @@
+@{
+    #if !IS_PMSS_ENHANCED
+        bool is_pmss_enhanced = false;
+    #endif
+    #if IS_PMSS_ENHANCED
+        bool is_pmss_enhanced = true;
+    #endif
+}
+<html lang="en" class="theme-purple">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="The Maternal Mortality Review Information App (MMRIA) is temporarily unavailable.">
+  <title>Maternal Mortality Review Information App (MMRIA) | CDC - Service Unavailable</title>
+  <link rel="shortcut icon" href="/TemplatePackage/4.0/assets/imgs/favicon.ico">
+  <link rel="stylesheet prefetch" href="/TemplatePackage/4.0/assets/vendor/css/bootstrap.css">
+  <link rel="stylesheet prefetch" href="/TemplatePackage/4.0/assets/css/app.min.css">
+  <link rel="stylesheet" media="print" href="/TemplatePackage/4.0/assets/css/print.css">
+  <link rel="stylesheet" href="/styles/mmria-custom.css" />
+  <link rel="stylesheet" href="/css/index.css" />
+
+  <script src="/TemplatePackage/4.0/assets/vendor/js/jquery.min.js"></script>
+  <script src="/scripts/jquery-ui.min.js"></script>
+</head>
+
+<body>
+
+  @await Html.PartialAsync("_SkipToContent")
+
+  @await Html.PartialAsync("_Header")
+
+  <main
+    id="content"
+    role="main"
+    aria-label="Main Content Area"
+    >
+    <div class="app-main purple-pattern">
+      <div class="justify-content-center pt-3 col-md-12">
+        @{
+          string offlineMessage = ViewData["OfflinePageMessage"] as string ?? string.Empty;
+        }
+        <div class="mt-4 mb-4" style="padding:0 15px;">
+          <div style="background-color:#7b2d8e; border-radius:4px; padding:40px 30px; display:flex; align-items:center; justify-content:center; min-height:200px; max-width:96%; margin:0 auto;">
+            <p style="color:white; font-size:18px; margin:0; line-height:1.6; text-align:center; white-space:pre-wrap;">@offlineMessage</p>
+          </div>
+        </div>
+        <div class="box container p-3" style="font-size: 14px">
+          <p><strong>Conditions of Use</strong></p>
+          <ul>
+            <li>This warning banner provides privacy and security notices consistent with applicable federal laws, directives, and other federal guidance for accessing this Government system, which includes (1) this computer network, (2) all computers connected to this network, and (3) all devices and storage media attached to this network or to a computer on this network.</li>
+            <li>This system is provided for Government-authorized use only.</li>
+            <li>Unauthorized or improper use of this system is prohibited and may result in disciplinary action and/or civil and criminal penalties.</li>
+            <li>Personal use of social media and networking sites on this system is limited as to not interfere with official work duties and is subject to monitoring.</li>
+            <li>By using this system, you understand and consent to the following:
+              <ul>
+                <li>The Government may monitor, record, and audit your system usage, including usage of personal devices and email systems for official duties or to conduct HHS business. Therefore, you have no reasonable expectation of privacy regarding any communication or data transiting or stored on this system. At any time, and for any lawful Government purpose, the government may monitor, intercept, and search and seize any communication or data transiting or stored on this system.</li>
+                <li>Any communication or data transiting or stored on this system may be disclosed or used for any lawful Government purpose.</li>
+              </ul>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  @await Html.PartialAsync("_Footer")
+
+  <script src="/scripts/mmria-custom.js"></script>
+  <script>
+  (function () {
+    var POLL_INTERVAL_MS = 30000;
+
+    async function checkOfflineStatus() {
+      try {
+        var resp = await fetch('/api/account/offline-status', { cache: 'no-store' });
+        if (!resp.ok) return;
+        var data = await resp.json();
+        if (!data.is_offline) {
+          window.location.href = '/Account/AutoLogin';
+        }
+      } catch (e) {
+        // network error — stay on page and let the next poll retry
+      }
+    }
+
+    // Immediate check on page load (covers both first visit and manual refresh),
+    // then poll every 30 seconds until the app comes back online.
+    checkOfflineStatus();
+    setInterval(checkOfflineStatus, POLL_INTERVAL_MS);
+  })();
+  </script>
+</body>
+</html>

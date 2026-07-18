@@ -106,20 +106,41 @@ public AccountController
         return Redirect(loginUrl);
     }
 
+    [AllowAnonymous]
+    public async Task<IActionResult> AppOffline()
+    {
+        var offlineConfig = await LoadSystemOfflineConfigAsync();
+        if (!IsJurisdictionAffected(offlineConfig, host_prefix) || !IsSystemOffline(offlineConfig.offline_date))
+            return RedirectToAction("AutoLogin");
+        ViewData["OfflinePageMessage"] = _systemOfflineManager.SubstituteMessage(
+            offlineConfig.offline_page_message, offlineConfig.warn_date, offlineConfig.offline_date, offlineConfig.restoration_hours);
+        return View();
+    }
+
+    [AllowAnonymous]
+    [HttpGet]
+    [Route("~/api/account/offline-status")]
+    public async Task<IActionResult> OfflineStatus()
+    {
+        var offlineConfig = await LoadSystemOfflineConfigAsync();
+        var isOffline = IsJurisdictionAffected(offlineConfig, host_prefix) && IsSystemOffline(offlineConfig.offline_date);
+        return Json(new { is_offline = isOffline });
+    }
+
     [AllowAnonymous] 
     public async Task<IActionResult> Login(string returnUrl = null)
-    {
+    { 
+        var offlineConfig = await LoadSystemOfflineConfigAsync();
+        if (IsJurisdictionAffected(offlineConfig, host_prefix) && IsSystemOffline(offlineConfig.offline_date))
+            return RedirectToAction("AppOffline");
+
+        if (use_sams.HasValue && use_sams.Value)
+            return RedirectToAction("SignIn");
+
         TempData["returnUrl"] = returnUrl;
         ViewBag.is_offline_mode_enabled = _configuration.GetBoolean("is_offline_mode_enabled", host_prefix) ?? false;
         ViewBag.is_offline_logging_enabled = _configuration.GetBoolean("is_offline_logging_enabled", host_prefix) ?? false;
         ViewBag.offline_logging_max_logs = _configuration.GetInteger("offline_logging_max_logs", host_prefix) ?? 10000;
-
-        var offlineConfig = await LoadSystemOfflineConfigAsync();
-        var offlineForThisTenant = IsJurisdictionAffected(offlineConfig, host_prefix) && IsSystemOffline(offlineConfig.offline_date);
-        ViewData["IsOffline"] = offlineForThisTenant;
-        ViewData["OfflinePageMessage"] = _systemOfflineManager.SubstituteMessage(
-            offlineConfig.offline_page_message, offlineConfig.warn_date, offlineConfig.offline_date, offlineConfig.restoration_hours);
-
         return View();
     }
 
@@ -139,12 +160,7 @@ public AccountController
         // Block login if system is offline for this tenant
         var postOfflineConfig = await LoadSystemOfflineConfigAsync();
         if (IsJurisdictionAffected(postOfflineConfig, host_prefix) && IsSystemOffline(postOfflineConfig.offline_date))
-        {
-            ViewData["IsOffline"] = true;
-            ViewData["OfflinePageMessage"] = _systemOfflineManager.SubstituteMessage(
-                postOfflineConfig.offline_page_message, postOfflineConfig.warn_date, postOfflineConfig.offline_date, postOfflineConfig.restoration_hours);
-            return View();
-        }
+            return RedirectToAction("AppOffline");
 
         // Validate basic input
         if (user == null || string.IsNullOrWhiteSpace(user.UserName) || string.IsNullOrWhiteSpace(user.Value))
@@ -390,6 +406,9 @@ public AccountController
             use_sams.Value 
         )
         {
+            var logoutOfflineConfig = await LoadSystemOfflineConfigAsync();
+            if (IsJurisdictionAffected(logoutOfflineConfig, host_prefix) && IsSystemOffline(logoutOfflineConfig.offline_date))
+                return RedirectToAction("AppOffline");
 
             return Redirect(_configuration.GetSharedString("sams:logout_url"));
         }

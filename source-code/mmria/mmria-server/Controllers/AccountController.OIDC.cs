@@ -106,13 +106,39 @@ public sealed partial class AccountController : Controller
 
 
     [AllowAnonymous] 
-    public ActionResult SignIn()
+    public async Task<ActionResult> SignIn()
     {
-
-        //Response.Cookies.Delete("sid");
-        //Response.Cookies.Delete("expires_at");
-
-        
+        // Guard: redirect to app-offline page if the system is currently offline for this tenant.
+        // This prevents an unnecessary SAMS round-trip when the app is unavailable.
+        try
+        {
+            var vitalsUrl = configuration.GetString("vitals_url", host_prefix)
+                ?.Replace("/api/Message/IJESet", string.Empty);
+            if (!string.IsNullOrWhiteSpace(vitalsUrl))
+            {
+                var requestOptions = new mmria.common.getset.CouchDbRequestOptions
+                {
+                    VitalServiceKey = configuration.GetString("vital_service_key", host_prefix)
+                };
+                var json = await _couchDbHttpClient.ExecuteAsync(
+                    "GET", $"{vitalsUrl}/api/systemOffline/GetSystemOfflineConfig",
+                    null, "application/json", requestOptions);
+                var cfg = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.SystemOfflineConfig>(json);
+                if (cfg != null)
+                {
+                    bool affectsThisTenant = cfg.apply_to_all_jurisdictions ||
+                        (cfg.selected_jurisdictions ?? new List<string>())
+                            .Contains(host_prefix, StringComparer.OrdinalIgnoreCase);
+                    bool isOffline = !string.IsNullOrWhiteSpace(cfg.offline_date) &&
+                        DateTime.TryParse(cfg.offline_date, null,
+                            System.Globalization.DateTimeStyles.RoundtripKind, out var offlineDate) &&
+                        DateTime.UtcNow >= offlineDate.ToUniversalTime();
+                    if (affectsThisTenant && isOffline)
+                        return RedirectToAction("AppOffline");
+                }
+            }
+        }
+        catch { /* if the offline check fails, proceed with the normal SAMS redirect */ }
 
         var sams_endpoint_authorization = configuration.GetString("sams:endpoint_authorization",host_prefix);
         var sams_client_id = sams_config.client_id;

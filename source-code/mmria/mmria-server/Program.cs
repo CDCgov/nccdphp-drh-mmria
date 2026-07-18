@@ -362,8 +362,7 @@ public sealed partial class Program
             // IDatabaseLifecycleService SQL migration seam: c_db_setup is the CouchDB implementation of startup
             // database initialization. A future SQL implementation substitutes here without touching Program.cs startup logic.
             // Note: resolved via direct instantiation in startup Task.Run (per-tenant parameters);
-            // the DI registration is present for architectural documentation and future injection scenarios.
-            builder.Services.AddScoped<mmria.server.IDatabaseLifecycleService, mmria.server.utils.c_db_setup>();
+            // DI registration omitted — OverridableConfiguration and host_prefix are per-tenant and not resolvable from the container.
 
             //var hosted_service_prefix = new HostedServicePrefix(host_prefix);
 

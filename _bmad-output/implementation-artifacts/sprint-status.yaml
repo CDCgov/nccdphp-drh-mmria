@@ -99,6 +99,8 @@ development_status:
   8-2-login-page-offline-state: done
   8-3-warning-and-offline-modals: done
   8-4-periodic-status-check: done
+  8-5-sams-aware-app-offline-entry-points: done
+  8-6-offline-detection-precision-resilience: done
   epic-8-retrospective: optional
 
   # ── Epic 9: Standalone Bug Fixes ─────────────────────────────────────────
