@@ -50,7 +50,7 @@ public sealed class MetadataVersionDAL : IMetadataRepository
     public async Task<mmria.common.metadata.app> GetAppDocumentAsync(string version, DBConfigurationDetail dbConfig)
     {
         string url = $"{dbConfig.url}/metadata/version_specification-{version}/metadata";
-        string response = await _couchDbHttpClient.ExecuteAsync("GET", url, null, null, null);
+        string response = await _couchDbHttpClient.ExecuteAsync("GET", url, null, dbConfig.user_name, dbConfig.user_value);
         return JsonConvert.DeserializeObject<mmria.common.metadata.app>(response, IgnoreNullSettings);
     }
 
@@ -60,7 +60,7 @@ public sealed class MetadataVersionDAL : IMetadataRepository
     public async Task<ExpandoObject> GetDefaultMetadataDocumentAsync(DBConfigurationDetail dbConfig)
     {
         string url = $"{dbConfig.url}/metadata/{DefaultMetadataId}";
-        string response = await _couchDbHttpClient.ExecuteAsync("GET", url, null, null, null);
+        string response = await _couchDbHttpClient.ExecuteAsync("GET", url, null, dbConfig.user_name, dbConfig.user_value);
         return JsonConvert.DeserializeObject<ExpandoObject>(response, new ExpandoObjectConverter());
     }
 
@@ -68,7 +68,7 @@ public sealed class MetadataVersionDAL : IMetadataRepository
     public async Task<ExpandoObject> GetMetadataDocumentByIdAsync(string id, DBConfigurationDetail dbConfig)
     {
         string url = $"{dbConfig.url}/metadata/{id}";
-        string response = await _couchDbHttpClient.ExecuteAsync("GET", url, null, null, null);
+        string response = await _couchDbHttpClient.ExecuteAsync("GET", url, null, dbConfig.user_name, dbConfig.user_value);
         return JsonConvert.DeserializeObject<ExpandoObject>(response, new ExpandoObjectConverter());
     }
 
@@ -161,7 +161,7 @@ public sealed class MetadataVersionDAL : IMetadataRepository
     public async Task<string> GetVersionDocumentAttachmentAsync(string version, string documentName, DBConfigurationDetail dbConfig)
     {
         string url = $"{dbConfig.url}/metadata/version_specification-{version}/{documentName}";
-        return await _couchDbHttpClient.ExecuteAsync("GET", url, null, null, null);
+        return await _couchDbHttpClient.ExecuteAsync("GET", url, null, dbConfig.user_name, dbConfig.user_value);
     }
 
     /// <inheritdoc />
@@ -398,7 +398,7 @@ public sealed class MetadataVersionDAL : IMetadataRepository
     public async Task<mmria.common.metadata.app> GetAppDocumentByRawIdAsync(string documentId, DBConfigurationDetail dbConfig)
     {
         string url = $"{dbConfig.url}/metadata/{documentId}/metadata";
-        string response = await _couchDbHttpClient.ExecuteAsync("GET", url, null, null, null);
+        string response = await _couchDbHttpClient.ExecuteAsync("GET", url, null, dbConfig.user_name, dbConfig.user_value);
         return JsonConvert.DeserializeObject<mmria.common.metadata.app>(response, IgnoreNullSettings);
     }
 

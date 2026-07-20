@@ -343,7 +343,9 @@ public sealed partial class Program
                     serviceProvider.GetRequiredService<mmria.common.SharedLibraries.MMRIARebuild.DAL.MMRIARebuildDAL>(),
                     serviceProvider.GetRequiredService<mmria.common.getset.CouchDbHttpClient>(),
                     configuration,
-                    serviceProvider.GetRequiredService<List<mmria.common.couchdb.ConfigurationSet>>()));
+                    serviceProvider.GetRequiredService<List<mmria.common.couchdb.ConfigurationSet>>(),
+                    new mmria.common.SharedLibraries.MetadataVersion.DAL.MetadataVersionDAL(
+                        serviceProvider.GetRequiredService<mmria.common.getset.CouchDbHttpClient>())));
             builder.Services.AddScoped<mmria.common.SharedLibraries.BackupAdmin.DAL.BackupAdminDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.BackupAdmin.Manager.BackupAdminManager>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.Attachment.DAL.AttachmentDAL>();

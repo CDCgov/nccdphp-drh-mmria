@@ -15,19 +15,22 @@ public sealed class MMRIARebuildManager
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly List<mmria.common.couchdb.ConfigurationSet> _configurationSets;
     private readonly mmria.common.couchdb.MultiTenantConfigurationLoader _configLoader;
+    private readonly mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository _metadataRepository;
 
     public MMRIARebuildManager(
         MMRIARebuildDAL mmriaRebuildDal,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
         IConfiguration configuration,
-        mmria.common.couchdb.ConfigurationSet configurationSet)
+        mmria.common.couchdb.ConfigurationSet configurationSet,
+        mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository metadataRepository = null)
         : this(
             mmriaRebuildDal,
             couchDbHttpClient,
             configuration,
             configurationSet == null
                 ? new List<mmria.common.couchdb.ConfigurationSet>()
-                : new List<mmria.common.couchdb.ConfigurationSet> { configurationSet })
+                : new List<mmria.common.couchdb.ConfigurationSet> { configurationSet },
+            metadataRepository)
     {
     }
 
@@ -35,13 +38,15 @@ public sealed class MMRIARebuildManager
         MMRIARebuildDAL mmriaRebuildDal,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
         IConfiguration configuration,
-        List<mmria.common.couchdb.ConfigurationSet> configurationSets)
+        List<mmria.common.couchdb.ConfigurationSet> configurationSets,
+        mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository metadataRepository = null)
     {
         _mmriaRebuildDal = mmriaRebuildDal ?? throw new ArgumentNullException(nameof(mmriaRebuildDal));
         _couchDbHttpClient = couchDbHttpClient ?? throw new ArgumentNullException(nameof(couchDbHttpClient));
         ArgumentNullException.ThrowIfNull(configuration);
         _configurationSets = configurationSets ?? throw new ArgumentNullException(nameof(configurationSets));
         _configLoader = new mmria.common.couchdb.MultiTenantConfigurationLoader(configuration);
+        _metadataRepository = metadataRepository;
     }
 
     public static string BuildServiceUrl(string vitalsUrl)
@@ -184,7 +189,8 @@ public sealed class MMRIARebuildManager
                     lease,
                     normalizedSource,
                     normalizedConfiguredTenants,
-                    normalizedSummaryHostPrefix);
+                    normalizedSummaryHostPrefix,
+                    _metadataRepository);
 
                 await excludedWorker.PersistExcludedSummaryAsync();
                 lease.Dispose();
@@ -212,7 +218,8 @@ public sealed class MMRIARebuildManager
                 lease,
                 normalizedSource,
                 normalizedConfiguredTenants,
-                normalizedSummaryHostPrefix);
+                normalizedSummaryHostPrefix,
+                _metadataRepository);
 
             await worker.PersistQueuedSummaryAsync();
 

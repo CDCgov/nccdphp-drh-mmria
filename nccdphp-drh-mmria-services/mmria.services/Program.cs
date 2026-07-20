@@ -106,7 +106,8 @@ public sealed class Program
                 serviceProvider.GetRequiredService<MMRIARebuildDAL>(),
                 serviceProvider.GetRequiredService<mmria.common.getset.CouchDbHttpClient>(),
                 configuration,
-                serviceProvider.GetRequiredService<mmria.common.couchdb.ConfigurationSet>()));
+                serviceProvider.GetRequiredService<mmria.common.couchdb.ConfigurationSet>(),
+                serviceProvider.GetRequiredService<mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository>()));
 
         builder.Services.AddSingleton<ActorSystem>(serviceProvider =>
         {

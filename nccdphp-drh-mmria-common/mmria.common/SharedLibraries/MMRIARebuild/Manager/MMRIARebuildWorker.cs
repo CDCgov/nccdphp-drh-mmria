@@ -26,6 +26,7 @@ internal sealed class MMRIARebuildWorker
     private readonly string _rebuildSource;
     private readonly List<string> _configuredTenants;
     private readonly string _summaryHostPrefix;
+    private readonly mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository _metadataRepository;
 
     public MMRIARebuildWorker(
         string couchdbUrl,
@@ -39,7 +40,8 @@ internal sealed class MMRIARebuildWorker
         TenantRebuildCoordinator.TenantRebuildLease tenantRebuildLease,
         string rebuildSource,
         List<string> configuredTenants,
-        string summaryHostPrefix)
+        string summaryHostPrefix,
+        mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository metadataRepository = null)
     {
         _couchdbUrl = couchdbUrl;
         _userName = userName;
@@ -55,6 +57,7 @@ internal sealed class MMRIARebuildWorker
         _summaryHostPrefix = string.IsNullOrWhiteSpace(summaryHostPrefix)
             ? null
             : summaryHostPrefix.Trim();
+        _metadataRepository = metadataRepository;
     }
 
     public async Task PersistQueuedSummaryAsync()
@@ -209,7 +212,7 @@ internal sealed class MMRIARebuildWorker
                 writeRetryCount,
                 writeRetryDelayMs,
                 startupRebuildIndexAddBeginning,
-                async progress =>
+                progress_callback: async progress =>
                 {
                     processedCaseCount = progress.processed_case_count;
                     skippedCaseCount = progress.skipped_case_count;
@@ -228,7 +231,8 @@ internal sealed class MMRIARebuildWorker
                         forceReset: false,
                         context: shouldPersistProgress ? $"legacy post-batch {progress.batch_number}" : $"legacy cached post-batch {progress.batch_number}",
                         persistToDatabase: shouldPersistProgress);
-                });
+                },
+                metadataRepository: _metadataRepository);
 
             var legacyResult = await legacySyncAll.executeAsync();
             processedCaseCount = legacyResult.processed_case_count;
