@@ -5,6 +5,7 @@ using Akka.Actor;
 using mmria.common.getset;
 using mmria.common.SharedLibraries.ExportQueue;
 using mmria.services.Models;
+using mmria.services.Utilities;
 
 namespace mmria.services.ExportQueue;
 
@@ -525,8 +526,9 @@ public sealed class Process_Export_Queue : ReceiveActor
 
             try
             {
-                string item_directory_name = item_to_process.file_name.Substring (0, item_to_process.file_name.LastIndexOf ("."));
-                string export_directory = CleanPath.execute(System.IO.Path.Combine (scheduleInfoMessage.export_directory, item_directory_name));
+                var validated_file_name = PathSanitizer.ValidatePathSegment(item_to_process.file_name, nameof(item_to_process.file_name));
+                string item_directory_name = System.IO.Path.GetFileNameWithoutExtension(validated_file_name);
+                string export_directory = System.IO.Path.Combine(scheduleInfoMessage.export_directory, item_directory_name);
 
                 try
                 {
@@ -541,7 +543,7 @@ public sealed class Process_Export_Queue : ReceiveActor
                     System.Console.WriteLine ("check_for_changes_job.Process_Export_Queue_Delete: Unable to Delete Directory {0}", export_directory);
                 }
 
-                string file_path = CleanPath.execute(System.IO.Path.Combine (scheduleInfoMessage.export_directory, item_to_process.file_name));
+                string file_path = System.IO.Path.Combine(scheduleInfoMessage.export_directory, validated_file_name);
                 try
                 {
                     
