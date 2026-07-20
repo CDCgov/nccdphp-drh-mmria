@@ -19,10 +19,11 @@ public static class EscapedJsonResultFactory
         TypeNameHandling = TypeNameHandling.None
     };
 
-    public static ContentResult Create(object value) =>
+    public static JsonResult Create(object value) =>
         new SecureEscapedJsonResult
         {
-            Content = Serialize(value),
+            Value = value,
+            SerializerSettings = HtmlEscapingSerializerSettings,
             ContentType = JsonContentType,
             StatusCode = 200
         };
@@ -42,8 +43,12 @@ public static class EscapedJsonResultFactory
         return stringWriter.ToString();
     }
 
-    private sealed class SecureEscapedJsonResult : ContentResult
+    private sealed class SecureEscapedJsonResult : JsonResult
     {
+        public SecureEscapedJsonResult() : base(value: null)
+        {
+        }
+
         public override Task ExecuteResultAsync(ActionContext context)
         {
             context.HttpContext.Response.Headers[NoSniffHeaderName] = NoSniffHeaderValue;

@@ -143,10 +143,18 @@ public static class ContainedPathHelper
 
     public static string EnsureContainedDirectoryExists(string trustedBaseDirectory, string childDirectoryName)
     {
-        var safePath = ResolveContainedDirectoryPath(trustedBaseDirectory, childDirectoryName);
+        var normalizedRoot = NormalizeTrustedDirectoryRoot(trustedBaseDirectory, nameof(trustedBaseDirectory));
+        var safeDirectoryName = ValidateContainedName(childDirectoryName, nameof(childDirectoryName));
+        var safePath = Path.GetFullPath(Path.Combine(normalizedRoot, safeDirectoryName));
+        EnsureContainedPath(normalizedRoot, safePath, nameof(childDirectoryName));
         ThrowIfExistingPathOrAncestorIsReparsePoint(safePath, nameof(childDirectoryName));
-        Directory.CreateDirectory(safePath);
-        return safePath;
+
+        var createdDirectory = Directory.CreateDirectory(safePath);
+        var normalizedCreatedPath = Path.GetFullPath(createdDirectory.FullName);
+        EnsureContainedPath(normalizedRoot, normalizedCreatedPath, nameof(childDirectoryName));
+        ThrowIfExistingPathOrAncestorIsReparsePoint(normalizedCreatedPath, nameof(childDirectoryName));
+
+        return normalizedCreatedPath;
     }
 
     public static FileStream OpenContainedWriteStream(string trustedBaseDirectory, string fileName)
