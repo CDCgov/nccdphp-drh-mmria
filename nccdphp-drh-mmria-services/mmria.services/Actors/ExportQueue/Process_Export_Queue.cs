@@ -528,7 +528,7 @@ public sealed class Process_Export_Queue : ReceiveActor
             {
                 var validated_file_name = PathSanitizer.ValidatePathSegment(item_to_process.file_name, nameof(item_to_process.file_name));
                 string item_directory_name = System.IO.Path.GetFileNameWithoutExtension(validated_file_name);
-                string export_directory = System.IO.Path.Combine(scheduleInfoMessage.export_directory, item_directory_name);
+                string export_directory = PathSanitizer.ResolveContainedPath(scheduleInfoMessage.export_directory, item_directory_name, nameof(item_directory_name));
 
                 try
                 {
@@ -543,7 +543,7 @@ public sealed class Process_Export_Queue : ReceiveActor
                     System.Console.WriteLine ("check_for_changes_job.Process_Export_Queue_Delete: Unable to Delete Directory {0}", export_directory);
                 }
 
-                string file_path = System.IO.Path.Combine(scheduleInfoMessage.export_directory, validated_file_name);
+                string file_path = PathSanitizer.ResolveContainedPath(scheduleInfoMessage.export_directory, validated_file_name, nameof(validated_file_name));
                 try
                 {
                     

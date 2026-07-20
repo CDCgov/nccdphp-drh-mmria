@@ -46,6 +46,46 @@ public static class PathSanitizer
     }
 
     /// <summary>
+    /// Combines a trusted base directory with a single path segment and returns the
+    /// canonical absolute path, after confirming the result is contained within the
+    /// base directory.  Use this instead of <see cref="Path.Combine"/> whenever one
+    /// of the components originates from user-supplied or database-sourced data.
+    /// </summary>
+    /// <param name="trustedBaseDirectory">
+    /// The server-controlled root directory.  Must be a fully-qualified path.
+    /// </param>
+    /// <param name="segment">
+    /// A single file or folder name (no directory separators or traversal sequences).
+    /// Validated by <see cref="ValidatePathSegment"/> before use.
+    /// </param>
+    /// <param name="segmentParamName">Parameter name reported in exception messages.</param>
+    /// <returns>The canonical absolute path of the combined result.</returns>
+    public static string ResolveContainedPath(string trustedBaseDirectory, string segment, string segmentParamName)
+    {
+        if (string.IsNullOrWhiteSpace(trustedBaseDirectory))
+            throw new ArgumentException("Base directory must not be null or whitespace.", nameof(trustedBaseDirectory));
+
+        var normalizedRoot = Path.GetFullPath(trustedBaseDirectory);
+        if (!Path.IsPathFullyQualified(normalizedRoot))
+            throw new ArgumentException("Base directory must be a fully-qualified path.", nameof(trustedBaseDirectory));
+
+        // Append separator so the StartsWith containment check cannot be fooled by a
+        // sibling directory whose name shares a common prefix with normalizedRoot.
+        if (!Path.EndsInDirectorySeparator(normalizedRoot))
+            normalizedRoot += Path.DirectorySeparatorChar;
+
+        var validatedSegment = ValidatePathSegment(segment, segmentParamName);
+        var combined = Path.GetFullPath(Path.Combine(normalizedRoot, validatedSegment));
+
+        if (!combined.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException(
+                $"Resolved path escaped the configured base directory.",
+                segmentParamName);
+
+        return combined;
+    }
+
+    /// <summary>
     /// Sanitizes a CouchDB document ID for use as a safe folder/file name segment.
     /// Replaces characters that are valid in CouchDB IDs but unsafe in file paths.
     /// </summary>
