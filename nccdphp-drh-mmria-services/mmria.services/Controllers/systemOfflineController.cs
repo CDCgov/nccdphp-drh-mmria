@@ -168,9 +168,14 @@ public sealed class systemOfflineController : Controller
             return new List<string>();
         }
 
-        return token.Values<string>()
-            .Where(value => value != null)
-            .ToList();
+        try
+        {
+            return token.ToObject<List<string>>() ?? new List<string>();
+        }
+        catch (JsonException)
+        {
+            return new List<string>();
+        }
     }
 
     private static T ReadValue<T>(JObject json, string propertyName, T defaultValue)
