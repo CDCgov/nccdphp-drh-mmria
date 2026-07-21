@@ -115,6 +115,10 @@ FR-11.2: Epic 10 â€” Server-side CVS structured error handling (CVSManager,
 FR-11.3: Epic 10 â€” Client-side CVS retry loop with countdown and try-again button
 FR-11.4: Epic 10 â€” BroadcastChannel CVS status and parent-page button state (mmria.js)
 
+FR-29.1: Epic 29 — Server-side record ID format validation and uniqueness guard in SaveCaseAsync
+FR-29.2: Epic 29 — Client-side per-candidate uniqueness check via /api/record_id before case save
+FR-29.3: Epic 29 — Add record_id_list CouchDB view and remove broken bulk-list dependency from case creation flow
+
 ## Epic List
 
 ### Epic 1: Case Narrative Editor Fidelity
@@ -188,6 +192,12 @@ Four stories completing the controller migration started in Epics 17–21. The f
 The null-fallback scaffolding placed in `exporter.cs`, `mmrds_exporter.cs`, and `core_element_exporter.cs` during Epic 24 (Stories 24.10–24.11) is activated by wiring real repository instances from actor supervisors down through the export-utility pipeline. Story 27.2 classifies the remaining `BatchProcessor.cs` DELETE call and formally documents the `Process_Migrate_*` actors as intentional direct-access paths excluded from the repository pattern by design.
 **Architecture rule:** project-context.md §2.2 SharedLibraries pattern
 **Stories:** 27.1 — Activate export-utility repository wiring, 27.2 — BatchProcessor assessment + migration actor classification
+
+### Epic 29: Record ID Uniqueness Enforcement
+
+Abstractors creating new cases are protected against duplicate MMRIA Record IDs (`{jurisdiction}-{year-of-death}-{4-digit-number}`) by a defense-in-depth strategy. The server rejects any new-case save where the record ID already exists in the database. The client verifies uniqueness per-candidate against the server before saving, eliminating the TOCTOU race condition. The broken bulk-list CouchDB view dependency is removed from the case creation flow and a functioning design-document view is added in its place.
+**FRs covered:** FR-29.1, FR-29.2, FR-29.3
+**Stories:** 29.1 — Server-side format validation and uniqueness guard, 29.2 — Client-side per-candidate API check, 29.3 — Add record_id_list view and remove broken bulk-list call
 
 ---
 
@@ -3747,4 +3757,516 @@ All three stories are independent and can proceed in parallel.
 
 **Final non-DAL gate:** When Epic 28 is complete, every `CouchDbHttpClient.ExecuteAsync` call in `mmria-server` and `mmria.services` that touches a CouchDB application database routes through a repository interface. The only remaining non-DAL calls are in formally classified infrastructure files (sync utilities, rebuild actors, `c_db_setup.cs`, migration actors) which are addressed as a unit when SQL migration implementation begins.
 
+
+
+---
+
+## Epic 29: Record ID Uniqueness Enforcement
+
+**Summary:** Production cases were created with duplicate MMRIA Record IDs (`{jurisdiction}-{year-of-death}-{4-digit-number}`). Root-cause analysis identified three compounding defects: no server-side uniqueness enforcement on save, a TOCTOU race condition in the client-side generation loop, and a broken CouchDB view dependency that silently left the client with no uniqueness data. This epic implements defense-in-depth: the server is the authoritative last line of defense, the client validates per-candidate before saving, and the broken infrastructure is repaired. The 4-digit numeric suffix is the focus of uniqueness — the full record ID format is validated end-to-end but the suffix is where collisions occur.
+
+**Files in scope:**
+
+| Story | File | Action |
+|---|---|---|
+| 29.1 | `nccdphp-drh-mmria-common/mmria.common/SharedLibraries/Case/Manager/CaseManager.cs` | Add format validation + uniqueness guard in `SaveCaseAsync` |
+| 29.2 | `source-code/mmria/mmria-server/wwwroot/scripts/case/index.mmria.js` | Replace stale-Set loop with per-candidate `/api/record_id` calls |
+| 29.2 | `source-code/mmria/mmria-server/wwwroot/scripts/case/index.pmss.js` | Same change for PMSS variant |
+| 29.3 | `source-code/mmria/mmria-server/database-scripts/case_design_sortable.json` | Add `record_id_list` view |
+| 29.3 | `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js` | Remove `Get_Record_Id_List` function and `g_record_id_list` Set (dead code after 29.2) |
+
+---
+
+### Story 29.1: Server-Side Record ID Format Validation and Uniqueness Guard
+
+**Story ID:** 29.1
+**Depends on:** None
+
+As a system,
+I want new case saves to be rejected when the MMRIA Record ID is already in use or does not follow the required format,
+So that no two cases in the same jurisdiction database can ever share a Record ID, regardless of how the client behaves.
+
+**Background:** `SaveCaseAsync` in `CaseManager.cs` performs authorization, lock, and rev-conflict checks but does not validate `record_id`. The infrastructure to check uniqueness already exists: `RecordIdExistsAsync` (used in `GetRecordIdReplacementForYearOfDeathAsync`) calls a Mango `_find` query per candidate and is accurate under concurrency. The `record_idController` (`GET /api/record_id`) also uses this method but is never called from the case creation path.
+
+**Acceptance Criteria:**
+
+**AC-1 — Guard is scoped to new cases only**
+Given a case save request where the existing CouchDB document returned HTTP 404 (new case, no `_rev`)
+When `SaveCaseAsync` reaches the record ID check
+Then the guard runs; for existing cases (HTTP 200 from CouchDB probe) the guard is skipped entirely — record ID is set at creation time and is immutable via this path
+
+**AC-2 — Record ID format is validated**
+Given a new case save where `home_record.record_id` is not null and not empty
+When `SaveCaseAsync` validates the record ID
+Then it verifies the ID matches the pattern `{jurisdiction}-{year}-{4-digit-number}`: splitting on `-` the last segment is exactly 4 decimal digits (`\d{4}`), the second-to-last segment is a 4-digit year between 1900 and 2100 (`\d{4}`, value in range), and the jurisdiction prefix (everything before those two segments) is non-empty; if validation fails, the save is rejected with `ok = false` and a descriptive `error_description` naming which part failed
+
+**AC-3 — Record ID uniqueness is enforced**
+Given a new case with a validly formatted record ID
+When `SaveCaseAsync` calls `RecordIdExistsAsync(mmria_record_id, dbConfig)`
+Then if the method returns `true`, the save is rejected with `ok = false` and `error_description` = `"Record ID '{record_id}' is already in use. Please generate a new Record ID."` — the case document is not written to CouchDB
+
+**AC-4 — Empty or null record ID is not blocked (backward compat)**
+Given a new case save where `home_record.record_id` is null, empty, or whitespace
+When the guard runs
+Then the save proceeds normally — the format and uniqueness check is skipped; the record ID is assigned by the client and may legitimately be absent on first save in some workflows
+
+**AC-5 — Error on RecordIdExistsAsync failure defaults safe**
+Given `RecordIdExistsAsync` throws an exception (CouchDB unreachable)
+When the exception propagates
+Then the existing `catch` in `SaveCaseAsync` handles it; the save does not silently succeed — the caller receives an error response per existing exception-handling behavior
+
+**AC-6 — Build passes**
+Given the guard is added
+When all three projects (`mmria-server`, `mmria.common`, `mmria.services`) are built
+Then zero build errors
+
+**Dev Notes:**
+- Insert the guard after the existing CouchDB document probe (the `if (checkStatusCode == 404)` branch), before the write. Keep it inside the `404` branch only.
+- `RecordIdExistsAsync` is already injected via `_caseRepository` — no new dependencies needed.
+- Regex for last segment: `^\d{4}$`. Regex for year segment: `^\d{4}$` with `int.Parse` range check. Split strategy: `recordId.Split('-')` then validate `array[^1]` (4-digit suffix) and `array[^2]` (year) and confirm `array.Length >= 3`.
+- `mmria_record_id` is set at line ~923 from `caseData.home_record.record_id` — use that variable directly.
+
+---
+
+### Story 29.2: Client-Side Per-Candidate Uniqueness Check via API
+
+**Story ID:** 29.2
+**Depends on:** 29.1 (server guard is the safety net; this story eliminates the primary race condition)
+
+As an abstractor,
+I want the "Generate Record ID" flow to confirm with the server that each candidate ID is unique before using it,
+So that the generated ID is guaranteed unique at the moment of selection, not just against a stale in-memory snapshot.
+
+**Background:** Currently `add_new_case()` loops `while(g_record_id_list.has(new_record_id))` against a client-side `Set` populated by `Get_Record_Id_List()`. That Set is a point-in-time snapshot: if two abstractors generate IDs simultaneously, both see the same snapshot and may produce the same ID. The server-side endpoint `GET /api/record_id?record_id=X` (served by the existing `record_idController`) already performs a per-candidate Mango query and returns `{ ok: true, is_unique: true|false }`. It exists but is never called from the case creation flow.
+
+**Acceptance Criteria:**
+
+**AC-1 — Online mode: generation loop uses per-candidate API call**
+Given the user is in online mode (not offline) and clicks "Generate Record ID & Continue" and confirms
+When `add_new_case()` generates the initial candidate `{jurisdiction}-{year}-{NNNN}`
+Then it calls `GET /api/record_id?record_id={candidate}` and checks `response.is_unique`; if `false`, a new candidate is generated and the API is called again; the loop continues until `is_unique === true`
+
+**AC-2 — Candidate generation format is preserved**
+Given the loop in AC-1
+When a new candidate is generated on each retry
+Then it uses the same format: `reporting_state.trim() + '-' + year.trim() + '-' + $mmria.getRandomCryptoValue().toString().substring(2, 6)` — the 4-digit suffix is regenerated each time; the jurisdiction and year components are not changed
+
+**AC-3 — Max-retry guard prevents infinite loop**
+Given the API repeatedly returns `is_unique: false` (pathological case)
+When the retry count reaches 20
+Then the loop exits, an error is surfaced to the user ("Unable to generate a unique Record ID after multiple attempts. Please try again."), and `add_new_case()` does not proceed
+
+**AC-4 — Offline mode: existing behavior is preserved unchanged**
+Given the user is in offline mode (`window.OfflineStatus.isOffline() === true`)
+When `add_new_case()` runs
+Then it loads offline record IDs from `window.OfflineSessionManager.loadOfflineRecordIds(g_ui)` into a local Set and uses the existing `while(localSet.has(candidate))` loop — no API calls are made in offline mode
+
+**AC-5 — `Get_Record_Id_List` is no longer called for the online confirm path**
+Given Story 29.2 is complete for `index.mmria.js`
+When the confirm handler fires in online mode
+Then `Get_Record_Id_List` is not called; the per-candidate API loop in `add_new_case()` provides the uniqueness guarantee directly
+
+**AC-6 — Same change applied to `index.pmss.js`**
+Given the PMSS variant has the same race condition (`index.pmss.js` line ~424)
+When this story is complete
+Then `index.pmss.js` applies the same per-candidate API loop for online mode, with the same offline-mode preservation and max-retry guard
+
+**AC-7 — No regressions in case creation flow**
+Given the change is made
+When an abstractor creates a new case in a local multi-tenant environment
+Then the case saves successfully, navigates to the home_record form, and the assigned Record ID is unique in the database
+
+**Dev Notes:**
+- The API call is `$.ajax({ url: \`${location.protocol}//${location.host}/api/record_id?record_id=${encodeURIComponent(candidate)}\` })` — `record_idController` is already wired and requires auth.
+- Keep `g_record_id_list.add(new_record_id.toUpperCase())` after confirming uniqueness — the Set still guards against within-session duplicates while the API guards against cross-session duplicates.
+- The offline branch should call `window.OfflineSessionManager.loadOfflineRecordIds(g_ui)` directly at the point of generation, not rely on a prior `Get_Record_Id_List` call.
+- `index.mmria.js` and `index.pmss.js` share `index.js` as a dependency — `g_record_id_list` and `Get_Record_Id_List` are defined there. Do not remove them in this story (Story 29.3 handles cleanup).
+
+---
+
+### Story 29.3: Add record_id_list CouchDB View and Remove Dead Bulk-List Code
+
+**Story ID:** 29.3
+**Depends on:** 29.2 (bulk-list code is only safe to remove after per-candidate checks replace it)
+
+As a developer,
+I want the `record_id_list` CouchDB view to exist in the tracked design document and the unused `Get_Record_Id_List` client function to be removed,
+So that the `/api/case_view/record-id-list` endpoint is functional (for any future use) and dead client code does not mislead future developers.
+
+**Background:** `CaseViewManager.GetRecordIdListAsync()` and `CaseDAL.GetCaseRecordIdListViewJsonAsync()` both call `mmrds/_design/sortable/_view/record_id_list`. This view is not present in `case_design_sortable.json` — the tracked design document lists 17 views but not `record_id_list`. As a result, the API endpoint always returns HTTP 404 or empty, and the client's `Get_Record_Id_List` silently fails, calling its callback with an empty Set. After Story 29.2, `Get_Record_Id_List` is no longer called from the online case creation path, making it dead code.
+
+**Acceptance Criteria:**
+
+**AC-1 — `record_id_list` view added to `case_design_sortable.json`**
+Given `case_design_sortable.json` currently has no `record_id_list` view
+When this story is complete
+Then a `record_id_list` view is added to the `views` object with the map function:
+```javascript
+function(doc) {
+  if (doc.home_record && doc.home_record.record_id) {
+    emit(doc.home_record.record_id, { record_id: doc.home_record.record_id });
+  }
+}
+```
+The view name matches the string used in `CaseViewManager.GetRecordIdListAsync()` exactly: `record_id_list`
+
+**AC-2 — `Get_Record_Id_List` function removed from `index.js`**
+Given `Get_Record_Id_List` is defined in `index.js` (around line 2388) and is no longer called from `index.mmria.js` or `index.pmss.js` after Story 29.2
+When this story is complete
+Then the `Get_Record_Id_List` async function declaration and its entire body are removed from `index.js`; no call sites remain (confirmed by grep)
+
+**AC-3 — `g_record_id_list` Set retained for offline-mode use**
+Given `g_record_id_list` (declared in `index.js`) is still used by the offline branch of `add_new_case()` after Story 29.2
+When this story is complete
+Then `g_record_id_list` is **not** removed — it remains as the within-session duplicate guard for offline mode; a comment is added: `// Used in offline mode only — online mode uses per-candidate /api/record_id checks (Story 29.2)`
+
+**AC-4 — Design document update script is run**
+Given the design document change in AC-1
+When this story is complete
+Then the developer confirms the view is deployed to the local multi-tenant CouchDB instance and `GET /api/case_view/record-id-list` returns a valid (possibly empty) response rather than 404
+
+**AC-5 — Build and smoke test pass**
+Given the dead code removal and design doc change
+When the server is built and a case creation is performed in the local environment
+Then zero build errors, and the case creation flow completes normally for both online and offline modes
+
+**Dev Notes:**
+- The design document is deployed via the existing `case_design_sortable.json` update path used by `db-redeploy`. Confirm the exact script invocation with the existing production update process.
+- Before removing `Get_Record_Id_List`, run: `Select-String -Path "source-code\mmria\mmria-server\wwwroot\scripts\**\*.js" -Pattern "Get_Record_Id_List"` to confirm no remaining call sites.
+- `GetRecordIdListAsync` in `CaseViewManager` and `GetCaseRecordIdListViewJsonAsync` in `CaseDAL` are **not** removed — they serve the `/api/case_view/record-id-list` endpoint which is now functional and may be called by future features or utilities.
+
+---
+
+## Epic 29 — Story Sequencing
+
+| Story | Risk | Dependencies |
+|---|---|---|
+| 29.1 — Server-side uniqueness guard | Low | None — uses existing `RecordIdExistsAsync` |
+| 29.2 — Client-side per-candidate API check | Low | None — uses existing `record_idController` |
+| 29.3 — Add CouchDB view + remove dead code | Low | 29.2 must complete first (ensures `Get_Record_Id_List` has no call sites) |
+
+29.1 and 29.2 can proceed in parallel. 29.3 depends on 29.2.
+
+---
+
+## Epic 30: Unified Server-Side Geocoding (TAMU Refactor)
+
+**Goal:** Replace all scattered TAMU geocoding with a single `GeocodingManager` in SharedLibraries, per-location apply-methods in `CaseGeocodingManager`, and a unified API endpoint that geocodes and saves atomically. The vital import batch service shares the same manager. Client-side JS is reduced to thin wrappers. All duplicated urban-status logic is consolidated server-side.
+
+---
+
+### Background and Problem Statement
+
+TAMU geocoding currently operates across four isolated layers with no shared logic:
+
+**Layer A — Client-triggered (MMRIA_calculations.js):** 10 button-click handlers each call `$mmria.get_geocode_info()` → `GET /api/tamuGeoCode` → then apply results to `g_data` in ~100-line callback bodies. Each callback independently duplicates the urban-status calculation (Metropolitan / Micropolitan / Rural / Undetermined branching). The geocode + save is non-atomic — a network failure between the TAMU response and `$mmria.save_current_record()` leaves geocode data unwritten.
+
+**Layer B — Legacy paths (mmria-check-code.js / validator.js):** 8 geocode calls in each file using the old 4-argument `get_geocode_info(street, city, state, zip, callback)` — the `census_year` parameter is absent, potentially producing stale census tract assignments.
+
+**Layer C — Direct browser→TAMU (mmria.committee_member.js):** One `get_geocode_info` implementation that calls `geoservices.tamu.edu` directly from the browser, exposing the API key to the client. ⚠️ Security risk.
+
+**Layer D — Server-side batch (BatchItemProcessingService.cs):** Private `get_geocode_info()` method instantiates `TAMUGeoCode` (which lives in `mmria.services`) and applies results through four private `Set_*_Geocode()` methods. Entirely isolated from Layers A–C with duplicated field-mapping logic.
+
+**Existing assets to build on:**
+- `mmria.common/texas_am/` — model types (`geocode_response`, `OutputGeocode`, `CensusValue`, etc.) already in common
+- `mmria.common/SharedLibraries/Geocoding/Manager/` and `.../DAL/` — both folders exist and are **empty** — the intended home is already scaffolded
+- `tamuGeoCodeController.cs` — secure server proxy with input sanitization and compiled regex guards — stays in place
+
+---
+
+### Geocoding Location Inventory
+
+**Static form locations (10 total across Layers A and D):**
+
+| Location Key | Case Document Path | Layer A JS Function | Layer D Method |
+|---|---|---|---|
+| `dc_place_of_last_residence` | `death_certificate/place_of_last_residence/...` | `geocode_dc_last_res` | `Set_place_of_last_residence_Geocode` |
+| `dc_address_of_injury` | `death_certificate/address_of_injury/...` | `geocode_dc_injury_place` | — |
+| `dc_address_of_death` | `death_certificate/address_of_death/...` | `geocode_dc_death_place` | `Set_address_of_death_Geocode` |
+| `bc_facility_of_delivery` | `birth_fetal_death_certificate_parent/facility_of_delivery_location/...` | `geocode_bc_delivery_place` | `Set_facility_of_delivery_location_Geocode` |
+| `bc_location_of_residence` | `birth_fetal_death_certificate_parent/location_of_residence/...` | `geocode_bc_residence` | `Set_location_of_residence_Geocode` |
+| `pc_primary_care_facility` | `prenatal_care_record/location_of_primary_prenatal_care_facility/...` | `geocode_pc_primary_care_location` | — |
+| `erh_location` *(dynamic list)* | `er_visit_and_hospital_medical_records[i]/location/...` | `geocode_erh_location` | — |
+| `omv_location_of_care` *(dynamic list)* | `other_medical_office_visits[i]/location_of_medical_care_facility/...` | `geocode_omov_location` | — |
+| `mt_origin_address` *(dynamic list)* | `medical_transport[i]/origin_information/address/...` | `medical_transport_origin_information_address_get_coordinates` | — |
+| `mt_destination_address` *(dynamic list)* | `medical_transport[i]/destination_information/address/...` | `medical_transport_destination_information_address_get_coordinates` | — |
+
+**Geocode fields written at each location (same set for all 10):**
+`latitude`, `longitude`, `feature_matching_geography_type`, `naaccr_gis_coordinate_quality_code`, `naaccr_gis_coordinate_quality_type`, `naaccr_census_tract_certainty_code`, `naaccr_census_tract_certainty_type`, `census_state_fips`, `census_county_fips`, `census_tract_fips`, `census_cbsa_fips`, `census_cbsa_micro`, `census_met_div_fips`, `urban_status`, `state_county_fips`
+
+---
+
+### Story 30.1 — Create `GeocodingManager` in SharedLibraries
+
+**User Story:** As a developer, I need a single injectable service in `mmria.common` that calls the TAMU geocoding API and returns a fully-resolved `GeocodeResult` DTO (including derived `UrbanStatus` and `StateCountyFips`), so that all geocoding paths in the codebase share one implementation.
+
+**Scope:**
+- Create `mmria.common/SharedLibraries/Geocoding/Manager/GeocodingManager.cs`
+- Create `GeocodeResult` record/class (can live in the same file or a sibling) holding all 15 output fields
+- The urban-status derivation logic (Metropolitan Division / Metropolitan / Micropolitan / Rural / Undetermined / Unmatchable) moves here — calculated once
+- `StateCountyFips` = `CensusStateFips + CensusCountyFips` derivation also moves here
+- Method signature: `GeocodeResult FetchGeocode(string geocodeApiKey, string street, string city, string state, string zip, string censusYear)`
+  - `geocodeApiKey` passed in at call time — manager has no config dependency (Architecture Rule 2.3)
+  - State value split on `-` (e.g. `"GA-Georgia"` → `"GA"`) handled here
+  - Returns an `Unmatchable` result (all fields empty, `UrbanStatus = "Undetermined"`) on any TAMU error rather than throwing
+- The TAMU HTTP call is extracted from `TAMUGeoCode` in `mmria.services` into a private helper inside this manager (or the manager wraps the existing class — whichever avoids assembly coupling)
+- `TAMUGeoCode` in `mmria.services/Utilities/` is left in place (not deleted) until Story 30.5 removes it
+
+**Acceptance Criteria:**
+
+**AC-1 — `GeocodingManager` exists in SharedLibraries**
+Given the `mmria.common/SharedLibraries/Geocoding/Manager/` folder
+When Story 30.1 is complete
+Then `GeocodingManager.cs` exists and compiles in `mmria.common`
+
+**AC-2 — `GeocodeResult` contains all required fields**
+Given a successful TAMU response
+When `FetchGeocode` is called with a valid address
+Then the returned `GeocodeResult` has non-null/non-empty values for: `Latitude`, `Longitude`, `UrbanStatus`, `StateCountyFips`, and at least one Census FIPS field
+
+**AC-3 — Urban status derivation is correct**
+Given geocode results with `NAACCRCensusTractCertaintyCode` in range 1–6:
+- When `CensusCbsaFips > 0` and `CensusMetDivFips` is non-empty → `UrbanStatus = "Metropolitan Division"`
+- When `CensusCbsaFips > 0` and `CensusCbsaMicro == "0"` → `UrbanStatus = "Metropolitan"`
+- When `CensusCbsaFips > 0` and `CensusCbsaMicro == "1"` → `UrbanStatus = "Micropolitan"`
+- When `CensusCbsaFips` is empty → `UrbanStatus = "Rural"`
+- When certainty code is 0 or outside 1–6 → `UrbanStatus = "Undetermined"`
+
+**AC-4 — Unmatchable / error cases return gracefully**
+Given a TAMU response with `FeatureMatchingResultType = "Unmatchable"` or an HTTP error
+When `FetchGeocode` is called
+Then a `GeocodeResult` is returned with `FeatureMatchingResultType = "Unmatchable"` and all other fields empty — no exception is thrown
+
+**AC-5 — Build passes**
+When `dotnet build mmria.common.csproj` is run
+Then zero build errors
+
+---
+
+### Story 30.2 — Create `CaseGeocodingManager` with Per-Location Apply Methods
+
+**User Story:** As a developer, I need named methods in SharedLibraries that apply a `GeocodeResult` to a specific case document location, so that both the web layer and the batch service can write geocode fields using a single implementation.
+
+**Scope:**
+- Create `mmria.common/SharedLibraries/Case/Manager/CaseGeocodingManager.cs`
+- 10 public methods — one per location from the inventory table above
+- Method signature for static locations: `void Apply_[LocationKey]_Geocode(ExpandoObject caseDoc, GeocodeResult result)`
+- Method signature for dynamic-list locations: `void Apply_[LocationKey]_Geocode(ExpandoObject caseDoc, GeocodeResult result, int listIndex)`
+- Each method writes the 15 geocode fields to the correct case document path using path-based setters consistent with existing `C_Get_Set_Value` patterns
+- When `result.FeatureMatchingResultType == "Unmatchable"`, all fields are written as empty strings (mirrors current JS behavior)
+- No CouchDB access in this class — pure document mutation
+
+**Acceptance Criteria:**
+
+**AC-1 — All 10 methods exist and compile**
+When `dotnet build mmria.common.csproj` is run
+Then zero errors and all 10 `Apply_*_Geocode` methods are present
+
+**AC-2 — Static location field paths are correct**
+Given a valid `GeocodeResult` applied to `Apply_DC_PlaceOfLastResidence_Geocode`
+When the resulting `ExpandoObject` is inspected
+Then `death_certificate.place_of_last_residence.latitude` equals `result.Latitude` and all 15 fields are written to the correct path
+
+**AC-3 — Dynamic list location uses `listIndex` correctly**
+Given `Apply_ERH_Location_Geocode(caseDoc, result, listIndex: 2)`
+When the resulting document is inspected
+Then `er_visit_and_hospital_medical_records[2].location.latitude` equals `result.Latitude` — index 0 and index 1 entries are unmodified
+
+**AC-4 — Unmatchable clears all fields**
+Given `result.FeatureMatchingResultType == "Unmatchable"`
+When any `Apply_*_Geocode` method is called
+Then all 15 geocode fields at that path are written as empty string
+
+---
+
+### Story 30.3 — New API Endpoint: `POST /api/case-geocode/{caseId}/{locationKey}`
+
+**User Story:** As an abstractor, when I click "Get Coordinates" on a case form, the geocoding and the case save should happen in a single server-side operation, so that geocode data is never lost due to a mid-operation network failure.
+
+**Scope:**
+- New `CaseGeocodeController` (or action added to existing case controller — confirm with team)
+- Route: `POST /api/case-geocode/{caseId}/{locationKey}`
+- Request body: `{ street, city, state, zip, listIndex? }` (JSON)
+- Action flow:
+  1. Resolve tenant config, get `geocode_api_key` via `configuration.GetSharedString`
+  2. Call `GeocodingManager.FetchGeocode(...)` 
+  3. Load current case document from CouchDB
+  4. Call the matching `CaseGeocodingManager.Apply_*_Geocode(caseDoc, result, listIndex?)` based on `locationKey`
+  5. Save updated case document
+  6. Return `GeocodeResult` as JSON (for the JS to update form fields)
+- Requires `[Authorize(Roles = "abstractor")]`
+- `tamuGeoCodeController` GET endpoint is **not removed** — kept for backward compatibility during migration
+- Invalid `locationKey` → `400 BadRequest`
+- Case not found → `404 NotFound`
+- `listIndex` required when `locationKey` is a dynamic-list location → `400 BadRequest` if absent
+
+**Acceptance Criteria:**
+
+**AC-1 — Endpoint exists and returns geocode result**
+Given a valid `caseId`, `locationKey = "dc_place_of_last_residence"`, and a valid US address
+When `POST /api/case-geocode/{caseId}/dc_place_of_last_residence` is called
+Then the response contains a `GeocodeResult` JSON object with `latitude` and `longitude` populated
+
+**AC-2 — Case document is updated in CouchDB**
+Given the request from AC-1
+When the case is fetched from CouchDB after the POST
+Then `death_certificate.place_of_last_residence.latitude` matches the returned value
+
+**AC-3 — Dynamic list location requires `listIndex`**
+Given `locationKey = "erh_location"` and no `listIndex` in the body
+When the POST is made
+Then the response is `400 BadRequest`
+
+**AC-4 — Unknown `locationKey` returns 400**
+Given `locationKey = "not_a_real_location"`
+When the POST is made
+Then the response is `400 BadRequest`
+
+**AC-5 — Unauthorized request is rejected**
+Given a request without an `abstractor` role
+When the POST is made
+Then the response is `401` or `403`
+
+---
+
+### Story 30.4 — Refactor `MMRIA_calculations.js` Geocode Functions
+
+**User Story:** As a developer, I need the 10 client-side geocode handler functions in `MMRIA_calculations.js` to use the new server endpoint, so that geocoding and case save are atomic and urban-status calculation logic no longer lives in the browser.
+
+**Scope:**
+- Each of the 10 geocode functions is replaced with a thin wrapper:
+  1. Read address fields from `this` / `g_data` as before
+  2. `POST /api/case-geocode/{g_data._id}/{locationKey}` with address + optional `listIndex`
+  3. On success: call `$mmria.set_control_value(...)` for the 15 geocode fields from the response (or re-render the form section)
+  4. On failure: show an error dialog (reuse `$mmria.info_dialog_show`)
+- The `get_geocode_info` function in `mmria.js` is **not removed** — it remains for backward compat (still used by Layer B until Story 30.6)
+- The `geocode_dc_last_res` function (DC Place of Last Residence) retains the post-geocode CVS community vital signs lookup call — this call stays client-side after the geocode response returns
+- The `census_year` argument passed to `get_geocode_info` previously is now included in the POST body
+- For dynamic-list locations, `$global.get_current_multiform_index()` provides the `listIndex`
+- The ~100-line urban-status calculation and field-setting blocks are removed from all 10 functions
+
+**Acceptance Criteria:**
+
+**AC-1 — All 10 functions POST to the new endpoint**
+Given a button click on any geocode button in the case form
+When the network tab is observed
+Then a `POST /api/case-geocode/...` request is made (not `GET /api/tamuGeoCode`)
+
+**AC-2 — Form fields are updated from response**
+Given a successful geocode POST response
+When the callback completes
+Then the 15 geocode fields visible on the form reflect the values from the server response
+
+**AC-3 — CVS lookup still fires for DC Place of Last Residence**
+Given a successful geocode for `dc_place_of_last_residence`
+When the form updates
+Then `$mmria.get_cvs_api_data_info(...)` is still called with the returned `state_county_fips` and `census_tract_fips`
+
+**AC-4 — Dynamic list index is sent correctly**
+Given the user is on `medical_transport` list item at index 1
+When the origin address geocode button is clicked
+Then the POST body includes `listIndex: 1`
+
+**AC-5 — Build and smoke test pass**
+When the server is built and a geocode button is clicked in the local environment
+Then the request succeeds, the case is updated, and no JS errors appear in the console
+
+---
+
+### Story 30.5 — Refactor `BatchItemProcessingService` to Use Shared `GeocodingManager`
+
+**User Story:** As a developer, I need the vital import batch processing service to use the shared `GeocodingManager` and `CaseGeocodingManager` from SharedLibraries, so that geocoding logic is not duplicated between the batch service and the web layer.
+
+**Scope:**
+- Remove the private `get_geocode_info(string street, ...)` method from `BatchItemProcessingService`
+- Remove the `GeocodeTuple` inner class — it is replaced by `GeocodeResult` from SharedLibraries
+- Replace calls to private `Set_facility_of_delivery_location_Geocode`, `Set_location_of_residence_Geocode`, `Set_place_of_last_residence_Geocode`, `Set_address_of_death_Geocode` with calls to the corresponding `CaseGeocodingManager.Apply_*_Geocode()` methods
+- `geocode_api_key` resolution stays in `BatchItemProcessingService` (resolved from `db_config_set.name_value["geocode_api_key"]` as today — per Architecture Rule 2.3)
+- `TAMUGeoCode` class in `mmria.services/Utilities/TAMUGeocode.cs` is **deleted** after this story — its logic now lives in `GeocodingManager`
+- The four private `Set_*_Geocode` methods in `BatchItemProcessingService` are removed
+
+**Acceptance Criteria:**
+
+**AC-1 — Private geocode methods and `GeocodeTuple` removed**
+When a search is run for `GeocodeTuple` and `Set_facility_of_delivery_location_Geocode` in `BatchItemProcessingService.cs`
+Then zero results are found
+
+**AC-2 — `TAMUGeocode.cs` is deleted**
+When `Get-ChildItem -Recurse -Filter TAMUGeocode.cs` is run
+Then no file is found
+
+**AC-3 — Batch processing produces correct geocode output**
+Given the existing IJE import test suite (`mmria.services.tests`)
+When the tests are run with `dotnet test`
+Then all tests that previously passed continue to pass
+
+**AC-4 — Build passes**
+When `dotnet build mmria.services.csproj` is run
+Then zero build errors
+
+---
+
+### Story 30.6 — Fix Legacy Geocode Calls in `mmria-check-code.js` / `validator.js`
+
+**User Story:** As a developer, I need the legacy geocode functions (`x2f_ocl`, `x6b_ocl`, etc.) in `mmria-check-code.js` and `validator.js` to use the new server endpoint and pass `census_year`, so that census tract results are not stale and logic is consistent.
+
+**Scope:**
+- Identify all 8 call sites in each file
+- Replace each `$mmria.get_geocode_info(street, city, state, zip, callback)` call with a POST to `/api/case-geocode/{id}/{locationKey}` (same pattern as Story 30.4)
+- Add `census_year` from `g_data.home_record.date_of_death.year` (same source as `MMRIA_calculations.js`)
+- The function names (`x2f_ocl`, etc.) are not changed — they are event handler names bound by the metadata
+
+**Acceptance Criteria:**
+
+**AC-1 — No 4-argument `get_geocode_info` calls remain**
+When `Select-String` is run for `get_geocode_info` across `mmria-check-code.js` and `validator.js`
+Then all remaining calls include `census_year` or use the new POST endpoint
+
+**AC-2 — Census tract results use correct year**
+Given a case with `date_of_death.year = 2015`
+When a legacy geocode function fires
+Then the census year sent to TAMU is `"2010"` (the correct bracket)
+
+---
+
+### Story 30.7 — Fix Direct Browser→TAMU Call in `mmria.committee_member.js` (Security)
+
+**User Story:** As a security engineer, I need the `get_geocode_info` function in `mmria.committee_member.js` to route through the server proxy, so that the TAMU API key is not exposed in client-side code.
+
+**Scope:**
+- The `get_geocode_info` function in `mmria.committee_member.js` currently builds a direct `geoservices.tamu.edu` URL with the API key embedded
+- Replace this implementation with a call to `GET /api/tamuGeoCode?...` (the existing secure proxy in `tamuGeoCodeController`) — same pattern as `mmria.js`
+- Confirm no other client-side JS files contain a hardcoded `geoservices.tamu.edu` URL or API key
+- The `tamuGeoCodeController` is retained as the proxy endpoint
+
+**Acceptance Criteria:**
+
+**AC-1 — No hardcoded TAMU URL in client JS**
+When `Select-String -Recurse -Path wwwroot/scripts -Pattern "geoservices.tamu.edu"` is run
+Then zero results are found
+
+**AC-2 — API key not present in client JS**
+When `Select-String -Recurse -Path wwwroot/scripts -Pattern "geocode_api_key|apikey="` is run
+Then zero results are found in files served to the browser
+
+**AC-3 — Committee member geocode still functions**
+Given a committee member form with a geocodeable address field
+When the geocode button is clicked
+Then a request goes to `GET /api/tamuGeoCode` (observable in the network tab) and the fields are populated
+
+---
+
+## Epic 30 — Story Sequencing
+
+| Story | Risk | Dependencies |
+|---|---|---|
+| 30.1 — Create `GeocodingManager` | Low | None |
+| 30.2 — Create `CaseGeocodingManager` apply methods | Low | 30.1 must complete first |
+| 30.3 — New `POST /api/case-geocode` endpoint | Medium | 30.1 and 30.2 must complete first |
+| 30.4 — Refactor `MMRIA_calculations.js` | Medium | 30.3 must complete first |
+| 30.5 — Refactor `BatchItemProcessingService` | Low | 30.1 and 30.2 must complete first; can run parallel to 30.3 |
+| 30.6 — Fix legacy `mmria-check-code.js` / `validator.js` | Low | 30.3 must complete first; can run parallel to 30.4 |
+| 30.7 — Fix `mmria.committee_member.js` (security) | Low | None — independent; only requires existing `tamuGeoCodeController` |
+
+30.1 → 30.2 → 30.3 is the critical path. 30.5 can be worked in parallel with 30.3 once 30.1 and 30.2 are done. 30.6 and 30.7 are independent tail stories.
 
