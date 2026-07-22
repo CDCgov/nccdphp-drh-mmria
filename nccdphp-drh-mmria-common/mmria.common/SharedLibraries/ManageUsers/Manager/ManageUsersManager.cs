@@ -348,7 +348,8 @@ public class ManageUsersManager
                 if
                 (
                     item.data_type != null &&
-                    item.data_type == user_role_jurisdiction.user_role_jursidiction_const &&
+                    (item.data_type == user_role_jurisdiction.user_role_jursidiction_const ||
+                     item.data_type == "user_role_jurisdiction") &&
                     authorization.is_authorized_to_handle_jurisdiction_id(jurisdiction_hashset, ResourceRightEnum.ReadUser, item)
                 )
                 {
@@ -362,7 +363,8 @@ public class ManageUsersManager
             if
             (
                 item.data_type != null &&
-                item.data_type == user_role_jurisdiction.user_role_jursidiction_const &&
+                (item.data_type == user_role_jurisdiction.user_role_jursidiction_const ||
+                 item.data_type == "user_role_jurisdiction") &&
                 authorization.is_authorized_to_handle_jurisdiction_id(jurisdiction_hashset, ResourceRightEnum.ReadUser, item)
             )
             {
