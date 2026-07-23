@@ -189,6 +189,32 @@ public sealed class Program
             configuration["mmria_settings:vitals_service_key"] = vitals_service_key;
             configuration["mmria_settings:config_id"] = config_id;
             configuration["mmria_settings:vitals_import_additional_tenants"] = vitals_import_additional_tenants;
+
+            // populate_cdc_* throttle settings — only override if the env var is explicitly set
+            string[] populateCdcKeys = new[]
+            {
+                "populate_cdc_copy_page_size",
+                "populate_cdc_copy_max_parallelism",
+                "populate_cdc_copy_bulk_doc_chunk_size",
+                "populate_cdc_copy_batch_delay_ms",
+                "populate_cdc_copy_bulk_write_retry_count",
+                "populate_cdc_copy_bulk_write_retry_delay_ms",
+                "populate_cdc_rebuild_page_size",
+                "populate_cdc_rebuild_max_parallelism",
+                "populate_cdc_rebuild_bulk_doc_chunk_size",
+                "populate_cdc_rebuild_batch_delay_ms",
+                "populate_cdc_rebuild_bulk_write_retry_count",
+                "populate_cdc_rebuild_bulk_write_retry_delay_ms",
+            };
+            foreach (string cdcKey in populateCdcKeys)
+            {
+                string? envValue = System.Environment.GetEnvironmentVariable(cdcKey);
+                if (!string.IsNullOrWhiteSpace(envValue))
+                {
+                    configuration[$"mmria_settings:{cdcKey}"] = envValue;
+                }
+            }
+
             return;
         }
 
