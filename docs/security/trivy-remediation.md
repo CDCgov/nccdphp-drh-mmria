@@ -299,3 +299,303 @@
 **CVE research:** NVD CVE-2026-59874 and OSV — the affected component is explicitly identified as `node-tar` (npm), a JavaScript library for Node.js. The exploit (`tar.replace` API accepting a negative base-256 size header) is specific to the Node.js `node-tar` implementation; GNU tar 1.34 does not expose a `tar.replace` JavaScript API. No Red Hat advisory references CVE-2026-59874 for the `tar` RPM. This is a Trivy scanner misattribution.
 
 ---
+
+## Scan: 30955 — MMRIA S2I @ ebcbe2cb (2026-07-23)
+
+- **Commit:** `ebcbe2cb36c55445061cf49dcc91bbbb728cfdb1`
+- **Service:** MMRIA S2I
+- **Target:** `mmria-s2i:latest (redhat 9.8)`
+- **Findings in:** HIGH=18, CRITICAL=0
+
+### Triage summary
+
+| Severity | Original | Fixed | Pending image update | Residual | Not applicable | Remaining |
+|----------|----------|-------|----------------------|----------|----------------|-----------|
+| HIGH     | 18       | 0     | 0                    | 14       | 4              | 14        |
+
+⏳ **EVIDENCE WOULD UPGRADE:** Residual findings for `curl-minimal`, `libcurl-minimal`, and `dotnet-host` can be upgraded only if live pod verification disproves package usage preconditions (commands listed in each SWA entry).
+
+### Fixes made
+
+| File | Package | CVEs | Before → After |
+|------|---------|------|----------------|
+| _No code or containerfile delta in this scan_ | N/A | N/A | Carried from prior scan — evidence unchanged relative to scan 30948 |
+
+### HIGH/CRITICAL release analysis
+
+| Package | Vulnerability | Verdict | Evidence |
+|---------|--------------|---------|----------|
+| curl-minimal 7.76.1-40.el9 | CVE-2026-11352 | Residual risk – required, not reachable under current controls | Carried from prior scan — evidence unchanged; no fix available (status: affected); QUIC/HTTP3 client precondition not used by MMRIA runtime |
+| curl-minimal 7.76.1-40.el9 | CVE-2026-11586 | Residual risk – required, not reachable under current controls | Carried from prior scan — evidence unchanged; no fix available (status: affected); requires curl WebSocket client path not used by MMRIA |
+| curl-minimal 7.76.1-40.el9 | CVE-2026-12064 | Residual risk – required, not reachable under current controls | Carried from prior scan — evidence unchanged; requires curl CLI invocation with schemeless URL and `--proto-default sftp/scp` |
+| curl-minimal 7.76.1-40.el9 | CVE-2026-8286 | Residual risk – required, not reachable under current controls | Carried from prior scan — evidence unchanged; requires STARTTLS protocol usage, while MMRIA uses HTTPS |
+| curl-minimal 7.76.1-40.el9 | CVE-2026-8925 | Residual risk – required, not reachable under current controls | Carried from prior scan — evidence unchanged; requires GSASL SASL auth path not used by MMRIA |
+| curl-minimal 7.76.1-40.el9 | CVE-2026-9547 | Residual risk – required, not reachable under current controls | Carried from prior scan — evidence unchanged; requires SCP/SFTP with `CURLOPT_SSH_KEYFUNCTION`, not used by MMRIA |
+| dotnet-host 10.0.10-1.el9_8 | CVE-2024-38081 | Residual risk – required, not reachable under current controls | Carried from prior scan — evidence unchanged; `end_of_life`; Windows-authentication attack path is not present in Linux OpenShift runtime |
+| dotnet-host 10.0.10-1.el9_8 | CVE-2025-26682 | Residual risk – required, not reachable under current controls | Carried from prior scan — evidence unchanged; `end_of_life`; resource exhaustion constrained by OpenShift quotas and ingress controls |
+| dotnet-host 10.0.10-1.el9_8 | CVE-2025-59144 | Not applicable / false positive | Carried from prior scan — evidence unchanged; CVE is for npm `debug` package compromise, not the RHEL `dotnet-host` RPM |
+| dotnet-host 10.0.10-1.el9_8 | CVE-2026-48779 | Not applicable / false positive | Carried from prior scan — evidence unchanged; CVE is for npm `ws` package, not the RHEL `dotnet-host` RPM |
+| libcurl-minimal 7.76.1-40.el9 | CVE-2026-11352 | Residual risk – required, not reachable under current controls | Carried from prior scan — evidence unchanged; no fix available (status: affected); HTTP/3 precondition absent |
+| libcurl-minimal 7.76.1-40.el9 | CVE-2026-11586 | Residual risk – required, not reachable under current controls | Carried from prior scan — evidence unchanged; no fix available (status: affected); libcurl WebSocket client precondition absent |
+| libcurl-minimal 7.76.1-40.el9 | CVE-2026-12064 | Residual risk – required, not reachable under current controls | Carried from prior scan — evidence unchanged; schemeless URL + `--proto-default sftp/scp` precondition absent |
+| libcurl-minimal 7.76.1-40.el9 | CVE-2026-8286 | Residual risk – required, not reachable under current controls | Carried from prior scan — evidence unchanged; STARTTLS precondition absent |
+| libcurl-minimal 7.76.1-40.el9 | CVE-2026-8925 | Residual risk – required, not reachable under current controls | Carried from prior scan — evidence unchanged; GSASL auth precondition absent |
+| libcurl-minimal 7.76.1-40.el9 | CVE-2026-9547 | Residual risk – required, not reachable under current controls | Carried from prior scan — evidence unchanged; SCP/SFTP + SSH key callback precondition absent |
+| tar 2:1.34-11.el9 | CVE-2026-59873 | Not applicable / false positive | Carried from prior scan — evidence unchanged; CVE applies to npm `node-tar`, not GNU tar RPM |
+| tar 2:1.34-11.el9 | CVE-2026-59874 | Not applicable / false positive | Carried from prior scan — evidence unchanged; CVE applies to npm `node-tar`, not GNU tar RPM |
+
+---
+
+## SWA Exception Justifications
+
+### curl-minimal / CVE-2026-11352
+
+**Verdict:** Residual risk – required, not reachable under current controls
+
+**Summary:** Carried from prior scan — evidence unchanged. No upstream fix is available and this path requires curl/libcurl HTTP/3 (QUIC) client behavior that is not used by MMRIA.
+
+**CVE research:** NVD CVE-2026-11352 requires reaching curl's QUIC UDP receive path (AV:N/AC:H) through HTTP/3 client traffic. Red Hat status remains `affected` for RHEL 9.8.
+
+**Controls:** MMRIA traffic is HTTP/HTTPS application traffic; no HTTP/3 or QUIC client configuration is defined in runtime configuration.
+
+**Verification (Tier-2 handoff):** `oc rsh <pod> rpm -q curl-minimal && oc rsh <pod> grep -r "HTTP3\\|http3\\|QUIC\\|quic" /app/ || true`
+
+---
+
+### curl-minimal / CVE-2026-11586
+
+**Verdict:** Residual risk – required, not reachable under current controls
+
+**Summary:** Carried from prior scan — evidence unchanged. The vulnerable path requires curl WebSocket client sessions receiving attacker PING floods; MMRIA does not use curl WebSocket APIs.
+
+**CVE research:** NVD CVE-2026-11586 is a curl WebSocket memory-exhaustion path requiring active WebSocket client traffic. Red Hat status remains `affected`.
+
+**Controls:** MMRIA application calls are standard HTTP/HTTPS to internal services and do not execute curl WebSocket workflows.
+
+**Verification (Tier-2 handoff):** `oc rsh <pod> grep -r "websocket\\|WebSocket" /app/ || true`
+
+---
+
+### curl-minimal / CVE-2026-12064
+
+**Verdict:** Residual risk – required, not reachable under current controls
+
+**Summary:** Carried from prior scan — evidence unchanged. Exploitation requires explicit curl CLI usage with schemeless URL plus `--proto-default sftp`/`scp`; MMRIA does not invoke curl CLI this way.
+
+**CVE research:** NVD CVE-2026-12064 (AV:L/AC:H) requires a specific local invocation pattern. Red Hat status remains `affected` with no package fix.
+
+**Controls:** MMRIA runtime behavior is through .NET HttpClient and configured HTTPS endpoints, not shell-invoked curl CLI workflows.
+
+**Verification (Tier-2 handoff):** `oc rsh <pod> grep -r "curl\\b" /app/ /opt/app-root/ || true`
+
+---
+
+### curl-minimal / CVE-2026-8286
+
+**Verdict:** Residual risk – required, not reachable under current controls
+
+**Summary:** Carried from prior scan — evidence unchanged. STARTTLS connection-reuse precondition is required, and MMRIA uses HTTPS rather than STARTTLS-upgraded protocols.
+
+**CVE research:** NVD CVE-2026-8286 requires STARTTLS protocols (SMTP/IMAP/POP3/FTP-style upgrade behavior). Red Hat status remains `affected`.
+
+**Controls:** Application endpoints are configured for direct HTTPS; no STARTTLS protocol stack is configured by MMRIA.
+
+**Verification (Tier-2 handoff):** `oc rsh <pod> ss -tnp`
+
+---
+
+### curl-minimal / CVE-2026-8925
+
+**Verdict:** Residual risk – required, not reachable under current controls
+
+**Summary:** Carried from prior scan — evidence unchanged. GSASL double-free path requires GSASL-enabled SASL usage via curl/libcurl, which MMRIA does not use.
+
+**CVE research:** NVD CVE-2026-8925 requires GSASL SASL path invocation in curl/libcurl. Red Hat status remains `affected`.
+
+**Controls:** MMRIA authentication flows are HTTPS-based application auth (CouchDB/basic/cookie), not GSASL SASL.
+
+**Verification (Tier-2 handoff):** `oc rsh <pod> rpm -q gsasl libgsasl 2>&1`
+
+---
+
+### curl-minimal / CVE-2026-9547
+
+**Verdict:** Residual risk – required, not reachable under current controls
+
+**Summary:** Carried from prior scan — evidence unchanged. This CVE requires SCP/SFTP transfers with `CURLOPT_SSH_KEYFUNCTION`; MMRIA does not implement SCP/SFTP transfer workflows.
+
+**CVE research:** NVD CVE-2026-9547 requires libcurl SSH transfer mode and callback behavior. Red Hat status remains `affected`.
+
+**Controls:** Application data movement uses HTTPS endpoints and does not configure libcurl SSH file transfer.
+
+**Verification (Tier-2 handoff):** `oc rsh <pod> grep -r "sftp\\|SFTP\\|SCP\\|SSH_KEY" /app/ || true`
+
+---
+
+### dotnet-host / CVE-2024-38081
+
+**Verdict:** Residual risk – required, not reachable under current controls
+
+**Summary:** Carried from prior scan — evidence unchanged. This .NET EoP finding is Windows-authentication-path specific and is not reachable in Linux OpenShift runtime.
+
+**CVE research:** NVD CVE-2024-38081 CVSS includes local attack characteristics and Microsoft describes Windows-authentication-related exposure; Trivy marks installed package status as `end_of_life`.
+
+**Controls:** Runtime is Linux container (`dotnet-host` RPM in RHEL 9 image), not Windows host stack.
+
+**Verification (Tier-2 handoff):** `oc rsh <pod> uname -a && oc rsh <pod> cat /etc/os-release`
+
+---
+
+### dotnet-host / CVE-2025-26682
+
+**Verdict:** Residual risk – required, not reachable under current controls
+
+**Summary:** Carried from prior scan — evidence unchanged. ASP.NET resource exhaustion risk remains `end_of_life` for package channel; exploitability is bounded by platform memory/CPU quotas and ingress controls.
+
+**CVE research:** NVD CVE-2025-26682 is network DoS by unbounded resource allocation. Trivy marks RHEL package state as `end_of_life` with no immediate package-channel fix.
+
+**Controls:** OpenShift scheduling, limits, and authenticated ingress patterns constrain blast radius for resource-exhaustion attempts.
+
+**Verification (Tier-2 handoff):** `oc describe limitrange -n <namespace> && oc get networkpolicy -n <namespace>`
+
+---
+
+### dotnet-host / CVE-2025-59144
+
+**Verdict:** Not applicable / false positive
+
+**Summary:** Carried from prior scan — evidence unchanged. CVE-2025-59144 targets compromised npm `debug` package publication; it does not apply to the `dotnet-host` RPM.
+
+**CVE research:** NVD and OSV identify npm `debug` artifact versions in the JavaScript ecosystem as affected; no Red Hat advisory maps this CVE to RHEL `dotnet-host`.
+
+**Controls:** `dotnet-host` is a native runtime host binary package and does not ship npm package payloads.
+
+**Verification (Tier-2 handoff):** `oc rsh <pod> rpm -q dotnet-host && oc rsh <pod> find /app -maxdepth 6 -type d -name debug`
+
+---
+
+### dotnet-host / CVE-2026-48779
+
+**Verdict:** Not applicable / false positive
+
+**Summary:** Carried from prior scan — evidence unchanged. CVE-2026-48779 affects npm `ws` package versions, not the RHEL `dotnet-host` package.
+
+**CVE research:** NVD and OSV list `ws` npm ranges as impacted and describe Node.js library behavior; no mapping exists to the .NET host RPM.
+
+**Controls:** `dotnet-host` package content is unrelated to Node.js dependency trees.
+
+**Verification (Tier-2 handoff):** `oc rsh <pod> rpm -q dotnet-host && oc rsh <pod> find /app -maxdepth 8 -name package.json -o -name node_modules`
+
+---
+
+### libcurl-minimal / CVE-2026-11352
+
+**Verdict:** Residual risk – required, not reachable under current controls
+
+**Summary:** Carried from prior scan — evidence unchanged. libcurl HTTP/3 QUIC receive path precondition is not exercised by MMRIA traffic patterns.
+
+**CVE research:** NVD CVE-2026-11352 requires HTTP/3 client behavior to reach vulnerable QUIC parser path; Red Hat status remains `affected`.
+
+**Controls:** MMRIA runtime configuration and known service calls are HTTP/HTTPS, not HTTP/3.
+
+**Verification (Tier-2 handoff):** `oc rsh <pod> rpm -q libcurl-minimal && oc rsh <pod> grep -r "http3\\|quic" /app/ || true`
+
+---
+
+### libcurl-minimal / CVE-2026-11586
+
+**Verdict:** Residual risk – required, not reachable under current controls
+
+**Summary:** Carried from prior scan — evidence unchanged. WebSocket PING flood condition requires libcurl WebSocket client use, which is not part of MMRIA behavior.
+
+**CVE research:** NVD CVE-2026-11586 describes memory growth from WebSocket PING handling in curl/libcurl client sessions; Red Hat status remains `affected`.
+
+**Controls:** MMRIA does not implement libcurl WebSocket communication paths.
+
+**Verification (Tier-2 handoff):** `oc rsh <pod> grep -r "CURLOPT_WS\\|websocket\\|WebSocket" /app/ || true`
+
+---
+
+### libcurl-minimal / CVE-2026-12064
+
+**Verdict:** Residual risk – required, not reachable under current controls
+
+**Summary:** Carried from prior scan — evidence unchanged. Exploit precondition requires schemeless URL with `--proto-default sftp/scp`; this invocation pattern is absent from MMRIA.
+
+**CVE research:** NVD CVE-2026-12064 documents this as a specific invocation-path issue and Red Hat status remains `affected`.
+
+**Controls:** Service endpoints are explicit HTTPS URLs; no SFTP/SCP scheme or proto-default flow is configured.
+
+**Verification (Tier-2 handoff):** `oc rsh <pod> grep -r "sftp\\|scp://" /app/ || true`
+
+---
+
+### libcurl-minimal / CVE-2026-8286
+
+**Verdict:** Residual risk – required, not reachable under current controls
+
+**Summary:** Carried from prior scan — evidence unchanged. STARTTLS downgrade/reuse path requires STARTTLS protocol usage, which MMRIA does not use.
+
+**CVE research:** NVD CVE-2026-8286 ties exploitability to STARTTLS upgrade protocols; Red Hat status remains `affected`.
+
+**Controls:** MMRIA communications use native HTTPS, not explicit STARTTLS upgrades.
+
+**Verification (Tier-2 handoff):** `oc rsh <pod> ss -tnp`
+
+---
+
+### libcurl-minimal / CVE-2026-8925
+
+**Verdict:** Residual risk – required, not reachable under current controls
+
+**Summary:** Carried from prior scan — evidence unchanged. GSASL double-free path requires GSASL-enabled SASL authentication through libcurl, not present in MMRIA flows.
+
+**CVE research:** NVD CVE-2026-8925 requires GSASL context use; Red Hat status remains `affected`.
+
+**Controls:** Current authentication paths do not use GSASL in application-level communication.
+
+**Verification (Tier-2 handoff):** `oc rsh <pod> rpm -q gsasl libgsasl 2>&1`
+
+---
+
+### libcurl-minimal / CVE-2026-9547
+
+**Verdict:** Residual risk – required, not reachable under current controls
+
+**Summary:** Carried from prior scan — evidence unchanged. Vulnerable path requires SCP/SFTP with SSH key callback in libcurl; MMRIA does not configure that transfer mode.
+
+**CVE research:** NVD CVE-2026-9547 requires `CURLOPT_SSH_KEYFUNCTION` and SSH transport context; Red Hat status remains `affected`.
+
+**Controls:** Application integrations rely on HTTPS APIs; no SSH file transfer code path is configured.
+
+**Verification (Tier-2 handoff):** `oc rsh <pod> grep -r "SFTP\\|SCP\\|SSH_KEYFUNCTION" /app/ || true`
+
+---
+
+### tar / CVE-2026-59873
+
+**Verdict:** Not applicable / false positive
+
+**Summary:** Carried from prior scan — evidence unchanged. This CVE affects npm `node-tar` extraction logic, not the GNU `tar` RPM (`2:1.34-11.el9`) present in the scanned image.
+
+**CVE research:** NVD and OSV identify Node.js package `node-tar` (npm ecosystem) as affected; no Red Hat advisory maps this CVE to GNU tar package in RHEL 9.
+
+**Controls:** Installed artifact is GNU tar binary package, not Node.js `node-tar` library.
+
+**Verification (Tier-2 handoff):** `oc rsh <pod> rpm -q tar && oc rsh <pod> node -e "try{require('tar');console.log('node-tar present')}catch(e){console.log('node-tar absent')}" || true`
+
+---
+
+### tar / CVE-2026-59874
+
+**Verdict:** Not applicable / false positive
+
+**Summary:** Carried from prior scan — evidence unchanged. CVE-2026-59874 is specific to npm `node-tar` `tar.replace` behavior and does not apply to GNU tar RPM in RHEL image.
+
+**CVE research:** NVD and OSV scope the vulnerability to Node.js `node-tar` code paths; no Red Hat mapping exists for GNU tar package.
+
+**Controls:** Runtime package inventory shows GNU tar RPM; no Node.js tar library dependency is required for service execution.
+
+**Verification (Tier-2 handoff):** `oc rsh <pod> rpm -q tar && oc rsh <pod> find /app -maxdepth 8 -name package.json -o -name node_modules`
+
+---
