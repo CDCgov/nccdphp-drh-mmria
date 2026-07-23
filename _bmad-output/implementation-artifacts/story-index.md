@@ -1053,6 +1053,20 @@ dev this story _bmad-output/implementation-artifacts/28-3-server-core-element-ex
 
 ---
 
+## Epic 31: Section 508 — Home Page General Section Keyboard Focus Indicators
+
+| Story | File | Status |
+| --- | --- | --- |
+| 31.1 Add `:focus-visible` Outline to General Section Buttons | `31-1-home-page-general-section-focus-indicator.md` | done |
+
+**Story 31.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/31-1-home-page-general-section-focus-indicator.md
+```
+
+---
+
 ## Open Items — Resolve Before Affected Story
 
 | OI       | Affects               | What to resolve                                                                                                                                                                                                                                                                                                                                                                                        |
