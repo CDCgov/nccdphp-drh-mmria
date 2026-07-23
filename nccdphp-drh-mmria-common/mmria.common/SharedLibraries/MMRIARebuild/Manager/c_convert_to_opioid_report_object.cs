@@ -797,7 +797,7 @@ mDeathbyRace  MDeathbyRace17 17
         {
             if (_isShowSyncDocumentStatus)
             {
-                System.Console.WriteLine("c_convert_to_report_object.get_value bad mapping {0}\n {1}", p_path, ex);
+                System.Console.WriteLine($"[DbRebuildError] [tenant:{_hostPrefix}] [case:{_documentId}] [path:{p_path}] get_value bad mapping — {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -864,7 +864,7 @@ mDeathbyRace  MDeathbyRace17 17
                     }
                     else
                     {
-                        System.Console.WriteLine($"[DbRebuildError] [tenant:{_hostPrefix}] [case:{_documentId}] This should not happen. {p_path}");
+                        System.Console.WriteLine($"[DbRebuildError] [tenant:{_hostPrefix}] [case:{_documentId}] [path:{p_path}] This should not happen");
                     }
 
                 }
@@ -902,7 +902,7 @@ mDeathbyRace  MDeathbyRace17 17
         {
             if (_isShowSyncDocumentStatus)
             {
-                System.Console.WriteLine("c_convert_to_report_object.get_value bad mapping {0}\n {1}", p_path, ex);
+                System.Console.WriteLine($"[DbRebuildError] [tenant:{_hostPrefix}] [case:{_documentId}] [path:{p_path}] get_value bad mapping — {ex.GetType().Name}: {ex.Message}");
             }
         }
 

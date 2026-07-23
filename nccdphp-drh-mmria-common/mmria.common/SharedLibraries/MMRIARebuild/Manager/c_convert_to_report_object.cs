@@ -17,6 +17,8 @@ public sealed partial class c_convert_to_report_object
     private readonly System.Dynamic.ExpandoObject _source_object;
     private readonly mmria.common.metadata.app _metadata;
     private readonly mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository _metadataRepository;
+    private readonly string _documentId;
+    private readonly string _hostPrefix;
 
     private System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, string>> List_Look_Up;
 
@@ -118,7 +120,8 @@ public sealed partial class c_convert_to_report_object
         mmria.common.couchdb.OverridableConfiguration configuration = null,
         string host_prefix = null,
         System.Dynamic.ExpandoObject p_source_object = null,
-        mmria.common.metadata.app p_metadata = null
+        mmria.common.metadata.app p_metadata = null,
+        string documentId = null
     )
     {
 
@@ -130,6 +133,8 @@ public sealed partial class c_convert_to_report_object
         _source_object = p_source_object;
         _metadata = p_metadata;
         _metadataRepository = metadataRepository;
+        _documentId = documentId;
+        _hostPrefix = host_prefix;
     }
 
 
@@ -442,7 +447,7 @@ public sealed partial class c_convert_to_report_object
             is_error = true;
             if (_isShowSyncDocumentStatus)
             {
-                System.Console.WriteLine("c_convert_to_report_object.get_value bad mapping {0}\n {1}", p_path, ex);
+                System.Console.WriteLine($"[DbRebuildError] [tenant:{_hostPrefix}] [case:{_documentId}] [path:{p_path}] get_value bad mapping — {ex.GetType().Name}: {ex.Message}");
             }
         }
 

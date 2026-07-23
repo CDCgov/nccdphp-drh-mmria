@@ -676,7 +676,7 @@ prenatal/routine_monitoring/date_and_time
                             }
                             catch(Exception ex)
                             {
-                                System.Console.WriteLine($"[DbRebuildError] [tenant:{_hostPrefix}] [case:{_documentId}] Calc_Date setting DateOnly error — {ex.GetType().Name}: {ex.Message}");
+                                System.Console.WriteLine($"[DbRebuildError] [tenant:{_hostPrefix}] [case:{_documentId}] [path:{path}] Calc_Date setting DateOnly error — {ex.GetType().Name}: {ex.Message}");
                             }
 
                         }
@@ -694,7 +694,7 @@ prenatal/routine_monitoring/date_and_time
                 }
                 catch(Exception ex)
                 {
-                    System.Console.WriteLine($"[DbRebuildError] [tenant:{_hostPrefix}] [case:{_documentId}] Calc_Date on Group Field error — {ex.GetType().Name}: {ex.Message}");
+                    System.Console.WriteLine($"[DbRebuildError] [tenant:{_hostPrefix}] [case:{_documentId}] [path:{path}] Calc_Date on Group Field error — {ex.GetType().Name}: {ex.Message}");
                 }
 
                 for(var i = 0; i < p_node.children.Count(); i++)

@@ -218,7 +218,7 @@ public sealed class c_sync_document
 
         result.de_identified_json = await build_de_identified_json_async(source_object);
 
-        string aggregate_json = await new mmria.common.SharedLibraries.MMRIARebuild.Manager.c_convert_to_report_object(document_json, metadata_version, db_config, _couchDbHttpClient, _metadataRepository, _configuration, _host_prefix, source_object, _rebuild_context?.metadata).executeAsync();
+        string aggregate_json = await new mmria.common.SharedLibraries.MMRIARebuild.Manager.c_convert_to_report_object(document_json, metadata_version, db_config, _couchDbHttpClient, _metadataRepository, _configuration, _host_prefix, source_object, _rebuild_context?.metadata, documentId: this.document_id).executeAsync();
         if(!string.IsNullOrWhiteSpace(aggregate_json))
         {
             result.report_document_json_list.Add(ensure_document_id(aggregate_json, this.document_id, remove_revision: _skip_revision_lookup));
