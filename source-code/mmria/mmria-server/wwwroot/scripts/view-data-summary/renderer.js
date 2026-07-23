@@ -665,19 +665,14 @@ function render_search_result_item(p_result, p_metadata, p_path, p_selected_form
                 !g_filter.field_selection.has("all")
             )
             {
-                if(g_filter.field_selection.size == 1)
+                // Exclude fields outside the selection at any selection size (fixes
+                // multi-field selections rendering unfiltered).
+                if(!g_filter.field_selection.has(field_name))
                 {
-                    if(g_filter.field_selection.has(field_name))
-                    {
-                        is_single_field_filter = true;
-                    }
-                    else
-                    {
-                        return;
-                    }
-                    
+                    return;
                 }
 
+                is_single_field_filter = g_filter.field_selection.size == 1;
             }
 
 			if(p_search_text != null && p_search_text !="")
