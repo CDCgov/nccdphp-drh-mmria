@@ -43,8 +43,9 @@ WORKDIR /app
 USER root
 RUN (dnf update -y libacl && dnf clean all) || (microdnf update -y libacl && microdnf clean all)
 
-# Remove unused packages not required by the app at runtime (reduces attack surface)
-RUN (dnf remove -y curl-minimal libcurl-minimal tar && dnf clean all) || (microdnf remove -y curl-minimal libcurl-minimal tar && microdnf clean all)
+# Update curl to patched version to address CVE findings (curl-minimal cannot be removed;
+# rpm depends on libcurl-minimal, so removal breaks the package manager).
+RUN (dnf update -y curl-minimal libcurl-minimal && dnf clean all) || (microdnf update -y curl-minimal libcurl-minimal && microdnf clean all)
 
 # Copy published output from build image
 COPY --from=publish /app/publish .

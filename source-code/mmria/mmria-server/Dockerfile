@@ -36,8 +36,9 @@ USER root
 # fixed in libacl-2.4.0-1.el9_8). Fall back to microdnf for UBI-minimal variants.
 RUN (dnf update -y libacl && dnf clean all) || (microdnf update -y libacl && microdnf clean all)
 
-# Remove unused packages not required by the app at runtime (reduces attack surface)
-RUN (dnf remove -y curl-minimal libcurl-minimal tar && dnf clean all) || (microdnf remove -y curl-minimal libcurl-minimal tar && microdnf clean all)
+# Update curl to patched version to address CVE findings (curl-minimal cannot be removed;
+# rpm depends on libcurl-minimal, so removal breaks the package manager).
+RUN (dnf update -y curl-minimal libcurl-minimal && dnf clean all) || (microdnf update -y curl-minimal libcurl-minimal && microdnf clean all)
 
 WORKDIR /app
 COPY --from=publish /app/publish .
