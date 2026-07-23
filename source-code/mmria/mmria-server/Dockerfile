@@ -36,6 +36,9 @@ USER root
 # fixed in libacl-2.4.0-1.el9_8). Fall back to microdnf for UBI-minimal variants.
 RUN (dnf update -y libacl && dnf clean all) || (microdnf update -y libacl && microdnf clean all)
 
+# Remove unused packages not required by the app at runtime (reduces attack surface)
+RUN (dnf remove -y curl-minimal libcurl-minimal tar && dnf clean all) || (microdnf remove -y curl-minimal libcurl-minimal tar && microdnf clean all)
+
 WORKDIR /app
 COPY --from=publish /app/publish .
 RUN rm -f ./wwwroot/test*.html ./wwwroot/test.js ./wwwroot/pdf-version/test*.html ./wwwroot/print-version/test*.html || true
