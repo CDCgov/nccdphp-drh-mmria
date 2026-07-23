@@ -29,6 +29,11 @@ USER 1001
 # Runtime image (smaller)
 FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-90-runtime:9.0.9-1758211314@sha256:699c83e64b5e931eb0158c803de38cfe176d1a107030ae3b07f678e15c37a88e AS runtime
 WORKDIR /app
+
+# Remove unused packages not required by the app at runtime (reduces attack surface)
+USER root
+RUN (dnf remove -y curl-minimal libcurl-minimal tar && dnf clean all) || (microdnf remove -y curl-minimal libcurl-minimal tar && microdnf clean all)
+
 COPY --from=publish /app/publish .
 
 # Let the app bind to 8080 by default for OpenShift routing

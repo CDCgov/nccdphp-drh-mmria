@@ -43,6 +43,9 @@ WORKDIR /app
 USER root
 RUN (dnf update -y libacl && dnf clean all) || (microdnf update -y libacl && microdnf clean all)
 
+# Remove unused packages not required by the app at runtime (reduces attack surface)
+RUN (dnf remove -y curl-minimal libcurl-minimal tar && dnf clean all) || (microdnf remove -y curl-minimal libcurl-minimal tar && microdnf clean all)
+
 # Copy published output from build image
 COPY --from=publish /app/publish .
 
