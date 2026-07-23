@@ -45,6 +45,8 @@ FR-8.6: When a user navigates to the login page, the server checks the offline c
 FR-8.7: An installation-admin-only admin page (modeled on `/broadcast-message`, linked from installation admin nav) allows editing and saving all five offline config fields. Saves via mmria-server â†’ mmria-services â†’ CDC instance `metadata` DB.
 FR-9.1: On the Data Summary Checks page, when a Form is selected and the user toggles "ALL" in the Field dropdown, only fields belonging to the selected Form are shown and enabled. The no-Form-selected default state (all fields shown) is preserved unchanged.
 FR-10.1: On the Manage Users page, clicking "Export User List" when a Role or Username filter is active exports only the currently displayed users. When no filter is active, all users are exported (existing default preserved).
+FR-31.1: The "View/Download Informant Interview Summary Template" button (`#view-informant-interview-summary-template-button`) on the Home page displays a clearly visible, high-contrast focus outline when reached via keyboard navigation (`:focus-visible`). The outline must be visually distinct from the button's default appearance.
+FR-31.2: The "View/Download MMRIA Committee Decisions Form (CDF) Template PDF" button (`#view-cdf-template-button`) on the Home page displays the same clearly visible, high-contrast focus outline when reached via keyboard navigation (`:focus-visible`).
 
 ### NonFunctional Requirements
 
@@ -118,6 +120,9 @@ FR-11.4: Epic 10 â€” BroadcastChannel CVS status and parent-page button sta
 FR-29.1: Epic 29 — Server-side record ID format validation and uniqueness guard in SaveCaseAsync
 FR-29.2: Epic 29 — Client-side per-candidate uniqueness check via /api/record_id before case save
 FR-29.3: Epic 29 — Add record_id_list CouchDB view and remove broken bulk-list dependency from case creation flow
+
+FR-31.1: Epic 31 — CSS :focus-visible outline for Informant Interview Summary Template button (#view-informant-interview-summary-template-button)
+FR-31.2: Epic 31 — CSS :focus-visible outline for CDF Template PDF button (#view-cdf-template-button)
 
 ## Epic List
 
@@ -198,6 +203,12 @@ The null-fallback scaffolding placed in `exporter.cs`, `mmrds_exporter.cs`, and 
 Abstractors creating new cases are protected against duplicate MMRIA Record IDs (`{jurisdiction}-{year-of-death}-{4-digit-number}`) by a defense-in-depth strategy. The server rejects any new-case save where the record ID already exists in the database. The client verifies uniqueness per-candidate against the server before saving, eliminating the TOCTOU race condition. The broken bulk-list CouchDB view dependency is removed from the case creation flow and a functioning design-document view is added in its place.
 **FRs covered:** FR-29.1, FR-29.2, FR-29.3
 **Stories:** 29.1 — Server-side format validation and uniqueness guard, 29.2 — Client-side per-candidate API check, 29.3 — Add record_id_list view and remove broken bulk-list call
+
+### Epic 31: Section 508 — Home Page General Section Keyboard Focus Indicators
+
+Two `btn-link`-styled buttons in the Home page General section lack a visible keyboard focus indicator when reached via keyboard navigation. A targeted CSS `:focus-visible` rule is added to `index.scss` for both elements by ID, providing a high-contrast outline that satisfies Section 508 and WCAG 2.1 SC 2.4.7 (Focus Visible) requirements. CSS-only change — no server-side or JavaScript modifications required.
+**FRs covered:** FR-31.1, FR-31.2
+**Stories:** 31.1 — Add `:focus-visible` outline styles to General section buttons in `index.scss`
 
 ---
 
@@ -4269,4 +4280,71 @@ Then a request goes to `GET /api/tamuGeoCode` (observable in the network tab) an
 | 30.7 — Fix `mmria.committee_member.js` (security) | Low | None — independent; only requires existing `tamuGeoCodeController` |
 
 30.1 → 30.2 → 30.3 is the critical path. 30.5 can be worked in parallel with 30.3 once 30.1 and 30.2 are done. 30.6 and 30.7 are independent tail stories.
+
+---
+
+## Epic 31: Section 508 — Home Page General Section Keyboard Focus Indicators
+
+Two `btn-link`-styled buttons in the General section of the Home page (`Views/Home/Index.cshtml`) have no visible keyboard focus indicator. A 508 accessibility review identified both as non-compliant with Section 508 and WCAG 2.1 SC 2.4.7 (Focus Visible).
+
+### Root Cause
+
+Bootstrap's `.btn-link:focus` rule in `index.css` sets `box-shadow: none`, canceling the `.btn:focus` box-shadow indicator. The only remaining focus style is `text-decoration: underline` — but both buttons already carry `text-decoration: underline` unconditionally via their inline `style` attribute. The result is **zero visible change** when either button receives keyboard focus.
+
+**Affected elements (from `Views/Home/Index.cshtml`):**
+
+| Element ID | Text |
+|---|---|
+| `#view-informant-interview-summary-template-button` | View/Download Informant Interview Summary Template |
+| `#view-cdf-template-button` | View/Download MMRIA Committee Decisions Form (CDF) Template PDF |
+
+### Story 31.1: Add `:focus-visible` Outline to General Section Buttons
+
+As a keyboard-only user navigating the MMRIA Home page,
+I want to see a clear visual indicator when either General section download button has keyboard focus,
+So that I can tell which element is active and navigate the page with confidence.
+
+**Acceptance Criteria:**
+
+**Given** the user presses Tab to move keyboard focus to the "View/Download Informant Interview Summary Template" button (`#view-informant-interview-summary-template-button`)
+**When** the button receives focus
+**Then** a clearly visible, high-contrast outline (minimum 3 px, sufficient contrast against both the control and the surrounding background) is rendered around the button — the outline must be visually distinct from the button's non-focused appearance
+
+**Given** the user presses Tab to move keyboard focus to the "View/Download MMRIA Committee Decisions Form (CDF) Template PDF" button (`#view-cdf-template-button`)
+**When** the button receives focus
+**Then** the same clearly visible, high-contrast outline is rendered around that button
+
+**Given** the user navigates via mouse (no keyboard focus)
+**When** the buttons are hovered or clicked
+**Then** no new outline appears — the `:focus-visible` rule must not apply to mouse-initiated focus, preserving existing hover and click appearance
+
+**Given** the fix is implemented by adding `:focus-visible` rules targeting `#view-informant-interview-summary-template-button` and `#view-cdf-template-button` in `index.scss`
+**When** the developer adds the rules
+**Then** the compiled `index.css` contains corresponding `:focus-visible` declarations — no inline styles, no JavaScript, no server-side changes
+
+**Given** the site is verified in Edge and Chrome (NFR-1)
+**When** the developer tabs through the General section
+**Then** the focus outline is visible and consistent in both browsers
+
+**Implementation note:** Add the following to `index.scss` (alongside existing focus rules such as `.info-icon:focus`):
+
+```scss
+#view-informant-interview-summary-template-button:focus-visible,
+#view-cdf-template-button:focus-visible {
+  outline: 3px solid #0056b3;
+  outline-offset: 3px;
+}
+```
+
+The color `#0056b3` (Bootstrap link-hover blue) provides ≥ 3:1 contrast against the white card background. No changes to `Views/Home/Index.cshtml`, controller code, or JavaScript are required.
+
+---
+
+## Epic 31 — Story Sequencing
+
+| Story | Risk | Dependencies |
+|---|---|---|
+| 31.1 — Add `:focus-visible` outline to General section buttons | Low | None — CSS-only, no server or JS changes |
+
+Single-story epic. No sequencing constraints.
 
