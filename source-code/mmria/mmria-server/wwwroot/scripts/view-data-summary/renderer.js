@@ -108,12 +108,77 @@ function render_form_filter(p_filter)
 	return result.join("");
 }
 
+function get_valid_field_names_for_selected_form(p_selected_form)
+{
+    // Union of field names available under the given form filter. When p_selected_form is
+    // "all" (or empty), every field across every form is valid; otherwise only fields that
+    // belong to that specific form are valid.
+    const result = new Set();
+
+    for(const [form_name, fields] of g_form_field_map)
+    {
+        if(p_selected_form && p_selected_form != '' && p_selected_form != 'all' && form_name != p_selected_form)
+        {
+            continue;
+        }
+
+        for(const [field_name] of fields)
+        {
+            result.add(field_name);
+        }
+    }
+
+    return result;
+}
+
+function update_any_field_multiselect_label()
+{
+    const any_field_multiselect = document.getElementById('any_field_multiselect');
+    if(!any_field_multiselect)
+    {
+        return;
+    }
+
+    if(!g_filter.field_selection || g_filter.field_selection.size == 0 || g_filter.field_selection.has("all"))
+    {
+        any_field_multiselect.innerHTML = "(Any Field)";
+    }
+    else
+    {
+        any_field_multiselect.innerHTML = `${g_filter.field_selection.size} Field(s) Selected`;
+    }
+}
+
 function on_form_filter_changed(value)
 {
     //g_filter.field_selection = new Set(['all']);
     //g_filter.field_selection.add(value);
 
     g_filter.selected_form = value;
+
+    // Prune any specific field selections that don't exist for the newly selected form so the
+    // "N Field(s) Selected" count doesn't keep counting fields that no longer apply (e.g. the
+    // user picked fields for one form, then switched to "(Any Form)" or a different form).
+    if(g_filter.field_selection && !g_filter.field_selection.has("all"))
+    {
+        const valid_field_names = get_valid_field_names_for_selected_form(value);
+
+        for(const field_name of [...g_filter.field_selection])
+        {
+            if(!valid_field_names.has(field_name))
+            {
+                g_filter.field_selection.delete(field_name);
+            }
+        }
+
+        if(g_filter.field_selection.size == 0)
+        {
+            g_filter.field_selection.add("all");
+        }
+    }
+
+    update_any_field_multiselect_label();
+
     const html = render_field_filter(g_filter);
     const el = document.getElementById("checkboxes");
 
@@ -665,19 +730,14 @@ function render_search_result_item(p_result, p_metadata, p_path, p_selected_form
                 !g_filter.field_selection.has("all")
             )
             {
-                if(g_filter.field_selection.size == 1)
+                // Exclude fields outside the selection at any selection size (fixes
+                // multi-field selections rendering unfiltered).
+                if(!g_filter.field_selection.has(field_name))
                 {
-                    if(g_filter.field_selection.has(field_name))
-                    {
-                        is_single_field_filter = true;
-                    }
-                    else
-                    {
-                        return;
-                    }
-                    
+                    return;
                 }
 
+                is_single_field_filter = g_filter.field_selection.size == 1;
             }
 
 			if(p_search_text != null && p_search_text !="")

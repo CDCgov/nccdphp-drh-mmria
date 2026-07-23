@@ -1,5 +1,11 @@
 # Deferred Work
 
+## Deferred from: code review of view-data-summary-multi-field-filter fix (2026-07-22)
+
+- No automated regression coverage added for the field-filter results-table fix (`renderer.js` `render_search_result_item`) — requires a running app + CouchDB instance to author/verify a Playwright test (`../nccdphp-drh-mmria-utilities/e2e/tests/`), which is unavailable in this session. Follow-up: add a test selecting 2+ specific fields and asserting only matching rows appear in `#search_result_list`, alongside the existing `view-data-summary.field-form-filter.spec.ts` coverage from Story 9.1.
+- The `"all"` sentinel string used in `g_filter.field_selection` collides with the user-controlled field-name namespace — nothing prevents a real MMRIA field from being named `"all"`. Pre-existing debt, not introduced by this fix.
+- `g_filter` is mutable global state read directly inside `render_search_result_item`, making the filtering logic hard to unit-test in isolation without reaching into global setup. Pre-existing architectural pattern across this file, not introduced by this fix.
+
 ## Deferred from: code review of 9-3-fix-manage-users-role-filter-endswith (2026-07-10)
 
 - Regression coverage lives in a different repo (`nccdphp-drh-mmria-utilities`) than the fix (`nccdphp-drh-mmria`) — pre-existing repo split, matches Story 9.2 precedent.
