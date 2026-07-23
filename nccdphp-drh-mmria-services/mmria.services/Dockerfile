@@ -47,6 +47,15 @@ RUN (dnf update -y libacl && dnf clean all) || (microdnf update -y libacl && mic
 # rpm depends on libcurl-minimal, so removal breaks the package manager).
 RUN (dnf update -y curl-minimal libcurl-minimal && dnf clean all) || (microdnf update -y curl-minimal libcurl-minimal && microdnf clean all)
 
+# Update tar to pick up any available RHEL patches (belt-and-suspenders hygiene; Trivy
+# node-tar CVEs CVE-2026-59873 / CVE-2026-59874 are misattributed to GNU tar).
+RUN (dnf update -y tar && dnf clean all) || (microdnf update -y tar && microdnf clean all)
+
+# Attempt to update .NET runtime packages; when vendor patches become available for
+# CVE-2024-38081 / CVE-2025-26682 a base-image rebuild will be required.
+RUN (dnf update -y dotnet-host dotnet-runtime-10.0 aspnetcore-runtime-10.0 && dnf clean all) || \
+    (microdnf update -y dotnet-host dotnet-runtime-10.0 aspnetcore-runtime-10.0 && microdnf clean all) || true
+
 # Copy published output from build image
 COPY --from=publish /app/publish .
 
