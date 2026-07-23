@@ -38,6 +38,11 @@ USER 1001
 FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100-aspnet:9.8-1784686917@sha256:f817cb732559281aa739d0817325a4a8695cf735e5cb37fc3aad92a9bba4edb5 AS runtime
 WORKDIR /app
 
+# Update libacl to address CVE-2026-54369 (symlink traversal privilege escalation;
+# fixed in libacl-2.4.0-1.el9_8). Fall back to microdnf for UBI-minimal variants.
+USER root
+RUN (dnf update -y libacl && dnf clean all) || (microdnf update -y libacl && microdnf clean all)
+
 # Copy published output from build image
 COPY --from=publish /app/publish .
 

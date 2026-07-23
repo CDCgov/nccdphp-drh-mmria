@@ -29,8 +29,12 @@ USER 1001
 # https://console-openshift-console.apps.ecpaas-dev.cdc.gov/k8s/ns/trusted-images/imagestreamtags/dotnet-100-aspnet%3A9.7-1776776188
 FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100-aspnet:9.8-1784686917@sha256:f817cb732559281aa739d0817325a4a8695cf735e5cb37fc3aad92a9bba4edb5 AS runtime
 
-# Switch to root temporarily to create directories
+# Switch to root temporarily to create directories and patch OS packages
 USER root
+
+# Update libacl to address CVE-2026-54369 (symlink traversal privilege escalation;
+# fixed in libacl-2.4.0-1.el9_8). Fall back to microdnf for UBI-minimal variants.
+RUN (dnf update -y libacl && dnf clean all) || (microdnf update -y libacl && microdnf clean all)
 
 WORKDIR /app
 COPY --from=publish /app/publish .
