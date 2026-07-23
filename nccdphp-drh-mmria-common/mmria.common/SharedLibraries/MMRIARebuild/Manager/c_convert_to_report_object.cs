@@ -139,7 +139,7 @@ public sealed partial class c_convert_to_report_object
         string result = null;
         //Get_Value_Result value_result = null;
 
-        var metadata = await _metadataRepository.GetAppDocumentAsync(metadata_version, db_config);
+        var metadata = _metadata ?? await _metadataRepository.GetAppDocumentAsync(metadata_version, db_config);
 
 
         List_Look_Up = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);

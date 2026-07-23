@@ -335,7 +335,7 @@ mDeathbyRace  MDeathbyRace17 17
         string result = null;
 
 
-        var metadata = await _metadataRepository.GetAppDocumentAsync(metadata_version, db_config);
+        var metadata = _metadata ?? await _metadataRepository.GetAppDocumentAsync(metadata_version, db_config);
 
 
         List_Look_Up = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);

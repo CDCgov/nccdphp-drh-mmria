@@ -52,7 +52,7 @@ public sealed class c_convert_to_dqr_detail
 
         var gs = new migrate.C_Get_Set_Value(new ());
         
-        var metadata = await _metadataRepository.GetAppDocumentAsync(metadata_version, db_config);
+        var metadata = _metadata ?? await _metadataRepository.GetAppDocumentAsync(metadata_version, db_config);
 
 
         List_Look_Up = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
