@@ -83,12 +83,13 @@ public sealed class c_de_identifier
 
             foreach (string path in de_identified_set) 
             {
-                is_fully_de_identified  = is_fully_de_identified && set_de_identified_value (case_item_object, path);
-                /*
-                if(!is_fully_de_identified)
+                bool path_result = set_de_identified_value(case_item_object, path);
+                if(!path_result)
                 {
-                    set_de_identified_value (case_item_object, path);
-                }*/
+                    var case_id = (expando_object.ContainsKey("_id") ? expando_object["_id"]?.ToString() : null) ?? "unknown";
+                    System.Console.WriteLine($"[DeIdDiag] [case:{case_id}] path returned false: {path}");
+                }
+                is_fully_de_identified = is_fully_de_identified && path_result;
             }
 
             if(!is_fully_de_identified)
