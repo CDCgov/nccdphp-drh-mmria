@@ -786,10 +786,15 @@ public sealed class c_document_sync_all_legacy
                         write_stopwatch.Stop();
                         write_elapsed_ms += write_stopwatch.ElapsedMilliseconds;
                     }
+                    catch (System.Collections.Generic.KeyNotFoundException document_ex)
+                    {
+                        result.document_error_count++;
+                        System.Console.WriteLine($"[DbRebuildError] [tenant:{get_tenant_log_label()}] [case:{document_id}] KeyNotFoundException: {document_ex.Message}");
+                    }
                     catch (Exception document_ex)
                     {
                         result.document_error_count++;
-                        System.Console.WriteLine($"error running c_docment_sync_all_legacy.document {document_id}\n{document_ex}");
+                        System.Console.WriteLine($"[DbRebuildError] [tenant:{get_tenant_log_label()}] [case:{document_id}] error running document rebuild — {document_ex.GetType().Name}: {document_ex.Message}");
                     }
                 }
 
@@ -841,7 +846,7 @@ public sealed class c_document_sync_all_legacy
         catch (Exception ex)
         {
             result.last_error = ex.ToString();
-            System.Console.WriteLine($"error running c_docment_sync_all_legacy\n{ex}");
+            System.Console.WriteLine($"[DbRebuildError] [tenant:{get_tenant_log_label()}] error running c_document_sync_all_legacy — {ex.GetType().Name}: {ex.Message}");
         }
 
         return result;

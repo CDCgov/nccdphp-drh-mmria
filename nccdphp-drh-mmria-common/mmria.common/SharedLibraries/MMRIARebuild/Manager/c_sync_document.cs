@@ -224,16 +224,16 @@ public sealed class c_sync_document
             result.report_document_json_list.Add(ensure_document_id(aggregate_json, this.document_id, remove_revision: _skip_revision_lookup));
         }
 
-        string opioid_report_json = await new mmria.common.SharedLibraries.MMRIARebuild.Manager.c_convert_to_opioid_report_object(document_json, "overdose", metadata_version, db_config, _couchDbHttpClient, _metadataRepository, _configuration, _host_prefix, source_object, _rebuild_context?.metadata).executeAsync();
+        string opioid_report_json = await new mmria.common.SharedLibraries.MMRIARebuild.Manager.c_convert_to_opioid_report_object(document_json, "overdose", metadata_version, db_config, _couchDbHttpClient, _metadataRepository, _configuration, _host_prefix, source_object, _rebuild_context?.metadata, documentId: this.document_id).executeAsync();
         add_report_document(result.report_document_json_list, opioid_report_json, "opioid-" + this.document_id);
 
-        string powerbi_report_json = await new mmria.common.SharedLibraries.MMRIARebuild.Manager.c_convert_to_opioid_report_object(document_json, "powerbi", metadata_version, db_config, _couchDbHttpClient, _metadataRepository, _configuration, _host_prefix, source_object, _rebuild_context?.metadata).executeAsync();
+        string powerbi_report_json = await new mmria.common.SharedLibraries.MMRIARebuild.Manager.c_convert_to_opioid_report_object(document_json, "powerbi", metadata_version, db_config, _couchDbHttpClient, _metadataRepository, _configuration, _host_prefix, source_object, _rebuild_context?.metadata, documentId: this.document_id).executeAsync();
         add_report_document(result.report_document_json_list, powerbi_report_json, "powerbi-" + this.document_id);
 
         string dqr_detail_report_json = await new mmria.common.SharedLibraries.MMRIARebuild.Manager.c_convert_to_dqr_detail(document_json, "dqr-detail", metadata_version, db_config, _couchDbHttpClient, _metadataRepository, source_object, _rebuild_context?.metadata).executeAsync();
         add_report_document(result.report_document_json_list, dqr_detail_report_json, "dqr-" + this.document_id);
 
-        string freq_detail_report_json = await new mmria.common.SharedLibraries.MMRIARebuild.Manager.c_generate_frequency_summary_report(document_json, "freq-detail", metadata_version, db_config, _couchDbHttpClient, _metadataRepository, source_object, _rebuild_context?.metadata).executeAsync();
+        string freq_detail_report_json = await new mmria.common.SharedLibraries.MMRIARebuild.Manager.c_generate_frequency_summary_report(document_json, "freq-detail", metadata_version, db_config, _couchDbHttpClient, _metadataRepository, source_object, _rebuild_context?.metadata, documentId: this.document_id, hostPrefix: _host_prefix).executeAsync();
         add_report_document(result.report_document_json_list, freq_detail_report_json, "freq-" + this.document_id);
 
         return result;
@@ -462,8 +462,7 @@ public sealed class c_sync_document
         }
         catch (Exception ex)
         {
-            System.Console.WriteLine("sync dqr detail error");
-            System.Console.WriteLine(ex);
+            System.Console.WriteLine($"[DbRebuildError] [tenant:{_host_prefix}] [case:{this.document_id}] sync dqr detail error — {ex.GetType().Name}: {ex.Message}");
         }
 
 
@@ -508,8 +507,7 @@ public sealed class c_sync_document
         }
         catch (Exception ex)
         {
-            System.Console.WriteLine("sync freq detail error");
-            System.Console.WriteLine(ex);
+            System.Console.WriteLine($"[DbRebuildError] [tenant:{_host_prefix}] [case:{this.document_id}] sync freq detail error — {ex.GetType().Name}: {ex.Message}");
         }
 
     }

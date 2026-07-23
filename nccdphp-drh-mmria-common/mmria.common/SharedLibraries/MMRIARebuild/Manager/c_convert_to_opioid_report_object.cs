@@ -22,6 +22,8 @@ public sealed partial class c_convert_to_opioid_report_object
     private readonly System.Dynamic.ExpandoObject _source_object;
     private readonly mmria.common.metadata.app _metadata;
     private readonly mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository _metadataRepository;
+    private readonly string _documentId;
+    private readonly string _hostPrefix;
 
     private System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, string>> List_Look_Up;
 
@@ -127,7 +129,8 @@ public sealed partial class c_convert_to_opioid_report_object
         mmria.common.couchdb.OverridableConfiguration configuration = null,
         string host_prefix = null,
         System.Dynamic.ExpandoObject p_source_object = null,
-        mmria.common.metadata.app p_metadata = null
+        mmria.common.metadata.app p_metadata = null,
+        string documentId = null
     )
     {
 
@@ -140,6 +143,8 @@ public sealed partial class c_convert_to_opioid_report_object
         _source_object = p_source_object;
         _metadata = p_metadata;
         _metadataRepository = metadataRepository;
+        _documentId = documentId;
+        _hostPrefix = host_prefix;
     }
 
 
@@ -859,7 +864,7 @@ mDeathbyRace  MDeathbyRace17 17
                     }
                     else
                     {
-                        System.Console.WriteLine("This should not happen. {0}", p_path);
+                        System.Console.WriteLine($"[DbRebuildError] [tenant:{_hostPrefix}] [case:{_documentId}] This should not happen. {p_path}");
                     }
 
                 }
