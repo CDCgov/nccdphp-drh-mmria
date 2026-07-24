@@ -210,6 +210,12 @@ Two `btn-link`-styled buttons in the Home page General section lack a visible ke
 **FRs covered:** FR-31.1, FR-31.2
 **Stories:** 31.1 — Add `:focus-visible` outline styles to General section buttons in `index.scss`
 
+### Epic 32: Export Consistency — Date Format, De-identification Parity, and Hospital Code Normalization
+
+De-identified CSV exports produced from any MMRIA tenant are byte-consistent in date formatting, PII suppression, and coded-field rendering, regardless of which environment triggers the export. Closes three classes of compliance and data-quality risk identified by comparing FL production and T1 local de-identified exports.
+**Story 32.2 CLOSED** — Global de-id list updated (86 paths matching FL production). Eliminated 1,024 field differences; `certificate_infant_fetal_section.csv` and `data-dictionary.csv` now byte-for-byte identical with FL.
+**Remaining:** 32.1 — Normalize datetime serialization in exporter, 32.3 — Investigate hospital paternity field code discrepancy
+
 ---
 
 ## Epic 1: Case Narrative Editor Fidelity
@@ -4347,4 +4353,166 @@ The color `#0056b3` (Bootstrap link-hover blue) provides ≥ 3:1 contrast agains
 | 31.1 — Add `:focus-visible` outline to General section buttons | Low | None — CSS-only, no server or JS changes |
 
 Single-story epic. No sequencing constraints.
+
+---
+
+## Epic 32: Export Consistency — Date Format, De-identification Parity, and Hospital Code Normalization
+
+De-identified CSV exports produced from any MMRIA tenant are byte-consistent in date formatting, PII suppression, and coded-field rendering, regardless of which environment (FL production, multi-tenant dev, local) triggers the export.
+
+This epic addressed three classes of discrepancy observed when comparing `fl_all` and `tenant1_all` de-identified exports of the same 1,695-case dataset:
+- **Date format** *(open — Story 32.1)*: FL renders timestamps as `MM/dd/yyyy HH:mm:ss` (zero-padded, 24-hour); T1 renders them as `M/d/yyyy h:mm:ss AM/PM` (locale-dependent). Consuming tools cannot reliably parse both forms.
+- **PII suppression** *(CLOSED — Story 32.2)*: FL's "fl" de-id list suppressed 6 PII field paths not present in the "global" fallback list. The global list was updated to 86 paths matching FL production. This eliminated 1,024 field differences and made `certificate_infant_fetal_section.csv` and `data-dictionary.csv` byte-for-byte identical with FL.
+- **Hospital paternity code rendering** *(open — Story 32.3)*: `bfdcpdom_imnmhpabsit_hospi` shows specific coded values (1, 2, 7777) in FL but `9999` in T1 for 213 cases. Root cause is ambiguous; likely a data discrepancy tied to the NAT import integer type conversion (see Story 11.1).
+
+**Remaining open differences after Story 32.2 closed** (4,115 real field differences, excluding cosmetic `export_jurisdiction_name`):
+| Remaining Column | Rows | Root Cause | Story |
+|---|---|---|---|
+| `d_creat` | 1,695 | DateTime locale serialization | 32.1 |
+| `dl_updat` | 1,695 | DateTime locale serialization | 32.1 |
+| `hr_vitals_imp_date` | 459 | DateTime locale serialization | 32.1 |
+| `dlc_out` | 53 | DateTime locale serialization | 32.1 |
+| `bfdcpdom_imnmhpabsit_hospi` | 213 | Data or import discrepancy | 32.3 |
+
+### Story 32.1: Normalize Datetime Serialization in CSV Export
+
+As a data consumer,
+I want all timestamp columns in every MMRIA CSV export to use a fixed, unambiguous format,
+So that date parsing never depends on which server locale or culture produced the file.
+
+**Background:**
+`d_creat`, `dl_updat`, `dlc_out`, and `hr_vitals_imp_date` (and any other `datetime`-typed metadata fields) are deserialized from CouchDB JSON by Newtonsoft.Json into `System.DateTime` objects. Those objects are then assigned to `DataRow` columns of type `string`. Without an explicit format string, `DataRow` calls the system default `DateTime.ToString()`, which is culture-dependent — producing `MM/dd/yyyy HH:mm:ss` on FL's server and `M/d/yyyy h:mm:ss AM/PM` on T1's server. The agreed canonical output format is `MM/dd/yyyy HH:mm:ss` (matching current FL production output).
+
+**Acceptance Criteria:**
+
+**Given** any MMRIA CSV export is generated
+**When** a field has metadata type `"datetime"` and the value in the CouchDB document is a parseable ISO 8601 timestamp
+**Then** the exported CSV cell contains the value formatted as `MM/dd/yyyy HH:mm:ss` regardless of server locale or timezone
+
+**Given** `d_creat`, `dl_updat`, `dlc_out`, `hr_vitals_imp_date` in `mmria_case_export.csv`
+**When** exported from any tenant (FL, T1, local dev)
+**Then** the format is `MM/dd/yyyy HH:mm:ss` (zero-padded month/day, 24-hour time) — matching existing FL production output
+
+**Given** the flat-field loop in `mmrds_exporter.cs` processes a path whose `path_to_node_map[path].type.ToLower() == "datetime"`
+**When** the deserialized value is a `System.DateTime` object
+**Then** the row cell is set to `val.ToString("MM/dd/yyyy HH:mm:ss")` — not the default `val.ToString()`
+
+**Given** `exporter.cs` also processes datetime-typed fields
+**When** a datetime value is assigned to a CSV row
+**Then** it uses the same explicit format string
+
+**Given** the value in the CouchDB document is null or absent for a datetime field
+**When** exported
+**Then** the CSV cell is empty (existing behavior preserved)
+
+**Implementation Notes:**
+- Primary change: add an explicit `case "datetime":` branch in the flat-field `switch` in `mmrds_exporter.cs` (around line 640+, before `default:`) that calls `val.ToString("MM/dd/yyyy HH:mm:ss")` when `val` is `System.DateTime`, or passes through the raw string if val is already a string
+- Verify `exporter.cs` flat-field loop applies the same pattern
+- The grid-row switch in `mmrds_exporter.cs` (line ~2226) already uses `val.ToString("o")` for DateTime — leave that unchanged as it is a different output path
+
+---
+
+### Story 32.2: Add Missing PII Fields to Global Standard De-identification List — **CLOSED**
+
+> **Status: Closed.** The global de-id list was updated manually to 86 paths matching FL production. Re-export of T1 confirmed: `certificate_infant_fetal_section.csv` and `data-dictionary.csv` are now byte-for-byte identical with FL; 1,024 field differences in `mmria_case_export.csv` eliminated. No further code or configuration work required for this story.
+
+As a data steward,
+I want the standard de-identified export to suppress the same PII fields on every tenant,
+So that a de-identified export from any environment carries equivalent privacy protection.
+
+**Background:**
+The de-identified field list is stored in a CouchDB document at `/metadata/de-identified-list`. It is keyed by state code (e.g., `"fl"`) with a `"global"` fallback. The export-queue UI (`index.js`) calls `/api/de_identified_list?id=export`, extracts the host-state prefix from `location.host`, and selects that state's list or falls back to `"global"`.
+
+FL (`fl-mmria.cdc.gov`) uses the `"fl"` list, which includes paths for Medical Examiner identifiers, delivery facility names, and birth certificate record numbers. T1 (`tenant1-mmria.local:12345`) has no matching key, so it falls back to `"global"`, which omits all of these fields. The `"global"` list must be updated to include all fields that appear in any state-specific list and represent PII.
+
+**Fields confirmed suppressed in FL but absent from global (from export diff analysis):**
+
+| Export Column | MMRIA Path | Description |
+|---|---|---|
+| `arrc_juris` | `autopsy_report/report_coversheet/jurisdiction` | Medical Examiner case number + name — highest-sensitivity PII |
+| `bfdcpfodd_f_name` | `birth_fetal_death_certificate_parent/facility_of_delivery_demographics/facility_name` | Delivery facility name |
+| `bcifsri_nmr_numbe` | `birth_fetal_death_certificate/record_identification/medical_record_number` | Birth certificate / medical record number |
+| `bcifsbad_fc_state` | `birth_fetal_death_certificate/birth_attendant_demographics/facility_city_state` | Delivery facility city and state |
+| `bfdcpdom_co_birth` | `birth_fetal_death_certificate_parent/demographic_of_mother/city_of_birth` | Mother's birth city |
+| `bfdcpdof_co_birth` | `birth_fetal_death_certificate_parent/demographic_of_father/city_of_birth` | Father's birth city |
+
+**Acceptance Criteria:**
+
+**Given** the standard de-identification list is applied to a de-identified export
+**When** the host-state key is absent from the list document (i.e., `"global"` fallback is used)
+**Then** the export suppresses all six fields listed in the table above (cells are empty)
+
+**Given** the `de-identified-list` CouchDB document is updated
+**When** the global `paths` array is inspected
+**Then** it contains entries for all six MMRIA paths above
+
+**Given** a de-identified export is generated from T1 (local dev tenant)
+**When** `arrc_juris` is compared against the same case in an FL de-identified export
+**Then** both are empty (suppressed)
+
+**Given** the `de-identified-list` document is seeded during environment setup
+**When** the database initialization scripts run
+**Then** the updated global list with all six paths is applied
+
+**Given** the FL state-specific list already contains these paths
+**When** the global list is updated
+**Then** the FL state-specific list is left unchanged — no regression to FL behavior
+
+**Implementation Notes:**
+- Locate the `de-identified-list` document in the `metadata` CouchDB database (accessible via `/api/de_identified_list`)
+- Add the six MMRIA paths to the `global` → `paths` array in that document
+- Update the corresponding database-scripts seed file (check `source-code/mmria/mmria-server/database-scripts/` for the seeding JSON)
+- Verify paths against `source-code/mmria/mmria-server/database-scripts/metadata.json` using `sass_export_name` to confirm exact path strings
+- No code change is required in the exporter — `de_identified_set` already suppresses any path present in `de_identified_field_set`
+
+---
+
+### Story 32.3: Investigate and Resolve Hospital Paternity Field Code Discrepancy
+
+As a data quality officer,
+I want to understand why `bfdcpdom_imnmhpabsit_hospi` shows specific coded values in FL exports but `9999` in T1 exports for the same cases,
+So that the correct behavior can be documented and both environments produce consistent output.
+
+**Background:**
+The export diff shows `bfdcpdom_imnmhpabsit_hospi` ("if mother not married, has paternity acknowledgement been signed in the hospital") differs in 213 cases: FL has specific codes (`1`, `2`, `7777`) while T1 has `9999` (the MMRIA sentinel for "blank/not answered"). Two root causes are possible:
+
+- **Data discrepancy**: T1's test data was entered with this field left blank for those 213 cases, while FL's production cases have actual answers. In this case the exporter is correct and the fix is a data migration/seeding update.
+- **De-identification transform**: FL or T1 applies a post-read transform that replaces specific values with `9999` (or vice versa) for this field. In this case the exporter needs to be corrected to apply the transform consistently.
+
+**Acceptance Criteria:**
+
+**Given** the investigation is complete
+**When** the root cause is confirmed
+**Then** a documented determination is recorded: "data discrepancy" OR "exporter transform inconsistency"
+
+**Given** root cause is confirmed as "exporter transform inconsistency"
+**When** a de-identified export is generated from T1
+**Then** `bfdcpdom_imnmhpabsit_hospi` renders coded values (`1`, `2`, `7777`) matching FL output — not `9999`
+
+**Given** root cause is confirmed as "data discrepancy"
+**When** T1 test case data is examined for the 213 affected cases
+**Then** the field is confirmed blank (`9999` or absent) in the T1 CouchDB documents, and the FL CouchDB documents have specific coded values — proving the delta is data, not code
+
+**Given** root cause is "data discrepancy" and T1 is being used as a parity test environment
+**When** the 213 case documents in T1 are examined
+**Then** a data correction plan is documented (e.g., update the T1 seed data to include representative coded values for this field)
+
+**Investigation Steps:**
+1. Fetch one of the 213 differing case documents directly from both the FL CouchDB instance and the T1 CouchDB instance (use `_id` as the case key)
+2. Inspect `birth_fetal_death_certificate_parent/demographic_of_mother/if_mother_not_married_has_paternity_acknowledgement_been_signed_in_the_hospital` in both documents
+3. If FL has `"1"` / `"2"` / `"7777"` and T1 has `"9999"` or null → data discrepancy confirmed
+4. If both have the same raw value but export differently → exporter transform confirmed
+5. Check whether this path appears in any de-identification list or any special-casing in `mmrds_exporter.cs`
+
+---
+
+## Epic 32 — Story Sequencing
+
+| Story | Risk | Status | Dependencies |
+|---|---|---|---|
+| 32.1 — Normalize datetime serialization in exporter | Low | Open | None — isolated change in `mmrds_exporter.cs`/`exporter.cs` |
+| 32.2 — Add missing PII fields to global de-id list | Medium | **Closed** | Resolved manually — global list updated to 86 paths |
+| 32.3 — Investigate hospital paternity field discrepancy | Low | Open | Requires CouchDB access; likely data-only finding |
+
+32.1 and 32.3 are independent and can be worked in parallel. 32.3 is investigation-first; if it confirms the field values in T1 are simply missing data (9999 = blank from NAT import), no code change is needed and the story closes with a documented finding.
 

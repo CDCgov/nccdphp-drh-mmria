@@ -1067,6 +1067,28 @@ dev this story _bmad-output/implementation-artifacts/31-1-home-page-general-sect
 
 ---
 
+## Epic 32: Export Consistency — Date Format, De-identification Parity, and Hospital Code Normalization
+
+| Story | File | Status |
+| --- | --- | --- |
+| 32.1 Normalize Datetime Serialization in CSV Export | `32-1-normalize-datetime-serialization.md` | done |
+| 32.2 Add Missing PII Fields to Global De-id List | *(no story file — resolved manually)* | **closed** |
+| 32.3 Investigate Hospital Paternity Field Code Discrepancy | `32-3-hospital-paternity-field-investigation.md` | done |
+
+**Story 32.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/32-1-normalize-datetime-serialization.md
+```
+
+**Story 32.3 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/32-3-hospital-paternity-field-investigation.md
+```
+
+---
+
 ## Open Items — Resolve Before Affected Story
 
 | OI       | Affects               | What to resolve                                                                                                                                                                                                                                                                                                                                                                                        |

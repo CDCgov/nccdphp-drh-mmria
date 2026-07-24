@@ -1,5 +1,5 @@
 # generated: 2026-07-14
-last_updated: 2026-07-17
+last_updated: 2026-07-24
 # project: mmria
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@ last_updated: 2026-07-17
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-07-14
-last_updated: 2026-07-17
+last_updated: 2026-07-24
 project: mmria
 project_key: NOKEY
 tracking_system: file-system
@@ -263,3 +263,22 @@ development_status:
   28-2-auth-middleware-session-jurisdiction-wiring: done
   28-3-server-core-element-exporter-remaining-calls: done
   epic-28-retrospective: optional
+
+  # ── Epic 29: Record ID Uniqueness Enforcement ─────────────────────────────
+  epic-29: backlog
+  29-1-server-side-format-validation-and-uniqueness-guard: backlog
+  29-2-client-side-per-candidate-api-check: backlog
+  29-3-add-record-id-list-view-remove-broken-bulk-list-call: backlog
+  epic-29-retrospective: optional
+
+  # ── Epic 31: Section 508 — Home Page General Section Focus Indicators ─────
+  epic-31: done
+  31-1-home-page-general-section-focus-indicator: done
+  epic-31-retrospective: optional
+
+  # ── Epic 32: Export Consistency — Date Format, De-id Parity, Hospital Code ─
+  epic-32: done
+  32-1-normalize-datetime-serialization: done
+  # 32-2-add-missing-pii-fields-to-global-de-id-list: closed (resolved manually — no story file)
+  32-3-hospital-paternity-field-investigation: done
+  epic-32-retrospective: optional

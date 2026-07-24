@@ -287,9 +287,10 @@ public sealed class mmrds_exporter
             }
         }
 
+        var _utcSettings = new Newtonsoft.Json.JsonSerializerSettings { DateTimeZoneHandling = Newtonsoft.Json.DateTimeZoneHandling.RoundtripKind };
         await foreach(string case_id in get_case_ids_to_process())
         {
-            System.Dynamic.ExpandoObject case_row = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(await _caseRepository.GetCaseDocumentJsonAsync(case_id, db_config));
+            System.Dynamic.ExpandoObject case_row = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(await _caseRepository.GetCaseDocumentJsonAsync(case_id, db_config), _utcSettings);
 
             IDictionary<string, object> case_doc = case_row as IDictionary<string, object>;
 
@@ -695,7 +696,7 @@ public sealed class mmrds_exporter
                     }
 
                     string file_field_name = path_to_field_name_map[path];
-                    row[file_field_name] = val;
+                    row[file_field_name] = val is System.DateTime dt ? dt.ToString("MM/dd/yyyy HH:mm:ss") : val;
 
                     }
                     break;
@@ -1031,7 +1032,7 @@ public sealed class mmrds_exporter
 
 
 
-                                        grid_row[file_field_name] = val;
+                                        grid_row[file_field_name] = val is System.DateTime dt ? dt.ToString("MM/dd/yyyy HH:mm:ss") : val;
                                         break;
                                     }
                                 }
@@ -1455,12 +1456,12 @@ public sealed class mmrds_exporter
                             else
                             {
                                 form_row[file_field_name] = val;
-                            }							
+                            }						
                         }
                         else
                         {
                             // If regular row, then copy field
-                            form_row[file_field_name] = val;
+                            form_row[file_field_name] = val is System.DateTime fdt ? fdt.ToString("MM/dd/yyyy HH:mm:ss") : val;
                         }
                         }
                         break;
@@ -2956,11 +2957,11 @@ public sealed class mmrds_exporter
 
         if (this.qualitativeStreamCount[index] == 0)
         {
-            this.qualitativeStreamWriter[index].WriteLine($"{record_split}\nhr_r_id={p_record_id}\nid={p_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}");
+            this.qualitativeStreamWriter[index].Write($"{record_split}\nhr_r_id={p_record_id}\nid={p_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}\n");
         }
         else
         {
-            this.qualitativeStreamWriter[index].WriteLine($"\n{record_split}\nhr_r_id={p_record_id}\nid={p_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}");
+            this.qualitativeStreamWriter[index].Write($"\n{record_split}\nhr_r_id={p_record_id}\nid={p_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}\n");
         }
         this.qualitativeStreamCount[index] += 1;
     }

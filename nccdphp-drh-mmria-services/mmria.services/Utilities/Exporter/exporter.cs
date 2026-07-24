@@ -538,9 +538,10 @@ if(multiform_field_list.Count > 0)
     }
 
 
+    var _utcSettings = new Newtonsoft.Json.JsonSerializerSettings { DateTimeZoneHandling = Newtonsoft.Json.DateTimeZoneHandling.RoundtripKind };
     await foreach(string case_id in get_case_ids_to_process())
     {
-        System.Dynamic.ExpandoObject case_row = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(await _caseRepository.GetCaseDocumentJsonAsync(case_id, db_config));
+        System.Dynamic.ExpandoObject case_row = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(await _caseRepository.GetCaseDocumentJsonAsync(case_id, db_config), _utcSettings);
 
         IDictionary<string, object> case_doc = case_row as IDictionary<string, object>;
 
@@ -910,7 +911,7 @@ if(multiform_field_list.Count > 0)
                 }
 
                 string file_field_name = MetaDataNode_Dictionary[path].sass_export_name;
-                row[file_field_name] = val;
+                row[file_field_name] = val is System.DateTime dt ? dt.ToString("MM/dd/yyyy HH:mm:ss") : val;
 
                 }
                 break;
@@ -2237,11 +2238,11 @@ private void WriteQualitativeData
 
     if (this.qualitativeStreamCount[index] == 0)
     {
-        this.qualitativeStreamWriter[index].WriteLine($"{record_split}\nid={p_record_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}");
+        this.qualitativeStreamWriter[index].Write($"{record_split}\nid={p_record_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}\n");
     }
     else
     {
-        this.qualitativeStreamWriter[index].WriteLine($"\n{record_split}\nid={p_record_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}");
+        this.qualitativeStreamWriter[index].Write($"\n{record_split}\nid={p_record_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}\n");
     }
     this.qualitativeStreamCount[index] += 1;
 }
@@ -2277,11 +2278,11 @@ private void WriteClearTextData
 
     if (this.clearTextStreamCount[index] == 0)
     {
-        this.clearTextStreamWriter[index].WriteLine($"{record_split}\nid={p_record_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}");
+        this.clearTextStreamWriter[index].Write($"{record_split}\nid={p_record_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}\n");
     }
     else
     {
-        this.clearTextStreamWriter[index].WriteLine($"\n{record_split}\nid={p_record_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}");
+        this.clearTextStreamWriter[index].Write($"\n{record_split}\nid={p_record_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}\n");
     }
     this.clearTextStreamCount[index] += 1;
 }
