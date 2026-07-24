@@ -64,8 +64,8 @@
 ## Verification
 
 - Repo-static verification completed:
-  - reviewed `.s2i/bin/assemble` and `.s2i/bin/run`; neither script directly invokes `curl` or `tar`
-  - confirmed the vulnerable packages are now explicitly covered by `.s2i/dockerfile`
+  - reviewed `.s2i/bin/assemble` and `.s2i/bin/run`; `curl` only appears in a commented-out legacy line, while `tar` is still used when `DOTNET_PACK=true`
+  - confirmed the vulnerable packages are now explicitly covered by `.s2i/dockerfile`, which is safer than removing `tar` from the S2I builder image
 - CI log investigation attempted via GitHub MCP using workflow run `30112194673`, but the external `cdcent/nccdphp-od-devops` Actions API returned `404`, so no upstream build logs were available from this session
 - Pod/rebuild checks were not run from this sandbox. Run the following after the next image build:
 
