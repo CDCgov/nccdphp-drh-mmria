@@ -14,7 +14,8 @@
 The original pass on this scan marked all 18 findings "Fixed" because `.s2i/dockerfile` runs
 `dnf upgrade --refresh` for the affected RPMs. That claim does not hold: every row in
 `findings.json` has an empty `fixedIn` field, meaning RHEL/Red Hat has not yet shipped an
-errata build containing a fix for any of these fourteen curl/.NET findings — `dnf upgrade`
+errata build containing a fix for any of the fourteen genuinely-affected curl/.NET findings
+(excluding the four npm-mismatch false positives below) — `dnf upgrade`
 has nothing newer to install and is a no-op against these specific CVEs. The `dnf upgrade
 --refresh` step is retained in `.s2i/dockerfile` as a standing hygiene measure (it will pick
 up a fix automatically the moment RHEL publishes one, with no further code change required),
