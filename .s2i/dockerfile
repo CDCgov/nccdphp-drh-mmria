@@ -5,8 +5,18 @@ FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-imag
 
 USER root
 
-# Update libacl to address CVE-2026-54369 (symlink traversal privilege escalation;
-# fixed in libacl-2.4.0-1.el9_8)
-RUN dnf update -y libacl && dnf clean all
+# Refresh the packages called out by current Trivy findings (curl/libcurl, tar,
+# and the .NET host/runtime stack), and keep the existing libacl remediation.
+RUN dnf upgrade --refresh -y \
+    aspnetcore-runtime-10.0 \
+    curl-minimal \
+    dotnet-host \
+    dotnet-hostfxr-10.0 \
+    dotnet-runtime-10.0 \
+    dotnet-sdk-10.0 \
+    libacl \
+    libcurl-minimal \
+    tar \
+    && dnf clean all
 
 USER 1001
