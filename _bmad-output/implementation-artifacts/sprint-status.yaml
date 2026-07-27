@@ -1,5 +1,5 @@
 # generated: 2026-07-14
-last_updated: 2026-07-24
+last_updated: 2026-07-27
 # project: mmria
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@ last_updated: 2026-07-24
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-07-14
-last_updated: 2026-07-24
+last_updated: 2026-07-27
 project: mmria
 project_key: NOKEY
 tracking_system: file-system
@@ -282,3 +282,11 @@ development_status:
   # 32-2-add-missing-pii-fields-to-global-de-id-list: closed (resolved manually — no story file)
   32-3-hospital-paternity-field-investigation: done
   epic-32-retrospective: optional
+
+  # Epic 33: Case Generator Date and Number Plausibility
+  epic-33: in-progress
+  33-1-metadata-aware-numeric-generation: in-progress
+  33-2-date-group-validity-timeline-plausibility: ready-for-dev
+  33-3-recursive-date-number-validation-gate: ready-for-dev
+  33-4-generator-regression-coverage: ready-for-dev
+  epic-33-retrospective: optional

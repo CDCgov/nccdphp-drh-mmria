@@ -1089,6 +1089,43 @@ dev this story _bmad-output/implementation-artifacts/32-3-hospital-paternity-fie
 
 ---
 
+## Epic 33: Case Generator Date and Number Plausibility
+
+| Story | File | Status |
+| --- | --- | --- |
+| 33.1 Metadata-Aware Numeric Generation | `33-1-metadata-aware-numeric-generation.md` | ready-for-dev |
+| 33.2 Date Group Validity and Timeline Plausibility | `33-2-date-group-validity-timeline-plausibility.md` | ready-for-dev |
+| 33.3 Recursive Date and Number Validation Gate | `33-3-recursive-date-number-validation-gate.md` | ready-for-dev |
+| 33.4 Generator Regression Coverage for Date and Number Fields | `33-4-generator-regression-coverage.md` | ready-for-dev |
+
+**Sequencing:** 33.1 and 33.2 can proceed independently. 33.3 should land after the validation path design is clear and benefits from fixtures created for 33.1/33.2. 33.4 can be developed alongside the other stories, but it is the closeout proof before Epic 33 is marked done.
+
+**Story 33.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/33-1-metadata-aware-numeric-generation.md
+```
+
+**Story 33.2 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/33-2-date-group-validity-timeline-plausibility.md
+```
+
+**Story 33.3 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/33-3-recursive-date-number-validation-gate.md
+```
+
+**Story 33.4 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/33-4-generator-regression-coverage.md
+```
+
+---
+
 ## Open Items — Resolve Before Affected Story
 
 | OI       | Affects               | What to resolve                                                                                                                                                                                                                                                                                                                                                                                        |
