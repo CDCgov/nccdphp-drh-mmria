@@ -1,8 +1,12 @@
+---
+baseline_commit: d0066f0662fe7be5270fe0cc8b168f227be85cab
+---
+
 # Story 33.2 - Date Group Validity and Timeline Plausibility
 
 **Epic:** 33 - Case Generator Date and Number Plausibility
 **Story ID:** 33.2
-**Status:** ready-for-dev
+**Status:** review
 
 ---
 
@@ -80,31 +84,31 @@ Then edge values remain valid calendar dates and are constrained to intentional 
 
 ## Tasks / Subtasks
 
-- [ ] Fix date group component generation (AC-1, AC-2, AC-3)
-  - [ ] Update date-group detection so month/year groups are recognized without assuming a `day` child exists.
-  - [ ] Generate components only for child names present in metadata.
-  - [ ] Use one `DateTime`/`DateOnly` anchor per date group.
-  - [ ] Preserve the existing blank sentinel convention when a date group is intentionally blank.
+- [x] Fix date group component generation (AC-1, AC-2, AC-3)
+  - [x] Update date-group detection so month/year groups are recognized without assuming a `day` child exists.
+  - [x] Generate components only for child names present in metadata.
+  - [x] Use one `DateTime`/`DateOnly` anchor per date group.
+  - [x] Preserve the existing blank sentinel convention when a date group is intentionally blank.
 
-- [ ] Make date generation path-aware (AC-4 through AC-8)
-  - [ ] Pass metadata path/context to date generation where needed.
-  - [ ] Prefer a small helper over a new scenario engine.
-  - [ ] Keep existing post-process methods and strengthen them only where needed.
+- [x] Make date generation path-aware (AC-4 through AC-8)
+  - [x] Pass metadata path/context to date generation where needed.
+  - [x] Prefer a small helper over a new scenario engine.
+  - [x] Keep existing post-process methods and strengthen them only where needed.
 
-- [ ] Anchor core case timeline (AC-4, AC-5)
-  - [ ] Continue generating `home_record/date_of_death` in the past.
-  - [ ] Preserve record ID year alignment with date of death.
-  - [ ] Preserve maternal DOB/death-certificate DOB synchronization.
-  - [ ] Add limited pregnancy-date alignment for LMP, prenatal visits, delivery-related dates, and estimated confinement dates when those paths exist.
+- [x] Anchor core case timeline (AC-4, AC-5)
+  - [x] Continue generating `home_record/date_of_death` in the past.
+  - [x] Preserve record ID year alignment with date of death.
+  - [x] Preserve maternal DOB/death-certificate DOB synchronization.
+  - [x] Add limited pregnancy-date alignment for LMP, prenatal visits, delivery-related dates, and estimated confinement dates when those paths exist.
 
-- [ ] Order admission/discharge pairs (AC-6)
-  - [ ] Apply to grid rows and multiform instances without changing row counts.
-  - [ ] If only one side of a pair is populated, do not invent the missing side unless metadata generation already would.
+- [x] Order admission/discharge pairs (AC-6)
+  - [x] Apply to grid rows and multiform instances without changing row counts.
+  - [x] If only one side of a pair is populated, do not invent the missing side unless metadata generation already would.
 
-- [ ] Keep time/datetime parseable (AC-7, AC-8)
-  - [ ] Preserve `HH:mm` for time values.
-  - [ ] Preserve parseable datetime output.
-  - [ ] Ensure no invalid or partial datetime strings are emitted.
+- [x] Keep time/datetime parseable (AC-7, AC-8)
+  - [x] Preserve `HH:mm` for time values.
+  - [x] Preserve parseable datetime output.
+  - [x] Ensure no invalid or partial datetime strings are emitted.
 
 ---
 
@@ -152,13 +156,31 @@ dotnet test ..\nccdphp-drh-mmria-utilities\mmria-server.tests\mmria-server.tests
 
 ### Agent Model Used
 
-TBD
+GPT-5 Codex
 
 ### Debug Log References
 
+- 2026-07-27: User requested finishing implementation excluding tests.
+- 2026-07-27: `dotnet build ..\nccdphp-drh-mmria-utilities\mmria-tools\mmria-tools.csproj --no-restore -v minimal` passed after sandbox escalation for utilities build artifact writes.
+
 ### Completion Notes List
 
+- Implemented metadata-defined date group component generation so month/year groups no longer receive invented `day` fields.
+- Added shared date anchors for complete date groups and standalone month/day/year components under the same parent path.
+- Added path-aware date/datetime generation and prevented optional datetime blanks from becoming year-0001 timestamps.
+- Strengthened date-of-death, maternal DOB, death-certificate DOB, pregnancy timeline, gestational age, and admission/discharge ordering post-processing without adding row counts or missing pair sides.
+- Tests were not added or run per user instruction to finish this story excluding tests.
+
 ### File List
+
+- `../nccdphp-drh-mmria-utilities/mmria-tools/Testing/CaseGeneration/Generators/CaseDataGenerator.cs`
+- `../nccdphp-drh-mmria-utilities/mmria-tools/Testing/CaseGeneration/Generators/ValueGenerators/DateValueGenerator.cs`
+- `_bmad-output/implementation-artifacts/33-2-date-group-validity-timeline-plausibility.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+
+### Change Log
+
+- 2026-07-27: Implemented date group validity and timeline plausibility updates; marked ready for review without tests per user instruction.
 
 ---
 

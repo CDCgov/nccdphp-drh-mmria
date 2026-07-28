@@ -1,8 +1,12 @@
+---
+baseline_commit: d0066f0662fe7be5270fe0cc8b168f227be85cab
+---
+
 # Story 33.3 - Recursive Date and Number Validation Gate
 
 **Epic:** 33 - Case Generator Date and Number Plausibility
 **Story ID:** 33.3
-**Status:** ready-for-dev
+**Status:** review
 
 ---
 
@@ -75,32 +79,32 @@ Then the summary includes enough error context to identify the case number and f
 
 ## Tasks / Subtasks
 
-- [ ] Replace bare-name metadata lookup with path-aware validation input (AC-1)
-  - [ ] Prefer reusing `MetadataManager.NodeDictionary` instead of rebuilding a lossy dictionary.
-  - [ ] If `CollectNodes(...)` remains, key it by full path, not `node.name`.
-  - [ ] Preserve repeated field names without collisions.
+- [x] Replace bare-name metadata lookup with path-aware validation input (AC-1)
+  - [x] Prefer reusing `MetadataManager.NodeDictionary` instead of rebuilding a lossy dictionary.
+  - [x] If `CollectNodes(...)` remains, key it by full path, not `node.name`.
+  - [x] Preserve repeated field names without collisions.
 
-- [ ] Implement recursive case traversal (AC-1, AC-5)
-  - [ ] Traverse dictionaries for forms and groups.
-  - [ ] Traverse `List<Dictionary<string, object?>>` and compatible enumerable shapes for multiforms and grids.
-  - [ ] Build full metadata paths as traversal descends.
-  - [ ] Include row/instance context in error messages where helpful while still reporting the metadata path.
+- [x] Implement recursive case traversal (AC-1, AC-5)
+  - [x] Traverse dictionaries for forms and groups.
+  - [x] Traverse `List<Dictionary<string, object?>>` and compatible enumerable shapes for multiforms and grids.
+  - [x] Build full metadata paths as traversal descends.
+  - [x] Include row/instance context in error messages where helpful while still reporting the metadata path.
 
-- [ ] Tighten number/date/time validation (AC-2, AC-3, AC-4, AC-5)
-  - [ ] Use invariant-culture numeric parsing for string fallbacks.
-  - [ ] Treat populated unparseable values as errors.
-  - [ ] Treat intentional optional blanks as allowed.
-  - [ ] Validate time values as time values, not arbitrary dates.
-  - [ ] Validate date groups by constructing a real date from components.
+- [x] Tighten number/date/time validation (AC-2, AC-3, AC-4, AC-5)
+  - [x] Use invariant-culture numeric parsing for string fallbacks.
+  - [x] Treat populated unparseable values as errors.
+  - [x] Treat intentional optional blanks as allowed.
+  - [x] Validate time values as time values, not arbitrary dates.
+  - [x] Validate date groups by constructing a real date from components.
 
-- [ ] Gate outputs in `CaseGeneratorService` (AC-6, AC-7, AC-8)
-  - [ ] After validation, check `ValidationReport.InvalidCases` or equivalent error count before writing.
-  - [ ] On errors, set `GenerationResult.Success = false`, set a concise `ErrorMessage`, keep `GeneratedCases` and `ValidationReport`, and return before `JsonCaseWriter` or `CouchDbWriter`.
-  - [ ] Preserve existing behavior when `ValidateBeforeSave` is false.
+- [x] Gate outputs in `CaseGeneratorService` (AC-6, AC-7, AC-8)
+  - [x] After validation, check `ValidationReport.InvalidCases` or equivalent error count before writing.
+  - [x] On errors, set `GenerationResult.Success = false`, set a concise `ErrorMessage`, keep `GeneratedCases` and `ValidationReport`, and return before `JsonCaseWriter` or `CouchDbWriter`.
+  - [x] Preserve existing behavior when `ValidateBeforeSave` is false.
 
-- [ ] Improve result/report messaging (AC-8)
-  - [ ] Ensure `GenerationResult.GetSummary()` remains useful for CLI output.
-  - [ ] Include first failing case/path summaries without dumping excessive data.
+- [x] Improve result/report messaging (AC-8)
+  - [x] Ensure `GenerationResult.GetSummary()` remains useful for CLI output.
+  - [x] Include first failing case/path summaries without dumping excessive data.
 
 ---
 
@@ -155,13 +159,35 @@ dotnet test ..\nccdphp-drh-mmria-utilities\mmria-server.tests\mmria-server.tests
 
 ### Agent Model Used
 
-TBD
+Codex (GPT-5)
 
 ### Debug Log References
 
+- `dotnet build ..\nccdphp-drh-mmria-utilities\mmria-tools\mmria-tools.csproj --no-restore -v minimal` - passed with 0 warnings and 0 errors.
+- Unit-test additions and test execution were skipped per user request because the test build has a known issue.
+
 ### Completion Notes List
 
+- Replaced lossy bare-name validation setup with `MetadataManager.NodeDictionary` path-aware metadata.
+- Added recursive validation over nested form/group dictionaries, multiform/grid row lists, and compatible dictionary/enumerable shapes.
+- Tightened number parsing to invariant culture, added min/max range checks, allowed optional blanks, and made populated invalid number/date/datetime/time values produce validation errors.
+- Added date-group validation for month/day/year completeness and impossible dates.
+- Added the validation output gate so validation errors return an unsuccessful `GenerationResult` before JSON or CouchDB output.
+- Improved failure summaries with first case/path errors for CLI-friendly context.
+- Unit tests were intentionally not added for this story at user request.
+
 ### File List
+
+- `../nccdphp-drh-mmria-utilities/mmria-tools/Testing/CaseGeneration/Services/CaseGeneratorService.cs`
+- `../nccdphp-drh-mmria-utilities/mmria-tools/Testing/CaseGeneration/Validators/CaseValidator.cs`
+- `../nccdphp-drh-mmria-utilities/mmria-tools/Testing/CaseGeneration/Utilities/MetadataConstraintValidator.cs`
+- `../nccdphp-drh-mmria-utilities/mmria-tools/Testing/CaseGeneration/Models/GenerationResult.cs`
+- `_bmad-output/implementation-artifacts/33-3-recursive-date-number-validation-gate.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+
+### Change Log
+
+- 2026-07-27: Implemented recursive path-aware metadata validation gate; skipped unit tests per user request.
 
 ---
 

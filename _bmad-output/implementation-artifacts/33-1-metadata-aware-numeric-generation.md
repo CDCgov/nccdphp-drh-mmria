@@ -165,13 +165,30 @@ dotnet test ..\nccdphp-drh-mmria-utilities\mmria-server.tests\mmria-server.tests
 
 ### Agent Model Used
 
-TBD
+GPT-5 Codex
 
 ### Debug Log References
 
+- 2026-07-27: Added focused NUnit coverage for metadata-aware number generation; targeted test execution was intentionally skipped after user interruption/request.
+- 2026-07-27: Implemented generator changes without running validation per user instruction to ignore tests for the moment.
+
 ### Completion Notes List
 
+- Added a metadata-node numeric generation overload that returns numeric objects for populated number fields while preserving the existing optional blank convention.
+- Added invariant-culture metadata parsing for decimal precision, min, and max values; malformed constraints are treated as absent.
+- Added path-first plausible range selection for high-risk numeric fields including height, weight, birth/fetal weight, BMI, age, gestational age, Apgar scores, vital signs, and fallback bounded values.
+- Updated `CaseDataGenerator.GenerateNodeData(...)` to dispatch metadata number nodes through the metadata-aware overload.
+- Validation is pending because tests were not run at the user's request.
+
 ### File List
+
+- `../nccdphp-drh-mmria-utilities/mmria-tools/Testing/CaseGeneration/Generators/CaseDataGenerator.cs`
+- `../nccdphp-drh-mmria-utilities/mmria-tools/Testing/CaseGeneration/Generators/ValueGenerators/NumberValueGenerator.cs`
+- `../nccdphp-drh-mmria-utilities/mmria-server.tests/Tests/CaseGeneratorNumericValueTests.cs`
+
+### Change Log
+
+- 2026-07-27: Implemented metadata-aware numeric generation and focused regression tests; story remains in-progress pending validation.
 
 ---
 
