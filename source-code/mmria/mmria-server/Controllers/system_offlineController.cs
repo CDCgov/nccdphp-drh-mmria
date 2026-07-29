@@ -82,7 +82,7 @@ public sealed class system_offlineController : Controller
 
             var requestOptions = new mmria.common.getset.CouchDbRequestOptions
             {
-                VitalServiceKey = ConfigDB.name_value["vital_service_key"]
+                VitalServiceKey = configuration.GetString("vital_service_key", host_prefix)
             };
 
             result = await _manager.SaveConfigAsync(sanitized, GetServicesBaseUrl(), requestOptions);
@@ -139,7 +139,7 @@ public sealed class system_offlineController : Controller
         {
             var requestOptions = new mmria.common.getset.CouchDbRequestOptions
             {
-                VitalServiceKey = ConfigDB.name_value["vital_service_key"]
+                VitalServiceKey = configuration.GetString("vital_service_key", host_prefix)
             };
             return await _manager.LoadConfigAsync(GetServicesBaseUrl(), requestOptions);
         }
