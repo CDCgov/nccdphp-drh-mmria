@@ -47,12 +47,17 @@ FR-9.1: On the Data Summary Checks page, when a Form is selected and the user to
 FR-10.1: On the Manage Users page, clicking "Export User List" when a Role or Username filter is active exports only the currently displayed users. When no filter is active, all users are exported (existing default preserved).
 FR-31.1: The "View/Download Informant Interview Summary Template" button (`#view-informant-interview-summary-template-button`) on the Home page displays a clearly visible, high-contrast focus outline when reached via keyboard navigation (`:focus-visible`). The outline must be visually distinct from the button's default appearance.
 FR-31.2: The "View/Download MMRIA Committee Decisions Form (CDF) Template PDF" button (`#view-cdf-template-button`) on the Home page displays the same clearly visible, high-contrast focus outline when reached via keyboard navigation (`:focus-visible`).
+FR-33.1: The `mmria-case-generator` produces parseable, type-appropriate numeric values for metadata `number` fields, respecting metadata decimal precision where available and using plausible ranges for high-risk clinical/date-adjacent fields.
+FR-33.2: The `mmria-case-generator` produces valid date, datetime, time, and grouped month/day/year values, with core maternal-mortality timeline relationships kept plausible across date of death, date of birth, pregnancy, prenatal, admission, discharge, and visit fields.
+FR-33.3: When `ValidateBeforeSave = true`, generated cases are recursively validated by full metadata path before JSON output or CouchDB save, and invalid date/number values block output instead of being silently written.
+FR-33.4: Focused regression tests cover generator date and number plausibility across simple fields, groups, grids, multiforms, and fixed random seeds.
 
 ### NonFunctional Requirements
 
 NFR-1: All changes must function correctly in Microsoft Edge and Google Chrome. No other browsers are in scope.
 NFR-2: The vitals validation modals (FR-2.2, FR-2.6) must meet Section 508 accessibility requirements â€” role, aria-modal, aria-labelledby, focus management, keyboard dismissal, and focus return.
 NFR-3: Vitals range configuration is loaded once at server startup and held in memory. Field-level blur validation is synchronous against the in-memory config. No per-event network requests are introduced.
+NFR-33.1: Generator improvements must remain a low-impact utilities change: no metadata schema changes, no generated strong-case model edits, no new external services, and no broad rewrite of the case generation pipeline.
 
 ### Additional Requirements
 
@@ -123,6 +128,11 @@ FR-29.3: Epic 29 — Add record_id_list CouchDB view and remove broken bulk-list
 
 FR-31.1: Epic 31 — CSS :focus-visible outline for Informant Interview Summary Template button (#view-informant-interview-summary-template-button)
 FR-31.2: Epic 31 — CSS :focus-visible outline for CDF Template PDF button (#view-cdf-template-button)
+
+FR-33.1: Epic 33 — Metadata-aware numeric generation and plausible numeric ranges
+FR-33.2: Epic 33 — Date group validity and core timeline plausibility
+FR-33.3: Epic 33 — Recursive validation gate before JSON output or CouchDB save
+FR-33.4: Epic 33 — Focused generator regression tests for date and number fields
 
 ## Epic List
 
@@ -215,6 +225,12 @@ Two `btn-link`-styled buttons in the Home page General section lack a visible ke
 De-identified CSV exports produced from any MMRIA tenant are byte-consistent in date formatting, PII suppression, and coded-field rendering, regardless of which environment triggers the export. Closes three classes of compliance and data-quality risk identified by comparing FL production and T1 local de-identified exports.
 **Story 32.2 CLOSED** — Global de-id list updated (86 paths matching FL production). Eliminated 1,024 field differences; `certificate_infant_fetal_section.csv` and `data-dictionary.csv` now byte-for-byte identical with FL.
 **Remaining:** 32.1 — Normalize datetime serialization in exporter, 32.3 — Investigate hospital paternity field code discrepancy
+
+### Epic 33: Case Generator Date and Number Plausibility
+
+Generated test cases from `mmria-case-generator` should remain broad enough for regression coverage while avoiding obviously invalid dates and non-numeric or implausible number values. This epic tightens the existing metadata-driven generator with targeted date/number improvements, recursive validation, and focused tests, without redesigning the utility or changing production metadata.
+**FRs covered:** FR-33.1, FR-33.2, FR-33.3, FR-33.4
+**Stories:** 33.1 — Metadata-aware numeric generation, 33.2 — Date and timeline plausibility, 33.3 — Recursive validation gate, 33.4 — Regression coverage
 
 ---
 
@@ -4516,3 +4532,228 @@ The export diff shows `bfdcpdom_imnmhpabsit_hospi` ("if mother not married, has 
 
 32.1 and 32.3 are independent and can be worked in parallel. 32.3 is investigation-first; if it confirms the field values in T1 are simply missing data (9999 = blank from NAT import), no code change is needed and the story closes with a documented finding.
 
+---
+
+## Epic 33: Case Generator Date and Number Plausibility
+
+`mmria-case-generator` produces test cases that are useful for regression testing without filling date and number fields with impossible or type-hostile values. The generator remains metadata-driven and low-impact: no production metadata changes, no generated strong-case model edits, no new external service, and no broad rewrite of the case generation pipeline.
+
+### Background and Problem Statement
+
+The CLI in `../nccdphp-drh-mmria-utilities/mmria-case-generator` is a thin wrapper around `mmria-tools/Testing/CaseGeneration`. The core paths are:
+
+| Area | Current File |
+|---|---|
+| Case orchestration | `../nccdphp-drh-mmria-utilities/mmria-tools/Testing/CaseGeneration/Generators/CaseDataGenerator.cs` |
+| Numeric values | `../nccdphp-drh-mmria-utilities/mmria-tools/Testing/CaseGeneration/Generators/ValueGenerators/NumberValueGenerator.cs` |
+| Date/time values | `../nccdphp-drh-mmria-utilities/mmria-tools/Testing/CaseGeneration/Generators/ValueGenerators/DateValueGenerator.cs` |
+| Validation | `../nccdphp-drh-mmria-utilities/mmria-tools/Testing/CaseGeneration/Utilities/MetadataConstraintValidator.cs` |
+| Workflow gate | `../nccdphp-drh-mmria-utilities/mmria-tools/Testing/CaseGeneration/Services/CaseGeneratorService.cs` |
+
+The current generator already avoids many hard failures by using numeric-looking strings and `DateTime`-derived date groups, but it has four data-quality gaps:
+
+- Populated `number` fields are emitted mostly as strings rather than JSON numbers.
+- Numeric plausibility is driven by broad field-name heuristics, so fields like `height_feet` can receive inch-like values.
+- Many date groups are valid calendar dates but are generated independently, so pregnancy, prenatal, admission, discharge, and death timelines can be clinically implausible.
+- `ValidateBeforeSave` is shallow: it does not recursively validate nested forms, groups, grids, or multiforms by full metadata path, and validation errors do not currently block JSON/CouchDB output.
+
+### Scope
+
+Included:
+- `mmria-case-generator` CLI behavior only where needed to exercise or report generation validity.
+- `mmria-tools/Testing/CaseGeneration` generation and validation internals.
+- Unit/integration-style generator tests in `../nccdphp-drh-mmria-utilities/mmria-server.tests`.
+
+Excluded:
+- Production form metadata changes.
+- Hand edits to generated `mmria_case*.cs` files.
+- A full clinical scenario engine.
+- New CouchDB documents or admin UI.
+- Test data distribution tuning unrelated to dates and numbers.
+
+### Story 33.1: Metadata-Aware Numeric Generation
+
+As a developer or tester using generated MMRIA cases,
+I want populated numeric fields to contain numeric, plausible values,
+So that generated cases exercise realistic workflows without poisoning tests with obvious invalid data.
+
+**Acceptance Criteria:**
+
+**Given** a metadata node has `type = "number"`
+**When** the generator populates the field
+**Then** the emitted JSON value is numeric (`int`, `double`, or nullable numeric), not an arbitrary text string
+
+**Given** a non-required numeric field is intentionally left blank by strategy completeness
+**When** the case is serialized
+**Then** the existing blank convention is preserved only for intentional blank values, and validation does not treat intentional blanks as invalid numbers
+
+**Given** a numeric metadata node has `decimal_precision = "0"`
+**When** the generator produces a populated value
+**Then** the value is an integer-compatible number with no fractional component
+
+**Given** a numeric metadata node has `decimal_precision = "1"` or another supported precision
+**When** the generator produces a populated value
+**Then** the value is rounded to that precision using invariant-culture numeric formatting/parsing rules
+
+**Given** a high-risk clinical or date-adjacent numeric field is generated
+**When** the field name/path matches known patterns
+**Then** the generator uses plausible ranges, including:
+
+| Field Pattern | Plausible Range |
+|---|---|
+| `height_feet` | 4-6 |
+| `height_inches` | 0-11 |
+| generic adult `height` in inches | 58-74 |
+| `weight`, `pre_pregnancy_weight`, `weight_at_delivery`, `admission_weight` | 90-350 |
+| `birth_weight`, `fetal_weight` in grams | 500-5000 |
+| `bmi` | 15.0-60.0 |
+| `age`, `maternal_age`, `mother_age` | maternal 12-55 edge / 18-45 normal; generic age remains bounded |
+| `gestational_age_weeks` / `gestational_age` | 0-45, with pregnancy-specific defaults favoring 24-42 |
+| `gestational_age_days` | 0-6 |
+| `days_postpartum` | 0-365 |
+| Apgar score fields (`minute_5`, `minute_10`) | 0-10 |
+| systolic blood pressure | 70-250 |
+| diastolic blood pressure | 30-150 |
+| pulse / heart rate | 30-220 |
+| respiration | 6-60 |
+| oxygen saturation | 50-100 |
+| temperature | 90.0-107.0 |
+
+**Given** no special range applies
+**When** a populated number is generated
+**Then** the existing broad fallback behavior remains bounded and numeric.
+
+**Implementation Notes:**
+- Prefer a small range-selection helper inside the existing numeric generator path over a new subsystem.
+- Use metadata path when available; field name alone is not enough for repeated names such as `age`, `value`, `weight`, `month`, and `day`.
+- Preserve current strategy behavior for blank optional fields.
+
+---
+
+### Story 33.2: Date Group Validity and Timeline Plausibility
+
+As a developer or tester using generated MMRIA cases,
+I want date values to be valid and mostly chronological,
+So that generated data supports workflow and reporting tests without impossible timelines.
+
+**Acceptance Criteria:**
+
+**Given** a metadata group contains `month`, `day`, and `year` children
+**When** the generator populates the group
+**Then** the combined components always form a valid calendar date, or all populated components use the accepted blank sentinel convention
+
+**Given** a date group contains only `month` and `year`
+**When** the generator populates the group
+**Then** only the metadata-defined components are emitted; the generator does not add a `day` component that is absent from metadata
+
+**Given** `home_record/date_of_death` is generated
+**When** related fields are generated or post-processed
+**Then** maternal date of birth, death certificate date of birth, and record ID year remain consistent with date of death
+
+**Given** pregnancy-related date groups are present
+**When** `date_of_last_normal_menses`, prenatal visit dates, delivery dates, and estimated confinement dates are generated
+**Then** they are internally plausible relative to the case timeline: LMP precedes prenatal visits and delivery-related dates; prenatal visit dates do not occur after date of death; gestational age fields align with nearby date groups when both are populated
+
+**Given** ER/hospital admission and discharge date groups are present in a generated record
+**When** both fields are populated
+**Then** admission is not after discharge, and both dates remain near the case's pregnancy/death timeline
+
+**Given** generic `date`, `datetime`, and `time` metadata fields are generated
+**When** the strategy is not explicitly edge-case focused
+**Then** future dates are avoided unless the field semantics require a future projection
+
+**Given** the edge strategy is used
+**When** edge dates are emitted
+**Then** edge values remain valid calendar dates and are constrained to intentional edge cases documented in the generator tests.
+
+**Implementation Notes:**
+- Keep the current post-processing approach but centralize reusable date-group helpers enough to avoid component drift.
+- Use `DateOnly`/`DateTime` construction before assigning components; never construct components independently.
+- Do not create a comprehensive clinical scenario engine in this epic.
+
+---
+
+### Story 33.3: Recursive Date and Number Validation Gate
+
+As a developer running the case generator with `ValidateBeforeSave = true`,
+I want invalid generated date and number values to stop the run before output,
+So that bad generated cases are caught at the generator boundary instead of being written to JSON files or CouchDB.
+
+**Acceptance Criteria:**
+
+**Given** a generated case contains nested forms, groups, grids, or multiform instances
+**When** validation runs
+**Then** every generated value is validated recursively using the full metadata path from `MetadataManager.NodeDictionary`
+
+**Given** a field has metadata `type = "number"`
+**When** a populated value is not a JSON number or cannot be parsed as a number under invariant-culture rules
+**Then** validation records an error with the full path and case number
+
+**Given** a field has metadata `type = "date"`, `type = "datetime"`, or `type = "time"`
+**When** a populated value cannot be parsed into the expected date/time type
+**Then** validation records an error with the full path and case number
+
+**Given** a group has date components
+**When** the populated month/day/year combination is impossible (for example February 30) or partial in an unsupported way
+**Then** validation records an error with the full path and component values
+
+**Given** `ValidateBeforeSave = true` and validation errors exist
+**When** `CaseGeneratorService.GenerateCasesAsync` completes validation
+**Then** the result is unsuccessful and JSON/CouchDB output is skipped
+
+**Given** `ValidateBeforeSave = false`
+**When** generated data contains validation errors
+**Then** existing permissive behavior is preserved, but validation is not silently implied.
+
+**Implementation Notes:**
+- Do not collect metadata by bare node name only; repeated names collide.
+- Validation warnings may still be reported for suspicious-but-allowed values, but number/date parse failures should be errors.
+- Keep the validation result consumable by the CLI summary.
+
+---
+
+### Story 33.4: Generator Regression Coverage for Date and Number Fields
+
+As a maintainer,
+I want focused tests around date and number generation,
+So that future generator changes do not reintroduce invalid dates, non-numeric numbers, or shallow validation.
+
+**Acceptance Criteria:**
+
+**Given** the generator runs with a fixed random seed
+**When** test metadata includes simple number fields, grouped date fields, grids, and multiforms
+**Then** tests assert populated numeric fields are numeric and populated date fields are parseable
+
+**Given** test metadata includes `decimal_precision = "0"` and `decimal_precision = "1"`
+**When** numeric values are generated
+**Then** tests assert generated values honor the requested precision
+
+**Given** test metadata includes `height_feet`, `height_inches`, gestational age, Apgar, vital-sign, and BMI-like fields
+**When** numeric values are generated
+**Then** tests assert values fall within the agreed plausible ranges
+
+**Given** intentionally invalid nested values are passed to the validator
+**When** validation runs
+**Then** tests prove recursive validation catches the invalid values and reports full metadata paths
+
+**Given** `ValidateBeforeSave = true`
+**When** validation errors are present
+**Then** tests prove output writers are not called.
+
+**Implementation Notes:**
+- Prefer unit tests that construct minimal metadata objects over tests requiring a live CouchDB instance.
+- Add one integration-style generator test only if needed to cover `CaseGeneratorService` gating.
+- Existing broad `Scenario_A_CaseGenerator` coverage is not sufficient for this epic because it depends on CouchDB and asserts generation/save success, not date/number plausibility.
+
+---
+
+## Epic 33 — Story Sequencing
+
+| Story | Risk | Dependencies |
+|---|---|---|
+| 33.1 — Metadata-aware numeric generation | Low-Medium | None |
+| 33.2 — Date group validity and timeline plausibility | Low-Medium | None; coordinate with 33.1 only where date groups contain gestational numeric fields |
+| 33.3 — Recursive validation gate | Medium | Can start after validator path design is agreed; benefits from 33.1 and 33.2 test cases |
+| 33.4 — Generator regression coverage | Low | Develop alongside 33.1-33.3; must be complete before epic close |
+
+33.1 and 33.2 can be implemented independently. 33.3 should be integrated after the generator changes are understood so the validator distinguishes intentional blanks from invalid generated values. 33.4 runs throughout the epic and is the closeout proof that generated date and number data is mostly plausible.
