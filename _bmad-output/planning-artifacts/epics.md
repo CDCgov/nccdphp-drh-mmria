@@ -51,6 +51,9 @@ FR-33.1: The `mmria-case-generator` produces parseable, type-appropriate numeric
 FR-33.2: The `mmria-case-generator` produces valid date, datetime, time, and grouped month/day/year values, with core maternal-mortality timeline relationships kept plausible across date of death, date of birth, pregnancy, prenatal, admission, discharge, and visit fields.
 FR-33.3: When `ValidateBeforeSave = true`, generated cases are recursively validated by full metadata path before JSON output or CouchDB save, and invalid date/number values block output instead of being silently written.
 FR-33.4: Focused regression tests cover generator date and number plausibility across simple fields, groups, grids, multiforms, and fixed random seeds.
+FR-34.1: When the case narrative PDF export renders saved Trumbowyg HTML that has been reserialized after editing, whitespace-only inter-tag separator text nodes do not create visible blank rows or extra paragraph spacing in the PDF.
+FR-34.2: When the saved narrative contains an intentional blank paragraph such as `<p><br></p>`, the PDF export renders it as exactly one intentional blank line rather than multiplying the `<br>` newline with paragraph trailing newline behavior.
+FR-34.3: The spacing fix preserves the stored `g_data.case_narrative.case_opening_overview` HTML and constrains behavior changes to PDF conversion unless implementation evidence proves that scope cannot satisfy the defect.
 
 ### NonFunctional Requirements
 
@@ -58,6 +61,7 @@ NFR-1: All changes must function correctly in Microsoft Edge and Google Chrome. 
 NFR-2: The vitals validation modals (FR-2.2, FR-2.6) must meet Section 508 accessibility requirements â€” role, aria-modal, aria-labelledby, focus management, keyboard dismissal, and focus return.
 NFR-3: Vitals range configuration is loaded once at server startup and held in memory. Field-level blur validation is synchronous against the in-memory config. No per-event network requests are introduced.
 NFR-33.1: Generator improvements must remain a low-impact utilities change: no metadata schema changes, no generated strong-case model edits, no new external services, and no broad rewrite of the case generation pipeline.
+NFR-34.1: The case narrative PDF spacing fix remains surgical, with no new client-side dependencies, no bundler changes, no storage migration, and no broad rewrite of `pdf-version/index.js`.
 
 ### Additional Requirements
 
@@ -75,6 +79,9 @@ NFR-33.1: Generator improvements must remain a low-impact utilities change: no m
 - All open items (OI-3, OI-4, OI-5, OI-dev-B, OI-dev-C): do not block story creation but must be resolved before the affected implementation begins.
 - FR-9: Client-side only. Locate both the Form-select event handler and the ALL-toggle event handler in the Data Summary Checks page JS. Both handlers must enforce form-scoped field population when a Form is selected. Developer confirms the form-to-field association mechanism (metadata-driven or hardcoded) at implementation time.
 - FR-10: Client-side only. In `export_user_list_click()` in `manage-users/index.js`, replace the join target from `g_ui.user_summary_list` to `g_filtered_user_list`. No server-side changes.
+- FR-34 defect scope: fix PDF interpretation in `wwwroot/scripts/pdf-version/index.js` only unless implementation evidence proves otherwise; do not modify Trumbowyg save output or stored narrative HTML.
+- FR-34 evidence: use `docs/ai/local/case-narrative-spacing/changed-prod-data-v4.1.txt` and `docs/ai/local/case-narrative-spacing/unchanged-prod-data.txt` as regression fixtures or manual verification inputs.
+- FR-34 parser guard: preserve meaningful inline spaces and NBSP while ignoring structural whitespace-only nodes produced by edited one-line HTML between block tags.
 
 ### UX Design Requirements
 
@@ -133,6 +140,9 @@ FR-33.1: Epic 33 — Metadata-aware numeric generation and plausible numeric ran
 FR-33.2: Epic 33 — Date group validity and core timeline plausibility
 FR-33.3: Epic 33 — Recursive validation gate before JSON output or CouchDB save
 FR-33.4: Epic 33 — Focused generator regression tests for date and number fields
+FR-34.1: Epic 34 — Ignore structural whitespace-only text nodes in case narrative PDF conversion
+FR-34.2: Epic 34 — Render empty Trumbowyg paragraphs as one intentional blank line
+FR-34.3: Epic 34 — Preserve stored narrative HTML and constrain fix to PDF conversion
 
 ## Epic List
 
@@ -231,6 +241,12 @@ De-identified CSV exports produced from any MMRIA tenant are byte-consistent in 
 Generated test cases from `mmria-case-generator` should remain broad enough for regression coverage while avoiding obviously invalid dates and non-numeric or implausible number values. This epic tightens the existing metadata-driven generator with targeted date/number improvements, recursive validation, and focused tests, without redesigning the utility or changing production metadata.
 **FRs covered:** FR-33.1, FR-33.2, FR-33.3, FR-33.4
 **Stories:** 33.1 — Metadata-aware numeric generation, 33.2 — Date and timeline plausibility, 33.3 — Recursive validation gate, 33.4 — Regression coverage
+
+### Epic 34: Case Narrative PDF Spacing Fidelity
+
+The case narrative PDF export renders edited rich-text narrative HTML without adding extra vertical spacing between paragraphs. The fix is constrained to PDF HTML conversion so the editor's stored Trumbowyg HTML remains unchanged.
+**FRs covered:** FR-34.1, FR-34.2, FR-34.3
+**Stories:** 34.1 — Normalize case narrative PDF whitespace conversion
 
 ---
 
@@ -4757,3 +4773,57 @@ So that future generator changes do not reintroduce invalid dates, non-numeric n
 | 33.4 — Generator regression coverage | Low | Develop alongside 33.1-33.3; must be complete before epic close |
 
 33.1 and 33.2 can be implemented independently. 33.3 should be integrated after the generator changes are understood so the validator distinguishes intentional blanks from invalid generated values. 33.4 runs throughout the epic and is the closeout proof that generated date and number data is mostly plausible.
+
+---
+
+## Epic 34: Case Narrative PDF Spacing Fidelity
+
+Reviewers can edit a case narrative, add a new line, and export the Narrative PDF without the PDF adding extra paragraph spacing throughout the document. The implementation preserves the stored Trumbowyg HTML exactly and fixes only how `pdf-version/index.js` interprets that HTML for pdfMake.
+
+### Story 34.1: Normalize Case Narrative PDF Whitespace Conversion
+
+As a case reviewer,
+I want edited case narrative HTML to render in the PDF with normal paragraph spacing,
+So that adding a line in the narrative editor does not make the exported PDF harder to read.
+
+**Acceptance Criteria:**
+
+**Given** a saved narrative matching `docs/ai/local/case-narrative-spacing/changed-prod-data-v4.1.txt`
+**When** `convert_html_to_pdf(...)` walks the HTML for `case_opening_overview`
+**Then** whitespace-only text nodes that exist only between top-level or block tags do not produce visible PDF rows or extra paragraph spacing.
+
+**Given** an edited narrative contains `<p><br></p>` as an intentional blank paragraph
+**When** the narrative is converted for PDF
+**Then** the PDF representation contains one intentional blank line for that paragraph, not both the `<br>` newline and the paragraph trailing newline.
+
+**Given** inline formatting such as `<strong>This</strong> is a <strong>test</strong>`
+**When** PDF conversion normalizes whitespace
+**Then** meaningful inline text spacing is preserved and words do not collapse together.
+
+**Given** the stored narrative HTML is read from `g_data.case_narrative.case_opening_overview`
+**When** the fix runs
+**Then** the stored HTML, Trumbowyg editor output, and save sanitizer behavior are not changed.
+
+**Given** the unchanged production narrative fixture in `docs/ai/local/case-narrative-spacing/unchanged-prod-data.txt`
+**When** the PDF conversion runs
+**Then** its paragraph spacing does not become tighter than the original production PDF.
+
+**Implementation Notes:**
+- Primary file: `source-code/mmria/mmria-server/wwwroot/scripts/pdf-version/index.js`.
+- Primary functions: `convert_html_to_pdf(...)` and `ConvertHTMLDOMWalker(...)`.
+- The likely fix point is the `#TEXT` branch in `ConvertHTMLDOMWalker`: ignore structural whitespace-only separator nodes, but do not globally trim or drop inline spacing.
+- Treat `<p><br></p>` and equivalent empty paragraph nodes as one blank line in the PDF conversion path.
+- Do not change `source-code/mmria/mmria-server/wwwroot/scripts/editor/page_renderer/textarea.js` unless a later implementation investigation proves the PDF-only fix cannot satisfy the acceptance criteria.
+
+**Evidence:**
+- `changed-prod-data-v4.1.txt` has zero newlines, one `<p><br></p>`, and 29 literal `> <` inter-tag spaces after the edit.
+- `unchanged-prod-data.txt` has 70 newlines, no `<p><br></p>`, and zero literal `> <` inter-tag spaces.
+- `pdf-version/index.js` currently pushes `#TEXT`, `P`/`DIV`, and `BR` nodes as PDF text/newline content, which explains why edited structural whitespace can inflate PDF spacing.
+
+## Epic 34 - Story Sequencing
+
+| Story | Risk | Dependencies |
+|---|---|---|
+| 34.1 - Normalize case narrative PDF whitespace conversion | Medium | Existing case narrative editor fidelity behavior from Epic 1; supplied spacing fixtures |
+
+Implement Story 34.1 as a single surgical PDF-renderer change. Regression coverage should exercise the converter against both supplied HTML fixtures before any manual PDF comparison.
