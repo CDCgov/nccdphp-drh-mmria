@@ -1131,15 +1131,24 @@ dev this story _bmad-output/implementation-artifacts/33-4-generator-regression-c
 | Story | File | Status |
 | --- | --- | --- |
 | 34.1 Normalize Case Narrative PDF Whitespace Conversion | `34-1-normalize-case-narrative-pdf-whitespace-conversion.md` | done |
+| 34.2 Collapse BR Plus Empty Paragraph Separators | `34-2-collapse-br-empty-paragraph-separators.md` | done |
 
-**Sequencing:** Single story — no dependencies.
+**Sequencing:** Story 34.1 is complete. Story 34.2 reopens Epic 34 for the QA-specific `<br>` plus empty-paragraph separator shape and should be completed before Epic 34 is closed again.
 
 > ℹ️ Surgical fix to `pdf-version/index.js` only. Two defects in `ConvertHTMLDOMWalker`: (1) Trumbowyg v4.1 serializes HTML as a single line with literal spaces between block tags — these become whitespace-only `#TEXT` children of `BODY` that pdfMake renders as blank rows. (2) `<p><br></p>` emits two newlines instead of one. Evidence fixtures in `docs/ai/local/case-narrative-spacing/`. No server-side changes, no save-path changes.
+
+> Follow-up: QA evidence in `docs/ai/local/case-narrative-spacing/qa/html.txt` shows a third shape, repeated `<br>` plus whitespace-only empty paragraph separators, that must collapse to a single intentional break in PDF conversion.
 
 **Story 34.1 prompt:**
 
 ```
 dev this story _bmad-output/implementation-artifacts/34-1-normalize-case-narrative-pdf-whitespace-conversion.md
+```
+
+**Story 34.2 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/34-2-collapse-br-empty-paragraph-separators.md
 ```
 
 ---

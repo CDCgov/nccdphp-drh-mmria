@@ -1515,6 +1515,19 @@ function ConvertHTMLDOMWalker(p_result, p_node)
 				p_result.push({ text: '\n' });
 				return;
 			}
+			// Duplicate-separator guard: <br><p>whitespace-only</p> at body level creates two
+			// blank rows — one from the BR and one from this empty paragraph. QA narrative
+			// templates serialize section breaks as </p><br><p>\r\n</p>. When this P immediately
+			// follows a body-level BR and contains only whitespace, suppress it entirely; the
+			// BR's newline is the sole intentional separator between sections.
+			if (p_node.parentNode && p_node.parentNode.nodeName.toUpperCase() === 'BODY' &&
+					p_node.previousElementSibling &&
+					p_node.previousElementSibling.nodeName.toUpperCase() === 'BR' &&
+					(text_array.length === 0 ||
+						text_array.every(item => !item.canvas &&
+							typeof item.text === 'string' && /^\s*$/.test(item.text)))) {
+				return;
+			}
 			text_array.push({ text: "\n" });
 			{
 				// Canvas items (e.g. from <hr> inside <p>) cannot be inline text nodes;

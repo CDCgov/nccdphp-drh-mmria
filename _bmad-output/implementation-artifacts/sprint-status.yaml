@@ -1,5 +1,5 @@
 # generated: 2026-07-14
-last_updated: 2026-07-29
+last_updated: 2026-07-30
 # project: mmria
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@ last_updated: 2026-07-29
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-07-14
-last_updated: 2026-07-29
+last_updated: 2026-07-30
 project: mmria
 project_key: NOKEY
 tracking_system: file-system
@@ -293,5 +293,6 @@ development_status:
 
   # ── Epic 34: Case Narrative PDF Spacing Fidelity ──────────────────────────
   epic-34: in-progress
-  34-1-normalize-case-narrative-pdf-whitespace-conversion: ready-for-dev
+  34-1-normalize-case-narrative-pdf-whitespace-conversion: done
+  34-2-collapse-br-empty-paragraph-separators: ready-for-dev
   epic-34-retrospective: optional
