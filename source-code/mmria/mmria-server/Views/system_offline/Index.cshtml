@@ -20,7 +20,7 @@
 
 <div>
     <h1 class="h2 no-print" tabindex="-1">System Offline Configuration</h1>
-    <p>Configure warn and offline dates and messages for a planned outage. Users will see the warn message before the offline date and the offline message after.</p>
+    <p>Configure warn and offline dates and messages for a planned outage. Users will see the warn message before the offline date and the offline message after. <strong>All dates and times are in UTC.</strong></p>
 
     <div id="status_message_id" role="alert" style="display:none;" class="alert"></div>
 
@@ -61,10 +61,10 @@
             <table class="table table-sm" style="font-size:0.85em; margin-bottom:0;">
                 <thead><tr class="header-level-2"><th>Token</th><th>Replaced with</th></tr></thead>
                 <tbody>
-                    <tr><td><code>{{warn_date}}</code></td><td>Warn date formatted in local time</td></tr>
-                    <tr><td><code>{{offline_date}}</code></td><td>Offline date formatted in local time</td></tr>
-                    <tr><td><code>{{outage_duration}}</code></td><td>Time between warn and offline dates (e.g. &ldquo;3 hours&rdquo;)</td></tr>
-                    <tr><td><code>{{estimated_restoration}}</code></td><td>Offline date + 2 hours, formatted in local time</td></tr>
+                    <tr><td><code>{{warn_date}}</code></td><td>Warn date (UTC)</td></tr>
+                    <tr><td><code>{{offline_date}}</code></td><td>Offline date (UTC)</td></tr>
+                    <tr><td><code>{{outage_duration}}</code></td><td>Estimated maintenance duration (e.g. &ldquo;3 hours&rdquo;)</td></tr>
+                    <tr><td><code>{{estimated_restoration}}</code></td><td>Offline date + maintenance duration (UTC)</td></tr>
                 </tbody>
             </table>
             <div style="font-size:0.8em; color:#666; margin-top:4px;">Example: <em>The system will go offline on {{offline_date}} for approximately {{outage_duration}}.</em></div>
@@ -185,25 +185,25 @@ function renderJurisdictionTable(selectedJurisdictions) {
 }
 
 /**
- * Converts a stored UTC ISO date string to the value expected by a datetime-local input
- * (YYYY-MM-DDTHH:mm in the browser's local timezone).
+ * Converts a stored UTC ISO date string to the value expected by a datetime-local input.
+ * The input always shows UTC time so admins enter and read UTC directly.
  */
 function toDatetimeLocal(utcStr) {
     if (!utcStr) return '';
     var d = new Date(utcStr);
     if (isNaN(d.getTime())) return '';
-    // Shift UTC epoch to local wall-clock time, then format as ISO without Z
-    var local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
-    return local.toISOString().slice(0, 16);
+    // Show UTC wall-clock time in the input (no local-timezone shift)
+    return d.toISOString().slice(0, 16);
 }
 
 /**
- * Converts a datetime-local input value (local time, no timezone) to a UTC ISO string
- * so all users and the server see the same moment regardless of timezone.
+ * Converts a datetime-local input value to a UTC ISO string.
+ * The input is treated as UTC (admins enter UTC directly), so we just append 'Z'.
  */
 function fromDatetimeLocal(localStr) {
     if (!localStr) return null;
-    var d = new Date(localStr); // browser treats no-timezone string as local time
+    // Treat the datetime-local value as UTC by appending Z before parsing
+    var d = new Date(localStr + 'Z');
     if (isNaN(d.getTime())) return null;
     return d.toISOString(); // e.g. "2026-06-18T17:00:00.000Z"
 }

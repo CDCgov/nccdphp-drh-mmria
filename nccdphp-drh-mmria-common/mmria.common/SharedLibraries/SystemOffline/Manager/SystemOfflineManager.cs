@@ -67,7 +67,7 @@ public sealed class SystemOfflineManager
     }
 
     private static string FormatLocal(DateTime utcDt)
-        => utcDt.ToLocalTime().ToString("MMMM d, yyyy 'at' h:mm tt");
+        => utcDt.ToUniversalTime().ToString("MMMM d, yyyy 'at' h:mm tt", System.Globalization.CultureInfo.InvariantCulture) + " UTC";
 
     private static string FormatSpan(TimeSpan span)
     {
