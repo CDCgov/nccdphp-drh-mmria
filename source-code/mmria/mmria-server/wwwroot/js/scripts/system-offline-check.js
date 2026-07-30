@@ -140,6 +140,8 @@ function showOfflineModal(message, autoLogoutMinutes) {
     var minutes = (typeof autoLogoutMinutes === 'number' && autoLogoutMinutes > 0) ? autoLogoutMinutes : 5;
     var endTime = Date.now() + minutes * 60 * 1000;
     var countdownEl = document.getElementById('mmria-offline-modal-countdown');
+    // Store the duration so the countdown text stays consistent.
+    if (countdownEl) countdownEl.setAttribute('data-auto-logout-minutes', minutes);
 
     function tick() {
         var remaining = Math.max(0, endTime - Date.now());
@@ -147,7 +149,7 @@ function showOfflineModal(message, autoLogoutMinutes) {
         var m = Math.floor(totalSecs / 60);
         var s = totalSecs % 60;
         if (countdownEl) {
-            countdownEl.textContent = 'Automatically signing out in ' + m + ':' + (s < 10 ? '0' : '') + s + '.';
+            countdownEl.textContent = 'Redirecting to offline page in ' + m + ':' + (s < 10 ? '0' : '') + s + '.';
         }
         if (remaining <= 0) {
             clearAutoLogoutTimer();
@@ -157,7 +159,7 @@ function showOfflineModal(message, autoLogoutMinutes) {
                 .then(function (latestConfig) {
                     var result = latestConfig ? checkOfflineStatus(latestConfig) : { state: 'offline' };
                     if (result.state === 'offline') {
-                        _proceedWithSignOut();
+                        _proceedToAppOffline();
                     } else {
                         console.log('[OfflineCheck] Countdown expired but offline state no longer active; cancelling logout.');
                         _cancelOfflineLogout(result, latestConfig, null);
@@ -201,11 +203,11 @@ function mmria_offline_modal_ok_handler() {
         .then(function (latestConfig) {
             var result = latestConfig ? checkOfflineStatus(latestConfig) : { state: 'offline' };
             if (result.state !== 'offline') {
-                console.log('[OfflineCheck] OK clicked but offline state no longer active; cancelling logout.');
+                console.log('[OfflineCheck] OK clicked but offline state no longer active; cancelling redirect.');
                 _cancelOfflineLogout(result, latestConfig, okBtn);
                 return;
             }
-            _proceedWithSignOut();
+            _proceedToAppOffline();
         })
         .catch(function () {
             _handleFetchFailure(okBtn);
@@ -213,41 +215,12 @@ function mmria_offline_modal_ok_handler() {
 }
 
 /**
- * Submits a logout POST form directly. No further re-check — used as the
- * terminal sign-out step so catch paths can't trigger recursive re-checks.
+ * Redirects to the AppOffline page instead of signing the user out.
+ * A plain location redirect triggers beforeunload → navigation_away → sendBeacon
+ * so finalize-unload fires naturally while the session is still valid.
  */
-function _doSignOut() {
-    var token = '';
-    var tokenMeta = document.querySelector('meta[name="request-verification-token"]');
-    if (tokenMeta) token = tokenMeta.getAttribute('content') || '';
-    var form = document.createElement('form');
-    form.method = 'POST';
-    form.action = '/Account/Logout';
-    if (token) {
-        var input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = '__RequestVerificationToken';
-        input.value = token;
-        form.appendChild(input);
-    }
-    document.body.appendChild(form);
-    form.submit();
-}
-
-/**
- * Optionally saves unsaved changes then calls _doSignOut.
- */
-function _proceedWithSignOut() {
-    if (window.hasUnsavedChanges && typeof window.mmria_save_before_signout === 'function') {
-        try {
-            var saveResult = window.mmria_save_before_signout();
-            if (saveResult && typeof saveResult.then === 'function') {
-                saveResult.then(_doSignOut).catch(_doSignOut);
-                return;
-            }
-        } catch (e) { /* fall through */ }
-    }
-    _doSignOut();
+function _proceedToAppOffline() {
+    window.location.href = '/Account/AppOffline';
 }
 
 /**
@@ -274,9 +247,9 @@ function _cancelOfflineLogout(result, config, okButtonEl) {
 
 /**
  * Handles a failed status fetch by falling back to _lastKnownConfig.
- * If last known state was offline: proceeds with sign-out.
- * If last known state was online (or no prior data): cancels the logout.
- * This prevents a mmria-services outage from incorrectly signing users out.
+ * If last known state was offline: redirects to AppOffline.
+ * If last known state was online (or no prior data): cancels the redirect.
+ * This prevents a mmria-services outage from incorrectly redirecting users.
  * @param {Element|null} okButtonEl - OK button to re-enable if cancelling.
  */
 function _handleFetchFailure(okButtonEl) {
@@ -284,7 +257,7 @@ function _handleFetchFailure(okButtonEl) {
     var fb = _lastKnownConfig;
     var result = fb ? checkOfflineStatus(fb) : { state: 'normal' };
     if (result.state === 'offline') {
-        _proceedWithSignOut();
+        _proceedToAppOffline();
     } else {
         _cancelOfflineLogout(result, fb, okButtonEl);
     }

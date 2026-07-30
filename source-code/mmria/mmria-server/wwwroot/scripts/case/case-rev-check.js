@@ -5,6 +5,7 @@
 
 var _caseRevPollInterval = null;
 var _caseRevPollIntervalMs = 45000; // normal: 45 s
+var _caseRevPollGeneration = 0; // incremented on stop/restart; guards stale in-flight responses
 
 function isCaseRevPollingAllowed() {
     if (typeof window.mmria_is_case_rev_polling_allowed !== 'function') return true;
@@ -147,8 +148,11 @@ function showStaleCaseBanner() {
 
 /**
  * Stops the case _rev polling interval.
+ * Also increments _caseRevPollGeneration so any in-flight fetch responses
+ * from the old polling session are discarded when they resolve.
  */
 function stopCaseRevPolling() {
+    _caseRevPollGeneration++;
     if (_caseRevPollInterval !== null) {
         clearInterval(_caseRevPollInterval);
         _caseRevPollInterval = null;
@@ -164,8 +168,15 @@ function stopCaseRevPolling() {
  */
 function startCaseRevPolling(caseId, loadedRev) {
     if (!caseId || !loadedRev) return;
-    stopCaseRevPolling();
+    stopCaseRevPolling(); // increments _caseRevPollGeneration
     if (!isCaseRevPollingAllowed()) return;
+
+    // Capture the generation at the time this polling session starts.
+    // Any fetch response that resolves after stopCaseRevPolling() is called
+    // (e.g. an in-flight response from a previous session that was overtaken
+    // by a successful autosave updating _rev) will see a different generation
+    // and bail out instead of showing a false-positive stale-case banner.
+    var myGeneration = _caseRevPollGeneration;
 
     function poll() {
         if (!isCaseRevPollingAllowed()) {
@@ -179,6 +190,8 @@ function startCaseRevPolling(caseId, loadedRev) {
                 return response.json();
             })
             .then(function (data) {
+                // Discard if this response belongs to a superseded polling session.
+                if (_caseRevPollGeneration !== myGeneration) return;
                 if (!data) return;
                 if (data._rev && data._rev !== loadedRev) {
                     if (!isCaseRevPollingAllowed()) {
