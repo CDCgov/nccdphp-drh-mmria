@@ -2,7 +2,7 @@
 
 **Epic:** 34 — Case Narrative PDF Spacing Fidelity
 **Story ID:** 34.1
-**Status:** ready-for-dev
+**Status:** done
 
 ---
 
@@ -161,9 +161,9 @@ Then `textarea.js`, the save sanitizer, the Trumbowyg integration, and all serve
 
 ### Fix 1: Skip structural whitespace-only `#TEXT` nodes (AC-1, AC-3, AC-4)
 
-- [ ] In `ConvertHTMLDOMWalker`, locate the `#TEXT` case (line 1482)
-- [ ] Wrap the existing logic in a block (add `{ }` for `const` scoping) and compute `raw` once before the push
-- [ ] After computing `raw`, add a guard: if `raw` is whitespace-only (`/^\s*$/.test(raw)`) AND the parent node is the outer `BODY` element, `return` without pushing
+- [x] In `ConvertHTMLDOMWalker`, locate the `#TEXT` case (line 1482)
+- [x] Wrap the existing logic in a block (add `{ }` for `const` scoping) and compute `raw` once before the push
+- [x] After computing `raw`, add a guard: if `raw` is whitespace-only (`/^\s*$/.test(raw)`) AND the parent node is the outer `BODY` element, `return` without pushing
 
 **Intended transformation:**
 
@@ -203,8 +203,8 @@ case "#TEXT": {
 
 ### Fix 2: Collapse blank paragraph `<p><br></p>` to a single newline (AC-2, AC-4)
 
-- [ ] In `ConvertHTMLDOMWalker`, locate the `P` / `DIV` case (line 1488)
-- [ ] After the child-walking loop and before `text_array.push({ text: "\n" })`, add a check: if every item in `text_array` is `{ text: "\n" }` (a blank paragraph whose only content is one or more BR-derived newlines), push a single `{ text: "\n" }` and return early — do not push the paragraph trailing newline on top
+- [x] In `ConvertHTMLDOMWalker`, locate the `P` / `DIV` case (line 1488)
+- [x] After the child-walking loop and before `text_array.push({ text: "\n" })`, add a check: if every item in `text_array` is `{ text: "\n" }` (a blank paragraph whose only content is one or more BR-derived newlines), push a single `{ text: "\n" }` and return early — do not push the paragraph trailing newline on top
 
 **Intended insertion** (just before `text_array.push({ text: "\n" })`):
 

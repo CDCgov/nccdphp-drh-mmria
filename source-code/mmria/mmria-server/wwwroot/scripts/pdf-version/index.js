@@ -1479,21 +1479,41 @@ function ConvertHTMLDOMWalker(p_result, p_node)
 			p_result.push(table);
 			return;
 			break;
-		case "#TEXT":
+		case "#TEXT": {
 			// Do NOT use .trim() here: it strips &nbsp; (\u00a0) to empty string, losing
 			// the space between an inline element and the following text (e.g. the gap
 			// between <strong>The</strong> and &nbsp;decedent becomes "Thedecedent").
 			// Instead: replace &nbsp; with a regular space, remove HTML formatting
 			// line-breaks/tabs, and preserve all space characters.
-			p_result.push({ text: p_node.textContent.replace(/\u00a0/g, ' ').replace(/[\n\r\t]/g, '').replace('<br>', '\n') });
+			const raw = p_node.textContent.replace(/\u00a0/g, ' ').replace(/[\n\r\t]/g, '').replace('<br>', '\n');
+			// Skip structural whitespace-only separator nodes. Trumbowyg v4.1 serializes
+			// narrative HTML as a single line with literal spaces between block-level siblings
+			// (e.g., "<br> <p>"). These become #TEXT children of BODY and produce visible
+			// blank rows in the PDF. Inline spaces inside <p>/<span>/etc. are unaffected
+			// because their parent is not BODY.
+			if (/^\s*$/.test(raw) && p_node.parentNode &&
+					p_node.parentNode.nodeName.toUpperCase() === 'BODY') {
+				return;
+			}
+			p_result.push({ text: raw });
 			return;
 			break;
+		}
 		case "P":
 		case "DIV":
 			let text_array = [];
 			for (let i = 0; i < p_node.childNodes.length; i++) {
 				let child = p_node.childNodes[i];
 				ConvertHTMLDOMWalker(text_array, child);
+			}
+			// Blank paragraph guard: <p><br></p> produces one BR-derived newline in text_array.
+			// Without this, the paragraph's own trailing "\n" stacks on top, creating a
+			// double blank line in the PDF for each intentional empty paragraph.
+			// Collapse the entire paragraph to a single blank line.
+			if (text_array.length > 0 &&
+					text_array.every(item => Object.keys(item).length === 1 && item.text === '\n')) {
+				p_result.push({ text: '\n' });
+				return;
 			}
 			text_array.push({ text: "\n" });
 			{
