@@ -20,13 +20,13 @@
 
 <div>
     <h1 class="h2 no-print" tabindex="-1">System Offline Configuration</h1>
-    <p>Configure warn and offline dates and messages for a planned outage. Users will see the warn message before the offline date and the offline message after. <strong>All dates and times are in UTC.</strong></p>
+    <p>Configure warn and offline dates and messages for a planned outage. Users will see the warn message before the offline date and the offline message after. <strong>All dates and times are in Eastern Time (ET).</strong></p>
 
     <div id="status_message_id" role="alert" style="display:none;" class="alert"></div>
 
     <form id="system_offline_form_id">
         <div class="form-group">
-            <label for="warn_date_id">Warn Date</label>
+            <label for="warn_date_id">Warn Date (ET)</label>
             <input type="datetime-local" id="warn_date_id" name="warn_date" class="form-control" />
         </div>
         <div class="form-group">
@@ -34,8 +34,9 @@
             <textarea id="warn_message_id" name="warn_message" class="form-control" rows="3"></textarea>
         </div>
         <div class="form-group">
-            <label for="offline_date_id">Offline Date</label>
+            <label for="offline_date_id">Offline Date (ET)</label>
             <input type="datetime-local" id="offline_date_id" name="offline_date" class="form-control" />
+            <button type="button" class="btn btn-outline-secondary btn-sm mt-2" onclick="clearDates()">Clear Dates</button>
         </div>
         <div class="form-group">
             <label for="restoration_hours_id">Estimated Maintenance Duration (hours)</label>
@@ -61,10 +62,10 @@
             <table class="table table-sm" style="font-size:0.85em; margin-bottom:0;">
                 <thead><tr class="header-level-2"><th>Token</th><th>Replaced with</th></tr></thead>
                 <tbody>
-                    <tr><td><code>{{warn_date}}</code></td><td>Warn date (UTC)</td></tr>
-                    <tr><td><code>{{offline_date}}</code></td><td>Offline date (UTC)</td></tr>
+                    <tr><td><code>{{warn_date}}</code></td><td>Warn date (ET)</td></tr>
+                    <tr><td><code>{{offline_date}}</code></td><td>Offline date (ET)</td></tr>
                     <tr><td><code>{{outage_duration}}</code></td><td>Estimated maintenance duration (e.g. &ldquo;3 hours&rdquo;)</td></tr>
-                    <tr><td><code>{{estimated_restoration}}</code></td><td>Offline date + maintenance duration (UTC)</td></tr>
+                    <tr><td><code>{{estimated_restoration}}</code></td><td>Offline date + maintenance duration (ET)</td></tr>
                 </tbody>
             </table>
             <div style="font-size:0.8em; color:#666; margin-top:4px;">Example: <em>The system will go offline on {{offline_date}} for approximately {{outage_duration}}.</em></div>
@@ -185,27 +186,54 @@ function renderJurisdictionTable(selectedJurisdictions) {
 }
 
 /**
- * Converts a stored UTC ISO date string to the value expected by a datetime-local input.
- * The input always shows UTC time so admins enter and read UTC directly.
+ * Returns the epoch ms that corresponds to what Eastern Time's wall clock shows at `date`,
+ * expressed as a UTC timestamp — used to compute the ET↔UTC offset.
+ */
+function getEtWallClockAsUtcMs(date) {
+    var parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/New_York',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        hour12: false
+    }).formatToParts(date);
+    var get = function (type) { return parseInt(parts.find(function (p) { return p.type === type; }).value, 10); };
+    var h = get('hour');
+    if (h === 24) h = 0;
+    return Date.UTC(get('year'), get('month') - 1, get('day'), h, get('minute'), get('second'));
+}
+
+/**
+ * Converts a stored UTC ISO date string to the value expected by a datetime-local input,
+ * displayed in Eastern Time (ET) so admins enter and read ET directly.
  */
 function toDatetimeLocal(utcStr) {
     if (!utcStr) return '';
     var d = new Date(utcStr);
     if (isNaN(d.getTime())) return '';
-    // Show UTC wall-clock time in the input (no local-timezone shift)
-    return d.toISOString().slice(0, 16);
+    var parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/New_York',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit',
+        hour12: false
+    }).formatToParts(d);
+    var get = function (type) { return parts.find(function (p) { return p.type === type; }).value; };
+    var hour = get('hour');
+    if (hour === '24') hour = '00';
+    return get('year') + '-' + get('month') + '-' + get('day') + 'T' + hour + ':' + get('minute');
 }
 
 /**
- * Converts a datetime-local input value to a UTC ISO string.
- * The input is treated as UTC (admins enter UTC directly), so we just append 'Z'.
+ * Converts a datetime-local input value (entered as Eastern Time) to a UTC ISO string.
+ * Strategy: parse as UTC for a reference epoch, determine the ET offset at that moment,
+ * then shift to produce the true UTC equivalent of the ET wall-clock time entered.
  */
-function fromDatetimeLocal(localStr) {
-    if (!localStr) return null;
-    // Treat the datetime-local value as UTC by appending Z before parsing
-    var d = new Date(localStr + 'Z');
-    if (isNaN(d.getTime())) return null;
-    return d.toISOString(); // e.g. "2026-06-18T17:00:00.000Z"
+function fromDatetimeLocal(etStr) {
+    if (!etStr) return null;
+    var naive = new Date(etStr + 'Z'); // treat input as UTC to get a reference epoch
+    if (isNaN(naive.getTime())) return null;
+    var etWallMs = getEtWallClockAsUtcMs(naive);       // what ET shows at that epoch, as UTC ms
+    var offsetMs = naive.getTime() - etWallMs;         // ET offset from UTC (e.g. +4h for EDT)
+    return new Date(naive.getTime() + offsetMs).toISOString();
 }
 
 function escapeHtml(str) {
@@ -281,6 +309,11 @@ async function saveConfig() {
     } finally {
         btn.disabled = false;
     }
+}
+
+function clearDates() {
+    document.getElementById('warn_date_id').value = '';
+    document.getElementById('offline_date_id').value = '';
 }
 
 function showStatus(message, success) {

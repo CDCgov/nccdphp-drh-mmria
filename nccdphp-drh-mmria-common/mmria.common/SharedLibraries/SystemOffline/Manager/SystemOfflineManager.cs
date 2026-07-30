@@ -48,15 +48,23 @@ public sealed class SystemOfflineManager
         var offlineDate = ParseUtc(offlineDateUtc);
 
         message = message.Replace("{{warn_date}}",
-            warnDate.HasValue ? FormatLocal(warnDate.Value) : "(not set)");
+            warnDate.HasValue ? FormatEastern(warnDate.Value) : "(not set)");
         message = message.Replace("{{offline_date}}",
-            offlineDate.HasValue ? FormatLocal(offlineDate.Value) : "(not set)");
+            offlineDate.HasValue ? FormatEastern(offlineDate.Value) : "(not set)");
         message = message.Replace("{{outage_duration}}",
             FormatSpan(TimeSpan.FromHours(restorationHours)));
         message = message.Replace("{{estimated_restoration}}",
-            offlineDate.HasValue ? FormatLocal(offlineDate.Value.AddHours(restorationHours)) : "(not set)");
+            offlineDate.HasValue ? FormatEastern(offlineDate.Value.AddHours(restorationHours)) : "(not set)");
 
         return message;
+    }
+
+    private static readonly TimeZoneInfo _eastern = GetEasternTimeZone();
+
+    private static TimeZoneInfo GetEasternTimeZone()
+    {
+        try { return TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time"); }  // Windows
+        catch { return TimeZoneInfo.FindSystemTimeZoneById("America/New_York"); }     // Linux/macOS
     }
 
     private static DateTime? ParseUtc(string utcStr)
@@ -66,8 +74,12 @@ public sealed class SystemOfflineManager
         return dt;
     }
 
-    private static string FormatLocal(DateTime utcDt)
-        => utcDt.ToUniversalTime().ToString("MMMM d, yyyy 'at' h:mm tt", System.Globalization.CultureInfo.InvariantCulture) + " UTC";
+    private static string FormatEastern(DateTime utcDt)
+    {
+        var et   = TimeZoneInfo.ConvertTimeFromUtc(utcDt.ToUniversalTime(), _eastern);
+        var abbr = _eastern.IsDaylightSavingTime(et) ? "EDT" : "EST";
+        return et.ToString("MMMM d, yyyy 'at' h:mm tt", CultureInfo.InvariantCulture) + " " + abbr;
+    }
 
     private static string FormatSpan(TimeSpan span)
     {
