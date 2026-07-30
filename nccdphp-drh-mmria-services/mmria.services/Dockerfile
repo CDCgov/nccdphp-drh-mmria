@@ -1,5 +1,5 @@
 # ----- Stage 1: Build -----
-FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100:9.8-1784594615@sha256:c71106c2ad6009ee6238dc383f8bf4afe8539df2e4868ca0e1d9e1a724fe1d02 AS build
+FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100:9.8-1785401075@sha256:25cd4f9ebda2abe0f7c83a536437d246b39ca6837f97b669bd2f4b0f029fa7bd AS build
 WORKDIR /src
 
 # Copy the mmria.services project file first to leverage layer caching for restores.
@@ -35,7 +35,7 @@ USER 1001
 
 # ----- Stage 3: Runtime -----
 # https://console-openshift-console.apps.ecpaas-dev.cdc.gov/k8s/ns/trusted-images/imagestreamtags/dotnet-100-aspnet%3A9.7-1776776188
-FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100-aspnet:9.8-1784686917@sha256:f817cb732559281aa739d0817325a4a8695cf735e5cb37fc3aad92a9bba4edb5 AS runtime
+FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100-aspnet:9.8-1785375630@sha256:5427a40831bf058986d91d388b78e058cd95b021330d744e3eac9c330b1b15a8 AS runtime
 WORKDIR /app
 
 # Update libacl to address CVE-2026-54369 (symlink traversal privilege escalation;
