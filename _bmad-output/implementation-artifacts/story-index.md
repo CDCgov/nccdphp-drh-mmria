@@ -1093,10 +1093,10 @@ dev this story _bmad-output/implementation-artifacts/32-3-hospital-paternity-fie
 
 | Story | File | Status |
 | --- | --- | --- |
-| 33.1 Metadata-Aware Numeric Generation | `33-1-metadata-aware-numeric-generation.md` | ready-for-dev |
-| 33.2 Date Group Validity and Timeline Plausibility | `33-2-date-group-validity-timeline-plausibility.md` | ready-for-dev |
-| 33.3 Recursive Date and Number Validation Gate | `33-3-recursive-date-number-validation-gate.md` | ready-for-dev |
-| 33.4 Generator Regression Coverage for Date and Number Fields | `33-4-generator-regression-coverage.md` | ready-for-dev |
+| 33.1 Metadata-Aware Numeric Generation | `33-1-metadata-aware-numeric-generation.md` | in-progress |
+| 33.2 Date Group Validity and Timeline Plausibility | `33-2-date-group-validity-timeline-plausibility.md` | review |
+| 33.3 Recursive Date and Number Validation Gate | `33-3-recursive-date-number-validation-gate.md` | review |
+| 33.4 Generator Regression Coverage for Date and Number Fields | `33-4-generator-regression-coverage.md` | review |
 
 **Sequencing:** 33.1 and 33.2 can proceed independently. 33.3 should land after the validation path design is clear and benefits from fixtures created for 33.1/33.2. 33.4 can be developed alongside the other stories, but it is the closeout proof before Epic 33 is marked done.
 
@@ -1122,6 +1122,24 @@ dev this story _bmad-output/implementation-artifacts/33-3-recursive-date-number-
 
 ```
 dev this story _bmad-output/implementation-artifacts/33-4-generator-regression-coverage.md
+```
+
+---
+
+## Epic 34: Case Narrative PDF Spacing Fidelity
+
+| Story | File | Status |
+| --- | --- | --- |
+| 34.1 Normalize Case Narrative PDF Whitespace Conversion | `34-1-normalize-case-narrative-pdf-whitespace-conversion.md` | done |
+
+**Sequencing:** Single story — no dependencies.
+
+> ℹ️ Surgical fix to `pdf-version/index.js` only. Two defects in `ConvertHTMLDOMWalker`: (1) Trumbowyg v4.1 serializes HTML as a single line with literal spaces between block tags — these become whitespace-only `#TEXT` children of `BODY` that pdfMake renders as blank rows. (2) `<p><br></p>` emits two newlines instead of one. Evidence fixtures in `docs/ai/local/case-narrative-spacing/`. No server-side changes, no save-path changes.
+
+**Story 34.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/34-1-normalize-case-narrative-pdf-whitespace-conversion.md
 ```
 
 ---
