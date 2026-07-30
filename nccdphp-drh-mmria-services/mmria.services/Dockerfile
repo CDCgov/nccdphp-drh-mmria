@@ -35,7 +35,7 @@ USER 1001
 
 # ----- Stage 3: Runtime -----
 # https://console-openshift-console.apps.ecpaas-dev.cdc.gov/k8s/ns/trusted-images/imagestreamtags/dotnet-100-aspnet%3A9.7-1776776188
-FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100-aspnet:9.8-1784686917@sha256:f817cb732559281aa739d0817325a4a8695cf735e5cb37fc3aad92a9bba4edb5 AS runtime
+FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100-aspnet:9.8-1785375630@sha256:5427a40831bf058986d91d388b78e058cd95b021330d744e3eac9c330b1b15a8 AS runtime
 WORKDIR /app
 
 # Update libacl to address CVE-2026-54369 (symlink traversal privilege escalation;
