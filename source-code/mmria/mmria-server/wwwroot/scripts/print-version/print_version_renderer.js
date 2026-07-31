@@ -1082,6 +1082,17 @@ function print_version_textarea_replace_return_with_br(p_value)
     if(p_value!= null)
     {
         result = p_value.replace(crlf_regex, "<br/>");
+        // The raw stored narrative HTML has \n at the start/end of every <p> and
+        // between </p> and <p> section separators. After \n→<br/> those become
+        // leading/trailing blank lines inside each paragraph and extra blank lines
+        // between sections. CSS <p> margins provide sufficient paragraph spacing
+        // without any of these extra <br> elements.
+        // 1. Strip leading <br> from paragraph start:  <p><br>text → <p>text
+        result = result.replace(/<p>(\s*<br\s*\/?>\s*)+/gi, '<p>');
+        // 2. Strip trailing <br> before paragraph close:  text<br></p> → text</p>
+        result = result.replace(/(\s*<br\s*\/?>\s*)+<\/p>/gi, '</p>');
+        // 3. Strip all body-level <br> separators between paragraphs:  </p><br>+<p> → </p><p>
+        result = result.replace(/<\/p>(\s*)(?:<br\s*\/?>\s*)+(?=<p)/gi, '</p>$1');
     }
 
     return result
