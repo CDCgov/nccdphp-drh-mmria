@@ -54,6 +54,7 @@ FR-33.4: Focused regression tests cover generator date and number plausibility a
 FR-34.1: When the case narrative PDF export renders saved Trumbowyg HTML that has been reserialized after editing, whitespace-only inter-tag separator text nodes do not create visible blank rows or extra paragraph spacing in the PDF.
 FR-34.2: When the saved narrative contains an intentional blank paragraph such as `<p><br></p>`, the PDF export renders it as exactly one intentional blank line rather than multiplying the `<br>` newline with paragraph trailing newline behavior.
 FR-34.3: The spacing fix preserves the stored `g_data.case_narrative.case_opening_overview` HTML and constrains behavior changes to PDF conversion unless implementation evidence proves that scope cannot satisfy the defect.
+FR-34.4: When saved case narrative HTML contains a standalone `<br>` followed by a whitespace-only empty paragraph before the next section, the PDF export collapses that separator sequence to one intentional break instead of rendering duplicate blank rows.
 
 ### NonFunctional Requirements
 
@@ -82,6 +83,7 @@ NFR-34.1: The case narrative PDF spacing fix remains surgical, with no new clien
 - FR-34 defect scope: fix PDF interpretation in `wwwroot/scripts/pdf-version/index.js` only unless implementation evidence proves otherwise; do not modify Trumbowyg save output or stored narrative HTML.
 - FR-34 evidence: use `docs/ai/local/case-narrative-spacing/changed-prod-data-v4.1.txt` and `docs/ai/local/case-narrative-spacing/unchanged-prod-data.txt` as regression fixtures or manual verification inputs.
 - FR-34 parser guard: preserve meaningful inline spaces and NBSP while ignoring structural whitespace-only nodes produced by edited one-line HTML between block tags.
+- FR-34 QA follow-up evidence: use `docs/ai/local/case-narrative-spacing/qa/html.txt` as the regression fixture for Story 34.2; it contains repeated `<br>` plus empty-paragraph separators that were not covered by Story 34.1.
 
 ### UX Design Requirements
 
@@ -143,6 +145,7 @@ FR-33.4: Epic 33 — Focused generator regression tests for date and number fiel
 FR-34.1: Epic 34 — Ignore structural whitespace-only text nodes in case narrative PDF conversion
 FR-34.2: Epic 34 — Render empty Trumbowyg paragraphs as one intentional blank line
 FR-34.3: Epic 34 — Preserve stored narrative HTML and constrain fix to PDF conversion
+FR-34.4: Epic 34 — Collapse BR-plus-empty-paragraph section separators in case narrative PDF conversion
 
 ## Epic List
 
@@ -245,8 +248,8 @@ Generated test cases from `mmria-case-generator` should remain broad enough for 
 ### Epic 34: Case Narrative PDF Spacing Fidelity
 
 The case narrative PDF export renders edited rich-text narrative HTML without adding extra vertical spacing between paragraphs. The fix is constrained to PDF HTML conversion so the editor's stored Trumbowyg HTML remains unchanged.
-**FRs covered:** FR-34.1, FR-34.2, FR-34.3
-**Stories:** 34.1 — Normalize case narrative PDF whitespace conversion
+**FRs covered:** FR-34.1, FR-34.2, FR-34.3, FR-34.4
+**Stories:** 34.1 — Normalize case narrative PDF whitespace conversion, 34.2 — Collapse BR-plus-empty-paragraph separators
 
 ---
 
@@ -4820,10 +4823,52 @@ So that adding a line in the narrative editor does not make the exported PDF har
 - `unchanged-prod-data.txt` has 70 newlines, no `<p><br></p>`, and zero literal `> <` inter-tag spaces.
 - `pdf-version/index.js` currently pushes `#TEXT`, `P`/`DIV`, and `BR` nodes as PDF text/newline content, which explains why edited structural whitespace can inflate PDF spacing.
 
+### Story 34.2: Collapse BR Plus Empty Paragraph Separators
+
+As a case reviewer,
+I want QA narrative template section breaks to render with normal spacing in the PDF,
+So that section headings are not pushed apart by duplicate blank rows after editing or saving the narrative.
+
+**Acceptance Criteria:**
+
+**Given** a saved narrative matching `docs/ai/local/case-narrative-spacing/qa/html.txt`
+**When** `convert_html_to_pdf(...)` walks the HTML for `case_opening_overview`
+**Then** each top-level `<br>` immediately followed by a whitespace-only empty paragraph separator renders as one intentional break in the PDF output, not two visible blank rows.
+
+**Given** a body-level `<br>` is not adjacent to an empty paragraph separator
+**When** the narrative is converted for PDF
+**Then** existing intentional line-break behavior is preserved.
+
+**Given** a paragraph contains visible text, inline formatting, NBSP, or meaningful inline whitespace
+**When** PDF conversion normalizes empty separators
+**Then** meaningful text and inline spacing are preserved; words do not collapse together.
+
+**Given** the Story 34.1 fixtures still exist in `docs/ai/local/case-narrative-spacing/`
+**When** regression verification runs
+**Then** the prior fixes for body-level whitespace-only `#TEXT` nodes and `<p><br></p>` blank paragraphs still pass.
+
+**Given** the stored narrative HTML is read from `g_data.case_narrative.case_opening_overview`
+**When** the fix runs
+**Then** the stored HTML, Trumbowyg editor output, and save sanitizer behavior are not changed.
+
+**Implementation Notes:**
+- Primary file remains `source-code/mmria/mmria-server/wwwroot/scripts/pdf-version/index.js`.
+- Primary functions remain `convert_html_to_pdf(...)` and `ConvertHTMLDOMWalker(...)`.
+- Story 34.1 handled two shapes: body-level whitespace-only `#TEXT` nodes and `<p><br></p>` blank paragraphs.
+- The QA fixture introduces a third shape: repeated `</p><br><p>\r\n</p><p><strong>...` separators.
+- The current `BR` branch emits `{ text: "\n" }`, and the current `P`/`DIV` branch appends its own trailing newline. That means a `<br>` followed by an empty paragraph can still become two visible blank rows.
+- Keep the change in the PDF conversion path. Do not normalize stored narrative HTML, editor output, Trumbowyg configuration, or save-path sanitizer behavior.
+
+**Evidence:**
+- `docs/ai/local/case-narrative-spacing/qa/html.txt` has 12 `<br>` tags, 12 whitespace-only empty paragraphs, and 11 repeated `<br>` plus empty-paragraph separators.
+- The QA editor screenshot shows compact editor spacing, supporting the conclusion that the remaining defect is in PDF interpretation rather than editor display.
+- Story 34.1 was marked complete, and the QA symptom still reproduces with a new fixture shape.
+
 ## Epic 34 - Story Sequencing
 
 | Story | Risk | Dependencies |
 |---|---|---|
 | 34.1 - Normalize case narrative PDF whitespace conversion | Medium | Existing case narrative editor fidelity behavior from Epic 1; supplied spacing fixtures |
+| 34.2 - Collapse BR plus empty paragraph separators | Medium | Story 34.1 PDF converter changes; QA spacing fixture in `docs/ai/local/case-narrative-spacing/qa/html.txt` |
 
-Implement Story 34.1 as a single surgical PDF-renderer change. Regression coverage should exercise the converter against both supplied HTML fixtures before any manual PDF comparison.
+Story 34.1 remains the initial PDF-renderer correction. Story 34.2 reopens Epic 34 for the QA-specific separator shape and should remain a single surgical PDF conversion follow-up with regression coverage for all three fixture shapes before manual PDF comparison.
