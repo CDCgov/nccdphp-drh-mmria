@@ -1506,26 +1506,27 @@ function ConvertHTMLDOMWalker(p_result, p_node)
 				let child = p_node.childNodes[i];
 				ConvertHTMLDOMWalker(text_array, child);
 			}
-			// Blank paragraph guard: <p><br></p> produces one BR-derived newline in text_array.
-			// Without this, the paragraph's own trailing "\n" stacks on top, creating a
-			// double blank line in the PDF for each intentional empty paragraph.
-			// Collapse the entire paragraph to a single blank line.
-			if (text_array.length > 0 &&
-					text_array.every(item => Object.keys(item).length === 1 && item.text === '\n')) {
-				p_result.push({ text: '\n' });
-				return;
-			}
-			// Duplicate-separator guard: <br><p>whitespace-only</p> at body level creates two
-			// blank rows — one from the BR and one from this empty paragraph. QA narrative
-			// templates serialize section breaks as </p><br><p>\r\n</p>. When this P immediately
-			// follows a body-level BR and contains only whitespace, suppress it entirely; the
-			// BR's newline is the sole intentional separator between sections.
+			// Duplicate-separator guard: <br><p>empty-or-whitespace</p> at body level creates
+			// two blank rows — one from the body-level BR and one from this empty paragraph.
+			// Trumbowyg normalizes section-break separators as either </p><br><p>\r\n</p>
+			// (pre-save) or </p><br><p><br></p> (post-save). Both shapes produce an empty
+			// paragraph whose walked text is whitespace-only (\n from BR satisfies /^\s*$/).
+			// This guard must run BEFORE the blank-paragraph guard so <p><br></p> preceded by
+			// a body-level BR is suppressed entirely rather than emitting a second top-level \n.
 			if (p_node.parentNode && p_node.parentNode.nodeName.toUpperCase() === 'BODY' &&
 					p_node.previousElementSibling &&
 					p_node.previousElementSibling.nodeName.toUpperCase() === 'BR' &&
 					(text_array.length === 0 ||
 						text_array.every(item => !item.canvas &&
 							typeof item.text === 'string' && /^\s*$/.test(item.text)))) {
+				return;
+			}
+			// Blank paragraph guard: <p><br></p> not preceded by a body-level BR produces one
+			// BR-derived newline in text_array. Without this the paragraph's own trailing "\n"
+			// stacks on top, creating a double blank line. Collapse to a single blank line.
+			if (text_array.length > 0 &&
+					text_array.every(item => Object.keys(item).length === 1 && item.text === '\n')) {
+				p_result.push({ text: '\n' });
 				return;
 			}
 			text_array.push({ text: "\n" });
