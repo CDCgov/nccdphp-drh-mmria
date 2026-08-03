@@ -147,6 +147,11 @@ FR-34.2: Epic 34 — Render empty Trumbowyg paragraphs as one intentional blank 
 FR-34.3: Epic 34 — Preserve stored narrative HTML and constrain fix to PDF conversion
 FR-34.4: Epic 34 — Collapse BR-plus-empty-paragraph section separators in case narrative PDF conversion
 
+FR-36.1: Epic 36 — Reconcile false-positive suppression: distinguish already-committed items from genuine mismatch
+FR-36.2: Epic 36 — Change stack snapshot deduplication on enqueue (optional optimization)
+FR-36.3: Epic 36 — Rev poll generation guard verification and regression test during transient network outage
+FR-36.4: Epic 36 — Autosave-drop awaited-save data carry-through verification
+
 ## Epic List
 
 ### Epic 1: Case Narrative Editor Fidelity
@@ -250,6 +255,12 @@ Generated test cases from `mmria-case-generator` should remain broad enough for 
 The case narrative PDF export renders edited rich-text narrative HTML without adding extra vertical spacing between paragraphs. The fix is constrained to PDF HTML conversion so the editor's stored Trumbowyg HTML remains unchanged.
 **FRs covered:** FR-34.1, FR-34.2, FR-34.3, FR-34.4
 **Stories:** 34.1 — Normalize case narrative PDF whitespace conversion, 34.2 — Collapse BR-plus-empty-paragraph separators
+
+### Epic 36: Case Save Queue Reconcile — Idle Network Recovery Fix
+
+When a case is left idle during a transient network disruption, the autosave retry and the inactivity-triggered save (either the "Continue Editing" path after the warning threshold, or the lock-release path after the lock threshold) can both capture identical `g_change_stack` snapshots. When the autosave eventually succeeds and clears those items, the subsequent inactivity save's post-completion reconcile emits a false-positive warning implying edits were not saved. No data loss occurs, but the warning creates user and developer confusion. This epic eliminates the false-positive, verifies the rev poll generation guard handles network recovery correctly, and confirms awaited-save data carry-through when a retrying autosave is dropped.
+**FRs covered:** FR-36.1, FR-36.2, FR-36.3, FR-36.4
+**Stories:** 36.1 — Fix false-positive reconcile warning in `mmria_reconcile_live_save_state_after_success`, 36.2 — Verify rev poll generation guard during transient network outage, 36.3 — Verify autosave-drop data carry-through when inactivity save is awaited, 36.4 (optional) — Change stack snapshot deduplication on enqueue
 
 ---
 
@@ -4872,3 +4883,141 @@ So that section headings are not pushed apart by duplicate blank rows after edit
 | 34.2 - Collapse BR plus empty paragraph separators | Medium | Story 34.1 PDF converter changes; QA spacing fixture in `docs/ai/local/case-narrative-spacing/qa/html.txt` |
 
 Story 34.1 remains the initial PDF-renderer correction. Story 34.2 reopens Epic 34 for the QA-specific separator shape and should remain a single surgical PDF conversion follow-up with regression coverage for all three fixture shapes before manual PDF comparison.
+
+---
+
+## Epic 36: Case Save Queue Reconcile — Idle Network Recovery Fix
+
+When a case is left idle during a transient network disruption, the autosave retry and the inactivity-triggered save (either the "Continue Editing" path after the warning threshold, or the lock-release path after the lock threshold) can both capture identical `g_change_stack` snapshots. When the autosave eventually succeeds and clears those items, the subsequent inactivity save's post-completion reconcile emits a false-positive warning implying edits were not saved. No data loss occurs, but the warning creates user and developer confusion.
+
+### Background: The Race Condition
+
+The save queue serializes HTTP requests one at a time. The active item is protected from pruning while its HTTP request is in-flight (`save_queue.active_item` is set). During a network disruption:
+
+1. Autosave A is sent — `active_item = A`. The request stalls (ERR_NETWORK_CHANGED / ERR_CONNECTION_RESET).
+2. The inactivity threshold passes (`case_edit_inactivity_warning_minutes_before_lock` and/or `case_edit_inactivity_lock_minutes`). An awaited save B is enqueued via `save_case_and_wait(...)`. Because A is still the active item, the prune guard protects A. Queue = `[A (active, in-flight), B (awaited)]`.
+3. A and B both snapshot `g_change_stack` at their respective enqueue times. Since no new edits were made during the idle period, both snapshots are identical.
+4. Network recovers. A's request succeeds. A reconciles: prefix match passes → `g_change_stack` items are spliced out.
+5. B then processes and succeeds. B reconciles: `g_change_stack` is now empty (shorter than B's snapshot) → `mmria_is_change_stack_prefix_match` returns false → **false-positive warning fires**.
+
+Note: When A is in its retry backoff window (`active_item = null`), the prune guard does NOT protect A, and enqueuing B would instead drop A. In that case the warning does not fire. The race window exists only while A's HTTP request is actively in-flight.
+
+### Story 36.1: Fix False-Positive Reconcile Warning
+
+As a case reviewer,
+I want to have confidence that the absence of console warnings means my edits may not be saved,
+So that developers and reviewers are not misled by false-positive "unmatched edits" alerts during normal network-recovery save sequences.
+
+**Acceptance Criteria:**
+
+**Given** autosave A succeeds and reconciles, clearing `g_change_stack` to `[]`
+**And** a second save B (inactivity-triggered) has a snapshot of the same items A cleared
+**When** B completes and `mmria_reconcile_live_save_state_after_success` runs for B
+**Then** no `console.warn` is emitted — the function recognises the snapshot items are already committed and treats the reconcile as clean
+
+**Given** a save completes and `g_change_stack` currently has items `[D, E]` (not matching the save's snapshot `[A, B, C]`)
+**When** `mmria_reconcile_live_save_state_after_success` runs
+**Then** the warning **is** emitted and the items are left intact (genuine mismatch path unchanged)
+
+**Given** a save completes and `g_change_stack` is empty but the snapshot is also empty (`snapshot_items.length === 0`)
+**When** `mmria_reconcile_live_save_state_after_success` runs
+**Then** no warning is emitted and no splice is attempted
+
+**Implementation note:** The distinction between "already-committed" and "genuine mismatch" is:
+- **Already-committed**: `g_change_stack.length < snapshot_items.length` AND the items at the live stack head do not match snapshot position 0 (or the live stack is empty). Treat as clean — no warn.
+- **Genuine mismatch**: `g_change_stack.length >= snapshot_items.length` but at least one position differs. Warn and leave intact.
+
+All changes are in `wwwroot/scripts/case/index.js`. No server-side changes.
+
+**Files:** `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js`
+
+| Dependency | Risk |
+|---|---|
+| None — isolated reconcile function change | Low |
+
+### Story 36.2: Verify Rev Poll Generation Guard During Network Outage
+
+As a case reviewer,
+I want assurance that a brief network outage does not trigger a false "This case was updated" stale-case banner,
+So that I am not forced to reload a case that I was the only one editing.
+
+**Acceptance Criteria:**
+
+**Given** a case is in edit mode and the rev poll is running
+**When** the network drops and one or more poll requests return `TypeError: Failed to fetch`
+**Then** only `console.warn('[CaseRevPoll] poll failed:', err)` is logged — no stale-case banner is shown
+
+**Given** the network recovers and autosave succeeds, calling `mmria_sync_case_rev_polling()` with the new `_rev`
+**When** an in-flight poll response from before the save arrives late
+**Then** the generation guard (`_caseRevPollGeneration`) discards the stale response — no false-positive banner fires
+
+**Given** the above two scenarios hold at the `case_edit_inactivity_warning_minutes_before_lock` threshold (configurable) and at the `case_edit_inactivity_lock_minutes` threshold (configurable)
+**Then** behaviour is identical regardless of those configuration values
+
+**Implementation note:** No code change expected. Developer reads `case-rev-check.js` `startCaseRevPolling` and confirms the generation-guard assignment (`var myGeneration = _caseRevPollGeneration`) and the discard check (`if (_caseRevPollGeneration !== myGeneration) return`) cover the late-arrival scenario. If any gap is found, fix it in `case-rev-check.js`. Add a comment confirming the guard is intentional.
+
+**Files:** `source-code/mmria/mmria-server/wwwroot/scripts/case/case-rev-check.js`
+
+| Dependency | Risk |
+|---|---|
+| None — read/verify only unless gap found | Low |
+
+### Story 36.3: Verify Autosave-Drop Data Carry-Through
+
+As a case reviewer,
+I want assurance that when a retrying autosave is dropped in favour of an awaited inactivity save, none of my edits are silently lost,
+So that I can trust the inactivity save captures my full work.
+
+**Acceptance Criteria:**
+
+**Given** autosave A is retrying and an awaited inactivity save B is enqueued
+**When** `schedule_retry_or_fail` detects the awaited save and drops A (`awaited_save_is_queued` guard)
+**Then** B's `data` clone (captured from `g_data` at B's enqueue time) contains all field values present in `g_data` at that moment — no values from A's earlier snapshot are preferenced over B's
+
+**Given** B processes and the server returns `ok: true`
+**Then** `g_data._rev` is updated to the new revision and `g_change_stack` is correctly reconciled against B's snapshot
+
+**Given** both the inactivity warning path (`save_case_and_wait(..., 'edit_inactivity_continue')`) and the lock-release path (`save_case_and_wait(..., 'edit_inactivity_lock_release', { authRefreshPolicy: 'suppress' })`)
+**Then** data carry-through holds for both — the configuration values `case_edit_inactivity_warning_minutes_before_lock` and `case_edit_inactivity_lock_minutes` do not affect this property
+
+**Implementation note:** Verification story. Developer traces `get_new_save_queue_item` → `mmria_safe_clone(p_data)` and confirms `p_data` is always `g_data` (not A's stale clone) when B is enqueued. If `g_data` is correctly the live reference in both inactivity paths, no code change is needed — add a confirming code comment. If a gap is found, fix it.
+
+**Files:** `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js`, `source-code/mmria/mmria-server/wwwroot/scripts/case/edit-inactivity-manager.js`
+
+| Dependency | Risk |
+|---|---|
+| Story 36.1 (reconcile fix in same file) | Low |
+
+### Story 36.4 (Optional): Change Stack Snapshot Deduplication on Enqueue
+
+As a developer,
+I want the save queue to avoid capturing overlapping `g_change_stack` snapshots when an active save is already committed to those items,
+So that the reconcile false-positive cannot occur even if Story 36.1's reconcile fix is ever removed or regressed.
+
+**Acceptance Criteria:**
+
+**Given** autosave A is the active item with `change_stack_items: [item1, item2, item3]` (in-flight)
+**When** an inactivity save B is enqueued via `get_new_save_queue_item`
+**Then** B's `change_stack_items` snapshot starts from the offset after the items already captured in A (i.e., captures only items added after A's snapshot — or is empty if no new items exist)
+
+**Given** no active save exists for the case when B is enqueued
+**Then** B captures the full `g_change_stack` as normal (existing behaviour preserved)
+
+**Implementation note:** This story is a defence-in-depth optimization. It is blocked on Story 36.1 and should only be scheduled if the team decides the two-layer defence is worth the added complexity. Developer must ensure the offset logic handles the edge case where the active save's snapshot is a prefix of `g_change_stack` but new items have since been appended.
+
+**Files:** `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js`
+
+| Dependency | Risk |
+|---|---|
+| Story 36.1 must be complete | Medium — offset logic must be tested against all enqueue paths |
+
+## Epic 36 - Story Sequencing
+
+| Story | Risk | Dependencies |
+|---|---|---|
+| 36.1 — Fix false-positive reconcile warning | Low | None |
+| 36.2 — Verify rev poll generation guard | Low | None (parallel with 36.1) |
+| 36.3 — Verify autosave-drop data carry-through | Low | 36.1 (same file) |
+| 36.4 — Snapshot deduplication on enqueue (optional) | Medium | 36.1 complete |
+
+Stories 36.1 and 36.2 are independent and can be implemented in parallel. Story 36.3 should follow 36.1 since both touch `index.js`. Story 36.4 is optional and should only be scheduled if the team decides the defence-in-depth layer is warranted.
