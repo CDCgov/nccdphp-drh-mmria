@@ -475,6 +475,19 @@ function mmria_get_save_queue_item_policy(p_options)
   };
 }
 
+// Returns the number of g_change_stack items already captured in the active save's
+// snapshot for the given case ID. Used by get_new_save_queue_item to compute an
+// offset so that a newly enqueued save does not re-snapshot items the active save
+// has already committed to submitting.
+function mmria_get_active_save_snapshot_length(p_case_id)
+{
+  if (!p_case_id) return 0;
+  const active = save_queue.active_item;
+  if (!active || !active.data || active.data._id !== p_case_id) return 0;
+  if (!Array.isArray(active.change_stack_items)) return 0;
+  return active.change_stack_items.length;
+}
+
 function get_new_save_queue_item
 (
   p_data,
@@ -484,6 +497,9 @@ function get_new_save_queue_item
 )
 {
   const policy = mmria_get_save_queue_item_policy(p_options);
+  // Deep-clone the live case data at enqueue time. If a prior queued save is later
+  // dropped (e.g. schedule_retry_or_fail's awaited_save_is_queued guard), this item's
+  // data still reflects the complete case state at the moment this save was requested.
   const cloned_data = mmria_safe_clone(p_data);
 
   if
@@ -495,12 +511,23 @@ function get_new_save_queue_item
     cloned_data.host_state = window.location.host.split('-')[0];
   }
 
+  // Compute snapshot offset: exclude change stack items already captured in the
+  // active save's snapshot. This prevents the reconcile from seeing duplicate items
+  // across two consecutive saves. If there is no active save (or it is for a
+  // different case), offset is 0 and the full stack is snapshotted as before.
+  const active_snapshot_length = mmria_get_active_save_snapshot_length(
+    p_data && p_data._id
+  );
+  const change_stack_to_snapshot = Array.isArray(g_change_stack)
+    ? g_change_stack.slice(active_snapshot_length)
+    : [];
+
   return {
     id: $mmria.get_new_guid(),
     date_created: new Date(),
     date_completed: null,
     data: cloned_data, 
-    change_stack_items: mmria_safe_clone(Array.isArray(g_change_stack) ? g_change_stack : []),
+    change_stack_items: mmria_safe_clone(change_stack_to_snapshot),
     narrative_snapshot: mmria_get_narrative_save_snapshot(cloned_data),
     continuation_callback: p_call_back,
     note: p_note,
@@ -818,14 +845,20 @@ function mmria_reconcile_live_save_state_after_success(p_item)
   {
     if(mmria_is_change_stack_prefix_match(g_change_stack, snapshot_items))
     {
+      // Normal path: snapshot items are still at the head of the live stack — remove them.
       g_change_stack.splice(0, snapshot_items.length);
     }
-    else
+    else if(g_change_stack.length >= snapshot_items.length)
     {
+      // Genuine mismatch: the live stack has enough items but they don't match
+      // the snapshot prefix. Items were modified or reordered between enqueue
+      // and completion. Leave intact and warn.
       console.warn(
         'Save completed, but live change stack no longer matched the queued snapshot. Leaving unmatched edits intact.'
       );
     }
+    // else: live stack is shorter than the snapshot — a prior save already committed
+    // those items. Treat as clean; no warn, no splice needed.
   }
 
   mmria_reconcile_live_narrative_state_after_success(p_item);

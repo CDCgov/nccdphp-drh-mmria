@@ -191,6 +191,9 @@ function startCaseRevPolling(caseId, loadedRev) {
             })
             .then(function (data) {
                 // Discard if this response belongs to a superseded polling session.
+                // Guards against a late-arriving response from before mmria_sync_case_rev_polling()
+                // restarted polling with a new _rev after a successful autosave. Without this check,
+                // the stale response could incorrectly trigger the stale-case banner.
                 if (_caseRevPollGeneration !== myGeneration) return;
                 if (!data) return;
                 if (data._rev && data._rev !== loadedRev) {
