@@ -1126,18 +1126,20 @@ dev this story _bmad-output/implementation-artifacts/33-4-generator-regression-c
 
 ---
 
-## Epic 34: Case Narrative PDF Spacing Fidelity
+## Epic 34: Case Narrative PDF Spacing Fidelity and Paste Content Fidelity
 
 | Story | File | Status |
 | --- | --- | --- |
 | 34.1 Normalize Case Narrative PDF Whitespace Conversion | `34-1-normalize-case-narrative-pdf-whitespace-conversion.md` | done |
 | 34.2 Collapse BR Plus Empty Paragraph Separators | `34-2-collapse-br-empty-paragraph-separators.md` | done |
+| 34.3 Preserve Line Structure When Pasting Plain Text | `34-3-preserve-plain-text-paste-line-structure.md` | todo |
+| 34.4 Numbered-Paragraph Keyboard Continuation | `34-4-numbered-paragraph-keyboard-continuation.md` | todo |
 
-**Sequencing:** Story 34.1 is complete. Story 34.2 reopens Epic 34 for the QA-specific `<br>` plus empty-paragraph separator shape and should be completed before Epic 34 is closed again.
+**Sequencing:** Stories 34.1 and 34.2 (PDF fixes) are complete. Story 34.3 fixes the editor paste path and is independent of PDF behavior. Story 34.4 builds on the clean numbered paragraphs that Story 34.3 produces and should follow it.
 
-> ℹ️ Surgical fix to `pdf-version/index.js` only. Two defects in `ConvertHTMLDOMWalker`: (1) Trumbowyg v4.1 serializes HTML as a single line with literal spaces between block tags — these become whitespace-only `#TEXT` children of `BODY` that pdfMake renders as blank rows. (2) `<p><br></p>` emits two newlines instead of one. Evidence fixtures in `docs/ai/local/case-narrative-spacing/`. No server-side changes, no save-path changes.
+> ℹ️ Stories 34.1 and 34.2 are a surgical fix to `pdf-version/index.js` only. Two defects in `ConvertHTMLDOMWalker`: (1) Trumbowyg v4.1 serializes HTML as a single line with literal spaces between block tags — these become whitespace-only `#TEXT` children of `BODY` that pdfMake renders as blank rows. (2) `<p><br></p>` emits two newlines instead of one. Evidence fixtures in `docs/ai/local/case-narrative-spacing/`.
 
-> Follow-up: QA evidence in `docs/ai/local/case-narrative-spacing/qa/html.txt` shows a third shape, repeated `<br>` plus whitespace-only empty paragraph separators, that must collapse to a single intentional break in PDF conversion.
+> ℹ️ Stories 34.3 and 34.4 are editor-behavior fixes in `textarea.js`. Root cause: the plain-text paste path creates a single `Text` node from the clipboard string, and the browser collapses raw `\n` characters — all pasted lines land on one row. Fix: split by newline and create one `<p>` per line. Story 34.4 adds a `keydown` listener that detects `^\d+\.\s` paragraphs and auto-inserts the next numbered paragraph on Enter.
 
 **Story 34.1 prompt:**
 
@@ -1149,6 +1151,61 @@ dev this story _bmad-output/implementation-artifacts/34-1-normalize-case-narrati
 
 ```
 dev this story _bmad-output/implementation-artifacts/34-2-collapse-br-empty-paragraph-separators.md
+```
+
+**Story 34.3 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/34-3-preserve-plain-text-paste-line-structure.md
+```
+
+**Story 34.4 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/34-4-numbered-paragraph-keyboard-continuation.md
+```
+
+---
+
+## Epic 36: Case Save Queue Reconcile — Idle Network Recovery Fix
+
+| Story | File | Status |
+| --- | --- | --- |
+| 36.1 Fix False-Positive Reconcile Warning | `36-1-fix-reconcile-false-positive-warning.md` | todo |
+| 36.2 Verify Rev Poll Generation Guard During Network Outage | `36-2-verify-rev-poll-generation-guard.md` | todo |
+| 36.3 Verify Autosave-Drop Data Carry-Through | `36-3-verify-autosave-drop-data-carry-through.md` | todo |
+| 36.4 Change Stack Snapshot Deduplication on Enqueue _(optional)_ | `36-4-change-stack-snapshot-deduplication.md` | todo |
+
+**Sequencing:** Stories 36.1 and 36.2 are independent and can be worked in parallel. Story 36.3 should follow 36.1 (same file — `index.js`). Story 36.4 is optional and depends on 36.1 being complete.
+
+> ℹ️ **Root cause:** When a case is left idle during a transient network disruption, the in-flight autosave and an inactivity-triggered awaited save (fired after the configurable `case_edit_inactivity_warning_minutes_before_lock` or `case_edit_inactivity_lock_minutes` threshold) both snapshot the same `g_change_stack` items. The autosave eventually succeeds and clears those items; the subsequent inactivity save's reconcile then emits a false-positive "unmatched edits" warning. No data loss occurs. Story 36.1 is the primary fix.
+>
+> ℹ️ **Scope:** Client-side only. All changes are in `wwwroot/scripts/case/index.js` and/or `wwwroot/scripts/case/case-rev-check.js`. No server-side changes.
+>
+> ⚠️ **Story 36.4 is optional.** If the team decides the defence-in-depth snapshot-deduplication layer is not worth the complexity, 36.4 can be permanently deferred. Stories 36.1–36.3 fully resolve the observable symptom.
+
+**Story 36.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/36-1-fix-reconcile-false-positive-warning.md
+```
+
+**Story 36.2 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/36-2-verify-rev-poll-generation-guard.md
+```
+
+**Story 36.3 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/36-3-verify-autosave-drop-data-carry-through.md
+```
+
+**Story 36.4 prompt (optional):**
+
+```
+dev this story _bmad-output/implementation-artifacts/36-4-change-stack-snapshot-deduplication.md
 ```
 
 ---
