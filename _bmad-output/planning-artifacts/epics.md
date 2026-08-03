@@ -55,6 +55,9 @@ FR-34.1: When the case narrative PDF export renders saved Trumbowyg HTML that ha
 FR-34.2: When the saved narrative contains an intentional blank paragraph such as `<p><br></p>`, the PDF export renders it as exactly one intentional blank line rather than multiplying the `<br>` newline with paragraph trailing newline behavior.
 FR-34.3: The spacing fix preserves the stored `g_data.case_narrative.case_opening_overview` HTML and constrains behavior changes to PDF conversion unless implementation evidence proves that scope cannot satisfy the defect.
 FR-34.4: When saved case narrative HTML contains a standalone `<br>` followed by a whitespace-only empty paragraph before the next section, the PDF export collapses that separator sequence to one intentional break instead of rendering duplicate blank rows.
+FR-35.1: While a user is in offline mode, the "Exit Offline Mode" button is not shown on any page, while the "You're Offline" text/icon indicator remains visible and is right-aligned within its host container. The underlying widget, modal, and cleanup code are preserved (hidden, not deleted) for potential reuse in a future release.
+FR-35.2: Every user-visible occurrence of the "Go Online" label — both primary action buttons, their busy/connectivity state text, and the confirmation modal title and button — reads "Go Online & Sync Changes" instead.
+FR-35.3: Both "Go Online & Sync Changes" entry points (Offline Case List table and Cases Selected for Offline Work table) show the same confirmation modal before syncing changes and returning online; neither entry point bypasses confirmation.
 
 ### NonFunctional Requirements
 
@@ -63,6 +66,7 @@ NFR-2: The vitals validation modals (FR-2.2, FR-2.6) must meet Section 508 acces
 NFR-3: Vitals range configuration is loaded once at server startup and held in memory. Field-level blur validation is synchronous against the in-memory config. No per-event network requests are introduced.
 NFR-33.1: Generator improvements must remain a low-impact utilities change: no metadata schema changes, no generated strong-case model edits, no new external services, and no broad rewrite of the case generation pipeline.
 NFR-34.1: The case narrative PDF spacing fix remains surgical, with no new client-side dependencies, no bundler changes, no storage migration, and no broad rewrite of `pdf-version/index.js`.
+NFR-35.1: The Epic 35 change is UI/copy-scoped only — no server-side changes, no CouchDB schema changes, and no removal of `OfflineExitManager`, `offline-modals.js` exit-modal markup, or their cleanup/audit behavior. All hidden code remains fully intact and reachable via a future toggle.
 
 ### Additional Requirements
 
@@ -84,6 +88,11 @@ NFR-34.1: The case narrative PDF spacing fix remains surgical, with no new clien
 - FR-34 evidence: use `docs/ai/local/case-narrative-spacing/changed-prod-data-v4.1.txt` and `docs/ai/local/case-narrative-spacing/unchanged-prod-data.txt` as regression fixtures or manual verification inputs.
 - FR-34 parser guard: preserve meaningful inline spaces and NBSP while ignoring structural whitespace-only nodes produced by edited one-line HTML between block tags.
 - FR-34 QA follow-up evidence: use `docs/ai/local/case-narrative-spacing/qa/html.txt` as the regression fixture for Story 34.2; it contains repeated `<br>` plus empty-paragraph separators that were not covered by Story 34.1.
+- FR-35 origin: Rel 4.1 P-Immediate change request from Katrina's feedback, tracked as ADO #119294 (Marta Puskarz). Ships before Rel 4.1 deployment.
+- FR-35 scope decisions confirmed with the user (2026-08-03): (1) hide only — do not delete `OfflineExitManager`, the exit-offline confirmation modal, or the server cleanup calls; (2) rename "Go Online" everywhere, including the confirmation modal in `offline-modals.js`, not just the two primary buttons; (3) also fix the confirmation-modal inconsistency between the two "Go Online" entry points as part of this epic.
+- FR-35.1 host locations: `Views/Home/Index.cshtml`, `Views/Account/OfflineLogin.cshtml`, `Views/Shared/_BreadCrumbs.cshtml` (all render `[data-offline-exit-host]` divs populated by `offline-exit-manager.js`).
+- FR-35.2 rename sites: `wwwroot/scripts/editor/page_renderer/app.mmria.js` (2 static button labels), `wwwroot/scripts/offline/offline-transition-manager.js` (`set_go_online_button_state`), `wwwroot/scripts/offline/offline-network-monitor.js` (connectivity-driven state text), `wwwroot/scripts/offline/offline-modals.js` (`show_go_online_modal` title + confirm button). The busy-state text `'Going Online...'` is unchanged unless the user requests otherwise at implementation time.
+- FR-35.3: `app.mmria.js` line ~728 (`show_go_online_modal(event)`) already goes through the confirmation modal; line ~790 (`go_online_clicked(event)` called directly) bypasses it. Align the second entry point to route through the same confirmation modal as the first, rather than removing confirmation from the first.
 
 ### UX Design Requirements
 
@@ -123,7 +132,7 @@ FR-8.8: Epic 8 Story 8.5 - SAMS-aware offline entry points (SignIn/Login/Logout 
 FR-8.9: Epic 8 Story 8.5 - Dedicated AppOffline page + anonymous /api/account/offline-status endpoint
 FR-8.10: Epic 8 Story 8.6 - Precision offline detection (setTimeout at exact offline_date/warn_date)
 FR-8.11: Epic 8 Story 8.6 - Countdown/OK re-check and date-change recovery UX
-FR-8.12: Epic 8 Story 8.6 - mmria-services resilience (_lastKnownConfig fallback; assume online on no data)
+FR-8.12: Epic 8 Story 8.6 - mmria-services resilience (\_lastKnownConfig fallback; assume online on no data)
 FR-8.13: Epic 8 Story 8.6 - Page-refresh redirect to AppOffline (bypasses localStorage modal gate)FR-9.1: Standalone Bug Fix â€” Data Summary Checks "ALL" toggle scoped to selected Form
 FR-10.1: Standalone Bug Fix â€” Manage Users Export scoped to active filter
 FR-11.1: Epic 10 â€” Fix BatchSupervisor busy-wait CPU spin (mmria-services)
@@ -146,6 +155,9 @@ FR-34.1: Epic 34 — Ignore structural whitespace-only text nodes in case narrat
 FR-34.2: Epic 34 — Render empty Trumbowyg paragraphs as one intentional blank line
 FR-34.3: Epic 34 — Preserve stored narrative HTML and constrain fix to PDF conversion
 FR-34.4: Epic 34 — Collapse BR-plus-empty-paragraph section separators in case narrative PDF conversion
+FR-35.1: Epic 35 — Hide 'Exit Offline Mode' widget while offline (code preserved, not deleted)
+FR-35.2: Epic 35 — Rename 'Go Online' to 'Go Online & Sync Changes' everywhere, including the confirmation modal
+FR-35.3: Epic 35 — Align the two 'Go Online & Sync Changes' entry points to both confirm via modal before syncing
 
 ## Epic List
 
@@ -250,6 +262,12 @@ Generated test cases from `mmria-case-generator` should remain broad enough for 
 The case narrative PDF export renders edited rich-text narrative HTML without adding extra vertical spacing between paragraphs. The fix is constrained to PDF HTML conversion so the editor's stored Trumbowyg HTML remains unchanged.
 **FRs covered:** FR-34.1, FR-34.2, FR-34.3, FR-34.4
 **Stories:** 34.1 — Normalize case narrative PDF whitespace conversion, 34.2 — Collapse BR-plus-empty-paragraph separators
+
+### Epic 35: Offline Exit/Go Online UX Cleanup (Rel 4.1 P-Immediate)
+
+While a user is in offline mode, the confusing "Exit Offline Mode" escape hatch is hidden (not deleted) so it can be revisited in a future release. The "Go Online" action is renamed everywhere to "Go Online & Sync Changes" for clarity, and both entry points to that action now consistently confirm via modal before syncing.
+**FRs covered:** FR-35.1, FR-35.2, FR-35.3
+**Stories:** 35.1 — Hide Exit Offline Mode widget, 35.2 — Rename Go Online to Go Online & Sync Changes, 35.3 — Align Go Online confirmation behavior
 
 ---
 
@@ -1092,12 +1110,13 @@ So that mmrds access is fully consolidated within the common library layer.
 **Acceptance Criteria:**
 
 **Given** the following direct mmrds calls:
+
 - `AuditRecoveryDAL.cs` lines 24, 75 — case view `by_id` query and case GET at revision
 - `CVSDAL.cs` lines 73, 84 — `by_date_last_updated` view and case GET by ID
 - `VitalImportDAL.cs` lines 26, 33 — case GET by ID ×2
 - `AttachmentDAL.cs` line 21 — mmrds `by_pmss_number` view query
-**When** this story is complete
-**Then** each is replaced with the corresponding `ICaseRepository` method; `ICaseRepository` is injected into each DAL via constructor injection
+  **When** this story is complete
+  **Then** each is replaced with the corresponding `ICaseRepository` method; `ICaseRepository` is injected into each DAL via constructor injection
 
 **Given** each DAL's existing constructor and DI registration
 **When** `ICaseRepository` is added as a constructor parameter
@@ -1118,14 +1137,15 @@ So that the services project is covered by the same `ICaseRepository` contract a
 **Acceptance Criteria:**
 
 **Given** the following direct mmrds URL constructions in `mmria.services`:
+
 - `BatchProcessor.cs` — `_all_docs` and case GET at revision
 - `BatchItemProcessingService.cs` — case GET by ID
 - `PagedCaseIdLoader.cs` — `by_date_created` view
 - `core_element_exporter.cs` — case GET by ID
 - `exporter.cs` — `_all_docs` and case GET by ID
 - `mmrds_exporter.cs` — case GET by ID
-**When** this story is complete
-**Then** each is replaced with the corresponding `ICaseRepository` method; since `mmria.services` already references `mmria.common`, no new project reference is needed
+  **When** this story is complete
+  **Then** each is replaced with the corresponding `ICaseRepository` method; since `mmria.services` already references `mmria.common`, no new project reference is needed
 
 **Given** the `_all_docs` usages in `BatchProcessor` and `exporter`
 **When** the developer evaluates them
@@ -1195,16 +1215,16 @@ So that the boundary is explicit and future contributors do not try to merge the
 
 ## Epic 17 — Story Sequencing
 
-| Wave | Story | Risk | Dependencies |
-|---|---|---|---|
-| 17 | 17.1 — mmrds Operation Catalog | None | None — discovery only |
-| 17 | 17.7 — Boundary Decision | None | Can run in parallel with 17.1 |
-| 17 | 17.2 — ICaseRepository + CaseDAL | Low | 17.1 |
-| 17 | 17.3 — CaseManager direct calls | Medium | 17.2 |
-| 17 | 17.4 — CaseWorkflowAdminDAL | Low | 17.2 |
-| 17 | 17.5 — AuditRecovery / CVS / VitalImport / Attachment | Low | 17.2 |
-| 17 | 17.5b — mmria.services | Medium | 17.2 |
-| 17 | 17.6 — OfflineCaseManager | Medium | 17.2 |
+| Wave | Story                                                 | Risk   | Dependencies                  |
+| ---- | ----------------------------------------------------- | ------ | ----------------------------- |
+| 17   | 17.1 — mmrds Operation Catalog                        | None   | None — discovery only         |
+| 17   | 17.7 — Boundary Decision                              | None   | Can run in parallel with 17.1 |
+| 17   | 17.2 — ICaseRepository + CaseDAL                      | Low    | 17.1                          |
+| 17   | 17.3 — CaseManager direct calls                       | Medium | 17.2                          |
+| 17   | 17.4 — CaseWorkflowAdminDAL                           | Low    | 17.2                          |
+| 17   | 17.5 — AuditRecovery / CVS / VitalImport / Attachment | Low    | 17.2                          |
+| 17   | 17.5b — mmria.services                                | Medium | 17.2                          |
+| 17   | 17.6 — OfflineCaseManager                             | Medium | 17.2                          |
 
 17.3, 17.4, 17.5, 17.5b, and 17.6 can proceed in parallel once 17.2 is complete. 17.7 can run alongside 17.1.
 **When** `beginCvsReportRequest(record_id, p_control)` is called
@@ -1254,6 +1274,7 @@ So that these values can be tuned per environment without a code deployment.
 **Status:** not-started
 
 ### Summary
+
 Dropdown fields written during NAT/FET vitals import (MARN, ACKN, and adjacent coded fields) are stored as JSON strings instead of JSON integers. The front-end dropdown resolver expects integers, causing imported cases to display "Select Value" for fields that were successfully imported.
 
 The defect is in `C_Get_Set_Value.set_value(string, string, ...)` in `mmria.common` â€” it always assigns a .NET `string`, which Newtonsoft.Json serializes as a JSON string. mmria-server stores the same fields as .NET `int`, which serializes as a JSON number.
@@ -1295,6 +1316,7 @@ So that the case form does not show "Select Value" for fields that were successf
 **Status:** not-started
 
 ### Summary
+
 The `data-migration` project has hardcoded jurisdiction lists, flat config with no credential separation, and no environment-switching mechanism. Story 12.1 refactors it to use a layered appsettings pattern matching the Replication project. Story 12.2 adds a `VitalsTypeCorrection` migration that retroactively fixes the integer type defect on historical case data.
 
 Story 12.2 depends on Story 12.1.
@@ -1442,6 +1464,7 @@ Epics 7 and 8 were authored before `project-context.md` was updated. Two anti-pa
 2. `clear_case_status.cs` and `recover_deleted_case.cs` (Wave 9, migration matrix) still own raw CouchDB calls. Epic 7 audit stories (7.1 and 7.2) were implemented on top of these controllers at `verification` status, compounding the debt.
 
 Two earlier remediation stories (VitalSignRangeHelper relocation and Case Rev endpoint) were superseded before this epic was finalized:
+
 - VitalSignRangeHelper is deleted by Story 4.0 (replaced by the validation engine).
 - Story 12.3 (Case Rev Endpoint) was implemented as `done`.
 
@@ -1533,10 +1556,10 @@ All CouchDB reads and writes against the `_users` and `configuration` databases 
 
 **Scope summary (verified 2026-07-14):**
 
-| Database | Files with direct calls | Total hits | Already in DAL/Manager | Out-of-DAL leakage | Infra/out-of-scope |
-|---|---|---|---|---|---|
-| `_users` | 9 | 14 | `AccountDAL`, `AccountManager`, `ManageUsersDAL` | `AccountController.OIDC.cs`, `passwordChangeController.cs`, `JurisdictionSummary.cs`, `VROSummary.cs` | `c_db_setup.cs`, `Check_DB_Install.cs` |
-| `configuration` | 3 | 12 | none | `_config.cs`, `MMRIAServicesDAL.cs` | `MultiTenantConfigurationLoader.cs` (startup) |
+| Database        | Files with direct calls | Total hits | Already in DAL/Manager                           | Out-of-DAL leakage                                                                                    | Infra/out-of-scope                            |
+| --------------- | ----------------------- | ---------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `_users`        | 9                       | 14         | `AccountDAL`, `AccountManager`, `ManageUsersDAL` | `AccountController.OIDC.cs`, `passwordChangeController.cs`, `JurisdictionSummary.cs`, `VROSummary.cs` | `c_db_setup.cs`, `Check_DB_Install.cs`        |
+| `configuration` | 3                       | 12         | none                                             | `_config.cs`, `MMRIAServicesDAL.cs`                                                                   | `MultiTenantConfigurationLoader.cs` (startup) |
 
 **SQL migration note:** `_users` is CouchDB's built-in authentication database. The `IUserRepository` interface established here is the seam for a future migration to ASP.NET Identity or an IAM system. `IConfigurationRepository` is the seam for a future SQL configuration table.
 
@@ -1599,12 +1622,13 @@ So that no file outside `AccountDAL` or `ManageUsersDAL` constructs a `_users` U
 **Acceptance Criteria:**
 
 **Given** the following direct `_users` HTTP calls outside of DAL files:
+
 - `AccountController.OIDC.cs` — 2 hits (OIDC user lookup/provision during SAMS login)
 - `passwordChangeController.cs` — 1 hit (user document GET/PUT for password change)
 - `JurisdictionSummary.cs` — 1 hit (actor-side user lookup for jurisdiction summary)
 - `VROSummary.cs` — 1 hit (actor-side user lookup for VRO summary)
-**When** this story is complete
-**Then** each is replaced with the corresponding `IUserRepository` method; `IUserRepository` is injected via constructor injection where needed
+  **When** this story is complete
+  **Then** each is replaced with the corresponding `IUserRepository` method; `IUserRepository` is injected via constructor injection where needed
 
 **Given** `AccountController.OIDC.cs` OIDC-specific user provisioning logic
 **When** replaced
@@ -1633,10 +1657,11 @@ So that the files currently accessing the configuration database directly can be
 **Then** `mmria.common/SharedLibraries/SystemConfig/DAL/SystemConfigDAL.cs` is created containing all in-scope `configuration` database operations from the catalog; `IConfigurationRepository` is defined in the same feature directory; `SystemConfigDAL` implements `IConfigurationRepository`
 
 **Given** the following direct `configuration` database accesses:
+
 - `_config.cs` — 3 hits (admin configuration document GET/PUT)
 - `MMRIAServicesDAL.cs` — 3 hits (configuration reads for service orchestration)
-**When** this story is complete
-**Then** each is replaced with the corresponding `IConfigurationRepository` method; `IConfigurationRepository` is injected via constructor injection
+  **When** this story is complete
+  **Then** each is replaced with the corresponding `IConfigurationRepository` method; `IConfigurationRepository` is injected via constructor injection
 
 **Given** `MultiTenantConfigurationLoader.cs` (6 hits) reads the `configuration` database at startup to build the in-memory tenant map
 **When** evaluated
@@ -1663,6 +1688,7 @@ So that the startup tenant-registry and shared-config loading path can be swappe
 **Given** `MultiTenantConfigurationLoader` is currently a concrete class instantiated directly in `Program.cs` with no interface
 **When** this story is complete
 **Then** `IConfigurationBootstrapLoader` is defined in `mmria.common/couchdb/configuration/` with async method signatures covering the public surface of `MultiTenantConfigurationLoader` used by `Program.cs`:
+
 - `LoadRequiredConfigurationSetsAsync(...)`
 - `LoadRequiredOverridableConfigurationsAsync(...)`
 - `LoadTenantOverridableConfigurationAsync(...)`
@@ -1693,13 +1719,13 @@ So that the startup tenant-registry and shared-config loading path can be swappe
 
 ## Epic 18 — Story Sequencing
 
-| Wave | Story | Risk | Dependencies |
-|---|---|---|---|
-| 18 | 18.1 — `_users` Operation Catalog | None | None — discovery only |
-| 18 | 18.2 — `IUserRepository` + `AccountDAL` | Low | 18.1 |
-| 18 | 18.3 — Route leaking `_users` calls | Low–Medium | 18.2 |
-| 18 | 18.4 — `IConfigurationRepository` + `SystemConfigDAL` | Low | 18.1 |
-| 18 | 18.5 — `IConfigurationBootstrapLoader` over `MultiTenantConfigurationLoader` | Low | None — independent of all other stories |
+| Wave | Story                                                                        | Risk       | Dependencies                            |
+| ---- | ---------------------------------------------------------------------------- | ---------- | --------------------------------------- |
+| 18   | 18.1 — `_users` Operation Catalog                                            | None       | None — discovery only                   |
+| 18   | 18.2 — `IUserRepository` + `AccountDAL`                                      | Low        | 18.1                                    |
+| 18   | 18.3 — Route leaking `_users` calls                                          | Low–Medium | 18.2                                    |
+| 18   | 18.4 — `IConfigurationRepository` + `SystemConfigDAL`                        | Low        | 18.1                                    |
+| 18   | 18.5 — `IConfigurationBootstrapLoader` over `MultiTenantConfigurationLoader` | Low        | None — independent of all other stories |
 
 18.3 and 18.4 can proceed in parallel once 18.2 is complete. 18.4 and 18.5 have no dependency on 18.2 and can be done at any time.
 
@@ -1713,12 +1739,12 @@ All CouchDB reads and writes against the `jurisdiction` database are consolidate
 
 **Scope summary (verified 2026-07-14):**
 
-| Category | Files | Hits | Notes |
-|---|---|---|---|
-| Already in a DAL/Manager | `ManageUsersDAL`, `ManageUsersManager`, `SessionDAL` | 13 | Partial coverage — DAL methods exist but no interface |
-| Application CRUD (out-of-DAL) | `jurisdiction_treeController`, `vitalsController`, `_usersController`, `CaseViewManager`, `CaseViewSearch.pmss`, `JurisdictionSummary`, `VROSummary` | 15 | Mix of controllers, managers, and actors |
-| Auth middleware (hot path) | `authorization.cs`, `authorization_case.cs`, `authorization_user.cs`, `authorization.pmss.cs`, `authorization_case.pmss.cs`, `authorization_user.pmss.cs`, `AuthorizationRoleCache.cs`, `JurisdictionAuthorizationRequirement.cs` | 11 | **Special concern** — runs on every authorized request |
-| Infra/out-of-scope | `c_db_setup.cs` | 5 | DB setup only |
+| Category                      | Files                                                                                                                                                                                                                             | Hits | Notes                                                  |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------ |
+| Already in a DAL/Manager      | `ManageUsersDAL`, `ManageUsersManager`, `SessionDAL`                                                                                                                                                                              | 13   | Partial coverage — DAL methods exist but no interface  |
+| Application CRUD (out-of-DAL) | `jurisdiction_treeController`, `vitalsController`, `_usersController`, `CaseViewManager`, `CaseViewSearch.pmss`, `JurisdictionSummary`, `VROSummary`                                                                              | 15   | Mix of controllers, managers, and actors               |
+| Auth middleware (hot path)    | `authorization.cs`, `authorization_case.cs`, `authorization_user.cs`, `authorization.pmss.cs`, `authorization_case.pmss.cs`, `authorization_user.pmss.cs`, `AuthorizationRoleCache.cs`, `JurisdictionAuthorizationRequirement.cs` | 11   | **Special concern** — runs on every authorized request |
+| Infra/out-of-scope            | `c_db_setup.cs`                                                                                                                                                                                                                   | 5    | DB setup only                                          |
 
 **Two-interface design:** The auth middleware files all query a single read-only view (`jurisdiction/_design/sortable/_view/by_user_id`). This is architecturally different from application CRUD — it is a high-frequency, read-only authorization lookup. Mixing it with general CRUD behind one interface would create unacceptable coupling between the auth pipeline and the data layer. Two interfaces are required:
 
@@ -1822,6 +1848,7 @@ So that the interface established in Story 19.2 is the only path for application
 **Acceptance Criteria:**
 
 **Given** the following direct `jurisdiction` HTTP calls outside of DAL files:
+
 - `jurisdiction_treeController.cs` — 5 hits (tree document GET/PUT — Wave 8 planned migration target)
 - `vitalsController.cs` — 4 hits (jurisdiction reads for vitals context)
 - `_usersController.cs` — 2 hits (user-role-jurisdiction reads)
@@ -1831,8 +1858,8 @@ So that the interface established in Story 19.2 is the only path for application
 - `VROSummary.cs` — 1 hit (actor-side jurisdiction read)
 - `SessionDAL.cs` — 1 hit (session-related jurisdiction read)
 - `ManageUsersManager.cs` — 4 hits (any remaining direct construction after Story 19.2)
-**When** this story is complete
-**Then** each is replaced with the corresponding `IJurisdictionRepository` method; `IJurisdictionRepository` is injected via constructor injection in each class
+  **When** this story is complete
+  **Then** each is replaced with the corresponding `IJurisdictionRepository` method; `IJurisdictionRepository` is injected via constructor injection in each class
 
 **Given** `jurisdiction_treeController.cs` is also a Wave 8 migration target (planned move to `JurisdictionTree` SharedLibrary)
 **When** this story touches it
@@ -1846,12 +1873,12 @@ So that the interface established in Story 19.2 is the only path for application
 
 ## Epic 19 — Story Sequencing
 
-| Wave | Story | Risk | Dependencies |
-|---|---|---|---|
-| 19 | 19.1 — `jurisdiction` Operation Catalog | None | None — discovery only |
-| 19 | 19.2 — `IJurisdictionRepository` + `JurisdictionDAL` | Low–Medium | 19.1 |
-| 19 | 19.3 — `IJurisdictionAuthorizationReader` (auth middleware) | Medium | 19.1 |
-| 19 | 19.4 — Route out-of-DAL application CRUD | Low–Medium | 19.2 |
+| Wave | Story                                                       | Risk       | Dependencies          |
+| ---- | ----------------------------------------------------------- | ---------- | --------------------- |
+| 19   | 19.1 — `jurisdiction` Operation Catalog                     | None       | None — discovery only |
+| 19   | 19.2 — `IJurisdictionRepository` + `JurisdictionDAL`        | Low–Medium | 19.1                  |
+| 19   | 19.3 — `IJurisdictionAuthorizationReader` (auth middleware) | Medium     | 19.1                  |
+| 19   | 19.4 — Route out-of-DAL application CRUD                    | Low–Medium | 19.2                  |
 
 19.2 and 19.3 can proceed in parallel after 19.1. 19.4 depends on 19.2. Story 19.3 is independent of 19.2 — the auth reader DAL and the CRUD DAL are separate classes.
 
@@ -1865,13 +1892,13 @@ All CouchDB reads and writes against the `metadata` database are consolidated be
 
 **Scope summary (verified 2026-07-14):**
 
-| Category | Files | Hits | Notes |
-|---|---|---|---|
-| `MetadataVersionManager` (already DAL-backed) | `MetadataVersionManager.cs` | 22 | Canonical owner — but builds URLs directly in manager, not all through DAL |
-| Controllers bypassing DAL | `broadcast_messageController`, `de_identified_listController`, `export_list_managerController`, `substance_mappingController`, `abstractorDeidentifiedCaseController`, `CaseController`, `versionController`, `record_idController`, `systemOfflineController` | ~14 | Mix of planned and unplanned Wave targets |
-| SharedLibraries bypassing DAL | `AuditRecoveryDAL`, `CaseValidationDAL`, `MMRIAServicesDAL` | ~8 | Within common — still bypass the canonical DAL |
-| Services actors/exporters | `c_convert_to_report_object`, `c_convert_to_opioid_report_object`, `c_convert_to_dqr_detail`, `c_de_identifier`, `c_cdc_de_identifier`, `c_document_sync_all`, `c_document_sync_all_legacy`, `c_generate_frequency_summary_report`, `c_sync_document`, `BatchItemProcessingService`, `core_element_exporter`, `exporter`, `mmrds_exporter`, `export_all_generate_name_map`, `PopulateCDCInstanceSupervisor` | ~39 | Mostly read-only: `GET version_specification-{v}/metadata` and `GET de-identified-list` |
-| Infra/out-of-scope | `c_db_setup.cs`, `Process_Migrate_*` | ~15 | DB setup and one-time migration scripts |
+| Category                                      | Files                                                                                                                                                                                                                                                                                                                                                                                                       | Hits | Notes                                                                                   |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- | --------------------------------------------------------------------------------------- |
+| `MetadataVersionManager` (already DAL-backed) | `MetadataVersionManager.cs`                                                                                                                                                                                                                                                                                                                                                                                 | 22   | Canonical owner — but builds URLs directly in manager, not all through DAL              |
+| Controllers bypassing DAL                     | `broadcast_messageController`, `de_identified_listController`, `export_list_managerController`, `substance_mappingController`, `abstractorDeidentifiedCaseController`, `CaseController`, `versionController`, `record_idController`, `systemOfflineController`                                                                                                                                              | ~14  | Mix of planned and unplanned Wave targets                                               |
+| SharedLibraries bypassing DAL                 | `AuditRecoveryDAL`, `CaseValidationDAL`, `MMRIAServicesDAL`                                                                                                                                                                                                                                                                                                                                                 | ~8   | Within common — still bypass the canonical DAL                                          |
+| Services actors/exporters                     | `c_convert_to_report_object`, `c_convert_to_opioid_report_object`, `c_convert_to_dqr_detail`, `c_de_identifier`, `c_cdc_de_identifier`, `c_document_sync_all`, `c_document_sync_all_legacy`, `c_generate_frequency_summary_report`, `c_sync_document`, `BatchItemProcessingService`, `core_element_exporter`, `exporter`, `mmrds_exporter`, `export_all_generate_name_map`, `PopulateCDCInstanceSupervisor` | ~39  | Mostly read-only: `GET version_specification-{v}/metadata` and `GET de-identified-list` |
+| Infra/out-of-scope                            | `c_db_setup.cs`, `Process_Migrate_*`                                                                                                                                                                                                                                                                                                                                                                        | ~15  | DB setup and one-time migration scripts                                                 |
 
 **Key observation:** The services layer makes two operations overwhelmingly — `GET metadata/version_specification-{version}/metadata` and `GET metadata/de-identified-list` — accounting for the majority of the 39 services hits and all read-only.
 
@@ -1934,11 +1961,12 @@ So that no DAL file outside of `MetadataVersionDAL` constructs a `metadata` URL.
 **Acceptance Criteria:**
 
 **Given** the following direct `metadata` HTTP calls in SharedLibraries DAL files:
+
 - `AuditRecoveryDAL.cs` — 1 hit (`GET metadata/version_specification-{v}/metadata`)
 - `CaseValidationDAL.cs` — 2 hits (metadata document GET/PUT for case validation)
 - `MMRIAServicesDAL.cs` — 3 hits (de-id export list and populate-CDC config reads)
-**When** this story is complete
-**Then** each is replaced with the corresponding `IMetadataRepository` method; `IMetadataRepository` is injected into each DAL via constructor injection
+  **When** this story is complete
+  **Then** each is replaced with the corresponding `IMetadataRepository` method; `IMetadataRepository` is injected into each DAL via constructor injection
 
 **Given** `MMRIAServicesDAL` handles cross-tenant and CDC-scoped metadata reads
 **When** these are replaced
@@ -1959,6 +1987,7 @@ So that controllers contain no `metadata` URL construction.
 **Acceptance Criteria:**
 
 **Given** the following controllers with direct `metadata` URL construction:
+
 - `broadcast_messageController.cs` — 3 hits (broadcast-message-list GET/PUT — Wave 9 planned migration target)
 - `de_identified_listController.cs` — 2 hits (de-id and de-id-export list GET/PUT — Wave 8 planned target)
 - `export_list_managerController.cs` — 2 hits (export-standard-list GET/PUT)
@@ -1968,8 +1997,8 @@ So that controllers contain no `metadata` URL construction.
 - `versionController.cs` — 1 hit (metadata document GET by ID)
 - `record_idController.cs` — 1 hit (record ID document GET)
 - `systemOfflineController.cs` — 1 hit (system-offline-config URL builder)
-**When** this story is complete
-**Then** each is replaced with the corresponding `IMetadataRepository` or `MetadataVersionManager` method call; `IMetadataRepository` is injected where no manager intermediary already exists
+  **When** this story is complete
+  **Then** each is replaced with the corresponding `IMetadataRepository` or `MetadataVersionManager` method call; `IMetadataRepository` is injected where no manager intermediary already exists
 
 **Given** `broadcast_messageController` and `de_identified_listController` are also Wave 8/9 SharedLibraries migration targets
 **When** this story touches them
@@ -1990,15 +2019,17 @@ So that the services project is covered by the same interface contract as the se
 **Acceptance Criteria:**
 
 **Given** the two dominant read operations in `mmria.services`:
+
 - `GET metadata/version_specification-{version}/metadata` — in `c_convert_to_report_object`, `c_convert_to_opioid_report_object`, `c_convert_to_dqr_detail`, `c_de_identifier`, `c_cdc_de_identifier`, `c_document_sync_all`, `c_document_sync_all_legacy`, `c_generate_frequency_summary_report`, `c_sync_document`, `BatchItemProcessingService`, `core_element_exporter`, `exporter`, `mmrds_exporter`, `export_all_generate_name_map`
 - `GET metadata/de-identified-list` and `GET metadata/de-identified-export-list` — in `c_de_identifier`, `c_cdc_de_identifier`, `c_document_sync_all`, `c_document_sync_all_legacy`, `c_sync_document`, `core_element_exporter`
-**When** this story is complete
-**Then** each is replaced with the corresponding `IMetadataRepository` method; since `mmria.services` already references `mmria.common`, no new project reference is needed
+  **When** this story is complete
+  **Then** each is replaced with the corresponding `IMetadataRepository` method; since `mmria.services` already references `mmria.common`, no new project reference is needed
 
 **Given** the remaining services files with direct `metadata` access:
+
 - `PopulateCDCInstanceSupervisor.cs` — 2 hits (populate-CDC-instance config document)
-**When** evaluated
-**Then** these are replaced using the same `IMetadataRepository` method as `MMRIAServicesDAL`
+  **When** evaluated
+  **Then** these are replaced using the same `IMetadataRepository` method as `MMRIAServicesDAL`
 
 **Given** `c_document_sync_all` and `c_document_sync_all_legacy` use `metadata` reads as part of sync orchestration
 **When** replaced
@@ -2030,14 +2061,14 @@ So that the boundary is explicit and consistent with the decision made for `mmrd
 
 ## Epic 20 — Story Sequencing
 
-| Wave | Story | Risk | Dependencies |
-|---|---|---|---|
-| 20 | 20.1 — `metadata` Operation Catalog | None | None — discovery only |
-| 20 | 20.6 — Boundary Decision | None | Can run in parallel with 20.1 |
-| 20 | 20.2 — `IMetadataRepository` + `MetadataVersionDAL` | Low–Medium | 20.1 |
-| 20 | 20.3 — SharedLibraries DAL files | Low | 20.2 |
-| 20 | 20.4 — Controller direct calls | Low–Medium | 20.2 |
-| 20 | 20.5 — `mmria.services` read-only calls | Medium | 20.2 |
+| Wave | Story                                               | Risk       | Dependencies                  |
+| ---- | --------------------------------------------------- | ---------- | ----------------------------- |
+| 20   | 20.1 — `metadata` Operation Catalog                 | None       | None — discovery only         |
+| 20   | 20.6 — Boundary Decision                            | None       | Can run in parallel with 20.1 |
+| 20   | 20.2 — `IMetadataRepository` + `MetadataVersionDAL` | Low–Medium | 20.1                          |
+| 20   | 20.3 — SharedLibraries DAL files                    | Low        | 20.2                          |
+| 20   | 20.4 — Controller direct calls                      | Low–Medium | 20.2                          |
+| 20   | 20.5 — `mmria.services` read-only calls             | Medium     | 20.2                          |
 
 20.3, 20.4, 20.5, and 20.6 can proceed in parallel once 20.2 is complete.
 
@@ -2051,17 +2082,17 @@ All CouchDB reads and writes against the `audit` database are consolidated behin
 
 **Scope summary (verified 2026-07-15):**
 
-| Location | # Calls | Layer | URL Pattern | Notes |
-|---|---|---|---|---|
-| `AuditRecoveryDAL.cs` | 3 | DAL ✓ | **A** (wrong) | GET by ID, GET audit-manage-user, PUT audit-manage-user |
-| `CaseWorkflowAdminDAL.cs` | 4 | DAL ✓ | **B** (correct) | WriteAuditEntry, GetDeletedCasesView, GetAuditDoc, DeleteAuditDoc |
-| `ManageUsersDAL.cs` | 1 | DAL ✓ | **A** (wrong) | GET audit-manage-user (duplicate of AuditRecoveryDAL) |
-| `CaseManager.cs` | 6 | **Manager ✗** | **B** (correct) | All audit PUT (Change_Stack writes) — wrong layer |
-| `AuditRecoveryManager.cs` | 1 | **Manager ✗** | **A** (wrong) | Builds `_find` URL directly in manager |
-| `_auditController.cs` | 1 | **Controller ✗** | **A** (wrong) | `_find` by case_id — wrong layer |
-| `AuditRecoverUtilController.cs` | 1 | **Controller ✗** | **A** (wrong) | `_find` — wrong layer |
-| `caseController.pmss.cs` | 2 | **Controller ✗** | **B** (correct) | Audit PUT (Change_Stack writes) — wrong layer |
-| `c_db_setup.cs` | 5 | Infra | — | DB setup/security — **out of scope** |
+| Location                        | # Calls | Layer            | URL Pattern     | Notes                                                             |
+| ------------------------------- | ------- | ---------------- | --------------- | ----------------------------------------------------------------- |
+| `AuditRecoveryDAL.cs`           | 3       | DAL ✓            | **A** (wrong)   | GET by ID, GET audit-manage-user, PUT audit-manage-user           |
+| `CaseWorkflowAdminDAL.cs`       | 4       | DAL ✓            | **B** (correct) | WriteAuditEntry, GetDeletedCasesView, GetAuditDoc, DeleteAuditDoc |
+| `ManageUsersDAL.cs`             | 1       | DAL ✓            | **A** (wrong)   | GET audit-manage-user (duplicate of AuditRecoveryDAL)             |
+| `CaseManager.cs`                | 6       | **Manager ✗**    | **B** (correct) | All audit PUT (Change_Stack writes) — wrong layer                 |
+| `AuditRecoveryManager.cs`       | 1       | **Manager ✗**    | **A** (wrong)   | Builds `_find` URL directly in manager                            |
+| `_auditController.cs`           | 1       | **Controller ✗** | **A** (wrong)   | `_find` by case_id — wrong layer                                  |
+| `AuditRecoverUtilController.cs` | 1       | **Controller ✗** | **A** (wrong)   | `_find` — wrong layer                                             |
+| `caseController.pmss.cs`        | 2       | **Controller ✗** | **B** (correct) | Audit PUT (Change_Stack writes) — wrong layer                     |
+| `c_db_setup.cs`                 | 5       | Infra            | —               | DB setup/security — **out of scope**                              |
 
 **Total in-scope: 19 calls.** 8 are already in the DAL layer but behind no interface. 11 are leaking out of the DAL.
 
@@ -2105,6 +2136,7 @@ So that every caller can depend on the interface and a SQL migration requires ch
 **Given** no canonical `Audit` SharedLibraries feature exists
 **When** this story creates one
 **Then** the following structure exists:
+
 ```
 mmria.common/SharedLibraries/Audit/
   IAuditRepository.cs
@@ -2115,6 +2147,7 @@ mmria.common/SharedLibraries/Audit/
 **Given** the operation catalog from Story 21.1
 **When** `AuditDAL` is created
 **Then** it contains async methods for every in-scope operation, including at minimum:
+
 - `WriteAuditEntryAsync(Change_Stack entry, DBConfigurationDetail dbConfig)`
 - `GetAuditEntryAsync(string auditId, DBConfigurationDetail dbConfig)` → `Change_Stack`
 - `DeleteAuditEntryAsync(string auditId, string rev, DBConfigurationDetail dbConfig)`
@@ -2146,14 +2179,15 @@ So that audit access in the case manager layer follows the Manager → DAL bound
 **Acceptance Criteria:**
 
 **Given** the following 6 direct audit PUT calls in `CaseManager.cs` (all using `Get_Prefix_DB_Url`, Pattern B):
+
 - Line 318: `auditDbConfig.Get_Prefix_DB_Url($"audit/{changeStack._id}")`
 - Line 537: `auditDbConfig.Get_Prefix_DB_Url($"audit/{changeStack._id}")`
 - Line 1180: `dbConfig.Get_Prefix_DB_Url($"audit/{changeStack._id}")`
 - Line 1330: `dbConfig.Get_Prefix_DB_Url($"audit/{changeStack._id}")`
 - Line 1831: `dbConfig.Get_Prefix_DB_Url($"audit/{changeStack._id}")`
 - Line 2330: `dbConfig.Get_Prefix_DB_Url($"audit/{audit_data._id}")`
-**When** this story is complete
-**Then** each is replaced with `IAuditRepository.WriteAuditEntryAsync(changeStack, dbConfig)`; `IAuditRepository` is injected into `CaseManager` via constructor injection
+  **When** this story is complete
+  **Then** each is replaced with `IAuditRepository.WriteAuditEntryAsync(changeStack, dbConfig)`; `IAuditRepository` is injected into `CaseManager` via constructor injection
 
 **Given** `CaseManager` will now depend on both `ICaseRepository` and `IAuditRepository`
 **When** DI registration is updated
@@ -2174,12 +2208,13 @@ So that the workflow-admin DAL no longer constructs audit URLs directly.
 **Acceptance Criteria:**
 
 **Given** the following 4 audit calls in `CaseWorkflowAdminDAL.cs` (all Pattern B):
+
 - Line 49: `WriteAuditEntryAsync` — PUT `audit/{auditEntry._id}`
 - Line 57: `GetDeletedCasesViewAsync` — GET `audit/_design/sortable/_view/by_deleted`
 - Line 67: `GetAuditDocumentAsync` — GET `audit/{auditId}`
 - Line 92: `DeleteAuditDocumentAsync` — DELETE `audit/{auditId}?rev={rev}`
-**When** this story is complete
-**Then** each is replaced with the corresponding `IAuditRepository` method; `IAuditRepository` is injected into `CaseWorkflowAdminDAL` via constructor injection
+  **When** this story is complete
+  **Then** each is replaced with the corresponding `IAuditRepository` method; `IAuditRepository` is injected into `CaseWorkflowAdminDAL` via constructor injection
 
 **Given** `CaseWorkflowAdminDAL` after Epic 17 Story 17.4 already delegates mmrds calls to `ICaseRepository`
 **When** this story is implemented
@@ -2202,12 +2237,13 @@ So that controllers never touch the audit database directly.
 **Acceptance Criteria:**
 
 **Given** the following direct audit calls in controller/util files:
+
 - `_auditController.cs` line 107: `$"{db_config.url}/{db_config.prefix}audit/_find"` — builds `_find` URL in a private helper method, passes it to `AuditRecoveryManager`
 - `AuditRecoverUtilController.cs` line 54: `$"{configuration.url}/{configuration.prefix}audit/_find"` — `_find` URL passed to a service
 - `caseController.pmss.cs` line 261: `db_config.Get_Prefix_DB_Url($"audit/{audit_data._id}")` — audit PUT
 - `caseController.pmss.cs` line 418: `db_config.Get_Prefix_DB_Url($"audit/{audit_data._id}")` — audit PUT
-**When** this story is complete
-**Then** all four call sites are replaced with `IAuditRepository` method calls; `IAuditRepository` is injected into each controller via constructor injection; no controller constructs an `audit/` URL
+  **When** this story is complete
+  **Then** all four call sites are replaced with `IAuditRepository` method calls; `IAuditRepository` is injected into each controller via constructor injection; no controller constructs an `audit/` URL
 
 **Given** `_auditController.cs` `get_find_url()` helper method (line ~90–110) that currently builds the `_find` URL tuple `(url, postData)` and passes both to `AuditRecoveryManager.GetAuditViewDataAsync`
 **When** replaced
@@ -2236,11 +2272,12 @@ So that no DAL outside `AuditDAL` constructs audit URLs directly.
 **Then** the call is replaced with `IAuditRepository.GetAuditManageUserAsync(db_config)`; `IAuditRepository` is injected into `ManageUsersDAL`
 
 **Given** `AuditRecoveryDAL.cs` lines 39, 53, 70 (all Pattern A):
+
 - Line 39: GET `audit/{changeId}` → `Change_Stack`
 - Line 53: GET `audit/audit-manage-user` → `Audit_Manage_User`
 - Line 70: PUT `audit/{auditDocument._id}` → `document_put_response`
-**When** this story is complete
-**Then** all three are replaced with the corresponding `IAuditRepository` methods; `AuditRecoveryDAL` injects `IAuditRepository` instead of calling `_couchDbHttpClient` for audit operations
+  **When** this story is complete
+  **Then** all three are replaced with the corresponding `IAuditRepository` methods; `AuditRecoveryDAL` injects `IAuditRepository` instead of calling `_couchDbHttpClient` for audit operations
 
 **Given** `AuditRecoveryManager.cs` line 158 — builds `_find` URL directly as `$"{db_config.url}/{db_config.prefix}audit/_find"` and returns it as a tuple to be passed back to the DAL
 **When** this story is complete
@@ -2254,14 +2291,14 @@ So that no DAL outside `AuditDAL` constructs audit URLs directly.
 
 ## Epic 21 — Story Sequencing
 
-| Wave | Story | Risk | Dependencies |
-|---|---|---|---|
-| 21 | 21.1 — `audit` Operation Catalog | None | None — discovery only |
-| 21 | 21.2 — `AuditDAL` + `IAuditRepository` | Low | 21.1 |
-| 21 | 21.3 — CaseManager audit writes | Low | 21.2 |
-| 21 | 21.5 — Controller-level audit calls | Low–Medium | 21.2 |
-| 21 | 21.6 — ManageUsersDAL + AuditRecoveryDAL + AuditRecoveryManager | Low | 21.2 |
-| 21 | 21.4 — CaseWorkflowAdminDAL audit calls | Low | 21.2 **+ Epic 17 Story 17.4 done** |
+| Wave | Story                                                           | Risk       | Dependencies                       |
+| ---- | --------------------------------------------------------------- | ---------- | ---------------------------------- |
+| 21   | 21.1 — `audit` Operation Catalog                                | None       | None — discovery only              |
+| 21   | 21.2 — `AuditDAL` + `IAuditRepository`                          | Low        | 21.1                               |
+| 21   | 21.3 — CaseManager audit writes                                 | Low        | 21.2                               |
+| 21   | 21.5 — Controller-level audit calls                             | Low–Medium | 21.2                               |
+| 21   | 21.6 — ManageUsersDAL + AuditRecoveryDAL + AuditRecoveryManager | Low        | 21.2                               |
+| 21   | 21.4 — CaseWorkflowAdminDAL audit calls                         | Low        | 21.2 **+ Epic 17 Story 17.4 done** |
 
 21.3, 21.5, and 21.6 can proceed in parallel once 21.2 is complete. 21.4 must wait for Epic 17 Story 17.4 to avoid file conflict on `CaseWorkflowAdminDAL.cs`.
 
@@ -2272,11 +2309,13 @@ So that no DAL outside `AuditDAL` constructs audit URLs directly.
 All mmria projects are upgraded from .NET 9 to .NET 10. The developer machine receives the .NET 10 SDK, all project target frameworks are updated, third-party NuGet packages are verified for .NET 10 compatibility (with any necessary version bumps applied), and both production Dockerfiles are updated to reference the .NET 10 trusted base images from the EcPaaS registry.
 
 **Projects in scope (nccdphp-drh-mmria repo):**
+
 - `source-code/mmria/mmria-server/mmria-server.csproj`
 - `nccdphp-drh-mmria-common/mmria.common/mmria.common.csproj`
 - `nccdphp-drh-mmria-services/mmria.services/mmria.services.csproj`
 
 **Projects in scope (nccdphp-drh-mmria-utilities repo):**
+
 - `mmria-server.tests/mmria-server.tests.csproj`
 - `mmria-case-generator/mmria-case-generator.csproj`
 - `strongly-typed-case/strongcase.csproj`
@@ -2287,6 +2326,7 @@ All mmria projects are upgraded from .NET 9 to .NET 10. The developer machine re
 - `mmria-tenant-database-counts/mmria-tenant-database-counts.csproj`
 
 **Dockerfiles in scope:**
+
 - `source-code/mmria/mmria-server/Dockerfile` — build image `dotnet-90`, runtime image `dotnet-90-runtime`
 - `nccdphp-drh-mmria-services/mmria.services/Dockerfile` — same images
 - `.s2i/dockerfile` — legacy file, currently references `dotnet-80`; assess whether to update or retire
@@ -2307,22 +2347,22 @@ So that the upgrade execution story has a clear, evidence-based remediation plan
 
 **Given** the key third-party NuGet packages used across the in-scope projects:
 
-| Package | Current Version | Risk Notes |
-|---|---|---|
-| `Akka` / `Akka.Hosting` / `Akka.Cluster` / `Akka.DependencyInjection` | 1.5.52 | Check NuGet for .NET 10 TFM support |
-| `Akka.Quartz.Actor` | 1.5.13 | Transitively depends on Quartz 3.x; verify compatibility |
-| `Akka.DI.Core` / `Akka.DI.Extensions.DependencyInjection` | 1.4.51 / 1.4.22 | Older release train; may not declare net10.0 support |
-| `Quartz` | 3.13.1 | Check for .NET 10 support |
-| `Microsoft.AspNetCore.Mvc.NewtonsoftJson` | 9.0.0 | Must be updated to 10.0.x |
-| `Microsoft.Extensions.Http` | 9.0.0 | Must be updated to 10.0.x |
-| `Serilog.Extensions.Logging` | 9.0.0 | Check for 10.0.x release |
-| `System.Text.Encoding.CodePages` | 9.0.0 | Likely in-box for .NET 10; confirm |
-| `Microsoft.CodeAnalysis.CSharp` | 4.12.0 | Verify .NET 10 compiler support |
-| `NJsonSchema` / `NJsonSchema.CodeGeneration.CSharp` | 11.0.2 | Check for compatibility |
-| `FastExcel` | 3.0.13 | Low risk (no framework coupling) |
-| `SharpZipLib` | 1.4.2 | Low risk |
-| `TinyCsvParser` | 2.7.1 | Low risk |
-| `Newtonsoft.Json` | 13.0.3 | Low risk (framework-agnostic) |
+| Package                                                               | Current Version | Risk Notes                                               |
+| --------------------------------------------------------------------- | --------------- | -------------------------------------------------------- |
+| `Akka` / `Akka.Hosting` / `Akka.Cluster` / `Akka.DependencyInjection` | 1.5.52          | Check NuGet for .NET 10 TFM support                      |
+| `Akka.Quartz.Actor`                                                   | 1.5.13          | Transitively depends on Quartz 3.x; verify compatibility |
+| `Akka.DI.Core` / `Akka.DI.Extensions.DependencyInjection`             | 1.4.51 / 1.4.22 | Older release train; may not declare net10.0 support     |
+| `Quartz`                                                              | 3.13.1          | Check for .NET 10 support                                |
+| `Microsoft.AspNetCore.Mvc.NewtonsoftJson`                             | 9.0.0           | Must be updated to 10.0.x                                |
+| `Microsoft.Extensions.Http`                                           | 9.0.0           | Must be updated to 10.0.x                                |
+| `Serilog.Extensions.Logging`                                          | 9.0.0           | Check for 10.0.x release                                 |
+| `System.Text.Encoding.CodePages`                                      | 9.0.0           | Likely in-box for .NET 10; confirm                       |
+| `Microsoft.CodeAnalysis.CSharp`                                       | 4.12.0          | Verify .NET 10 compiler support                          |
+| `NJsonSchema` / `NJsonSchema.CodeGeneration.CSharp`                   | 11.0.2          | Check for compatibility                                  |
+| `FastExcel`                                                           | 3.0.13          | Low risk (no framework coupling)                         |
+| `SharpZipLib`                                                         | 1.4.2           | Low risk                                                 |
+| `TinyCsvParser`                                                       | 2.7.1           | Low risk                                                 |
+| `Newtonsoft.Json`                                                     | 13.0.3          | Low risk (framework-agnostic)                            |
 
 **When** the developer checks each package on NuGet.org for .NET 10 TFM listings, open issues, and release notes
 **Then** the findings report records the latest compatible version for each package (or "no upgrade needed" if the current version is compatible) and flags any packages with no .NET 10 support path as blockers
@@ -2340,6 +2380,7 @@ So that the upgrade execution story has a clear, evidence-based remediation plan
 **Then** the report notes any test-framework or assertion-library changes needed for .NET 10
 
 **Deliverable:** A markdown findings report committed to `docs/ai/dotnet10-compatibility-analysis.md` covering:
+
 1. Breaking-change audit results
 2. Per-package compatibility status table with recommended versions
 3. Docker image availability status and path forward
@@ -2375,13 +2416,17 @@ So that the codebase is on the current LTS release with continued Microsoft supp
 **Then** each is updated to the version specified in the report and the affected projects build and restore cleanly
 
 **Given** the `source-code/mmria/mmria-server/Dockerfile` build stage currently references:
+
 ```
 FROM .../trusted-images/dotnet-90:9.0-<tag>@sha256:<digest> AS build
 ```
+
 and the runtime stage references:
+
 ```
 FROM .../trusted-images/dotnet-90-runtime:9.0-<tag>@sha256:<digest> AS runtime
 ```
+
 **When** the developer updates the Dockerfile
 **Then** both `FROM` lines reference the `.NET 10` trusted images (`dotnet-100` / `dotnet-100-runtime`) with the correct tag and digest as identified in Story 22.1, and the `-f net9.0` flags in `dotnet build` and `dotnet publish` commands are updated to `-f net10.0`
 
@@ -2395,11 +2440,12 @@ FROM .../trusted-images/dotnet-90-runtime:9.0-<tag>@sha256:<digest> AS runtime
 
 **Given** the full build pipeline after all changes
 **When** the developer runs:
+
 - `dotnet build` on `mmria-server.csproj` (Release, net10.0)
 - `dotnet build` on `mmria.services.csproj` (Release, net10.0)
 - `dotnet build` on `mmria.common.csproj`
 - `dotnet test` on `mmria-server.tests.csproj`
-**Then** all builds succeed and all tests pass with no new failures (pre-existing failures, if any, are noted but do not block this story)
+  **Then** all builds succeed and all tests pass with no new failures (pre-existing failures, if any, are noted but do not block this story)
 
 **Given** the `vscode/tasks.json` build tasks reference `net9.0` in `-f` arguments (if any)
 **When** the developer searches task definitions
@@ -2411,19 +2457,19 @@ FROM .../trusted-images/dotnet-90-runtime:9.0-<tag>@sha256:<digest> AS runtime
 
 The following defects were found during the first full local test run after the `.vscode/launch.json` paths were corrected to `net10.0`. All are considered part of the 22.2 execution scope.
 
-| # | Location | Defect | Fix Applied |
-|---|---|---|---|
-| 22.2-B1 | `.vscode/launch.json` | All six `program` paths referenced `net9.0` DLL paths; `.NET 10` builds output to `net10.0`. The debugger launched the stale `net9.0` binary silently, so all breakpoints missed and all code changes since the TFM upgrade went untested locally. | All `net9.0` path segments replaced with `net10.0`. |
-| 22.2-B2 | `Controllers/_config.cs` | `sams_is_enabled` was read from `configuration["mmria_settings:sams:is_enabled"]` (nested colon path that does not exist in `appsettings.json`) instead of `configuration["mmria_settings:sams_is_enabled"]`. The key resolved to null, `sams_is_enabled` defaulted to `false`, and `OverridableConfiguration.boolean_keys["shared"]["sams:is_enabled"]` was stored as `false` — making `AccountController.use_sams` always `false` regardless of appsettings value. | Corrected key to `mmria_settings:sams_is_enabled`. |
-| 22.2-B3 | `Controllers/AccountController.cs` `GET Login` | The `GET /Account/Login` action had no SAMS guard. The `POST` handler correctly redirected to `SignIn` when `use_sams == true`, but the `GET` rendered the login form unconditionally, allowing SAMS-only deployments to display and submit the password form. | Added `if (use_sams.HasValue && use_sams.Value) return RedirectToAction("SignIn");` at the top of the `GET` action (offline check first, then SAMS check). |
-| 22.2-B4 | `Program.cs` | `builder.Services.AddScoped<IDatabaseLifecycleService, c_db_setup>()` was registered but unresolvable — `c_db_setup` requires `OverridableConfiguration` (not a DI-registered type) and a raw `string` host prefix. .NET 10's stricter `ValidateOnBuild` rejects this at startup. The registration was flagged in a comment as "for architectural documentation only"; actual usage is always direct `new c_db_setup(...)` instantiation. | Registration removed. The `IDatabaseLifecycleService` interface and both `new c_db_setup(...)` call sites are unchanged. |
+| #       | Location                                       | Defect                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Fix Applied                                                                                                                                                |
+| ------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 22.2-B1 | `.vscode/launch.json`                          | All six `program` paths referenced `net9.0` DLL paths; `.NET 10` builds output to `net10.0`. The debugger launched the stale `net9.0` binary silently, so all breakpoints missed and all code changes since the TFM upgrade went untested locally.                                                                                                                                                                                                                   | All `net9.0` path segments replaced with `net10.0`.                                                                                                        |
+| 22.2-B2 | `Controllers/_config.cs`                       | `sams_is_enabled` was read from `configuration["mmria_settings:sams:is_enabled"]` (nested colon path that does not exist in `appsettings.json`) instead of `configuration["mmria_settings:sams_is_enabled"]`. The key resolved to null, `sams_is_enabled` defaulted to `false`, and `OverridableConfiguration.boolean_keys["shared"]["sams:is_enabled"]` was stored as `false` — making `AccountController.use_sams` always `false` regardless of appsettings value. | Corrected key to `mmria_settings:sams_is_enabled`.                                                                                                         |
+| 22.2-B3 | `Controllers/AccountController.cs` `GET Login` | The `GET /Account/Login` action had no SAMS guard. The `POST` handler correctly redirected to `SignIn` when `use_sams == true`, but the `GET` rendered the login form unconditionally, allowing SAMS-only deployments to display and submit the password form.                                                                                                                                                                                                       | Added `if (use_sams.HasValue && use_sams.Value) return RedirectToAction("SignIn");` at the top of the `GET` action (offline check first, then SAMS check). |
+| 22.2-B4 | `Program.cs`                                   | `builder.Services.AddScoped<IDatabaseLifecycleService, c_db_setup>()` was registered but unresolvable — `c_db_setup` requires `OverridableConfiguration` (not a DI-registered type) and a raw `string` host prefix. .NET 10's stricter `ValidateOnBuild` rejects this at startup. The registration was flagged in a comment as "for architectural documentation only"; actual usage is always direct `new c_db_setup(...)` instantiation.                            | Registration removed. The `IDatabaseLifecycleService` interface and both `new c_db_setup(...)` call sites are unchanged.                                   |
 
 ---
 
-| Wave | Story | Risk | Dependencies |
-|---|---|---|---|
-| 22 | 22.1 — Compatibility Analysis & Risk Assessment | None — discovery only | None |
-| 22 | 22.2 — Upgrade Execution | Medium | 22.1 complete, no blockers in findings report |
+| Wave | Story                                           | Risk                  | Dependencies                                  |
+| ---- | ----------------------------------------------- | --------------------- | --------------------------------------------- |
+| 22   | 22.1 — Compatibility Analysis & Risk Assessment | None — discovery only | None                                          |
+| 22   | 22.2 — Upgrade Execution                        | Medium                | 22.1 complete, no blockers in findings report |
 
 22.1 must fully complete and produce a clean findings report before 22.2 begins. The two stories must not run in parallel.
 
@@ -2437,14 +2483,14 @@ Epics 17–21 established repository interfaces for `mmrds`, `_users`, `configur
 
 **Scope summary (verified 2026-07-16):**
 
-| Database | Existing DAL | Interface | Out-of-DAL application leaks | Notes |
-|---|---|---|---|---|
-| `session` | `SessionDAL` ✓ | None | `SessionManager` (2), `AccountController` (1), `AccountController.OIDC` (1), `Post_Session_Actor` (1), `Record_Session_Event` (1), `SessionSummary` (1); `AccountDAL` cross-feature (4) | All SessionDAL URLs are Pattern A — need canonicalization |
-| `offline_cases` | `OfflineCaseDAL` ✓ | None | `loggerController` (1 view read) | DAL CRUD uses Pattern A; view queries already Pattern B — need CRUD canonicalized |
-| `export_queue` | `ExportQueueDAL` ✓ | None | `core_element_exporter.cs` (1); Rebuild actors = infra out-of-scope | DAL uses Pattern B throughout — no URL fixes needed |
-| `vital_import` | `VitalImportDAL` partial (1 op), `MMRIAServicesDAL` (3 ops) | None | `ije_messageController` (3); `MMRIAServicesDAL` (3) must delegate to canonical DAL | No prefix separator in URL — special non-tenant config DB |
-| `report` | None | None | `AggregateReportManager` (1), `InteractiveReportManager` (1), 4 controllers (4) | Read-only interface only; sync/rebuild actors = infra out-of-scope |
-| `logging` | None | None | `loggerController` (3 reads/writes) | No SharedLibraries representation at all |
+| Database        | Existing DAL                                                | Interface | Out-of-DAL application leaks                                                                                                                                                            | Notes                                                                             |
+| --------------- | ----------------------------------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `session`       | `SessionDAL` ✓                                              | None      | `SessionManager` (2), `AccountController` (1), `AccountController.OIDC` (1), `Post_Session_Actor` (1), `Record_Session_Event` (1), `SessionSummary` (1); `AccountDAL` cross-feature (4) | All SessionDAL URLs are Pattern A — need canonicalization                         |
+| `offline_cases` | `OfflineCaseDAL` ✓                                          | None      | `loggerController` (1 view read)                                                                                                                                                        | DAL CRUD uses Pattern A; view queries already Pattern B — need CRUD canonicalized |
+| `export_queue`  | `ExportQueueDAL` ✓                                          | None      | `core_element_exporter.cs` (1); Rebuild actors = infra out-of-scope                                                                                                                     | DAL uses Pattern B throughout — no URL fixes needed                               |
+| `vital_import`  | `VitalImportDAL` partial (1 op), `MMRIAServicesDAL` (3 ops) | None      | `ije_messageController` (3); `MMRIAServicesDAL` (3) must delegate to canonical DAL                                                                                                      | No prefix separator in URL — special non-tenant config DB                         |
+| `report`        | None                                                        | None      | `AggregateReportManager` (1), `InteractiveReportManager` (1), 4 controllers (4)                                                                                                         | Read-only interface only; sync/rebuild actors = infra out-of-scope                |
+| `logging`       | None                                                        | None      | `loggerController` (3 reads/writes)                                                                                                                                                     | No SharedLibraries representation at all                                          |
 
 **Infra out-of-scope across all stories:** `c_db_setup.cs`, `Rebuild_Export_Queue.cs`, `rebuild_export_queue_job.cs`, `Process_Central_Pull_list.cs`, `Process_DB_Synchronization_Set.cs`, `c_document_sync_all*.cs`, `c_document_sync_all_legacy.cs`, `c_sync_document.pmss.cs` — these perform DB lifecycle (create/delete/index) and bulk document writes. SQL migration will address these as infrastructure replacement, not application interface substitution.
 
@@ -2501,19 +2547,21 @@ So that every caller depends on the interface and a SQL session-store migration 
 **Then** each is replaced with the corresponding `ISessionRepository` method; `ISessionRepository` is injected into `SessionManager` via constructor injection
 
 **Given** the following direct `session/` calls outside the Session feature:
+
 - `AccountController.cs` — 1 hit (session document DELETE on logout)
 - `AccountController.OIDC.cs` — 1 hit (session document PUT on OIDC login)
 - `Post_Session_Actor.cs` — 1 hit (session document PUT via actor)
 - `Record_Session_Event.cs` — 1 hit (session event document PUT via actor)
 - `SessionSummary.cs` — 1 hit (session view GET for summary page)
-**When** this story is complete
-**Then** each is replaced with the corresponding `ISessionRepository` method; `ISessionRepository` is injected into each class via constructor injection or Akka.NET actor props factory as appropriate
+  **When** this story is complete
+  **Then** each is replaced with the corresponding `ISessionRepository` method; `ISessionRepository` is injected into each class via constructor injection or Akka.NET actor props factory as appropriate
 
 **Given** `AccountDAL.cs` has 4 session-database calls (all already Pattern B — `dbConfig.Get_Prefix_DB_Url($"session/...")`):
+
 - Line ~323: session-event sortable view GET by user ID
 - Lines ~374, 403, 431: session document GET, GET, DELETE
-**When** this story is complete
-**Then** `AccountDAL` injects `ISessionRepository` and delegates those 4 calls to it; `AccountDAL` constructs no `session/` URLs directly
+  **When** this story is complete
+  **Then** `AccountDAL` injects `ISessionRepository` and delegates those 4 calls to it; `AccountDAL` constructs no `session/` URLs directly
 
 **Given** the build after all changes
 **When** verified
@@ -2590,11 +2638,12 @@ So that the vital import batch store can be migrated by changing only `VitalImpo
 **Acceptance Criteria:**
 
 **Given** the `vital_import` database is currently accessed in three places:
+
 - `VitalImportDAL.cs` line ~47: `GET vital_import/_all_docs` (1 operation — already in DAL)
 - `MMRIAServicesDAL.cs` lines ~118, 141, 156: `GET vital_import/_all_docs`, `PUT vital_import/{batch_id}`, `PUT vital_import/{_id}` (3 operations)
 - `ije_messageController.cs` lines ~73, 107, 148: `GET vital_import/_all_docs`, `DELETE vitals_url` (external service), `PUT vitals_url` (external service) — the external `vitals_url` calls are **not** CouchDB and are out of scope
-**When** this story is complete
-**Then** `VitalImportDAL` contains all in-scope `vital_import` CRUD operations: GET all docs, PUT batch document, PUT/DELETE individual document; `IVitalImportRepository` is defined in `mmria.common/SharedLibraries/VitalImport/` with async method signatures for every operation
+  **When** this story is complete
+  **Then** `VitalImportDAL` contains all in-scope `vital_import` CRUD operations: GET all docs, PUT batch document, PUT/DELETE individual document; `IVitalImportRepository` is defined in `mmria.common/SharedLibraries/VitalImport/` with async method signatures for every operation
 
 **Given** the `vital_import` database URL uses no prefix separator (`$"{config.url}/vital_import/..."` — intentional, non-tenant DB)
 **When** `VitalImportDAL` methods are written or updated
@@ -2629,6 +2678,7 @@ So that report query controllers and managers depend on the interface and a SQL 
 **Given** no `Report` SharedLibraries feature exists
 **When** this story creates one
 **Then** the following structure exists:
+
 ```
 mmria.common/SharedLibraries/Report/
   IReportRepository.cs
@@ -2637,12 +2687,13 @@ mmria.common/SharedLibraries/Report/
 ```
 
 **Given** the in-scope application read operations from the catalog:
+
 - `GET report/_all_docs?include_docs=true` — used by `AggregateReportManager`
 - `GET report/_design/interactive_aggregate_report/_view/indicator_id?...` — used by `InteractiveReportManager`
 - `GET report/_design/data_summary_view_report/_view/year_of_death?skip=N&limit=N` — used by `data_summary_viewController`
 - `POST report/_find` — used by `dqrReportController`, `overdose_measureController`, `powerbi_measureController`
-**When** `ReportDAL` is created
-**Then** it contains async methods for each: `GetAllReportDocumentsAsync(DBConfigurationDetail dbConfig)`, `GetIndicatorByIdAsync(string indicatorId, DBConfigurationDetail dbConfig)`, `GetDataSummaryViewAsync(int skip, int take, DBConfigurationDetail dbConfig)`, `FindReportDocumentsAsync(string selectorJson, DBConfigurationDetail dbConfig)` — each uses Pattern B via `dbConfig.Get_Prefix_DB_Url($"report/...")`
+  **When** `ReportDAL` is created
+  **Then** it contains async methods for each: `GetAllReportDocumentsAsync(DBConfigurationDetail dbConfig)`, `GetIndicatorByIdAsync(string indicatorId, DBConfigurationDetail dbConfig)`, `GetDataSummaryViewAsync(int skip, int take, DBConfigurationDetail dbConfig)`, `FindReportDocumentsAsync(string selectorJson, DBConfigurationDetail dbConfig)` — each uses Pattern B via `dbConfig.Get_Prefix_DB_Url($"report/...")`
 
 **Given** the sync/rebuild actors in `mmria-server/util/` and `mmria.common/SharedLibraries/MMRIARebuild/` write to and manage the `report` database
 **When** they are evaluated
@@ -2675,12 +2726,13 @@ So that no manager or controller constructs a `report/` URL directly.
 **Then** that call is replaced with `IReportRepository.GetIndicatorByIdAsync(indicatorId, dbConfig)`; `IReportRepository` is injected into `InteractiveReportManager` via constructor injection
 
 **Given** the following controllers with direct `report` URL construction:
+
 - `data_summary_viewController.cs` — 1 hit (view GET — Wave 8 planned migration target)
 - `dqrReportController.cs` — 1 hit (`_find` POST)
 - `overdose_measureController.cs` — 1 hit (`_find` POST)
 - `powerbi_measureController.cs` — 1 hit (`_find` POST)
-**When** this story is complete
-**Then** each is replaced with the corresponding `IReportRepository` method; `IReportRepository` is injected into each controller via constructor injection; no controller constructs a `report/` URL
+  **When** this story is complete
+  **Then** each is replaced with the corresponding `IReportRepository` method; `IReportRepository` is injected into each controller via constructor injection; no controller constructs a `report/` URL
 
 **Given** `data_summary_viewController` is also a Wave 8 SharedLibraries migration target
 **When** this story touches it
@@ -2703,6 +2755,7 @@ So that the logging store can be migrated (SQL, Elasticsearch, or other) by chan
 **Given** no `Logging` SharedLibraries feature exists
 **When** this story creates one
 **Then** the following structure exists:
+
 ```
 mmria.common/SharedLibraries/Logging/
   ILoggingRepository.cs
@@ -2711,10 +2764,11 @@ mmria.common/SharedLibraries/Logging/
 ```
 
 **Given** the in-scope `logging` database operations in `loggerController.cs`:
+
 - Line ~93: `GET {prefix}logging` — reads the list of logging modules (Pattern A)
 - Lines ~283, 653: one is a filtered view read, one is a document write (Pattern A throughout)
-**When** `LoggingDAL` is created
-**Then** it contains async methods for each in-scope operation using `dbConfig.Get_Prefix_DB_Url($"logging/...")` (Pattern B) throughout; `ILoggingRepository` is defined in the same directory; `LoggingDAL` implements `ILoggingRepository`
+  **When** `LoggingDAL` is created
+  **Then** it contains async methods for each in-scope operation using `dbConfig.Get_Prefix_DB_Url($"logging/...")` (Pattern B) throughout; `ILoggingRepository` is defined in the same directory; `LoggingDAL` implements `ILoggingRepository`
 
 **Given** `c_db_setup.cs` creates the `logging` database on first install
 **When** evaluated
@@ -2740,16 +2794,16 @@ mmria.common/SharedLibraries/Logging/
 
 ## Epic 23 — Story Sequencing
 
-| Wave | Story | Risk | Dependencies |
-|---|---|---|---|
-| 23 | 23.1 — Remaining Database Gap Scan | None | None — discovery only |
-| 23 | 23.2 — `ISessionRepository` + `SessionDAL` | Medium | 23.1 |
-| 23 | 23.3 — `IOfflineCaseRepository` + `OfflineCaseDAL` | Low | 23.1 |
-| 23 | 23.4 — `IExportQueueRepository` + `ExportQueueDAL` | Low | 23.1 |
-| 23 | 23.5 — `IVitalImportRepository` + `VitalImportDAL` canonicalization | Low–Medium | 23.1 |
-| 23 | 23.6 — `IReportRepository` + `ReportDAL` (read interface) | Low | 23.1 |
-| 23 | 23.7 — Route report read calls through `IReportRepository` | Low–Medium | 23.6 |
-| 23 | 23.8 — `ILoggingRepository` + `LoggingDAL` | Low | 23.1 |
+| Wave | Story                                                               | Risk       | Dependencies          |
+| ---- | ------------------------------------------------------------------- | ---------- | --------------------- |
+| 23   | 23.1 — Remaining Database Gap Scan                                  | None       | None — discovery only |
+| 23   | 23.2 — `ISessionRepository` + `SessionDAL`                          | Medium     | 23.1                  |
+| 23   | 23.3 — `IOfflineCaseRepository` + `OfflineCaseDAL`                  | Low        | 23.1                  |
+| 23   | 23.4 — `IExportQueueRepository` + `ExportQueueDAL`                  | Low        | 23.1                  |
+| 23   | 23.5 — `IVitalImportRepository` + `VitalImportDAL` canonicalization | Low–Medium | 23.1                  |
+| 23   | 23.6 — `IReportRepository` + `ReportDAL` (read interface)           | Low        | 23.1                  |
+| 23   | 23.7 — Route report read calls through `IReportRepository`          | Low–Medium | 23.6                  |
+| 23   | 23.8 — `ILoggingRepository` + `LoggingDAL`                          | Low        | 23.1                  |
 
 23.2, 23.3, 23.4, 23.5, 23.6, and 23.8 can all proceed in parallel once 23.1 is complete. 23.7 depends on 23.6. Story 23.2 carries medium risk due to the number of call sites (actors + controllers + cross-feature DAL injection); all others are low or low–medium.
 
@@ -2767,29 +2821,29 @@ mmria.common/SharedLibraries/Logging/
 
 **New interfaces introduced:**
 
-| Interface | Location | Purpose |
-|---|---|---|
-| `IDeIdentifiedRepository` | `mmria.common/SharedLibraries/DeIdentified/` | de_id database: per-doc CRUD, bulk write, and DB lifecycle (drop/reset, design docs, indexes) |
-| `IReportRepository` write ext. | Extends Epic 23 Story 23.6 read-only interface | Adds per-doc write, bulk write, drop/reset, design docs, and index operations |
-| `ICaseRepository` sync ext. | Extends Epic 17 Story 17.2 interface | Adds `GetCasesPagedAsync` (cursor-based bulk read) and `GetCaseChangesSinceAsync` (change-stream) |
-| `IDatabaseLifecycleService` | `mmria-server/` | Interface seam over `c_db_setup.cs` for full system startup initialization |
-| `IExportQueueRepository.PurgeAndReinitializeAsync` | Extends Epic 23 Story 23.4 interface | Adds nightly drop/recreate/security operation to the export-queue interface |
+| Interface                                          | Location                                       | Purpose                                                                                           |
+| -------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `IDeIdentifiedRepository`                          | `mmria.common/SharedLibraries/DeIdentified/`   | de_id database: per-doc CRUD, bulk write, and DB lifecycle (drop/reset, design docs, indexes)     |
+| `IReportRepository` write ext.                     | Extends Epic 23 Story 23.6 read-only interface | Adds per-doc write, bulk write, drop/reset, design docs, and index operations                     |
+| `ICaseRepository` sync ext.                        | Extends Epic 17 Story 17.2 interface           | Adds `GetCasesPagedAsync` (cursor-based bulk read) and `GetCaseChangesSinceAsync` (change-stream) |
+| `IDatabaseLifecycleService`                        | `mmria-server/`                                | Interface seam over `c_db_setup.cs` for full system startup initialization                        |
+| `IExportQueueRepository.PurgeAndReinitializeAsync` | Extends Epic 23 Story 23.4 interface           | Adds nightly drop/recreate/security operation to the export-queue interface                       |
 
 **Scope table — files in scope and which story owns them:**
 
-| File | Project | Primary operations | Story | Risk |
-|---|---|---|---|---|
-| `c_db_setup.cs` | mmria-server/util/ | ALL DBs: CREATE, SECURITY, DESIGN, INDEX, seed data | 24.5 | Low (interface extraction only) |
-| `Rebuild_Export_Queue.cs` | mmria-server/model/actor/quartz/ | export_queue: DELETE DB, CREATE DB, SECURITY | 24.4 | Low |
-| `rebuild_export_queue_job.cs` | mmria-server/model/ | export_queue: DELETE DB, CREATE DB, SECURITY (legacy IJob) | 24.4 | Low |
-| `c_sync_document.pmss.cs` | mmria-server/util/ | de_id: PUT/DELETE per-doc; report: 4 document-type variant PUTs | 24.6 | Low |
-| `c_document_sync_all.cs` | mmria-server/util/ | mmrds: paged bulk read; metadata: via DAL ✓; de_id: bulk write; report: bulk write, design, index | 24.7 | Medium |
-| `c_document_sync_all_legacy.cs` | mmria-server/util/ | mmrds: paged read; de_id: individual PUT; report: design + individual writes | 24.7 | Medium |
-| `c_document_sync_all.pmss.cs` | mmria-server/util/ | mmrds: paged bulk read; de_id: design + writes; report: design + index + writes | 24.7 | Medium |
-| `c_document_sync_all_legacy.cs` | mmria.common/SharedLibraries/MMRIARebuild/Manager/ | metadata: via DAL ✓; mmrds: paged; de_id: bulk write; report: bulk write + design | 24.7 | Medium |
-| `Process_DB_Synchronization_Set.cs` | mmria-server/model/actor/quartz/ | mmrds: `_changes` feed + doc GET; de_id: per-doc PUT/DELETE; report: per-doc PUT/DELETE | 24.8 | Medium |
-| `Process_Central_Pull_list.cs` | mmria-server/model/actor/quartz/ | mmrds (multi-source): bulk read; de_id: bulk write; report: design + index + bulk write | 24.9 | High |
-| `c_document_sync_all.cs` | mmria.services/Actors/populate-cdc-instance/ | metadata: via DAL ✓; mmrds: cursor paged; de_id: bulk write; report: design + bulk write | 24.9 | High |
+| File                                | Project                                            | Primary operations                                                                                | Story | Risk                            |
+| ----------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ----- | ------------------------------- |
+| `c_db_setup.cs`                     | mmria-server/util/                                 | ALL DBs: CREATE, SECURITY, DESIGN, INDEX, seed data                                               | 24.5  | Low (interface extraction only) |
+| `Rebuild_Export_Queue.cs`           | mmria-server/model/actor/quartz/                   | export_queue: DELETE DB, CREATE DB, SECURITY                                                      | 24.4  | Low                             |
+| `rebuild_export_queue_job.cs`       | mmria-server/model/                                | export_queue: DELETE DB, CREATE DB, SECURITY (legacy IJob)                                        | 24.4  | Low                             |
+| `c_sync_document.pmss.cs`           | mmria-server/util/                                 | de_id: PUT/DELETE per-doc; report: 4 document-type variant PUTs                                   | 24.6  | Low                             |
+| `c_document_sync_all.cs`            | mmria-server/util/                                 | mmrds: paged bulk read; metadata: via DAL ✓; de_id: bulk write; report: bulk write, design, index | 24.7  | Medium                          |
+| `c_document_sync_all_legacy.cs`     | mmria-server/util/                                 | mmrds: paged read; de_id: individual PUT; report: design + individual writes                      | 24.7  | Medium                          |
+| `c_document_sync_all.pmss.cs`       | mmria-server/util/                                 | mmrds: paged bulk read; de_id: design + writes; report: design + index + writes                   | 24.7  | Medium                          |
+| `c_document_sync_all_legacy.cs`     | mmria.common/SharedLibraries/MMRIARebuild/Manager/ | metadata: via DAL ✓; mmrds: paged; de_id: bulk write; report: bulk write + design                 | 24.7  | Medium                          |
+| `Process_DB_Synchronization_Set.cs` | mmria-server/model/actor/quartz/                   | mmrds: `_changes` feed + doc GET; de_id: per-doc PUT/DELETE; report: per-doc PUT/DELETE           | 24.8  | Medium                          |
+| `Process_Central_Pull_list.cs`      | mmria-server/model/actor/quartz/                   | mmrds (multi-source): bulk read; de_id: bulk write; report: design + index + bulk write           | 24.9  | High                            |
+| `c_document_sync_all.cs`            | mmria.services/Actors/populate-cdc-instance/       | metadata: via DAL ✓; mmrds: cursor paged; de_id: bulk write; report: design + bulk write          | 24.9  | High                            |
 
 ---
 
@@ -2830,6 +2884,7 @@ So that Stories 24.6–24.9 can route every call through a typed interface inste
 **Given** no `DeIdentified` SharedLibraries feature exists
 **When** this story creates one
 **Then** the following structure exists:
+
 ```
 mmria.common/SharedLibraries/DeIdentified/
   IDeIdentifiedRepository.cs
@@ -2840,6 +2895,7 @@ mmria.common/SharedLibraries/DeIdentified/
 **Given** the de_id operations identified in Story 24.1
 **When** `DeIdentifiedDAL` is created
 **Then** it contains async methods covering:
+
 - `GetRevisionAsync(string id, DBConfigurationDetail dbConfig)` → `string? rev` — used to check before write/delete
 - `UpsertDocumentAsync(string id, JObject doc, DBConfigurationDetail dbConfig)` → `document_put_response`
 - `DeleteDocumentAsync(string id, string rev, DBConfigurationDetail dbConfig)` → `document_put_response`
@@ -2857,6 +2913,7 @@ All CRUD and bulk methods use `dbConfig.Get_Prefix_DB_Url($"de_id/...")` (Patter
 **Given** `IReportRepository` from Story 23.6 is currently read-only
 **When** this story extends it
 **Then** `IReportRepository` gains these additional methods implemented in `ReportDAL`:
+
 - `GetRevisionAsync(string id, DBConfigurationDetail dbConfig)` → `string? rev`
 - `UpsertDocumentAsync(string id, JObject doc, DBConfigurationDetail dbConfig)` → `document_put_response`
 - `DeleteDocumentAsync(string id, string rev, DBConfigurationDetail dbConfig)` → `document_put_response`
@@ -2886,6 +2943,7 @@ So that `c_document_sync_all` variants and `Process_DB_Synchronization_Set` can 
 **Given** `ICaseRepository` from Story 17.2 covers per-document CRUD and view queries but not bulk paged reads or change-feed access
 **When** this story is complete
 **Then** `ICaseRepository` gains:
+
 - `GetCasesPagedAsync(string? startKey, int limit, DBConfigurationDetail dbConfig)` → `CasePage` containing `IReadOnlyList<JObject> documents` and `string? lastId`
 - `startKey` null means start from beginning; `lastId` of the returned page is passed as `startKey` for the next page
 - Implemented in `CaseDAL` as `GET {prefix}mmrds/_all_docs?include_docs=true&startkey={startKey}&limit={limit}` (cursor-based pagination)
@@ -2894,6 +2952,7 @@ So that `c_document_sync_all` variants and `Process_DB_Synchronization_Set` can 
 **Given** `Process_DB_Synchronization_Set` polls `mmrds/_changes` to detect mutations
 **When** this story is complete
 **Then** `ICaseRepository` gains:
+
 - `GetCaseChangesSinceAsync(string sinceSeq, DBConfigurationDetail dbConfig)` → `CaseChangeFeedResult` containing `string lastSeq` and `IReadOnlyList<CaseChangeEntry>`
 - `CaseChangeEntry` holds: `string id`, `string seq`, `bool deleted`, `JObject? doc` (full document for updates; null for deletes)
 - Implemented in `CaseDAL` as `GET {prefix}mmrds/_changes?since={sinceSeq}&include_docs=true`
@@ -2920,6 +2979,7 @@ So that the nightly export-queue drop/recreate is fully behind the repository in
 **Given** `IExportQueueRepository` from Story 23.4 covers application CRUD but not database-lifecycle operations
 **When** this story extends it
 **Then** `IExportQueueRepository` gains:
+
 - `PurgeAndReinitializeAsync(DBConfigurationDetail dbConfig)` — drops the `export_queue` database, recreates it empty, and restores the security document (`abstractor` role only); in SQL migration, the implementation executes `TRUNCATE TABLE export_queue` and resets row-level permissions
 
 **Given** `ExportQueueDAL` implements `PurgeAndReinitializeAsync`
@@ -2993,18 +3053,20 @@ So that this leaf-level per-document sync utility has no direct CouchDB calls �
 **Then** every direct CouchDB call in this file is replaced with the corresponding repository method call; `IDeIdentifiedRepository` and `IReportRepository` are injected via constructor injection
 
 **Given** the de_id operations in this file (identified in Story 24.1):
+
 - GET to check existing document revision before overwrite or delete
 - PUT de-identified document (Pattern B or A — as discovered)
 - DELETE de-identified document
-**When** this story is complete
-**Then** each is replaced with: `IDeIdentifiedRepository.GetRevisionAsync(...)`, `IDeIdentifiedRepository.UpsertDocumentAsync(...)`, `IDeIdentifiedRepository.DeleteDocumentAsync(...)` respectively
+  **When** this story is complete
+  **Then** each is replaced with: `IDeIdentifiedRepository.GetRevisionAsync(...)`, `IDeIdentifiedRepository.UpsertDocumentAsync(...)`, `IDeIdentifiedRepository.DeleteDocumentAsync(...)` respectively
 
 **Given** the report operations in this file — writes to four document-type variants per case (`freq-{id}`, `opioid-{id}`, `powerbi-{id}`, `dqr-{id}`):
+
 - GET revision for each variant before overwrite
 - PUT each variant
 - DELETE each variant (when a case is deleted from mmrds)
-**When** this story is complete
-**Then** each revision GET is replaced with `IReportRepository.GetRevisionAsync(...)` and each PUT/DELETE is replaced with `IReportRepository.UpsertDocumentAsync(...)` / `IReportRepository.DeleteDocumentAsync(...)` using the full document-type-prefixed ID (e.g., `"freq-{caseId}"`) as the `id` parameter — the document-type prefix is preserved in the ID, not extracted as a separate concept
+  **When** this story is complete
+  **Then** each revision GET is replaced with `IReportRepository.GetRevisionAsync(...)` and each PUT/DELETE is replaced with `IReportRepository.UpsertDocumentAsync(...)` / `IReportRepository.DeleteDocumentAsync(...)` using the full document-type-prefixed ID (e.g., `"freq-{caseId}"`) as the `id` parameter — the document-type prefix is preserved in the ID, not extracted as a separate concept
 
 **Given** the PMSS-specific de-identification and report-generation logic in this file (`c_de_identifier`, `c_generate_frequency_summary_report`, etc.)
 **When** this story is implemented
@@ -3029,32 +3091,35 @@ So that the full-database rebuild orchestration has no direct CouchDB calls.
 **Acceptance Criteria:**
 
 **Given** the four files in scope:
+
 1. `mmria-server/util/c_document_sync_all.cs`
 2. `mmria-server/util/c_document_sync_all_legacy.cs`
 3. `mmria-server/util/c_document_sync_all.pmss.cs`
 4. `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_document_sync_all_legacy.cs`
-**When** this story is complete
-**Then** every direct `CouchDbHttpClient.ExecuteAsync` call in each file is replaced with the corresponding interface method; the four interfaces used are `ICaseRepository`, `IDeIdentifiedRepository`, `IReportRepository`, and (for metadata reads not yet routed via DAL, if any) `IMetadataRepository`
+   **When** this story is complete
+   **Then** every direct `CouchDbHttpClient.ExecuteAsync` call in each file is replaced with the corresponding interface method; the four interfaces used are `ICaseRepository`, `IDeIdentifiedRepository`, `IReportRepository`, and (for metadata reads not yet routed via DAL, if any) `IMetadataRepository`
 
 **Given** the mmrds paged bulk read operations in all four files
 **When** this story is complete
 **Then** each is replaced with `ICaseRepository.GetCasesPagedAsync(startKey, limit, dbConfig)`; cursor-loop logic stays in the orchestrator — the repository returns one page; the orchestrator advances the cursor; no orchestration logic changes
 
 **Given** the de_id operations:
+
 - Drop/recreate de_id (during full rebuild start)
 - PUT design document on de_id
 - Bulk write de-identified documents (`_bulk_docs`)
 - Individual per-document writes (legacy variant)
-**When** this story is complete
-**Then** drop/recreate → `IDeIdentifiedRepository.DropAndResetAsync(dbConfig)`; design doc → `IDeIdentifiedRepository.EnsureDesignDocumentAsync(name, json, dbConfig)`; bulk write → `IDeIdentifiedRepository.BulkUpsertAsync(docs, dbConfig)`; individual write → `IDeIdentifiedRepository.UpsertDocumentAsync(id, doc, dbConfig)`
+  **When** this story is complete
+  **Then** drop/recreate → `IDeIdentifiedRepository.DropAndResetAsync(dbConfig)`; design doc → `IDeIdentifiedRepository.EnsureDesignDocumentAsync(name, json, dbConfig)`; bulk write → `IDeIdentifiedRepository.BulkUpsertAsync(docs, dbConfig)`; individual write → `IDeIdentifiedRepository.UpsertDocumentAsync(id, doc, dbConfig)`
 
 **Given** the report operations:
+
 - Drop/recreate report (during full rebuild, with system-doc preservation where applicable)
 - PUT design documents (`interactive_aggregate_report`, `data_summary_view_report`, `powerbi-report-index`, etc.)
 - POST Mango indexes (`opioid`, `powerbi` partial-filter indexes)
 - Bulk write report documents
-**When** this story is complete
-**Then** drop/recreate with system-doc preservation → `IReportRepository.DropAndResetWithSystemDocPreservationAsync(dbConfig)`; design docs → `IReportRepository.EnsureDesignDocumentAsync(name, json, dbConfig)`; indexes → `IReportRepository.EnsureIndexAsync(json, dbConfig)`; bulk write → `IReportRepository.BulkUpsertAsync(docs, dbConfig)`
+  **When** this story is complete
+  **Then** drop/recreate with system-doc preservation → `IReportRepository.DropAndResetWithSystemDocPreservationAsync(dbConfig)`; design docs → `IReportRepository.EnsureDesignDocumentAsync(name, json, dbConfig)`; indexes → `IReportRepository.EnsureIndexAsync(json, dbConfig)`; bulk write → `IReportRepository.BulkUpsertAsync(docs, dbConfig)`
 
 **Given** barrier queries in `c_document_sync_all_legacy.cs` (common) — these query `de_id/_design/sortable/_view/by_date_created?limit=1&update=true` and `report/_find` purely to wait for index readiness
 **When** evaluated
@@ -3137,12 +3202,13 @@ So that the CDC data integration path — the most complex infra flow — has no
 **Then** each is replaced with `ICaseRepository.GetCasesPagedAsync(startKey, limit, sourceDbConfig)` where `sourceDbConfig` is the `DBConfigurationDetail` for the source instance; the multi-instance loop over `cdc_instance_pull_list` entries is unchanged
 
 **Given** the target writes in `Process_Central_Pull_list.cs`:
+
 - DELETE and recreate target `mmrds`, `de_id`, `report` databases at the start of each CDC pull
 - PUT design documents on target `de_id` (sortable)
 - POST Mango indexes on target `report` (opioid, powerbi)
 - Per-document writes to target `mmrds` (via `Synchronize_Case` actor dispatch — these are already abstracted by the actor)
-**When** this story is complete
-**Then** mmrds target lifecycle → `ICaseRepository` lifecycle method (add `DropAndResetAsync(DBConfigurationDetail)` to `ICaseRepository` and `CaseDAL`); de_id lifecycle → `IDeIdentifiedRepository.DropAndResetAsync(...)` and `EnsureDesignDocumentAsync(...)`; report lifecycle → `IReportRepository.DropAndResetWithSystemDocPreservationAsync(...)` and `EnsureIndexAsync(...)`
+  **When** this story is complete
+  **Then** mmrds target lifecycle → `ICaseRepository` lifecycle method (add `DropAndResetAsync(DBConfigurationDetail)` to `ICaseRepository` and `CaseDAL`); de_id lifecycle → `IDeIdentifiedRepository.DropAndResetAsync(...)` and `EnsureDesignDocumentAsync(...)`; report lifecycle → `IReportRepository.DropAndResetWithSystemDocPreservationAsync(...)` and `EnsureIndexAsync(...)`
 
 **Given** adding `DropAndResetAsync` to `ICaseRepository`
 **When** evaluated
@@ -3178,17 +3244,17 @@ So that the CDC data integration path — the most complex infra flow — has no
 
 ## Epic 24 — Story Sequencing
 
-| Wave | Story | Risk | Dependencies |
-|---|---|---|---|
-| 24 | 24.1 — Infra Operations Catalog | None | None — discovery only |
-| 24 | 24.2 — `IDeIdentifiedRepository` + `IReportRepository` write/lifecycle ext. | Low | 24.1 |
-| 24 | 24.3 — `ICaseRepository` paged bulk read + change stream | Low | 24.1 |
-| 24 | 24.4 — Export queue rebuild routing | Low | 24.1; Epic 23 Story 23.4 done |
-| 24 | 24.5 — `IDatabaseLifecycleService` over `c_db_setup` | Low | 24.1 |
-| 24 | 24.6 — `c_sync_document.pmss.cs` routing | Low | 24.2 |
-| 24 | 24.7 — `c_document_sync_all` variants routing | Medium | 24.2, 24.3, 24.6 |
-| 24 | 24.8 — `Process_DB_Synchronization_Set` routing | Medium | 24.2, 24.3, 24.6 |
-| 24 | 24.9 — `Process_Central_Pull_list` + CDC `c_document_sync_all` routing | High | 24.2, 24.3, 24.7 |
+| Wave | Story                                                                       | Risk   | Dependencies                  |
+| ---- | --------------------------------------------------------------------------- | ------ | ----------------------------- |
+| 24   | 24.1 — Infra Operations Catalog                                             | None   | None — discovery only         |
+| 24   | 24.2 — `IDeIdentifiedRepository` + `IReportRepository` write/lifecycle ext. | Low    | 24.1                          |
+| 24   | 24.3 — `ICaseRepository` paged bulk read + change stream                    | Low    | 24.1                          |
+| 24   | 24.4 — Export queue rebuild routing                                         | Low    | 24.1; Epic 23 Story 23.4 done |
+| 24   | 24.5 — `IDatabaseLifecycleService` over `c_db_setup`                        | Low    | 24.1                          |
+| 24   | 24.6 — `c_sync_document.pmss.cs` routing                                    | Low    | 24.2                          |
+| 24   | 24.7 — `c_document_sync_all` variants routing                               | Medium | 24.2, 24.3, 24.6              |
+| 24   | 24.8 — `Process_DB_Synchronization_Set` routing                             | Medium | 24.2, 24.3, 24.6              |
+| 24   | 24.9 — `Process_Central_Pull_list` + CDC `c_document_sync_all` routing      | High   | 24.2, 24.3, 24.7              |
 
 24.2, 24.3, 24.4, and 24.5 can all proceed in parallel once 24.1 is complete.
 24.6 depends only on 24.2 and can start as soon as 24.2 is done.
@@ -3207,22 +3273,22 @@ So that the CDC data integration path — the most complex infra flow — has no
 
 **Non-DAL files remediated:**
 
-| File | Call type | Story |
-|---|---|---|
-| `mmria-server/util/JurisdictionAuthorizationRequirement.cs` | `.Result` blocking call | 25.1 |
-| `mmria-server/util/VROSummary.cs` | `.Result` blocking call | 25.1 |
-| `mmria-server/util/c_convert_to_dqr_detail.cs` | `metadata/version_specification-{v}/metadata` GET | 25.2 |
-| `mmria-server/util/c_convert_to_opioid_report_object.cs` | `metadata/version_specification-{v}/metadata` GET | 25.2 |
-| `mmria-server/util/c_convert_to_report_object.cs` | `metadata/version_specification-{v}/metadata` GET | 25.2 |
-| `mmria-server/util/c_generate_frequency_summary_report.cs` | `metadata/version_specification-{v}/metadata` GET | 25.2 |
-| `mmria-server/util/c_de_identifier.cs` | `metadata/de-identified-list` GET | 25.2 |
-| `mmria-server/util/c_cdc_de_identifier.cs` | `metadata/de-identified-export-list` GET | 25.2 |
-| `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_convert_to_dqr_detail.cs` | same as server variant | 25.2 |
-| `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_convert_to_opioid_report_object.cs` | same as server variant | 25.2 |
-| `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_convert_to_report_object.cs` | same as server variant | 25.2 |
-| `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_generate_frequency_summary_report.cs` | same as server variant | 25.2 |
-| `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_de_identifier.cs` | `metadata/de-identified-list` GET | 25.2 |
-| `mmria.common/SharedLibraries/MMRIAServices/Helper/c_cdc_de_identifier.cs` | `metadata/de-identified-export-list` GET | 25.2 |
+| File                                                                                       | Call type                                         | Story |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------- | ----- |
+| `mmria-server/util/JurisdictionAuthorizationRequirement.cs`                                | `.Result` blocking call                           | 25.1  |
+| `mmria-server/util/VROSummary.cs`                                                          | `.Result` blocking call                           | 25.1  |
+| `mmria-server/util/c_convert_to_dqr_detail.cs`                                             | `metadata/version_specification-{v}/metadata` GET | 25.2  |
+| `mmria-server/util/c_convert_to_opioid_report_object.cs`                                   | `metadata/version_specification-{v}/metadata` GET | 25.2  |
+| `mmria-server/util/c_convert_to_report_object.cs`                                          | `metadata/version_specification-{v}/metadata` GET | 25.2  |
+| `mmria-server/util/c_generate_frequency_summary_report.cs`                                 | `metadata/version_specification-{v}/metadata` GET | 25.2  |
+| `mmria-server/util/c_de_identifier.cs`                                                     | `metadata/de-identified-list` GET                 | 25.2  |
+| `mmria-server/util/c_cdc_de_identifier.cs`                                                 | `metadata/de-identified-export-list` GET          | 25.2  |
+| `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_convert_to_dqr_detail.cs`             | same as server variant                            | 25.2  |
+| `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_convert_to_opioid_report_object.cs`   | same as server variant                            | 25.2  |
+| `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_convert_to_report_object.cs`          | same as server variant                            | 25.2  |
+| `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_generate_frequency_summary_report.cs` | same as server variant                            | 25.2  |
+| `mmria.common/SharedLibraries/MMRIARebuild/Manager/c_de_identifier.cs`                     | `metadata/de-identified-list` GET                 | 25.2  |
+| `mmria.common/SharedLibraries/MMRIAServices/Helper/c_cdc_de_identifier.cs`                 | `metadata/de-identified-export-list` GET          | 25.2  |
 
 ---
 
@@ -3254,6 +3320,7 @@ When the build runs
 Then `mmria-server` builds with zero errors; no other call sites are changed
 
 **Dev Notes:**
+
 - `.Result` on a Task inside an async-context method causes a deadlock on ASP.NET's synchronized context under certain thread-pool contention conditions. Making the method `async` and using `await` is the correct fix — not `Task.Run(() => ...)`.
 - The enclosing types may implement interfaces that constrain the method signature (e.g., `IAuthorizationHandler`). Check the interface — ASP.NET Core authorization handlers use `Task HandleRequirementAsync(...)` which already returns `Task`, so the async change should propagate cleanly.
 - Do NOT add `ConfigureAwait(false)` — the project does not use it elsewhere.
@@ -3304,11 +3371,11 @@ Then `mmria-server`, `mmria.common`, and `mmria.services` all build with zero er
 
 **Dev Notes:**
 
-| File group | Method on `IMetadataRepository` |
-|---|---|
-| `c_convert_to_*`, `c_generate_frequency_summary_report` | `GetAppDocumentAsync(version, dbConfig)` → `mmria.common.metadata.app` |
-| `c_de_identifier` | `GetDeIdentifiedListAsync(dbConfig)` → `ExpandoObject` (add if absent) |
-| `c_cdc_de_identifier` | `GetDeIdentifiedExportListAsync(dbConfig)` → `ExpandoObject` (add if absent) |
+| File group                                              | Method on `IMetadataRepository`                                              |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `c_convert_to_*`, `c_generate_frequency_summary_report` | `GetAppDocumentAsync(version, dbConfig)` → `mmria.common.metadata.app`       |
+| `c_de_identifier`                                       | `GetDeIdentifiedListAsync(dbConfig)` → `ExpandoObject` (add if absent)       |
+| `c_cdc_de_identifier`                                   | `GetDeIdentifiedExportListAsync(dbConfig)` → `ExpandoObject` (add if absent) |
 
 Note: `mmria.services/Actors/populate-cdc-instance/c_document_sync_all.cs` already uses `_metadataRepository.GetDeIdentifiedListAsync(connection)` — confirm that method signature before adding to the interface to avoid duplication.
 
@@ -3316,10 +3383,10 @@ Note: `mmria.services/Actors/populate-cdc-instance/c_document_sync_all.cs` alrea
 
 ## Epic 25 — Story Sequencing
 
-| Story | Risk | Dependencies |
-|---|---|---|
-| 25.1 — Fix `.Result` blocking calls | Low | None |
-| 25.2 — Metadata reader injection pass | Low | Epic 20 complete (already done) |
+| Story                                 | Risk | Dependencies                    |
+| ------------------------------------- | ---- | ------------------------------- |
+| 25.1 — Fix `.Result` blocking calls   | Low  | None                            |
+| 25.2 — Metadata reader injection pass | Low  | Epic 20 complete (already done) |
 
 25.1 and 25.2 are independent and can proceed in parallel.
 
@@ -3333,26 +3400,26 @@ Note: `mmria.services/Actors/populate-cdc-instance/c_document_sync_all.cs` alrea
 
 **Non-DAL files remediated:**
 
-| Story | File | Repository needed |
-|---|---|---|
-| 26.1 | `mmria-server/Controllers/api/caseController.cs` | `ICaseRepository` (Epic 17 story 17.2) |
-| 26.1 | `mmria-server/Controllers/api/case_viewController.pmss.cs` | `ICaseRepository` |
-| 26.1 | `mmria-server/Controllers/api/caseRevisionListController.cs` | `ICaseRepository` |
-| 26.1 | `mmria-server/Controllers/api/de_idController.cs` | `IDeIdentifiedRepository` (Epic 24 story 24.2) |
-| 26.1 | `mmria-server/Controllers/api/record_idController.cs` | `ICaseRepository` |
-| 26.2 | `mmria-server/Controllers/AccountController.cs` | `IUserRepository` (Epic 18 story 18.2) |
-| 26.2 | `mmria-server/CustomAuthHandler.cs` | `ISessionRepository` (Epic 23 story 23.2) |
-| 26.2 | `mmria-server/Controllers/api/passwordChangeController.cs` | `ISessionRepository` |
-| 26.2 | `mmria-server/util/OfflineSessionHelper.cs` | `ISessionRepository` |
-| 26.3 | `mmria-server/Controllers/api/queueController.cs` | `IExportQueueRepository` (Epic 23 story 23.4) |
-| 26.3 | `mmria.services/Controllers/ExportQueueController.cs` | `IExportQueueRepository` |
-| 26.3 | `mmria-server/Controllers/broadcast_messageController.cs` | `IBroadcastMessageRepository` or direct via `mmria.services` — confirm pattern |
-| 26.3 | `mmria.services/Controllers/broadcastMessageController.cs` | same |
-| 26.3 | `mmria-server/Controllers/api/ije_messageController.cs` | `ICaseRepository` or `IOfflineCaseRepository` — confirm DB target |
-| 26.4 | `mmria-server/util/JurisdictionSummary.cs` | `IJurisdictionRepository` (Epic 19 story 19.2) |
-| 26.4 | `mmria.services/Utilities/authorization.cs` | `IJurisdictionRepository` |
-| 26.4 | `mmria-server/util/CaseViewSearch.pmss.cs` | `ICaseRepository` (PMSS path) |
-| 26.4 | `mmria-server/util/exporter/export_all_generate_name_map.cs` | `IMetadataRepository` (Epic 20) |
+| Story | File                                                         | Repository needed                                                              |
+| ----- | ------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| 26.1  | `mmria-server/Controllers/api/caseController.cs`             | `ICaseRepository` (Epic 17 story 17.2)                                         |
+| 26.1  | `mmria-server/Controllers/api/case_viewController.pmss.cs`   | `ICaseRepository`                                                              |
+| 26.1  | `mmria-server/Controllers/api/caseRevisionListController.cs` | `ICaseRepository`                                                              |
+| 26.1  | `mmria-server/Controllers/api/de_idController.cs`            | `IDeIdentifiedRepository` (Epic 24 story 24.2)                                 |
+| 26.1  | `mmria-server/Controllers/api/record_idController.cs`        | `ICaseRepository`                                                              |
+| 26.2  | `mmria-server/Controllers/AccountController.cs`              | `IUserRepository` (Epic 18 story 18.2)                                         |
+| 26.2  | `mmria-server/CustomAuthHandler.cs`                          | `ISessionRepository` (Epic 23 story 23.2)                                      |
+| 26.2  | `mmria-server/Controllers/api/passwordChangeController.cs`   | `ISessionRepository`                                                           |
+| 26.2  | `mmria-server/util/OfflineSessionHelper.cs`                  | `ISessionRepository`                                                           |
+| 26.3  | `mmria-server/Controllers/api/queueController.cs`            | `IExportQueueRepository` (Epic 23 story 23.4)                                  |
+| 26.3  | `mmria.services/Controllers/ExportQueueController.cs`        | `IExportQueueRepository`                                                       |
+| 26.3  | `mmria-server/Controllers/broadcast_messageController.cs`    | `IBroadcastMessageRepository` or direct via `mmria.services` — confirm pattern |
+| 26.3  | `mmria.services/Controllers/broadcastMessageController.cs`   | same                                                                           |
+| 26.3  | `mmria-server/Controllers/api/ije_messageController.cs`      | `ICaseRepository` or `IOfflineCaseRepository` — confirm DB target              |
+| 26.4  | `mmria-server/util/JurisdictionSummary.cs`                   | `IJurisdictionRepository` (Epic 19 story 19.2)                                 |
+| 26.4  | `mmria.services/Utilities/authorization.cs`                  | `IJurisdictionRepository`                                                      |
+| 26.4  | `mmria-server/util/CaseViewSearch.pmss.cs`                   | `ICaseRepository` (PMSS path)                                                  |
+| 26.4  | `mmria-server/util/exporter/export_all_generate_name_map.cs` | `IMetadataRepository` (Epic 20)                                                |
 
 **Not in scope:** `mmria-server/Controllers/api/nioshController.cs` — the `CouchDbHttpClient.ExecuteAsync` call at line 72 targets an external NIOSH URL with null credentials, not a CouchDB database. This is a general-purpose HTTP call that happens to use `CouchDbHttpClient` as a transport. No repository routing required.
 
@@ -3395,6 +3462,7 @@ When the build runs
 Then `mmria-server` builds with zero errors
 
 **Dev Notes:**
+
 - `de_idController.cs` reads a de_id document. If `IDeIdentifiedRepository` does not yet have a read method for individual de_id documents (it has `GetRevisionAsync` but may not have a full `GetDocumentAsync`), add `GetDocumentAsync(string id, DBConfigurationDetail dbConfig)` → `JObject?` to the interface and implement it in `DeIdentifiedDAL` before replacing the call site.
 - All five controllers already have `ICaseRepository` or DAL injection available via DI — confirm the existing DI wiring before adding new registrations.
 
@@ -3437,6 +3505,7 @@ When the build runs
 Then `mmria-server` builds with zero errors
 
 **Dev Notes:**
+
 - `CustomAuthHandler.cs` registers with ASP.NET Core's authorization pipeline — its constructor injection must be compatible with the DI lifetime of the handler. Confirm lifetime (usually `Scoped`) before injecting a scoped repository.
 - The session database uses `_users`-style access with credentials different from application databases on some tenants — confirm `ISessionRepository.GetSessionAsync` uses the correct dbConfig for the session database, not the main application dbConfig.
 
@@ -3520,12 +3589,12 @@ Then `mmria-server` and `mmria.services` both build with zero errors
 
 ## Epic 26 — Story Sequencing
 
-| Story | Risk | Dependencies |
-|---|---|---|
-| 26.1 — Case API controllers | Low | Epic 17 story 17.2, Epic 24 story 24.2 |
-| 26.2 — Auth/Session controllers | Low | Epic 23 story 23.2, Epic 18 story 18.2 |
-| 26.3 — Export/Broadcast controllers | Low-Medium | Epic 23 story 23.4; broadcast DB assessment |
-| 26.4 — Jurisdiction/Summary utilities | Low | Epic 19 story 19.2, Epic 20 |
+| Story                                 | Risk       | Dependencies                                |
+| ------------------------------------- | ---------- | ------------------------------------------- |
+| 26.1 — Case API controllers           | Low        | Epic 17 story 17.2, Epic 24 story 24.2      |
+| 26.2 — Auth/Session controllers       | Low        | Epic 23 story 23.2, Epic 18 story 18.2      |
+| 26.3 — Export/Broadcast controllers   | Low-Medium | Epic 23 story 23.4; broadcast DB assessment |
+| 26.4 — Jurisdiction/Summary utilities | Low        | Epic 19 story 19.2, Epic 20                 |
 
 All four stories are independent and can proceed in parallel. 26.3 has a minor assessment gate (broadcast message DB target) that should be resolved at the start of the story.
 
@@ -3539,14 +3608,14 @@ All four stories are independent and can proceed in parallel. 26.3 has a minor a
 
 **Files in scope:**
 
-| Story | File | Action |
-|---|---|---|
-| 27.1 | `mmria.services/Utilities/Exporter/exporter.cs` | Activate null-fallback: pass real `IExportQueueRepository` + `IReportRepository` from supervisor |
-| 27.1 | `mmria.services/Utilities/Exporter/mmrds_exporter.cs` | Activate null-fallback: same repos |
-| 27.1 | `mmria.services/Utilities/CoreElementExport/core_element_exporter.cs` (services) | Activate null-fallback: `IExportQueueRepository` |
-| 27.2 | `mmria.services/Actors/BatchProcessor.cs` | Classify DELETE target; replace with repo method or document as intentional |
-| 27.2 | `mmria-server/model/actor/quartz/Process_Migrate_Charactor_to_Numeric.cs` | Formal classification as intentional out-of-scope migration actor |
-| 27.2 | `mmria-server/model/actor/quartz/Process_Migrate_Data.cs` | Formal classification as intentional out-of-scope migration actor |
+| Story | File                                                                             | Action                                                                                           |
+| ----- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| 27.1  | `mmria.services/Utilities/Exporter/exporter.cs`                                  | Activate null-fallback: pass real `IExportQueueRepository` + `IReportRepository` from supervisor |
+| 27.1  | `mmria.services/Utilities/Exporter/mmrds_exporter.cs`                            | Activate null-fallback: same repos                                                               |
+| 27.1  | `mmria.services/Utilities/CoreElementExport/core_element_exporter.cs` (services) | Activate null-fallback: `IExportQueueRepository`                                                 |
+| 27.2  | `mmria.services/Actors/BatchProcessor.cs`                                        | Classify DELETE target; replace with repo method or document as intentional                      |
+| 27.2  | `mmria-server/model/actor/quartz/Process_Migrate_Charactor_to_Numeric.cs`        | Formal classification as intentional out-of-scope migration actor                                |
+| 27.2  | `mmria-server/model/actor/quartz/Process_Migrate_Data.cs`                        | Formal classification as intentional out-of-scope migration actor                                |
 
 ---
 
@@ -3587,6 +3656,7 @@ When the build runs and a CVS export job is triggered in the multi-tenant test e
 Then the build succeeds with zero errors and the export job completes normally without falling back to the direct HTTP path
 
 **Dev Notes:**
+
 - Trace the instantiation chain: `PopulateCDCInstanceSupervisor` → CDC actor → exporter utilities. The supervisor already has access to repos from its own DI injection (Story 24.11). Follow the chain and pass repos through.
 - The null-fallback (direct HTTP) path is still valid as a safety net — do not remove it. The goal is that runtime code always reaches the repo branch.
 
@@ -3632,10 +3702,10 @@ Then all three projects build with zero errors
 
 ## Epic 27 — Story Sequencing
 
-| Story | Risk | Dependencies |
-|---|---|---|
-| 27.1 — Activate export utility wiring | Low | Epics 24.10, 24.11, 26.3 |
-| 27.2 — BatchProcessor + migration actor classification | Low | None |
+| Story                                                  | Risk | Dependencies             |
+| ------------------------------------------------------ | ---- | ------------------------ |
+| 27.1 — Activate export utility wiring                  | Low  | Epics 24.10, 24.11, 26.3 |
+| 27.2 — BatchProcessor + migration actor classification | Low  | None                     |
 
 27.1 and 27.2 are independent and can proceed in parallel.
 
@@ -3649,12 +3719,12 @@ Then all three projects build with zero errors
 
 **Non-DAL files remediated:**
 
-| File | Calls | Database | Repository needed | Story |
-|---|---|---|---|---|
-| `mmria-server/util/VROSummary.cs` | 3 | `mmrds` (2 per-doc GETs + 1 `_all_docs` for ID list) | `ICaseRepository` (Epic 17) | 28.1 |
-| `mmria-server/util/JurisdictionAuthorizationRequirement.cs` | 1 | `jurisdiction/_design/sortable/_view/by_user_id` | `IJurisdictionAuthorizationReader` (Epic 19 story 19.3) | 28.2 |
-| `mmria-server/CustomAuthHandler.cs` | 1 | `session/{sid}` PUT (refresh session expiration) | `ISessionRepository` (Epic 23 story 23.2) | 28.2 |
-| `mmria-server/util/core_element_export/core_element_exporter.cs` | 4 | `metadata` (2 GETs) + `mmrds` (2 GETs) | `IMetadataRepository` (Epic 20) + `ICaseRepository` (Epic 17) | 28.3 |
+| File                                                             | Calls | Database                                             | Repository needed                                             | Story |
+| ---------------------------------------------------------------- | ----- | ---------------------------------------------------- | ------------------------------------------------------------- | ----- |
+| `mmria-server/util/VROSummary.cs`                                | 3     | `mmrds` (2 per-doc GETs + 1 `_all_docs` for ID list) | `ICaseRepository` (Epic 17)                                   | 28.1  |
+| `mmria-server/util/JurisdictionAuthorizationRequirement.cs`      | 1     | `jurisdiction/_design/sortable/_view/by_user_id`     | `IJurisdictionAuthorizationReader` (Epic 19 story 19.3)       | 28.2  |
+| `mmria-server/CustomAuthHandler.cs`                              | 1     | `session/{sid}` PUT (refresh session expiration)     | `ISessionRepository` (Epic 23 story 23.2)                     | 28.2  |
+| `mmria-server/util/core_element_export/core_element_exporter.cs` | 4     | `metadata` (2 GETs) + `mmrds` (2 GETs)               | `IMetadataRepository` (Epic 20) + `ICaseRepository` (Epic 17) | 28.3  |
 
 **Note:** This is the mmria-server copy of `core_element_exporter.cs` at `mmria-server/util/core_element_export/`. The `mmria.services` copy was fully remediated in Epics 24 and 27. The server copy was not in scope for those epics.
 
@@ -3695,10 +3765,10 @@ Then `mmria-server` builds with zero errors
 
 **Dev Notes — Files to Change:**
 
-| File | Change |
-|------|--------|
-| `source-code/mmria/mmria-server/util/VROSummary.cs` | **UPDATE** — inject `ICaseRepository`; replace 3 direct calls; remove `_couchDbHttpClient` if no calls remain |
-| Caller(s) that instantiate `VROSummary` | **UPDATE** — pass `ICaseRepository` instance from DI scope; remove `CouchDbHttpClient` arg if removed from ctor |
+| File                                                | Change                                                                                                          |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `source-code/mmria/mmria-server/util/VROSummary.cs` | **UPDATE** — inject `ICaseRepository`; replace 3 direct calls; remove `_couchDbHttpClient` if no calls remain   |
+| Caller(s) that instantiate `VROSummary`             | **UPDATE** — pass `ICaseRepository` instance from DI scope; remove `CouchDbHttpClient` arg if removed from ctor |
 
 **`ICaseRepository` note:** Check `GetCasesPagedAsync` signature from Epic 24 Story 24.3 before implementing AC-3. If the method returns `JObject` documents, extract IDs from the `_id` field. If `VROSummary` uses a `_design` filter (line 505: `if(_id.IndexOf("_design") > -1) continue`), preserve that filter in the loop.
 
@@ -3739,10 +3809,10 @@ Then `mmria-server` builds with zero errors
 
 **Dev Notes — Files to Change:**
 
-| File | Change |
-|------|--------|
+| File                                                                          | Change                                                                                                           |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | `source-code/mmria/mmria-server/util/JurisdictionAuthorizationRequirement.cs` | **UPDATE** — inject `IJurisdictionAuthorizationReader`; replace `ExecuteAsync` POST with `GetRolesByUserIdAsync` |
-| `source-code/mmria/mmria-server/CustomAuthHandler.cs` | **UPDATE** — inject `ISessionRepository`; replace `ExecuteAsync` PUT with `UpdateSessionAsync` (or equivalent) |
+| `source-code/mmria/mmria-server/CustomAuthHandler.cs`                         | **UPDATE** — inject `ISessionRepository`; replace `ExecuteAsync` PUT with `UpdateSessionAsync` (or equivalent)   |
 
 **`ISessionRepository` write method note:** Story 23.2 established `ISessionRepository` with session CRUD. Confirm the exact method name for writing/updating a session document. If a write method that accepts `session_message` exists, use it directly. If it only accepts raw JSON, use the raw-JSON PUT overload. Do NOT create a new interface method if an existing write method covers the operation.
 
@@ -3788,10 +3858,10 @@ Then `mmria-server` builds with zero errors
 
 **Dev Notes — Files to Change:**
 
-| File | Change |
-|------|--------|
+| File                                                                               | Change                                                                                                                                |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | `source-code/mmria/mmria-server/util/core_element_export/core_element_exporter.cs` | **UPDATE** — inject `IMetadataRepository` + `ICaseRepository`; replace 4 direct calls; remove `_couchDbHttpClient` if no calls remain |
-| Caller(s) that instantiate this exporter | **UPDATE** — resolve and pass repo instances from DI scope |
+| Caller(s) that instantiate this exporter                                           | **UPDATE** — resolve and pass repo instances from DI scope                                                                            |
 
 **mmria.services comparison note:** The `mmria.services` version of `core_element_exporter.cs` was remediated across Epics 24–27. The server copy lives at `mmria-server/util/core_element_export/core_element_exporter.cs` and is a separate file. Verify method signatures match what is now available on `ICaseRepository` and `IMetadataRepository` before implementing — they should match exactly what the services copy now uses.
 
@@ -3799,17 +3869,15 @@ Then `mmria-server` builds with zero errors
 
 ## Epic 28 — Story Sequencing
 
-| Story | Risk | Dependencies |
-|---|---|---|
-| 28.1 — `VROSummary.cs` case reads | Low | Epic 17 story 17.2 (ICaseRepository), Epic 24 story 24.3 (GetCasesPagedAsync) |
-| 28.2 — Auth middleware session and jurisdiction wiring | Low | Epic 23 story 23.2 (ISessionRepository), Epic 19 story 19.3 (IJurisdictionAuthorizationReader) |
-| 28.3 — mmria-server `core_element_exporter.cs` remaining calls | Low | Epic 17 story 17.2 (ICaseRepository), Epic 20 story 20.2 (IMetadataRepository) |
+| Story                                                          | Risk | Dependencies                                                                                   |
+| -------------------------------------------------------------- | ---- | ---------------------------------------------------------------------------------------------- |
+| 28.1 — `VROSummary.cs` case reads                              | Low  | Epic 17 story 17.2 (ICaseRepository), Epic 24 story 24.3 (GetCasesPagedAsync)                  |
+| 28.2 — Auth middleware session and jurisdiction wiring         | Low  | Epic 23 story 23.2 (ISessionRepository), Epic 19 story 19.3 (IJurisdictionAuthorizationReader) |
+| 28.3 — mmria-server `core_element_exporter.cs` remaining calls | Low  | Epic 17 story 17.2 (ICaseRepository), Epic 20 story 20.2 (IMetadataRepository)                 |
 
 All three stories are independent and can proceed in parallel.
 
 **Final non-DAL gate:** When Epic 28 is complete, every `CouchDbHttpClient.ExecuteAsync` call in `mmria-server` and `mmria.services` that touches a CouchDB application database routes through a repository interface. The only remaining non-DAL calls are in formally classified infrastructure files (sync utilities, rebuild actors, `c_db_setup.cs`, migration actors) which are addressed as a unit when SQL migration implementation begins.
-
-
 
 ---
 
@@ -3819,13 +3887,13 @@ All three stories are independent and can proceed in parallel.
 
 **Files in scope:**
 
-| Story | File | Action |
-|---|---|---|
-| 29.1 | `nccdphp-drh-mmria-common/mmria.common/SharedLibraries/Case/Manager/CaseManager.cs` | Add format validation + uniqueness guard in `SaveCaseAsync` |
-| 29.2 | `source-code/mmria/mmria-server/wwwroot/scripts/case/index.mmria.js` | Replace stale-Set loop with per-candidate `/api/record_id` calls |
-| 29.2 | `source-code/mmria/mmria-server/wwwroot/scripts/case/index.pmss.js` | Same change for PMSS variant |
-| 29.3 | `source-code/mmria/mmria-server/database-scripts/case_design_sortable.json` | Add `record_id_list` view |
-| 29.3 | `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js` | Remove `Get_Record_Id_List` function and `g_record_id_list` Set (dead code after 29.2) |
+| Story | File                                                                                | Action                                                                                 |
+| ----- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| 29.1  | `nccdphp-drh-mmria-common/mmria.common/SharedLibraries/Case/Manager/CaseManager.cs` | Add format validation + uniqueness guard in `SaveCaseAsync`                            |
+| 29.2  | `source-code/mmria/mmria-server/wwwroot/scripts/case/index.mmria.js`                | Replace stale-Set loop with per-candidate `/api/record_id` calls                       |
+| 29.2  | `source-code/mmria/mmria-server/wwwroot/scripts/case/index.pmss.js`                 | Same change for PMSS variant                                                           |
+| 29.3  | `source-code/mmria/mmria-server/database-scripts/case_design_sortable.json`         | Add `record_id_list` view                                                              |
+| 29.3  | `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js`                      | Remove `Get_Record_Id_List` function and `g_record_id_list` Set (dead code after 29.2) |
 
 ---
 
@@ -3873,6 +3941,7 @@ When all three projects (`mmria-server`, `mmria.common`, `mmria.services`) are b
 Then zero build errors
 
 **Dev Notes:**
+
 - Insert the guard after the existing CouchDB document probe (the `if (checkStatusCode == 404)` branch), before the write. Keep it inside the `404` branch only.
 - `RecordIdExistsAsync` is already injected via `_caseRepository` — no new dependencies needed.
 - Regex for last segment: `^\d{4}$`. Regex for year segment: `^\d{4}$` with `int.Parse` range check. Split strategy: `recordId.Split('-')` then validate `array[^1]` (4-digit suffix) and `array[^2]` (year) and confirm `array.Length >= 3`.
@@ -3929,7 +3998,8 @@ When an abstractor creates a new case in a local multi-tenant environment
 Then the case saves successfully, navigates to the home_record form, and the assigned Record ID is unique in the database
 
 **Dev Notes:**
-- The API call is `$.ajax({ url: \`${location.protocol}//${location.host}/api/record_id?record_id=${encodeURIComponent(candidate)}\` })` — `record_idController` is already wired and requires auth.
+
+- The API call is `$.ajax({ url: \`${location.protocol}//${location.host}/api/record_id?record_id=${encodeURIComponent(candidate)}\` })`—`record_idController` is already wired and requires auth.
 - Keep `g_record_id_list.add(new_record_id.toUpperCase())` after confirming uniqueness — the Set still guards against within-session duplicates while the API guards against cross-session duplicates.
 - The offline branch should call `window.OfflineSessionManager.loadOfflineRecordIds(g_ui)` directly at the point of generation, not rely on a prior `Get_Record_Id_List` call.
 - `index.mmria.js` and `index.pmss.js` share `index.js` as a dependency — `g_record_id_list` and `Get_Record_Id_List` are defined there. Do not remove them in this story (Story 29.3 handles cleanup).
@@ -3953,6 +4023,7 @@ So that the `/api/case_view/record-id-list` endpoint is functional (for any futu
 Given `case_design_sortable.json` currently has no `record_id_list` view
 When this story is complete
 Then a `record_id_list` view is added to the `views` object with the map function:
+
 ```javascript
 function(doc) {
   if (doc.home_record && doc.home_record.record_id) {
@@ -3960,6 +4031,7 @@ function(doc) {
   }
 }
 ```
+
 The view name matches the string used in `CaseViewManager.GetRecordIdListAsync()` exactly: `record_id_list`
 
 **AC-2 — `Get_Record_Id_List` function removed from `index.js`**
@@ -3983,6 +4055,7 @@ When the server is built and a case creation is performed in the local environme
 Then zero build errors, and the case creation flow completes normally for both online and offline modes
 
 **Dev Notes:**
+
 - The design document is deployed via the existing `case_design_sortable.json` update path used by `db-redeploy`. Confirm the exact script invocation with the existing production update process.
 - Before removing `Get_Record_Id_List`, run: `Select-String -Path "source-code\mmria\mmria-server\wwwroot\scripts\**\*.js" -Pattern "Get_Record_Id_List"` to confirm no remaining call sites.
 - `GetRecordIdListAsync` in `CaseViewManager` and `GetCaseRecordIdListViewJsonAsync` in `CaseDAL` are **not** removed — they serve the `/api/case_view/record-id-list` endpoint which is now functional and may be called by future features or utilities.
@@ -3991,11 +4064,11 @@ Then zero build errors, and the case creation flow completes normally for both o
 
 ## Epic 29 — Story Sequencing
 
-| Story | Risk | Dependencies |
-|---|---|---|
-| 29.1 — Server-side uniqueness guard | Low | None — uses existing `RecordIdExistsAsync` |
-| 29.2 — Client-side per-candidate API check | Low | None — uses existing `record_idController` |
-| 29.3 — Add CouchDB view + remove dead code | Low | 29.2 must complete first (ensures `Get_Record_Id_List` has no call sites) |
+| Story                                      | Risk | Dependencies                                                              |
+| ------------------------------------------ | ---- | ------------------------------------------------------------------------- |
+| 29.1 — Server-side uniqueness guard        | Low  | None — uses existing `RecordIdExistsAsync`                                |
+| 29.2 — Client-side per-candidate API check | Low  | None — uses existing `record_idController`                                |
+| 29.3 — Add CouchDB view + remove dead code | Low  | 29.2 must complete first (ensures `Get_Record_Id_List` has no call sites) |
 
 29.1 and 29.2 can proceed in parallel. 29.3 depends on 29.2.
 
@@ -4020,6 +4093,7 @@ TAMU geocoding currently operates across four isolated layers with no shared log
 **Layer D — Server-side batch (BatchItemProcessingService.cs):** Private `get_geocode_info()` method instantiates `TAMUGeoCode` (which lives in `mmria.services`) and applies results through four private `Set_*_Geocode()` methods. Entirely isolated from Layers A–C with duplicated field-mapping logic.
 
 **Existing assets to build on:**
+
 - `mmria.common/texas_am/` — model types (`geocode_response`, `OutputGeocode`, `CensusValue`, etc.) already in common
 - `mmria.common/SharedLibraries/Geocoding/Manager/` and `.../DAL/` — both folders exist and are **empty** — the intended home is already scaffolded
 - `tamuGeoCodeController.cs` — secure server proxy with input sanitization and compiled regex guards — stays in place
@@ -4030,18 +4104,18 @@ TAMU geocoding currently operates across four isolated layers with no shared log
 
 **Static form locations (10 total across Layers A and D):**
 
-| Location Key | Case Document Path | Layer A JS Function | Layer D Method |
-|---|---|---|---|
-| `dc_place_of_last_residence` | `death_certificate/place_of_last_residence/...` | `geocode_dc_last_res` | `Set_place_of_last_residence_Geocode` |
-| `dc_address_of_injury` | `death_certificate/address_of_injury/...` | `geocode_dc_injury_place` | — |
-| `dc_address_of_death` | `death_certificate/address_of_death/...` | `geocode_dc_death_place` | `Set_address_of_death_Geocode` |
-| `bc_facility_of_delivery` | `birth_fetal_death_certificate_parent/facility_of_delivery_location/...` | `geocode_bc_delivery_place` | `Set_facility_of_delivery_location_Geocode` |
-| `bc_location_of_residence` | `birth_fetal_death_certificate_parent/location_of_residence/...` | `geocode_bc_residence` | `Set_location_of_residence_Geocode` |
-| `pc_primary_care_facility` | `prenatal_care_record/location_of_primary_prenatal_care_facility/...` | `geocode_pc_primary_care_location` | — |
-| `erh_location` *(dynamic list)* | `er_visit_and_hospital_medical_records[i]/location/...` | `geocode_erh_location` | — |
-| `omv_location_of_care` *(dynamic list)* | `other_medical_office_visits[i]/location_of_medical_care_facility/...` | `geocode_omov_location` | — |
-| `mt_origin_address` *(dynamic list)* | `medical_transport[i]/origin_information/address/...` | `medical_transport_origin_information_address_get_coordinates` | — |
-| `mt_destination_address` *(dynamic list)* | `medical_transport[i]/destination_information/address/...` | `medical_transport_destination_information_address_get_coordinates` | — |
+| Location Key                              | Case Document Path                                                       | Layer A JS Function                                                 | Layer D Method                              |
+| ----------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------- | ------------------------------------------- |
+| `dc_place_of_last_residence`              | `death_certificate/place_of_last_residence/...`                          | `geocode_dc_last_res`                                               | `Set_place_of_last_residence_Geocode`       |
+| `dc_address_of_injury`                    | `death_certificate/address_of_injury/...`                                | `geocode_dc_injury_place`                                           | —                                           |
+| `dc_address_of_death`                     | `death_certificate/address_of_death/...`                                 | `geocode_dc_death_place`                                            | `Set_address_of_death_Geocode`              |
+| `bc_facility_of_delivery`                 | `birth_fetal_death_certificate_parent/facility_of_delivery_location/...` | `geocode_bc_delivery_place`                                         | `Set_facility_of_delivery_location_Geocode` |
+| `bc_location_of_residence`                | `birth_fetal_death_certificate_parent/location_of_residence/...`         | `geocode_bc_residence`                                              | `Set_location_of_residence_Geocode`         |
+| `pc_primary_care_facility`                | `prenatal_care_record/location_of_primary_prenatal_care_facility/...`    | `geocode_pc_primary_care_location`                                  | —                                           |
+| `erh_location` _(dynamic list)_           | `er_visit_and_hospital_medical_records[i]/location/...`                  | `geocode_erh_location`                                              | —                                           |
+| `omv_location_of_care` _(dynamic list)_   | `other_medical_office_visits[i]/location_of_medical_care_facility/...`   | `geocode_omov_location`                                             | —                                           |
+| `mt_origin_address` _(dynamic list)_      | `medical_transport[i]/origin_information/address/...`                    | `medical_transport_origin_information_address_get_coordinates`      | —                                           |
+| `mt_destination_address` _(dynamic list)_ | `medical_transport[i]/destination_information/address/...`               | `medical_transport_destination_information_address_get_coordinates` | —                                           |
 
 **Geocode fields written at each location (same set for all 10):**
 `latitude`, `longitude`, `feature_matching_geography_type`, `naaccr_gis_coordinate_quality_code`, `naaccr_gis_coordinate_quality_type`, `naaccr_census_tract_certainty_code`, `naaccr_census_tract_certainty_type`, `census_state_fips`, `census_county_fips`, `census_tract_fips`, `census_cbsa_fips`, `census_cbsa_micro`, `census_met_div_fips`, `urban_status`, `state_county_fips`
@@ -4053,6 +4127,7 @@ TAMU geocoding currently operates across four isolated layers with no shared log
 **User Story:** As a developer, I need a single injectable service in `mmria.common` that calls the TAMU geocoding API and returns a fully-resolved `GeocodeResult` DTO (including derived `UrbanStatus` and `StateCountyFips`), so that all geocoding paths in the codebase share one implementation.
 
 **Scope:**
+
 - Create `mmria.common/SharedLibraries/Geocoding/Manager/GeocodingManager.cs`
 - Create `GeocodeResult` record/class (can live in the same file or a sibling) holding all 15 output fields
 - The urban-status derivation logic (Metropolitan Division / Metropolitan / Micropolitan / Rural / Undetermined / Unmatchable) moves here — calculated once
@@ -4078,6 +4153,7 @@ Then the returned `GeocodeResult` has non-null/non-empty values for: `Latitude`,
 
 **AC-3 — Urban status derivation is correct**
 Given geocode results with `NAACCRCensusTractCertaintyCode` in range 1–6:
+
 - When `CensusCbsaFips > 0` and `CensusMetDivFips` is non-empty → `UrbanStatus = "Metropolitan Division"`
 - When `CensusCbsaFips > 0` and `CensusCbsaMicro == "0"` → `UrbanStatus = "Metropolitan"`
 - When `CensusCbsaFips > 0` and `CensusCbsaMicro == "1"` → `UrbanStatus = "Micropolitan"`
@@ -4100,6 +4176,7 @@ Then zero build errors
 **User Story:** As a developer, I need named methods in SharedLibraries that apply a `GeocodeResult` to a specific case document location, so that both the web layer and the batch service can write geocode fields using a single implementation.
 
 **Scope:**
+
 - Create `mmria.common/SharedLibraries/Case/Manager/CaseGeocodingManager.cs`
 - 10 public methods — one per location from the inventory table above
 - Method signature for static locations: `void Apply_[LocationKey]_Geocode(ExpandoObject caseDoc, GeocodeResult result)`
@@ -4136,12 +4213,13 @@ Then all 15 geocode fields at that path are written as empty string
 **User Story:** As an abstractor, when I click "Get Coordinates" on a case form, the geocoding and the case save should happen in a single server-side operation, so that geocode data is never lost due to a mid-operation network failure.
 
 **Scope:**
+
 - New `CaseGeocodeController` (or action added to existing case controller — confirm with team)
 - Route: `POST /api/case-geocode/{caseId}/{locationKey}`
 - Request body: `{ street, city, state, zip, listIndex? }` (JSON)
 - Action flow:
   1. Resolve tenant config, get `geocode_api_key` via `configuration.GetSharedString`
-  2. Call `GeocodingManager.FetchGeocode(...)` 
+  2. Call `GeocodingManager.FetchGeocode(...)`
   3. Load current case document from CouchDB
   4. Call the matching `CaseGeocodingManager.Apply_*_Geocode(caseDoc, result, listIndex?)` based on `locationKey`
   5. Save updated case document
@@ -4186,6 +4264,7 @@ Then the response is `401` or `403`
 **User Story:** As a developer, I need the 10 client-side geocode handler functions in `MMRIA_calculations.js` to use the new server endpoint, so that geocoding and case save are atomic and urban-status calculation logic no longer lives in the browser.
 
 **Scope:**
+
 - Each of the 10 geocode functions is replaced with a thin wrapper:
   1. Read address fields from `this` / `g_data` as before
   2. `POST /api/case-geocode/{g_data._id}/{locationKey}` with address + optional `listIndex`
@@ -4230,6 +4309,7 @@ Then the request succeeds, the case is updated, and no JS errors appear in the c
 **User Story:** As a developer, I need the vital import batch processing service to use the shared `GeocodingManager` and `CaseGeocodingManager` from SharedLibraries, so that geocoding logic is not duplicated between the batch service and the web layer.
 
 **Scope:**
+
 - Remove the private `get_geocode_info(string street, ...)` method from `BatchItemProcessingService`
 - Remove the `GeocodeTuple` inner class — it is replaced by `GeocodeResult` from SharedLibraries
 - Replace calls to private `Set_facility_of_delivery_location_Geocode`, `Set_location_of_residence_Geocode`, `Set_place_of_last_residence_Geocode`, `Set_address_of_death_Geocode` with calls to the corresponding `CaseGeocodingManager.Apply_*_Geocode()` methods
@@ -4263,6 +4343,7 @@ Then zero build errors
 **User Story:** As a developer, I need the legacy geocode functions (`x2f_ocl`, `x6b_ocl`, etc.) in `mmria-check-code.js` and `validator.js` to use the new server endpoint and pass `census_year`, so that census tract results are not stale and logic is consistent.
 
 **Scope:**
+
 - Identify all 8 call sites in each file
 - Replace each `$mmria.get_geocode_info(street, city, state, zip, callback)` call with a POST to `/api/case-geocode/{id}/{locationKey}` (same pattern as Story 30.4)
 - Add `census_year` from `g_data.home_record.date_of_death.year` (same source as `MMRIA_calculations.js`)
@@ -4286,6 +4367,7 @@ Then the census year sent to TAMU is `"2010"` (the correct bracket)
 **User Story:** As a security engineer, I need the `get_geocode_info` function in `mmria.committee_member.js` to route through the server proxy, so that the TAMU API key is not exposed in client-side code.
 
 **Scope:**
+
 - The `get_geocode_info` function in `mmria.committee_member.js` currently builds a direct `geoservices.tamu.edu` URL with the API key embedded
 - Replace this implementation with a call to `GET /api/tamuGeoCode?...` (the existing secure proxy in `tamuGeoCodeController`) — same pattern as `mmria.js`
 - Confirm no other client-side JS files contain a hardcoded `geoservices.tamu.edu` URL or API key
@@ -4310,15 +4392,15 @@ Then a request goes to `GET /api/tamuGeoCode` (observable in the network tab) an
 
 ## Epic 30 — Story Sequencing
 
-| Story | Risk | Dependencies |
-|---|---|---|
-| 30.1 — Create `GeocodingManager` | Low | None |
-| 30.2 — Create `CaseGeocodingManager` apply methods | Low | 30.1 must complete first |
-| 30.3 — New `POST /api/case-geocode` endpoint | Medium | 30.1 and 30.2 must complete first |
-| 30.4 — Refactor `MMRIA_calculations.js` | Medium | 30.3 must complete first |
-| 30.5 — Refactor `BatchItemProcessingService` | Low | 30.1 and 30.2 must complete first; can run parallel to 30.3 |
-| 30.6 — Fix legacy `mmria-check-code.js` / `validator.js` | Low | 30.3 must complete first; can run parallel to 30.4 |
-| 30.7 — Fix `mmria.committee_member.js` (security) | Low | None — independent; only requires existing `tamuGeoCodeController` |
+| Story                                                    | Risk   | Dependencies                                                       |
+| -------------------------------------------------------- | ------ | ------------------------------------------------------------------ |
+| 30.1 — Create `GeocodingManager`                         | Low    | None                                                               |
+| 30.2 — Create `CaseGeocodingManager` apply methods       | Low    | 30.1 must complete first                                           |
+| 30.3 — New `POST /api/case-geocode` endpoint             | Medium | 30.1 and 30.2 must complete first                                  |
+| 30.4 — Refactor `MMRIA_calculations.js`                  | Medium | 30.3 must complete first                                           |
+| 30.5 — Refactor `BatchItemProcessingService`             | Low    | 30.1 and 30.2 must complete first; can run parallel to 30.3        |
+| 30.6 — Fix legacy `mmria-check-code.js` / `validator.js` | Low    | 30.3 must complete first; can run parallel to 30.4                 |
+| 30.7 — Fix `mmria.committee_member.js` (security)        | Low    | None — independent; only requires existing `tamuGeoCodeController` |
 
 30.1 → 30.2 → 30.3 is the critical path. 30.5 can be worked in parallel with 30.3 once 30.1 and 30.2 are done. 30.6 and 30.7 are independent tail stories.
 
@@ -4334,10 +4416,10 @@ Bootstrap's `.btn-link:focus` rule in `index.css` sets `box-shadow: none`, cance
 
 **Affected elements (from `Views/Home/Index.cshtml`):**
 
-| Element ID | Text |
-|---|---|
-| `#view-informant-interview-summary-template-button` | View/Download Informant Interview Summary Template |
-| `#view-cdf-template-button` | View/Download MMRIA Committee Decisions Form (CDF) Template PDF |
+| Element ID                                          | Text                                                            |
+| --------------------------------------------------- | --------------------------------------------------------------- |
+| `#view-informant-interview-summary-template-button` | View/Download Informant Interview Summary Template              |
+| `#view-cdf-template-button`                         | View/Download MMRIA Committee Decisions Form (CDF) Template PDF |
 
 ### Story 31.1: Add `:focus-visible` Outline to General Section Buttons
 
@@ -4383,9 +4465,9 @@ The color `#0056b3` (Bootstrap link-hover blue) provides ≥ 3:1 contrast agains
 
 ## Epic 31 — Story Sequencing
 
-| Story | Risk | Dependencies |
-|---|---|---|
-| 31.1 — Add `:focus-visible` outline to General section buttons | Low | None — CSS-only, no server or JS changes |
+| Story                                                          | Risk | Dependencies                             |
+| -------------------------------------------------------------- | ---- | ---------------------------------------- |
+| 31.1 — Add `:focus-visible` outline to General section buttons | Low  | None — CSS-only, no server or JS changes |
 
 Single-story epic. No sequencing constraints.
 
@@ -4396,9 +4478,10 @@ Single-story epic. No sequencing constraints.
 De-identified CSV exports produced from any MMRIA tenant are byte-consistent in date formatting, PII suppression, and coded-field rendering, regardless of which environment (FL production, multi-tenant dev, local) triggers the export.
 
 This epic addressed three classes of discrepancy observed when comparing `fl_all` and `tenant1_all` de-identified exports of the same 1,695-case dataset:
-- **Date format** *(open — Story 32.1)*: FL renders timestamps as `MM/dd/yyyy HH:mm:ss` (zero-padded, 24-hour); T1 renders them as `M/d/yyyy h:mm:ss AM/PM` (locale-dependent). Consuming tools cannot reliably parse both forms.
-- **PII suppression** *(CLOSED — Story 32.2)*: FL's "fl" de-id list suppressed 6 PII field paths not present in the "global" fallback list. The global list was updated to 86 paths matching FL production. This eliminated 1,024 field differences and made `certificate_infant_fetal_section.csv` and `data-dictionary.csv` byte-for-byte identical with FL.
-- **Hospital paternity code rendering** *(open — Story 32.3)*: `bfdcpdom_imnmhpabsit_hospi` shows specific coded values (1, 2, 7777) in FL but `9999` in T1 for 213 cases. Root cause is ambiguous; likely a data discrepancy tied to the NAT import integer type conversion (see Story 11.1).
+
+- **Date format** _(open — Story 32.1)_: FL renders timestamps as `MM/dd/yyyy HH:mm:ss` (zero-padded, 24-hour); T1 renders them as `M/d/yyyy h:mm:ss AM/PM` (locale-dependent). Consuming tools cannot reliably parse both forms.
+- **PII suppression** _(CLOSED — Story 32.2)_: FL's "fl" de-id list suppressed 6 PII field paths not present in the "global" fallback list. The global list was updated to 86 paths matching FL production. This eliminated 1,024 field differences and made `certificate_infant_fetal_section.csv` and `data-dictionary.csv` byte-for-byte identical with FL.
+- **Hospital paternity code rendering** _(open — Story 32.3)_: `bfdcpdom_imnmhpabsit_hospi` shows specific coded values (1, 2, 7777) in FL but `9999` in T1 for 213 cases. Root cause is ambiguous; likely a data discrepancy tied to the NAT import integer type conversion (see Story 11.1).
 
 **Remaining open differences after Story 32.2 closed** (4,115 real field differences, excluding cosmetic `export_jurisdiction_name`):
 | Remaining Column | Rows | Root Cause | Story |
@@ -4441,6 +4524,7 @@ So that date parsing never depends on which server locale or culture produced th
 **Then** the CSV cell is empty (existing behavior preserved)
 
 **Implementation Notes:**
+
 - Primary change: add an explicit `case "datetime":` branch in the flat-field `switch` in `mmrds_exporter.cs` (around line 640+, before `default:`) that calls `val.ToString("MM/dd/yyyy HH:mm:ss")` when `val` is `System.DateTime`, or passes through the raw string if val is already a string
 - Verify `exporter.cs` flat-field loop applies the same pattern
 - The grid-row switch in `mmrds_exporter.cs` (line ~2226) already uses `val.ToString("o")` for DateTime — leave that unchanged as it is a different output path
@@ -4462,14 +4546,14 @@ FL (`fl-mmria.cdc.gov`) uses the `"fl"` list, which includes paths for Medical E
 
 **Fields confirmed suppressed in FL but absent from global (from export diff analysis):**
 
-| Export Column | MMRIA Path | Description |
-|---|---|---|
-| `arrc_juris` | `autopsy_report/report_coversheet/jurisdiction` | Medical Examiner case number + name — highest-sensitivity PII |
-| `bfdcpfodd_f_name` | `birth_fetal_death_certificate_parent/facility_of_delivery_demographics/facility_name` | Delivery facility name |
-| `bcifsri_nmr_numbe` | `birth_fetal_death_certificate/record_identification/medical_record_number` | Birth certificate / medical record number |
-| `bcifsbad_fc_state` | `birth_fetal_death_certificate/birth_attendant_demographics/facility_city_state` | Delivery facility city and state |
-| `bfdcpdom_co_birth` | `birth_fetal_death_certificate_parent/demographic_of_mother/city_of_birth` | Mother's birth city |
-| `bfdcpdof_co_birth` | `birth_fetal_death_certificate_parent/demographic_of_father/city_of_birth` | Father's birth city |
+| Export Column       | MMRIA Path                                                                             | Description                                                   |
+| ------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `arrc_juris`        | `autopsy_report/report_coversheet/jurisdiction`                                        | Medical Examiner case number + name — highest-sensitivity PII |
+| `bfdcpfodd_f_name`  | `birth_fetal_death_certificate_parent/facility_of_delivery_demographics/facility_name` | Delivery facility name                                        |
+| `bcifsri_nmr_numbe` | `birth_fetal_death_certificate/record_identification/medical_record_number`            | Birth certificate / medical record number                     |
+| `bcifsbad_fc_state` | `birth_fetal_death_certificate/birth_attendant_demographics/facility_city_state`       | Delivery facility city and state                              |
+| `bfdcpdom_co_birth` | `birth_fetal_death_certificate_parent/demographic_of_mother/city_of_birth`             | Mother's birth city                                           |
+| `bfdcpdof_co_birth` | `birth_fetal_death_certificate_parent/demographic_of_father/city_of_birth`             | Father's birth city                                           |
 
 **Acceptance Criteria:**
 
@@ -4494,6 +4578,7 @@ FL (`fl-mmria.cdc.gov`) uses the `"fl"` list, which includes paths for Medical E
 **Then** the FL state-specific list is left unchanged — no regression to FL behavior
 
 **Implementation Notes:**
+
 - Locate the `de-identified-list` document in the `metadata` CouchDB database (accessible via `/api/de_identified_list`)
 - Add the six MMRIA paths to the `global` → `paths` array in that document
 - Update the corresponding database-scripts seed file (check `source-code/mmria/mmria-server/database-scripts/` for the seeding JSON)
@@ -4533,6 +4618,7 @@ The export diff shows `bfdcpdom_imnmhpabsit_hospi` ("if mother not married, has 
 **Then** a data correction plan is documented (e.g., update the T1 seed data to include representative coded values for this field)
 
 **Investigation Steps:**
+
 1. Fetch one of the 213 differing case documents directly from both the FL CouchDB instance and the T1 CouchDB instance (use `_id` as the case key)
 2. Inspect `birth_fetal_death_certificate_parent/demographic_of_mother/if_mother_not_married_has_paternity_acknowledgement_been_signed_in_the_hospital` in both documents
 3. If FL has `"1"` / `"2"` / `"7777"` and T1 has `"9999"` or null → data discrepancy confirmed
@@ -4543,11 +4629,11 @@ The export diff shows `bfdcpdom_imnmhpabsit_hospi` ("if mother not married, has 
 
 ## Epic 32 — Story Sequencing
 
-| Story | Risk | Status | Dependencies |
-|---|---|---|---|
-| 32.1 — Normalize datetime serialization in exporter | Low | Open | None — isolated change in `mmrds_exporter.cs`/`exporter.cs` |
-| 32.2 — Add missing PII fields to global de-id list | Medium | **Closed** | Resolved manually — global list updated to 86 paths |
-| 32.3 — Investigate hospital paternity field discrepancy | Low | Open | Requires CouchDB access; likely data-only finding |
+| Story                                                   | Risk   | Status     | Dependencies                                                |
+| ------------------------------------------------------- | ------ | ---------- | ----------------------------------------------------------- |
+| 32.1 — Normalize datetime serialization in exporter     | Low    | Open       | None — isolated change in `mmrds_exporter.cs`/`exporter.cs` |
+| 32.2 — Add missing PII fields to global de-id list      | Medium | **Closed** | Resolved manually — global list updated to 86 paths         |
+| 32.3 — Investigate hospital paternity field discrepancy | Low    | Open       | Requires CouchDB access; likely data-only finding           |
 
 32.1 and 32.3 are independent and can be worked in parallel. 32.3 is investigation-first; if it confirms the field values in T1 are simply missing data (9999 = blank from NAT import), no code change is needed and the story closes with a documented finding.
 
@@ -4561,13 +4647,13 @@ The export diff shows `bfdcpdom_imnmhpabsit_hospi` ("if mother not married, has 
 
 The CLI in `../nccdphp-drh-mmria-utilities/mmria-case-generator` is a thin wrapper around `mmria-tools/Testing/CaseGeneration`. The core paths are:
 
-| Area | Current File |
-|---|---|
-| Case orchestration | `../nccdphp-drh-mmria-utilities/mmria-tools/Testing/CaseGeneration/Generators/CaseDataGenerator.cs` |
-| Numeric values | `../nccdphp-drh-mmria-utilities/mmria-tools/Testing/CaseGeneration/Generators/ValueGenerators/NumberValueGenerator.cs` |
-| Date/time values | `../nccdphp-drh-mmria-utilities/mmria-tools/Testing/CaseGeneration/Generators/ValueGenerators/DateValueGenerator.cs` |
-| Validation | `../nccdphp-drh-mmria-utilities/mmria-tools/Testing/CaseGeneration/Utilities/MetadataConstraintValidator.cs` |
-| Workflow gate | `../nccdphp-drh-mmria-utilities/mmria-tools/Testing/CaseGeneration/Services/CaseGeneratorService.cs` |
+| Area               | Current File                                                                                                           |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| Case orchestration | `../nccdphp-drh-mmria-utilities/mmria-tools/Testing/CaseGeneration/Generators/CaseDataGenerator.cs`                    |
+| Numeric values     | `../nccdphp-drh-mmria-utilities/mmria-tools/Testing/CaseGeneration/Generators/ValueGenerators/NumberValueGenerator.cs` |
+| Date/time values   | `../nccdphp-drh-mmria-utilities/mmria-tools/Testing/CaseGeneration/Generators/ValueGenerators/DateValueGenerator.cs`   |
+| Validation         | `../nccdphp-drh-mmria-utilities/mmria-tools/Testing/CaseGeneration/Utilities/MetadataConstraintValidator.cs`           |
+| Workflow gate      | `../nccdphp-drh-mmria-utilities/mmria-tools/Testing/CaseGeneration/Services/CaseGeneratorService.cs`                   |
 
 The current generator already avoids many hard failures by using numeric-looking strings and `DateTime`-derived date groups, but it has four data-quality gaps:
 
@@ -4579,11 +4665,13 @@ The current generator already avoids many hard failures by using numeric-looking
 ### Scope
 
 Included:
+
 - `mmria-case-generator` CLI behavior only where needed to exercise or report generation validity.
 - `mmria-tools/Testing/CaseGeneration` generation and validation internals.
 - Unit/integration-style generator tests in `../nccdphp-drh-mmria-utilities/mmria-server.tests`.
 
 Excluded:
+
 - Production form metadata changes.
 - Hand edits to generated `mmria_case*.cs` files.
 - A full clinical scenario engine.
@@ -4618,31 +4706,32 @@ So that generated cases exercise realistic workflows without poisoning tests wit
 **When** the field name/path matches known patterns
 **Then** the generator uses plausible ranges, including:
 
-| Field Pattern | Plausible Range |
-|---|---|
-| `height_feet` | 4-6 |
-| `height_inches` | 0-11 |
-| generic adult `height` in inches | 58-74 |
-| `weight`, `pre_pregnancy_weight`, `weight_at_delivery`, `admission_weight` | 90-350 |
-| `birth_weight`, `fetal_weight` in grams | 500-5000 |
-| `bmi` | 15.0-60.0 |
-| `age`, `maternal_age`, `mother_age` | maternal 12-55 edge / 18-45 normal; generic age remains bounded |
-| `gestational_age_weeks` / `gestational_age` | 0-45, with pregnancy-specific defaults favoring 24-42 |
-| `gestational_age_days` | 0-6 |
-| `days_postpartum` | 0-365 |
-| Apgar score fields (`minute_5`, `minute_10`) | 0-10 |
-| systolic blood pressure | 70-250 |
-| diastolic blood pressure | 30-150 |
-| pulse / heart rate | 30-220 |
-| respiration | 6-60 |
-| oxygen saturation | 50-100 |
-| temperature | 90.0-107.0 |
+| Field Pattern                                                              | Plausible Range                                                 |
+| -------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `height_feet`                                                              | 4-6                                                             |
+| `height_inches`                                                            | 0-11                                                            |
+| generic adult `height` in inches                                           | 58-74                                                           |
+| `weight`, `pre_pregnancy_weight`, `weight_at_delivery`, `admission_weight` | 90-350                                                          |
+| `birth_weight`, `fetal_weight` in grams                                    | 500-5000                                                        |
+| `bmi`                                                                      | 15.0-60.0                                                       |
+| `age`, `maternal_age`, `mother_age`                                        | maternal 12-55 edge / 18-45 normal; generic age remains bounded |
+| `gestational_age_weeks` / `gestational_age`                                | 0-45, with pregnancy-specific defaults favoring 24-42           |
+| `gestational_age_days`                                                     | 0-6                                                             |
+| `days_postpartum`                                                          | 0-365                                                           |
+| Apgar score fields (`minute_5`, `minute_10`)                               | 0-10                                                            |
+| systolic blood pressure                                                    | 70-250                                                          |
+| diastolic blood pressure                                                   | 30-150                                                          |
+| pulse / heart rate                                                         | 30-220                                                          |
+| respiration                                                                | 6-60                                                            |
+| oxygen saturation                                                          | 50-100                                                          |
+| temperature                                                                | 90.0-107.0                                                      |
 
 **Given** no special range applies
 **When** a populated number is generated
 **Then** the existing broad fallback behavior remains bounded and numeric.
 
 **Implementation Notes:**
+
 - Prefer a small range-selection helper inside the existing numeric generator path over a new subsystem.
 - Use metadata path when available; field name alone is not enough for repeated names such as `age`, `value`, `weight`, `month`, and `day`.
 - Preserve current strategy behavior for blank optional fields.
@@ -4686,6 +4775,7 @@ So that generated data supports workflow and reporting tests without impossible 
 **Then** edge values remain valid calendar dates and are constrained to intentional edge cases documented in the generator tests.
 
 **Implementation Notes:**
+
 - Keep the current post-processing approach but centralize reusable date-group helpers enough to avoid component drift.
 - Use `DateOnly`/`DateTime` construction before assigning components; never construct components independently.
 - Do not create a comprehensive clinical scenario engine in this epic.
@@ -4725,6 +4815,7 @@ So that bad generated cases are caught at the generator boundary instead of bein
 **Then** existing permissive behavior is preserved, but validation is not silently implied.
 
 **Implementation Notes:**
+
 - Do not collect metadata by bare node name only; repeated names collide.
 - Validation warnings may still be reported for suspicious-but-allowed values, but number/date parse failures should be errors.
 - Keep the validation result consumable by the CLI summary.
@@ -4760,6 +4851,7 @@ So that future generator changes do not reintroduce invalid dates, non-numeric n
 **Then** tests prove output writers are not called.
 
 **Implementation Notes:**
+
 - Prefer unit tests that construct minimal metadata objects over tests requiring a live CouchDB instance.
 - Add one integration-style generator test only if needed to cover `CaseGeneratorService` gating.
 - Existing broad `Scenario_A_CaseGenerator` coverage is not sufficient for this epic because it depends on CouchDB and asserts generation/save success, not date/number plausibility.
@@ -4768,12 +4860,12 @@ So that future generator changes do not reintroduce invalid dates, non-numeric n
 
 ## Epic 33 — Story Sequencing
 
-| Story | Risk | Dependencies |
-|---|---|---|
-| 33.1 — Metadata-aware numeric generation | Low-Medium | None |
-| 33.2 — Date group validity and timeline plausibility | Low-Medium | None; coordinate with 33.1 only where date groups contain gestational numeric fields |
-| 33.3 — Recursive validation gate | Medium | Can start after validator path design is agreed; benefits from 33.1 and 33.2 test cases |
-| 33.4 — Generator regression coverage | Low | Develop alongside 33.1-33.3; must be complete before epic close |
+| Story                                                | Risk       | Dependencies                                                                            |
+| ---------------------------------------------------- | ---------- | --------------------------------------------------------------------------------------- |
+| 33.1 — Metadata-aware numeric generation             | Low-Medium | None                                                                                    |
+| 33.2 — Date group validity and timeline plausibility | Low-Medium | None; coordinate with 33.1 only where date groups contain gestational numeric fields    |
+| 33.3 — Recursive validation gate                     | Medium     | Can start after validator path design is agreed; benefits from 33.1 and 33.2 test cases |
+| 33.4 — Generator regression coverage                 | Low        | Develop alongside 33.1-33.3; must be complete before epic close                         |
 
 33.1 and 33.2 can be implemented independently. 33.3 should be integrated after the generator changes are understood so the validator distinguishes intentional blanks from invalid generated values. 33.4 runs throughout the epic and is the closeout proof that generated date and number data is mostly plausible.
 
@@ -4812,6 +4904,7 @@ So that adding a line in the narrative editor does not make the exported PDF har
 **Then** its paragraph spacing does not become tighter than the original production PDF.
 
 **Implementation Notes:**
+
 - Primary file: `source-code/mmria/mmria-server/wwwroot/scripts/pdf-version/index.js`.
 - Primary functions: `convert_html_to_pdf(...)` and `ConvertHTMLDOMWalker(...)`.
 - The likely fix point is the `#TEXT` branch in `ConvertHTMLDOMWalker`: ignore structural whitespace-only separator nodes, but do not globally trim or drop inline spacing.
@@ -4819,6 +4912,7 @@ So that adding a line in the narrative editor does not make the exported PDF har
 - Do not change `source-code/mmria/mmria-server/wwwroot/scripts/editor/page_renderer/textarea.js` unless a later implementation investigation proves the PDF-only fix cannot satisfy the acceptance criteria.
 
 **Evidence:**
+
 - `changed-prod-data-v4.1.txt` has zero newlines, one `<p><br></p>`, and 29 literal `> <` inter-tag spaces after the edit.
 - `unchanged-prod-data.txt` has 70 newlines, no `<p><br></p>`, and zero literal `> <` inter-tag spaces.
 - `pdf-version/index.js` currently pushes `#TEXT`, `P`/`DIV`, and `BR` nodes as PDF text/newline content, which explains why edited structural whitespace can inflate PDF spacing.
@@ -4852,6 +4946,7 @@ So that section headings are not pushed apart by duplicate blank rows after edit
 **Then** the stored HTML, Trumbowyg editor output, and save sanitizer behavior are not changed.
 
 **Implementation Notes:**
+
 - Primary file remains `source-code/mmria/mmria-server/wwwroot/scripts/pdf-version/index.js`.
 - Primary functions remain `convert_html_to_pdf(...)` and `ConvertHTMLDOMWalker(...)`.
 - Story 34.1 handled two shapes: body-level whitespace-only `#TEXT` nodes and `<p><br></p>` blank paragraphs.
@@ -4860,15 +4955,133 @@ So that section headings are not pushed apart by duplicate blank rows after edit
 - Keep the change in the PDF conversion path. Do not normalize stored narrative HTML, editor output, Trumbowyg configuration, or save-path sanitizer behavior.
 
 **Evidence:**
+
 - `docs/ai/local/case-narrative-spacing/qa/html.txt` has 12 `<br>` tags, 12 whitespace-only empty paragraphs, and 11 repeated `<br>` plus empty-paragraph separators.
 - The QA editor screenshot shows compact editor spacing, supporting the conclusion that the remaining defect is in PDF interpretation rather than editor display.
 - Story 34.1 was marked complete, and the QA symptom still reproduces with a new fixture shape.
 
 ## Epic 34 - Story Sequencing
 
-| Story | Risk | Dependencies |
-|---|---|---|
-| 34.1 - Normalize case narrative PDF whitespace conversion | Medium | Existing case narrative editor fidelity behavior from Epic 1; supplied spacing fixtures |
-| 34.2 - Collapse BR plus empty paragraph separators | Medium | Story 34.1 PDF converter changes; QA spacing fixture in `docs/ai/local/case-narrative-spacing/qa/html.txt` |
+| Story                                                     | Risk   | Dependencies                                                                                               |
+| --------------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------- |
+| 34.1 - Normalize case narrative PDF whitespace conversion | Medium | Existing case narrative editor fidelity behavior from Epic 1; supplied spacing fixtures                    |
+| 34.2 - Collapse BR plus empty paragraph separators        | Medium | Story 34.1 PDF converter changes; QA spacing fixture in `docs/ai/local/case-narrative-spacing/qa/html.txt` |
 
 Story 34.1 remains the initial PDF-renderer correction. Story 34.2 reopens Epic 34 for the QA-specific separator shape and should remain a single surgical PDF conversion follow-up with regression coverage for all three fixture shapes before manual PDF comparison.
+
+## Epic 35: Offline Exit/Go Online UX Cleanup (Rel 4.1 P-Immediate)
+
+While a user is in offline mode, the confusing "Exit Offline Mode" escape hatch is hidden (not deleted) so it can be revisited in a future release. The "Go Online" action is renamed everywhere to "Go Online & Sync Changes" for clarity, and both entry points to that action now consistently confirm via modal before syncing. Originated from Katrina's Rel 4.1 feedback, tracked as ADO #119294 (Marta Puskarz). Investigation case file: `_bmad-output/implementation-artifacts/investigations/epic-35-remove-exit-offline-rename-go-online-investigation.md`.
+
+### Story 35.1: Hide Exit Offline Mode Widget
+
+As a case reviewer working in offline mode,
+I want the "Exit Offline Mode" button to no longer appear while still seeing a clear "You're Offline" indicator,
+So that I am not tempted into an escape hatch that discards my offline changes, while the underlying code stays available for a future release.
+
+**Acceptance Criteria:**
+
+**Given** a user is in offline mode (`isOfflineModeActive()`, `isProcessingOfflineCases()`, or `isOfflineModeServerSession()` is true)
+**When** any page renders a `[data-offline-exit-host]` widget host (Home/Index, Account/OfflineLogin, Shared/\_BreadCrumbs)
+**Then** no "Exit Offline Mode" button is visible anywhere on the page.
+
+**Given** a user is in offline mode
+**When** the widget renders
+**Then** the "You're Offline" text and icon indicator remain visible — the widget is not hidden in its entirety, only the button is removed from view.
+
+**Given** the button is no longer shown
+**When** the "You're Offline" indicator renders in any of the 3 host locations
+**Then** it is right-aligned within its host container, consistent with each host's existing right-side layout conventions (e.g. the breadcrumbs row's `justify-content: space-between` and the offline-login row's `justify-content-end`).
+
+**Given** the "Exit Offline Mode" button is hidden
+**When** the codebase is reviewed
+**Then** `OfflineExitManager`'s underlying logic (`confirmExitOfflineMode`, cleanup/audit calls) and the `show_exit_offline_mode_modal` confirmation modal in `offline-modals.js` remain fully present and unmodified in behavior — only the button's markup/visibility and the indicator's alignment change.
+
+**Given** a user was mid-flow with a pending deferred cleanup (`mmria_exit_offline_cleanup_pending`) before this change ships
+**When** they return online
+**Then** `finishPendingCleanup()` still runs unaffected, since only the button's rendering is suppressed, not the cleanup pipeline.
+
+**Implementation Notes:**
+
+- Primary file: `source-code/mmria/mmria-server/wwwroot/scripts/offline/offline-exit-manager.js`.
+- Fix point is `renderWidgetMarkup()`: remove the `<button data-action="show-exit-offline-mode">` element from the returned template string; keep the icon + `<span>You're Offline</span>` div. Do **not** change `shouldShowExitWidget()` — it correctly continues to gate the remaining indicator's visibility to "while offline."
+- Add right-alignment styling to the outer `.mmria-offline-exit-widget` wrapper (e.g. `width: 100%; justify-content: flex-end;`) so the remaining text/icon sits flush right now that the button no longer occupies that space — most impactful on `Views/Home/Index.cshtml`, whose host `<div>` has no existing flex/alignment styling of its own.
+- Do not remove the `[data-offline-exit-host]` host `<div>` elements from `Views/Home/Index.cshtml`, `Views/Account/OfflineLogin.cshtml`, or `Views/Shared/_BreadCrumbs.cshtml` — leave them in place.
+- Do not delete `offline-modals.js`'s `show_exit_offline_mode_modal`, `OfflineExitManager.confirmExitOfflineMode`, or any server cleanup call (`/api/OfflineCase/update-offline-state`, `/api/OfflineCase/release-case-locks`) — this is a hide-only change per explicit user decision.
+
+**Evidence:**
+
+- `offline-exit-manager.js:404-421` (`renderWidgetMarkup`), `:426-441` (`initializeWidgetHosts`), `:576-580` (`shouldShowExitWidget`).
+- Host divs: `Views/Home/Index.cshtml:167`, `Views/Account/OfflineLogin.cshtml:43`, `Views/Shared/_BreadCrumbs.cshtml:25`.
+
+### Story 35.2: Rename Go Online to Go Online & Sync Changes
+
+As a case reviewer working in offline mode,
+I want the action to return online to be labeled "Go Online & Sync Changes",
+So that it's clear the action both reconnects me and syncs my offline work.
+
+**Acceptance Criteria:**
+
+**Given** the "Offline Case List" table footer or the "Cases Selected for Offline Work" table footer is rendered while offline
+**When** the primary action button is displayed
+**Then** its label reads "Go Online & Sync Changes" instead of "Go Online".
+
+**Given** the button is clicked and connectivity is being checked or the transition is in progress
+**When** `set_go_online_button_state(isBusy)` or the connectivity-driven handler in `offline-network-monitor.js` updates the button text
+**Then** the idle-state text reads "Go Online & Sync Changes" (the busy-state text `"Going Online..."` is unchanged).
+
+**Given** the confirmation modal (`show_go_online_modal`) is opened
+**When** the modal title and confirm button are rendered
+**Then** both read "Go Online & Sync Changes" (or a natural title-cased variant of it), consistent with the button label.
+
+**Implementation Notes:**
+
+- Files to update in lockstep: `wwwroot/scripts/editor/page_renderer/app.mmria.js` (2 static button labels, lines ~728 and ~790), `wwwroot/scripts/offline/offline-transition-manager.js` (`set_go_online_button_state`, line ~208), `wwwroot/scripts/offline/offline-network-monitor.js` (connectivity state text, lines ~69 and ~80), `wwwroot/scripts/offline/offline-modals.js` (`show_go_online_modal` title line ~416 and confirm button line ~434).
+- Do not change the busy-state string `"Going Online..."` unless separately requested.
+- No server-side or metadata changes — this is a client-side JS string change only, consistent with project-context.md's no-build-step vanilla JS rule for `wwwroot/`.
+
+**Evidence:**
+
+- `app.mmria.js:728,790` (`id="go-online-btn"`, two independent render sites).
+- `offline-transition-manager.js:196-209`, `offline-network-monitor.js:54-86` (dynamic state text writers on the same DOM elements).
+- `offline-modals.js:409-459` (`show_go_online_modal`, modal title + confirm button).
+
+### Story 35.3: Align Go Online Confirmation Behavior
+
+As a case reviewer working in offline mode,
+I want the same confirmation experience regardless of which table's button I click,
+So that going online and syncing changes is predictable no matter where I trigger it from.
+
+**Acceptance Criteria:**
+
+**Given** the "Go Online & Sync Changes" button in the "Offline Case List" table (`show_go_online_modal(event)`, line ~728)
+**When** it is clicked
+**Then** the confirmation modal appears before `go_online_clicked` runs (existing, unchanged behavior).
+
+**Given** the "Go Online & Sync Changes" button in the "Cases Selected for Offline Work" table (currently `go_online_clicked(event)` directly, line ~790)
+**When** it is clicked
+**Then** the same confirmation modal (`show_go_online_modal`) now appears first, and `go_online_clicked` only runs after the user confirms — matching the first entry point.
+
+**Given** either entry point is confirmed
+**When** `go_online_clicked` executes
+**Then** existing connectivity checks, diagnostic logging, and sync behavior are unchanged — only the missing confirmation step is added to the second entry point.
+
+**Implementation Notes:**
+
+- Primary file: `source-code/mmria/mmria-server/wwwroot/scripts/editor/page_renderer/app.mmria.js`.
+- Change the second button's `onclick` from `go_online_clicked(event)` to `show_go_online_modal(event)`, matching the first button, so both routes go through the confirmation modal before syncing.
+- No change to `go_online_clicked` itself or to the modal's own confirm handler.
+
+**Evidence:**
+
+- Side finding from the Epic 35 investigation case file: the two "Go Online" buttons in `app.mmria.js` have inconsistent click handlers — one confirms via modal, one does not.
+
+## Epic 35 — Story Sequencing
+
+| Story                                               | Risk | Dependencies                                                                                |
+| --------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
+| 35.1 - Hide Exit Offline Mode widget                | Low  | None — pure visibility change, code untouched otherwise                                     |
+| 35.2 - Rename Go Online to Go Online & Sync Changes | Low  | None — string-only change across 4 files                                                    |
+| 35.3 - Align Go Online confirmation behavior        | Low  | Story 35.2 label change should land first so the aligned button shows the correct new label |
+
+All three stories are low-risk, surgical, client-side-only changes with no server or metadata impact. Recommended sequencing: 35.1 and 35.2 can proceed in parallel; 35.3 should follow 35.2 so the newly-aligned button already carries the renamed label.

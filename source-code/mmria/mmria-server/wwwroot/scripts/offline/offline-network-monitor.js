@@ -66,7 +66,7 @@ function update_go_online_button_state(isConnected) {
         
         const buttonText = goOnlineButton.querySelector('.button-text');
         if (buttonText) {
-            buttonText.textContent = 'Go Online';
+            buttonText.textContent = 'Go Online & Sync Changes';
         }
         
     } else {
@@ -77,7 +77,7 @@ function update_go_online_button_state(isConnected) {
         
         const buttonText = goOnlineButton.querySelector('.button-text');
         if (buttonText) {
-            buttonText.textContent = 'Go Online';
+            buttonText.textContent = 'Go Online & Sync Changes';
         }
     }
     

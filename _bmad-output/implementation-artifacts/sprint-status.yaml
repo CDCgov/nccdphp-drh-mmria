@@ -1,5 +1,5 @@
 # generated: 2026-07-14
-last_updated: 2026-07-30
+last_updated: 2026-08-03
 # project: mmria
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@ last_updated: 2026-07-30
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-07-14
-last_updated: 2026-07-30
+last_updated: 2026-08-03
 project: mmria
 project_key: NOKEY
 tracking_system: file-system
@@ -296,3 +296,10 @@ development_status:
   34-1-normalize-case-narrative-pdf-whitespace-conversion: done
   34-2-collapse-br-empty-paragraph-separators: ready-for-dev
   epic-34-retrospective: optional
+
+  # ── Epic 35: Offline Exit/Go Online UX Cleanup (Rel 4.1 P-Immediate) ──────
+  epic-35: in-progress
+  35-1-hide-exit-offline-mode-widget: review
+  35-2-rename-go-online-to-go-online-and-sync-changes: review
+  35-3-align-go-online-confirmation-behavior: ready-for-dev
+  epic-35-retrospective: optional

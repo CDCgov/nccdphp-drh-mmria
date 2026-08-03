@@ -205,7 +205,7 @@ function set_go_online_button_state(isBusy) {
 
     const buttonText = goOnlineButton.querySelector('.button-text');
     if (buttonText) {
-        buttonText.textContent = isBusy ? 'Going Online...' : 'Go Online';
+        buttonText.textContent = isBusy ? 'Going Online...' : 'Go Online & Sync Changes';
     }
 }
 
