@@ -397,6 +397,78 @@ function normalize_word_paste(node)
         opNodes[0].parentNode.removeChild(opNodes[0]);
     }
 
+    // Step 1b: Convert h1–h6 elements to toolbar-native <p><strong><span> constructs.
+    //
+    // Word emits heading paragraphs as <h1>–<h6> elements. The toolbar for this editor
+    // has no heading button — <hN> tags only arrive via paste and are not supported by
+    // the PDF converter (ConvertHTMLDOMWalker has no H1–H6 case). Convert them to
+    // constructs the editor and PDF path already understand: <p><strong><span>.
+    //
+    // Font-size strategy: read the <span style="font-size:Xpt"> inside the heading (if
+    // present) and convert pt→px (1pt = 4/3px at 96 DPI), then snap to the nearest
+    // value in the toolbar's fontsize vocabulary [14,16,18,24,32,48]. Fall back to a
+    // level-based default when no font-size span exists inside the heading.
+    var WORD_TBFONT_SIZES = [14, 16, 18, 24, 32, 48]; // px values in toolbar sizeList
+    var WORD_HDG_FALLBACK = { h1: 32, h2: 24, h3: 18, h4: 16, h5: 16, h6: 16 };
+
+    function word_nearest_toolbar_size(px)
+    {
+        var best = WORD_TBFONT_SIZES[0];
+        var bestDist = Math.abs(px - best);
+        for (var wsi = 1; wsi < WORD_TBFONT_SIZES.length; wsi++)
+        {
+            var dist = Math.abs(px - WORD_TBFONT_SIZES[wsi]);
+            if (dist < bestDist) { bestDist = dist; best = WORD_TBFONT_SIZES[wsi]; }
+        }
+        return best;
+    }
+
+    function word_heading_px(hEl, hTag)
+    {
+        // Search direct children first, then any descendant span with font-size in pt/px
+        var spans = hEl.querySelectorAll('span[style]');
+        for (var whs = 0; whs < spans.length; whs++)
+        {
+            var styleVal = spans[whs].getAttribute('style') || '';
+            var ptMatch  = styleVal.match(/font-size\s*:\s*([\d.]+)pt/i);
+            var pxMatch  = styleVal.match(/font-size\s*:\s*([\d.]+)px/i);
+            if (ptMatch)
+            {
+                var rawPx = parseFloat(ptMatch[1]) * (4 / 3); // 1pt = 4/3px at 96 DPI
+                return word_nearest_toolbar_size(rawPx);
+            }
+            if (pxMatch)
+            {
+                return word_nearest_toolbar_size(parseFloat(pxMatch[1]));
+            }
+        }
+        // No font-size span found — use level-based fallback
+        return WORD_HDG_FALLBACK[hTag] || 16;
+    }
+
+    var wHdgEls = node.querySelectorAll('h1, h2, h3, h4, h5, h6');
+    var wHdgArr = [];
+    for (var whi = 0; whi < wHdgEls.length; whi++) { wHdgArr.push(wHdgEls[whi]); }
+
+    for (var whi = 0; whi < wHdgArr.length; whi++)
+    {
+        var wHEl  = wHdgArr[whi];
+        if (!wHEl.parentNode) continue;
+        var wHTag  = wHEl.nodeName.toLowerCase();
+        var wHText = wHEl.textContent.trim();
+        if (!wHText) { wHEl.parentNode.removeChild(wHEl); continue; }
+
+        var wHPx   = word_heading_px(wHEl, wHTag);
+        var wHP    = document.createElement('p');
+        var wHStr  = document.createElement('strong');
+        var wHSpan = document.createElement('span');
+        wHSpan.style.fontSize = wHPx + 'px';
+        wHSpan.textContent = wHText;
+        wHStr.appendChild(wHSpan);
+        wHP.appendChild(wHStr);
+        wHEl.parentNode.replaceChild(wHP, wHEl);
+    }
+
     // Step 2: Convert MsoListParagraph paragraphs to clean elements
     // Bullet prefix: middle-dot (U+00B7), bullet (U+2022), or en-dash (U+2013) + nbsp(s)
     var WORD_BULLET_RE = /^[\u00B7\u2022\u2013\-]\u00A0+/;
