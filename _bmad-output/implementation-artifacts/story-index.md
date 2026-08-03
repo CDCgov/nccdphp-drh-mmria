@@ -1132,8 +1132,8 @@ dev this story _bmad-output/implementation-artifacts/33-4-generator-regression-c
 | --- | --- | --- |
 | 34.1 Normalize Case Narrative PDF Whitespace Conversion | `34-1-normalize-case-narrative-pdf-whitespace-conversion.md` | done |
 | 34.2 Collapse BR Plus Empty Paragraph Separators | `34-2-collapse-br-empty-paragraph-separators.md` | done |
-| 34.3 Preserve Line Structure When Pasting Plain Text | `34-3-preserve-plain-text-paste-line-structure.md` | todo |
-| 34.4 Numbered-Paragraph Keyboard Continuation | `34-4-numbered-paragraph-keyboard-continuation.md` | todo |
+| 34.3 Preserve Line Structure When Pasting Plain Text | `34-3-preserve-plain-text-paste-line-structure.md` | done |
+| 34.4 Numbered-Paragraph Keyboard Continuation | `34-4-numbered-paragraph-keyboard-continuation.md` | done |
 
 **Sequencing:** Stories 34.1 and 34.2 (PDF fixes) are complete. Story 34.3 fixes the editor paste path and is independent of PDF behavior. Story 34.4 builds on the clean numbered paragraphs that Story 34.3 produces and should follow it.
 

@@ -2,7 +2,7 @@
 
 **Epic:** 34 — Case Narrative PDF Spacing Fidelity and Paste Content Fidelity
 **Story ID:** 34.4
-**Status:** todo
+**Status:** done
 
 ---
 
@@ -218,6 +218,18 @@ This pattern must match against `kP.textContent`, not `innerHTML`, to avoid matc
 - Change is **one additional `keydown` listener** in `attach_narrative_paste_handler`
 - Do NOT convert paragraphs to `<ol>/<li>` structure
 - Do NOT modify saved HTML on reopen or on any path other than the Enter key action
+
+---
+
+## Completion Notes
+
+### AC-4 Investigation: Cursor Placement at Position 0
+
+Searched `textarea.js` for `mousedown`, `click`, `selectionchange`, `focus`, and `contenteditable="false"` — none found. The only event listeners on `editorElement` in `attach_narrative_paste_handler` are the `paste` (capture phase) and the newly added `keydown` listener. **No mechanism in `textarea.js` restricts cursor placement at position 0.** The perception of restricted cursor movement was caused by the collapsed-line paste issue fixed in Story 34.3 — when pasted numbered paragraphs landed as a single line, there was no "before the 1" position to reach in separate paragraphs. AC-4 is closed with free movement confirmed; no code removal required.
+
+### Implementation
+
+Added one `keydown` listener inside `attach_narrative_paste_handler` (line 597 of `textarea.js`), after the `paste` listener's closing `}, true);`. The listener has closure access to `p_object_path`, `p_metadata_path`, `p_dictionary_path` and calls `tbw_onchange` after inserting the new numbered paragraph.
 - Do NOT attempt to retroactively renumber existing numbered paragraphs when a paragraph is deleted
 
 ### References

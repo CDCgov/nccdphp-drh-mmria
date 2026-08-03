@@ -2,7 +2,7 @@
 
 **Epic:** 34 — Case Narrative PDF Spacing Fidelity and Paste Content Fidelity
 **Story ID:** 34.3
-**Status:** todo
+**Status:** done
 
 ---
 
