@@ -1171,10 +1171,10 @@ dev this story _bmad-output/implementation-artifacts/34-4-numbered-paragraph-key
 
 | Story | File | Status |
 | --- | --- | --- |
-| 36.1 Fix False-Positive Reconcile Warning | `36-1-fix-reconcile-false-positive-warning.md` | todo |
-| 36.2 Verify Rev Poll Generation Guard During Network Outage | `36-2-verify-rev-poll-generation-guard.md` | todo |
-| 36.3 Verify Autosave-Drop Data Carry-Through | `36-3-verify-autosave-drop-data-carry-through.md` | todo |
-| 36.4 Change Stack Snapshot Deduplication on Enqueue _(optional)_ | `36-4-change-stack-snapshot-deduplication.md` | todo |
+| 36.1 Fix False-Positive Reconcile Warning | `36-1-fix-reconcile-false-positive-warning.md` | done |
+| 36.2 Verify Rev Poll Generation Guard During Network Outage | `36-2-verify-rev-poll-generation-guard.md` | done |
+| 36.3 Verify Autosave-Drop Data Carry-Through | `36-3-verify-autosave-drop-data-carry-through.md` | done |
+| 36.4 Change Stack Snapshot Deduplication on Enqueue _(optional)_ | `36-4-change-stack-snapshot-deduplication.md` | done |
 
 **Sequencing:** Stories 36.1 and 36.2 are independent and can be worked in parallel. Story 36.3 should follow 36.1 (same file — `index.js`). Story 36.4 is optional and depends on 36.1 being complete.
 

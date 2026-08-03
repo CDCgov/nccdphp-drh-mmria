@@ -2,7 +2,7 @@
 
 **Epic:** 36 — Case Save Queue Reconcile — Idle Network Recovery Fix
 **Story ID:** 36.1
-**Status:** todo
+**Status:** done
 **Date added:** 2026-08-03
 **Depends on:** None
 **Source requirements:** FR-36.1
@@ -185,3 +185,28 @@ After applying the fix, reproduce the race manually:
 | Dependency | Risk |
 |---|---|
 | None — isolated single-function change | Low |
+
+---
+
+## Dev Agent Record
+
+**Completion Date:** 2026-08-03
+**Completed by:** Amelia (bmad-agent-dev)
+
+### Completion Notes
+
+Implemented the single-line logic change in `mmria_reconcile_live_save_state_after_success`. The `else` branch that unconditionally emitted `console.warn` was replaced with an `else if (g_change_stack.length >= snapshot_items.length)` guard. This means:
+- When `g_change_stack` is shorter than the snapshot (prior save already committed those items), the implicit `else` now silently does nothing — no warn, no splice. AC-1 and AC-2 satisfied.
+- When `g_change_stack` has enough items but they don't prefix-match the snapshot, the warn still fires. AC-3 satisfied.
+- Empty snapshots remain no-ops via the outer `if`. AC-4 satisfied.
+- The fix is purely conditional logic; `mmria_is_change_stack_prefix_match` is unchanged.
+
+### File List
+
+| File | Change |
+|------|--------|
+| `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js` | Replaced unconditional `else { console.warn(...) }` with `else if (g_change_stack.length >= snapshot_items.length) { console.warn(...) }` in `mmria_reconcile_live_save_state_after_success` |
+
+### Change Log
+
+- **index.js line ~818** — Added `else if(g_change_stack.length >= snapshot_items.length)` condition before the `console.warn`, turning the unconditional warn into a guarded warn. Added explanatory comments for all three branches.

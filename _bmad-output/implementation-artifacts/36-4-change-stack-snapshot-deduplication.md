@@ -1,8 +1,12 @@
+---
+baseline_commit: fd6e038ff4bc5ea1f491097ab07a9d17d9e400b1
+---
+
 # Story 36.4 — Change Stack Snapshot Deduplication on Enqueue (Optional)
 
 **Epic:** 36 — Case Save Queue Reconcile — Idle Network Recovery Fix
 **Story ID:** 36.4
-**Status:** todo
+**Status:** done
 **Date added:** 2026-08-03
 **Depends on:** Story 36.1 (must be complete before scheduling this story)
 **Source requirements:** FR-36.2
@@ -153,3 +157,33 @@ With this story in place, when A (snapshot: `[item1, item2, item3]`) and B (snap
 | Dependency | Risk |
 |---|---|
 | Story 36.1 must be complete (same file; reconcile fix acts as safety net for any edge cases this story misses) | Medium — offset logic must be tested across all enqueue paths including fire-and-forget autosave, navigation saves, and offline saves |
+
+---
+
+## Dev Agent Record
+
+**Completed:** 2026-08-03
+**Agent:** GitHub Copilot (Claude Sonnet 4.6)
+
+### Completion Notes
+
+Implemented the defence-in-depth snapshot deduplication layer as specified. Two changes were made to `index.js`:
+
+1. **New helper `mmria_get_active_save_snapshot_length(p_case_id)`** — Returns the number of `g_change_stack` items already captured in the active save's snapshot for a given case ID. Returns 0 (full snapshot) when: no case ID provided, no active save, active save is for a different case, or `change_stack_items` is not an array.
+
+2. **Modified `get_new_save_queue_item`** — Before building the return object, computes `active_snapshot_length` via the helper, then slices `g_change_stack` starting at that offset. When there is no active save the offset is 0 and the full stack is captured (identical to prior behaviour). When an active save exists for the same case, only new items added since that save's snapshot are captured.
+
+AC-5 verified analytically: `mmria_reconcile_live_save_state_after_success` uses prefix-splice — A's reconcile removes items 0–2, leaving `[item4]`; B's reconcile removes `[item4]`, leaving `[]`. No warning fires.
+
+### File List
+
+| File | Change |
+|------|--------|
+| `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js` | Added `mmria_get_active_save_snapshot_length` helper; modified `get_new_save_queue_item` to offset `change_stack_items` snapshot by active save's captured length |
+
+### Change Log
+
+| Location | Before | After |
+|----------|--------|-------|
+| Before `get_new_save_queue_item` (line ~478) | (nothing) | Added `mmria_get_active_save_snapshot_length` helper function |
+| Inside `get_new_save_queue_item` — `change_stack_items` field | `mmria_safe_clone(Array.isArray(g_change_stack) ? g_change_stack : [])` | `mmria_safe_clone(change_stack_to_snapshot)` where `change_stack_to_snapshot = g_change_stack.slice(active_snapshot_length)` |

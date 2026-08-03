@@ -2,7 +2,7 @@
 
 **Epic:** 36 — Case Save Queue Reconcile — Idle Network Recovery Fix
 **Story ID:** 36.2
-**Status:** todo
+**Status:** done
 **Date added:** 2026-08-03
 **Depends on:** None (can run in parallel with Story 36.1)
 **Source requirements:** FR-36.3
@@ -167,3 +167,28 @@ If the discard check is missing, misplaced (e.g., in the initiating code rather 
 | Dependency | Risk |
 |---|---|
 | None — read/verify only unless a gap is found; parallel with Story 36.1 | Low |
+
+---
+
+## Dev Agent Record
+
+### Completion Notes
+
+- Code read confirmed: generation guard (`_caseRevPollGeneration !== myGeneration`) is correctly placed inside the `.then()` callback — it evaluates at response resolution time, not at fetch initiation time. This covers the late-arriving response scenario exactly as described in AC-2.
+- `stopCaseRevPolling()` correctly increments `_caseRevPollGeneration` before `startCaseRevPolling()` reassigns `myGeneration`, ensuring old in-flight responses from superseded sessions are always discarded.
+- `catch` block already emits only `console.warn('[CaseRevPoll] poll failed:', err)` — no banner shown on fetch errors (AC-1 satisfied).
+- AC-3: The existing single-line comment at the discard check was minimal. Expanded to the full 4-line comment per the story spec, explaining the late-response scenario and consequence of removing the guard.
+- AC-4: Guard is threshold-agnostic — it depends only on generation counters, not on inactivity timer values.
+- No structural fix was needed; the only deliverable was the expanded comment.
+
+### Files List
+
+| File | Action |
+|------|--------|
+| `source-code/mmria/mmria-server/wwwroot/scripts/case/case-rev-check.js` | Comment expanded — discard-check comment augmented with late-response rationale |
+
+### Change Log
+
+| File | Change |
+|------|--------|
+| `source-code/mmria/mmria-server/wwwroot/scripts/case/case-rev-check.js` | Replaced 1-line comment on generation guard discard check with 4-line comment explaining late-arriving response scenario and consequence of removal |

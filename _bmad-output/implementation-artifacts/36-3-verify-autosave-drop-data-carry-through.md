@@ -2,7 +2,7 @@
 
 **Epic:** 36 — Case Save Queue Reconcile — Idle Network Recovery Fix
 **Story ID:** 36.3
-**Status:** todo
+**Status:** done
 **Date added:** 2026-08-03
 **Depends on:** Story 36.1 (same file — `index.js`)
 **Source requirements:** FR-36.4
@@ -155,3 +155,29 @@ If either inactivity path passes a stale or intermediate copy of `g_data` (not t
 | Dependency | Risk |
 |---|---|
 | Story 36.1 must be complete (both touch `index.js`) | Low |
+
+---
+
+## Dev Agent Record
+
+**Completion Date:** 2026-08-03
+
+**Completion Notes:**
+All three verification checks passed — no code logic changes were required. Data carry-through was already correct:
+- AC-1/AC-2: `get_new_save_queue_item` in `index.js` uses `mmria_safe_clone(p_data)` — a deep clone of whatever live reference is passed. Any dropped autosave's stale data cannot contaminate a subsequently enqueued awaited save.
+- AC-3 (Continue Editing path): `continue_editing_inactivity` passes `g_data` directly — not a pre-modified copy.
+- AC-3 (Lock Release path): `release_edit_lock_due_to_inactivity` mutates `g_data` in-place (clears checkout fields) before calling `save_case_and_wait`, which is correct — the clone captures the fully updated state.
+- AC-4: The behaviour is independent of inactivity timer configuration values.
+
+Deliverable: confirming code comments added at all three relevant sites.
+
+**File List:**
+- `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js`
+- `source-code/mmria/mmria-server/wwwroot/scripts/case/edit-inactivity-manager.js`
+
+**Change Log:**
+
+| File | Change |
+|------|--------|
+| `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js` | Added confirming comment before `mmria_safe_clone` in `get_new_save_queue_item` |
+| `source-code/mmria/mmria-server/wwwroot/scripts/case/edit-inactivity-manager.js` | Added confirming comment before `save_case_and_wait` in `continue_editing_inactivity`; added confirming comment before `save_case_and_wait` in `release_edit_lock_due_to_inactivity` |
