@@ -3693,12 +3693,17 @@ async function process_save_case()
       const delay_ms = mmria_get_save_retry_delay_ms(item.attempt_count);
       item.next_attempt_ms = Date.now() + delay_ms;
 
-      const dialog_cooldown_ms = 30000;
-      const last_shown = item.last_error_dialog_shown_ms || 0;
-      if(Date.now() - last_shown > dialog_cooldown_ms)
+      // Autosave is a silent background operation — never interrupt the user for it.
+      const is_autosave = item.intent === 'autosave';
+      if(!is_autosave)
       {
-        item.last_error_dialog_shown_ms = Date.now();
-        try { $mmria.unstable_network_dialog_show(err, item.note); } catch(_ex) { /* ignore */ }
+        const dialog_cooldown_ms = 30000;
+        const last_shown = item.last_error_dialog_shown_ms || 0;
+        if(Date.now() - last_shown > dialog_cooldown_ms)
+        {
+          item.last_error_dialog_shown_ms = Date.now();
+          try { $mmria.unstable_network_dialog_show(err, item.note); } catch(_ex) { /* ignore */ }
+        }
       }
 
       finalize_queue_state();
@@ -3706,7 +3711,10 @@ async function process_save_case()
       return;
     }
 
-    try { $mmria.unstable_network_dialog_show(err, item.note); } catch(_ex) { /* ignore */ }
+    if(item.intent !== 'autosave')
+    {
+      try { $mmria.unstable_network_dialog_show(err, item.note); } catch(_ex) { /* ignore */ }
+    }
     fail_item(err);
   };
 
