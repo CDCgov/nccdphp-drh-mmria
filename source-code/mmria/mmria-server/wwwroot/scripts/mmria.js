@@ -1148,6 +1148,10 @@ var $mmria = function()
                 {
                     g_data._rev = case_response.rev;
                     set_local_case(g_data);
+                    // Sync rev polling so the new _rev is the baseline for stale-tab detection.
+                    // Without this, the interval started by the preceding save (e.g. enable_edit)
+                    // would keep running with the old loadedRev and falsely show the stale-case banner.
+                    if (typeof mmria_sync_case_rev_polling === 'function') mmria_sync_case_rev_polling();
                     //console.log('set_value save finished');
                 }
         

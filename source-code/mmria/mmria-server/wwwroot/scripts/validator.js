@@ -1989,7 +1989,7 @@ async function x57_ocl(p_control) {
             }
             g_data.death_certificate.place_of_last_residence.state_county_fips = state_county_fips;
             const t_geoid = state_county_fips + g_data.death_certificate.place_of_last_residence.census_tract_fips.replace('.', '').padStart(6, '0');
-            $mmria.get_cvs_api_data_info(g_data.death_certificate.place_of_last_residence.state_county_fips, t_geoid, g_data.home_record.date_of_death.year, $mmria.callback_cvs_data_success, $mmria.callback_cvs_data_error);
+            $mmria.get_cvs_api_data_info(g_data.death_certificate.place_of_last_residence.state_county_fips, t_geoid, String(g_data.home_record.date_of_death.year), $mmria.callback_cvs_data_success, $mmria.callback_cvs_data_error);
             $mmria.save_current_record();
             $mmria.set_control_value('death_certificate/place_of_last_residence/latitude', g_data.death_certificate.place_of_last_residence.latitude);
             $mmria.set_control_value('death_certificate/place_of_last_residence/longitude', g_data.death_certificate.place_of_last_residence.longitude);

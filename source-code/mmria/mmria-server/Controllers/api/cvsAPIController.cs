@@ -164,10 +164,15 @@ public sealed class cvsAPIController: ControllerBase
                     if(is_abstractor)
                     {
                         var tc = await _cvsManager.GetAllDataAsync(safePayload, cvs);
-
-                        result =  Ok(tc);
-
-        
+                        if (tc == null)
+                        {
+                            return StatusCode(502, new { message = "CVS data service did not return a valid response. The data may not be available for the requested geography or year." });
+                        }
+                        result = Ok(tc);
+                    }
+                    else
+                    {
+                        return Forbid();
                     }
 
                     break;
