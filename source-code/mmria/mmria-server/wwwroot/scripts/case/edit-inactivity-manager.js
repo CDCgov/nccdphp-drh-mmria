@@ -250,6 +250,8 @@ async function continue_edit_after_inactivity_warning()
   try
   {
     g_data.date_last_updated = new Date();
+    // Pass live g_data — get_new_save_queue_item will deep-clone it at enqueue time,
+    // capturing all edits made up to this moment.
     await save_case_and_wait(g_data, null, 'edit_inactivity_continue');
     create_save_message();
   }
@@ -291,6 +293,9 @@ async function release_edit_lock_due_to_inactivity()
     stop_edit_mode_auto_timers();
     g_apply_sort(g_metadata, g_data, '', '', '');
 
+    // g_data has already been mutated above to clear checkout fields.
+    // get_new_save_queue_item will deep-clone this updated state — the saved document
+    // correctly reflects the lock release.
     await save_case_and_wait(g_data, null, 'edit_inactivity_lock_release', {
       authRefreshPolicy: 'suppress'
     });

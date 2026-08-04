@@ -374,6 +374,185 @@ function strip_clipboard_artifacts(node)
 }
 
 /**
+ * Converts Word-specific list HTML (MsoListParagraph) to clean editor structure.
+ *
+ * Word copies list items as <p class="MsoListParagraphCxSp*"> paragraphs where:
+ *   - Bullet items use a middle-dot/bullet character followed by non-breaking spaces as the prefix
+ *   - Numbered items use N.\u00A0+ as the prefix
+ *   - <o:p> namespace elements appear as empty child nodes
+ *
+ * This function:
+ *   1. Removes all <o:p> elements
+ *   2. Converts MsoListParagraph bullet paragraphs to <li> elements
+ *   3. Converts MsoListParagraph number paragraphs to clean <p>N. content</p>
+ *   4. Groups consecutive orphaned <li> elements under a <ul> wrapper
+ *   5. Strips any remaining Mso* class attributes
+ */
+function normalize_word_paste(node)
+{
+    // Step 1: Remove <o:p> Office namespace elements (always empty noise)
+    var opNodes = node.getElementsByTagName('o:p');
+    while (opNodes.length > 0)
+    {
+        opNodes[0].parentNode.removeChild(opNodes[0]);
+    }
+
+    // Step 1b: Convert h1–h6 elements to toolbar-native <p><strong><span> constructs.
+    //
+    // Word emits heading paragraphs as <h1>–<h6> elements. The toolbar for this editor
+    // has no heading button — <hN> tags only arrive via paste and are not supported by
+    // the PDF converter (ConvertHTMLDOMWalker has no H1–H6 case). Convert them to
+    // constructs the editor and PDF path already understand: <p><strong><span>.
+    //
+    // Font-size strategy: read the <span style="font-size:Xpt"> inside the heading (if
+    // present) and convert pt→px (1pt = 4/3px at 96 DPI), then snap to the nearest
+    // value in the toolbar's fontsize vocabulary [14,16,18,24,32,48]. Fall back to a
+    // level-based default when no font-size span exists inside the heading.
+    var WORD_TBFONT_SIZES = [14, 16, 18, 24, 32, 48]; // px values in toolbar sizeList
+    var WORD_HDG_FALLBACK = { h1: 32, h2: 24, h3: 18, h4: 16, h5: 16, h6: 16 };
+
+    function word_nearest_toolbar_size(px)
+    {
+        var best = WORD_TBFONT_SIZES[0];
+        var bestDist = Math.abs(px - best);
+        for (var wsi = 1; wsi < WORD_TBFONT_SIZES.length; wsi++)
+        {
+            var dist = Math.abs(px - WORD_TBFONT_SIZES[wsi]);
+            if (dist < bestDist) { bestDist = dist; best = WORD_TBFONT_SIZES[wsi]; }
+        }
+        return best;
+    }
+
+    function word_heading_px(hEl, hTag)
+    {
+        // Search direct children first, then any descendant span with font-size in pt/px
+        var spans = hEl.querySelectorAll('span[style]');
+        for (var whs = 0; whs < spans.length; whs++)
+        {
+            var styleVal = spans[whs].getAttribute('style') || '';
+            var ptMatch  = styleVal.match(/font-size\s*:\s*([\d.]+)pt/i);
+            var pxMatch  = styleVal.match(/font-size\s*:\s*([\d.]+)px/i);
+            if (ptMatch)
+            {
+                var rawPx = parseFloat(ptMatch[1]) * (4 / 3); // 1pt = 4/3px at 96 DPI
+                return word_nearest_toolbar_size(rawPx);
+            }
+            if (pxMatch)
+            {
+                return word_nearest_toolbar_size(parseFloat(pxMatch[1]));
+            }
+        }
+        // No font-size span found — use level-based fallback
+        return WORD_HDG_FALLBACK[hTag] || 16;
+    }
+
+    var wHdgEls = node.querySelectorAll('h1, h2, h3, h4, h5, h6');
+    var wHdgArr = [];
+    for (var whi = 0; whi < wHdgEls.length; whi++) { wHdgArr.push(wHdgEls[whi]); }
+
+    for (var whi = 0; whi < wHdgArr.length; whi++)
+    {
+        var wHEl  = wHdgArr[whi];
+        if (!wHEl.parentNode) continue;
+        var wHTag  = wHEl.nodeName.toLowerCase();
+        var wHText = wHEl.textContent.trim();
+        if (!wHText) { wHEl.parentNode.removeChild(wHEl); continue; }
+
+        var wHPx   = word_heading_px(wHEl, wHTag);
+        var wHP    = document.createElement('p');
+        var wHStr  = document.createElement('strong');
+        var wHSpan = document.createElement('span');
+        wHSpan.style.fontSize = wHPx + 'px';
+        wHSpan.textContent = wHText;
+        wHStr.appendChild(wHSpan);
+        wHP.appendChild(wHStr);
+        wHEl.parentNode.replaceChild(wHP, wHEl);
+    }
+
+    // Step 2: Convert MsoListParagraph paragraphs to clean elements
+    // Bullet prefix: middle-dot (U+00B7), bullet (U+2022), or en-dash (U+2013) + nbsp(s)
+    var WORD_BULLET_RE = /^[\u00B7\u2022\u2013\-]\u00A0+/;
+    // Number prefix: digits + period + one or more nbsp
+    var WORD_NUMBER_RE = /^(\d+)\.\u00A0+/;
+
+    var msoPs = node.querySelectorAll('p[class*="MsoList"]');
+    var msoPArr = [];
+    for (var wmi = 0; wmi < msoPs.length; wmi++) { msoPArr.push(msoPs[wmi]); }
+
+    for (var wmi = 0; wmi < msoPArr.length; wmi++)
+    {
+        var wMsoP = msoPArr[wmi];
+        if (!wMsoP.parentNode) continue;
+        var wRawText = wMsoP.textContent;
+
+        var wBulletMatch = WORD_BULLET_RE.exec(wRawText);
+        var wNumberMatch = WORD_NUMBER_RE.exec(wRawText);
+
+        var wNewEl;
+        if (wBulletMatch)
+        {
+            var wContent = wRawText.substring(wBulletMatch[0].length).trim();
+            wNewEl = document.createElement('li');
+            wNewEl.textContent = wContent;
+        }
+        else if (wNumberMatch)
+        {
+            var wNumContent = wRawText.substring(wNumberMatch[0].length).trim();
+            wNewEl = document.createElement('p');
+            wNewEl.textContent = wNumberMatch[1] + '. ' + wNumContent;
+        }
+        else
+        {
+            // MsoList class but no recognized prefix — strip the class, keep content
+            wMsoP.removeAttribute('class');
+            continue;
+        }
+
+        wMsoP.parentNode.replaceChild(wNewEl, wMsoP);
+    }
+
+    // Step 3: Group consecutive orphaned <li> elements under a <ul> wrapper
+    // (querySelectorAll returns a static snapshot — safe to mutate DOM during iteration)
+    var wAllLis = node.querySelectorAll('li');
+    for (var wli = 0; wli < wAllLis.length; wli++)
+    {
+        var wLiEl = wAllLis[wli];
+        if (!wLiEl.parentNode) continue;
+        var wParentName = wLiEl.parentNode.nodeName.toLowerCase();
+        if (wParentName === 'ul' || wParentName === 'ol') continue; // already in a list
+
+        // Collect this <li> and all consecutive <li> siblings
+        var wGroup = [wLiEl];
+        var wNext = wLiEl.nextSibling;
+        while (wNext)
+        {
+            if (wNext.nodeType === Node.TEXT_NODE && wNext.nodeValue.trim() === '')
+            {
+                wNext = wNext.nextSibling;
+                continue;
+            }
+            if (wNext.nodeType === Node.ELEMENT_NODE && wNext.nodeName.toLowerCase() === 'li')
+            {
+                wGroup.push(wNext);
+                wNext = wNext.nextSibling;
+            }
+            else { break; }
+        }
+
+        var wUlEl = document.createElement('ul');
+        wLiEl.parentNode.insertBefore(wUlEl, wLiEl);
+        for (var wgi = 0; wgi < wGroup.length; wgi++) { wUlEl.appendChild(wGroup[wgi]); }
+    }
+
+    // Step 4: Strip any remaining Mso* class attributes
+    var wMsoClass = node.querySelectorAll('[class*="Mso"]');
+    for (var wci = 0; wci < wMsoClass.length; wci++)
+    {
+        wMsoClass[wci].removeAttribute('class');
+    }
+}
+
+/**
  * Attaches a Range API paste handler to the Trumbowyg narrative editor div.
  * Uses the capture phase to intercept paste before Trumbowyg's built-in handler,
  * ensuring content is inserted at the active cursor position.
@@ -434,6 +613,8 @@ function attach_narrative_paste_handler(p_object_path, p_metadata_path, p_dictio
             // Comment nodes (embedded StartFragment/EndFragment from prior paste cycles)
             // and Mac WebKit Apple-interchange-newline <br> elements.
             strip_clipboard_artifacts(cleanNode);
+            // Convert Word list HTML (MsoListParagraph, <o:p>) to clean <ul>/<li> and <p> elements.
+            normalize_word_paste(cleanNode);
             // Strip browser-computed noise styles; keep only font-size, color, background-color
             // on spans, and remove all inline styles from block elements.
             strip_paste_noise_styles(cleanNode);
@@ -444,7 +625,20 @@ function attach_narrative_paste_handler(p_object_path, p_metadata_path, p_dictio
         }
         else if (pastedText)
         {
-            fragment.appendChild(document.createTextNode(pastedText));
+            var _ptLines = pastedText.split(/\r?\n/);
+            for (var _pli = 0; _pli < _ptLines.length; _pli++)
+            {
+                var _ptP = document.createElement('p');
+                if (_ptLines[_pli].length > 0)
+                {
+                    _ptP.textContent = _ptLines[_pli];
+                }
+                else
+                {
+                    _ptP.innerHTML = '<br>';
+                }
+                fragment.appendChild(_ptP);
+            }
         }
 
         // Step 5: Insert at captured range — with block-level safety for block content.
@@ -580,6 +774,51 @@ function attach_narrative_paste_handler(p_object_path, p_metadata_path, p_dictio
         tbw_onchange(p_object_path, p_metadata_path, p_dictionary_path);
 
     }, true); // capture phase — runs before and suppresses Trumbowyg's bubble-phase handler
+
+    editorElement.addEventListener('keydown', function(event)
+    {
+        if (event.key !== 'Enter' || event.shiftKey || event.ctrlKey || event.altKey) return;
+
+        var sel = window.getSelection();
+        if (!sel || sel.rangeCount === 0) return;
+        var kRange = sel.getRangeAt(0);
+
+        // Find nearest <p> ancestor within the editor
+        var kNode = kRange.startContainer;
+        var kP = kNode.nodeType === Node.ELEMENT_NODE ? kNode : kNode.parentElement;
+        while (kP && kP.nodeName.toLowerCase() !== 'p' && !kP.classList.contains('trumbowyg-editor'))
+        {
+            kP = kP.parentElement;
+        }
+        if (!kP || kP.nodeName.toLowerCase() !== 'p') return;
+
+        var kText = kP.textContent;
+        var kMatch = kText.match(/^(\d+)\.\s\S/);
+        if (!kMatch) return;
+
+        // Confirm cursor is at end of paragraph
+        var kLastChild = kP.lastChild;
+        if (!kLastChild) return;
+        var kAtEnd = (kRange.startContainer === kLastChild && kRange.startOffset === (kLastChild.nodeValue || kLastChild.textContent || '').length)
+                      || (kRange.startContainer === kP && kRange.startOffset === kP.childNodes.length);
+        if (!kAtEnd) return;
+
+        event.preventDefault();
+        var kN = parseInt(kMatch[1], 10);
+        var kNewP = document.createElement('p');
+        kNewP.textContent = (kN + 1) + '. ';
+        if (kP.nextSibling) { kP.parentNode.insertBefore(kNewP, kP.nextSibling); }
+        else                { kP.parentNode.appendChild(kNewP); }
+
+        // Move caret to end of new paragraph
+        var kNewRange = document.createRange();
+        kNewRange.selectNodeContents(kNewP);
+        kNewRange.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(kNewRange);
+
+        tbw_onchange(p_object_path, p_metadata_path, p_dictionary_path);
+    }, false);
 }
 
 function tbw_change_paste(p_object_path, p_metadata_path, p_dictionary_path)

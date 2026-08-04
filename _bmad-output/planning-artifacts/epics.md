@@ -55,6 +55,8 @@ FR-34.1: When the case narrative PDF export renders saved Trumbowyg HTML that ha
 FR-34.2: When the saved narrative contains an intentional blank paragraph such as `<p><br></p>`, the PDF export renders it as exactly one intentional blank line rather than multiplying the `<br>` newline with paragraph trailing newline behavior.
 FR-34.3: The spacing fix preserves the stored `g_data.case_narrative.case_opening_overview` HTML and constrains behavior changes to PDF conversion unless implementation evidence proves that scope cannot satisfy the defect.
 FR-34.4: When saved case narrative HTML contains a standalone `<br>` followed by a whitespace-only empty paragraph before the next section, the PDF export collapses that separator sequence to one intentional break instead of rendering duplicate blank rows.
+FR-34.5: When clipboard content contains `text/plain` only (no `text/html`), pasting into the case narrative editor converts each newline-delimited line to a separate `<p>` paragraph. Empty lines become `<p><br></p>`. No raw newline characters remain embedded in text nodes after the paste.
+FR-34.6: When the cursor is at the end of a narrative paragraph whose text begins with the pattern `^\d+\.\s` followed by non-whitespace content, pressing Enter (no modifier keys) inserts a new paragraph beginning with the next sequential integer followed by `. `, with the cursor positioned immediately after that prefix.
 FR-35.1: While a user is in offline mode, the "Exit Offline Mode" button is not shown on any page, while the "You're Offline" text/icon indicator remains visible and is right-aligned within its host container. The underlying widget, modal, and cleanup code are preserved (hidden, not deleted) for potential reuse in a future release.
 FR-35.2: Every user-visible occurrence of the "Go Online" label — both primary action buttons, their busy/connectivity state text, and the confirmation modal title and button — reads "Go Online & Sync Changes" instead.
 FR-35.3: Both "Go Online & Sync Changes" entry points (Offline Case List table and Cases Selected for Offline Work table) show the same confirmation modal before syncing changes and returning online; neither entry point bypasses confirmation.
@@ -66,6 +68,7 @@ NFR-2: The vitals validation modals (FR-2.2, FR-2.6) must meet Section 508 acces
 NFR-3: Vitals range configuration is loaded once at server startup and held in memory. Field-level blur validation is synchronous against the in-memory config. No per-event network requests are introduced.
 NFR-33.1: Generator improvements must remain a low-impact utilities change: no metadata schema changes, no generated strong-case model edits, no new external services, and no broad rewrite of the case generation pipeline.
 NFR-34.1: The case narrative PDF spacing fix remains surgical, with no new client-side dependencies, no bundler changes, no storage migration, and no broad rewrite of `pdf-version/index.js`.
+NFR-34.2: The plain-text paste fix (FR-34.5) is scoped to the `else if (pastedText)` branch in `attach_narrative_paste_handler` in `textarea.js`. The `text/html` paste path, `textarea_control_strip_html_attributes`, the save path, and `pdf-version/index.js` are not changed.
 NFR-35.1: The Epic 35 change is UI/copy-scoped only — no server-side changes, no CouchDB schema changes, and no removal of `OfflineExitManager`, `offline-modals.js` exit-modal markup, or their cleanup/audit behavior. All hidden code remains fully intact and reachable via a future toggle.
 
 ### Additional Requirements
@@ -88,6 +91,8 @@ NFR-35.1: The Epic 35 change is UI/copy-scoped only — no server-side changes, 
 - FR-34 evidence: use `docs/ai/local/case-narrative-spacing/changed-prod-data-v4.1.txt` and `docs/ai/local/case-narrative-spacing/unchanged-prod-data.txt` as regression fixtures or manual verification inputs.
 - FR-34 parser guard: preserve meaningful inline spaces and NBSP while ignoring structural whitespace-only nodes produced by edited one-line HTML between block tags.
 - FR-34 QA follow-up evidence: use `docs/ai/local/case-narrative-spacing/qa/html.txt` as the regression fixture for Story 34.2; it contains repeated `<br>` plus empty-paragraph separators that were not covered by Story 34.1.
+- FR-34.5 implementation: Split `pastedText` by `/\r?\n/`; non-empty lines → `createElement('p')` with `textContent`; empty lines → `createElement('p')` with `innerHTML = '<br>'`. Use the block-safe sibling insertion path (same as `fragmentHasBlocks` path) — do NOT use `range.insertNode` for multi-paragraph plain text, and do NOT insert `<br>` tags as line separators.
+- FR-34.6 implementation: Attach a `keydown` listener on the editor element within the same init block as the paste handler in `attach_narrative_paste_handler`. Match the current paragraph's `textContent` against `/^(\d+)\.\s\S/` before firing. If the cursor is at the end of the paragraph and the pattern matches with real content after the prefix, call `preventDefault()`, create a new `<p>` with text `(n+1) + '. '`, insert it after the current paragraph, and move the cursor to the end. Do NOT convert paragraphs to `<ol>/<li>` structure.
 - FR-35 origin: Rel 4.1 P-Immediate change request from Katrina's feedback, tracked as ADO #119294 (Marta Puskarz). Ships before Rel 4.1 deployment.
 - FR-35 scope decisions confirmed with the user (2026-08-03): (1) hide only — do not delete `OfflineExitManager`, the exit-offline confirmation modal, or the server cleanup calls; (2) rename "Go Online" everywhere, including the confirmation modal in `offline-modals.js`, not just the two primary buttons; (3) also fix the confirmation-modal inconsistency between the two "Go Online" entry points as part of this epic.
 - FR-35.1 host locations: `Views/Home/Index.cshtml`, `Views/Account/OfflineLogin.cshtml`, `Views/Shared/_BreadCrumbs.cshtml` (all render `[data-offline-exit-host]` divs populated by `offline-exit-manager.js`).
@@ -155,9 +160,17 @@ FR-34.1: Epic 34 — Ignore structural whitespace-only text nodes in case narrat
 FR-34.2: Epic 34 — Render empty Trumbowyg paragraphs as one intentional blank line
 FR-34.3: Epic 34 — Preserve stored narrative HTML and constrain fix to PDF conversion
 FR-34.4: Epic 34 — Collapse BR-plus-empty-paragraph section separators in case narrative PDF conversion
+FR-34.5: Epic 34 — Plain-text paste newline-to-paragraph conversion in the narrative editor
+FR-34.6: Epic 34 — Numbered-paragraph Enter continuation in the narrative editor
+
 FR-35.1: Epic 35 — Hide 'Exit Offline Mode' widget while offline (code preserved, not deleted)
 FR-35.2: Epic 35 — Rename 'Go Online' to 'Go Online & Sync Changes' everywhere, including the confirmation modal
 FR-35.3: Epic 35 — Align the two 'Go Online & Sync Changes' entry points to both confirm via modal before syncing
+
+FR-36.1: Epic 36 — Reconcile false-positive suppression: distinguish already-committed items from genuine mismatch
+FR-36.2: Epic 36 — Change stack snapshot deduplication on enqueue (optional optimization)
+FR-36.3: Epic 36 — Rev poll generation guard verification and regression test during transient network outage
+FR-36.4: Epic 36 — Autosave-drop awaited-save data carry-through verification
 
 ## Epic List
 
@@ -268,6 +281,12 @@ The case narrative PDF export renders edited rich-text narrative HTML without ad
 While a user is in offline mode, the confusing "Exit Offline Mode" escape hatch is hidden (not deleted) so it can be revisited in a future release. The "Go Online" action is renamed everywhere to "Go Online & Sync Changes" for clarity, and both entry points to that action now consistently confirm via modal before syncing.
 **FRs covered:** FR-35.1, FR-35.2, FR-35.3
 **Stories:** 35.1 — Hide Exit Offline Mode widget, 35.2 — Rename Go Online to Go Online & Sync Changes, 35.3 — Align Go Online confirmation behavior
+
+### Epic 36: Case Save Queue Reconcile — Idle Network Recovery Fix
+
+When a case is left idle during a transient network disruption, the autosave retry and the inactivity-triggered save (either the "Continue Editing" path after the warning threshold, or the lock-release path after the lock threshold) can both capture identical `g_change_stack` snapshots. When the autosave eventually succeeds and clears those items, the subsequent inactivity save's post-completion reconcile emits a false-positive warning implying edits were not saved. No data loss occurs, but the warning creates user and developer confusion. This epic eliminates the false-positive, verifies the rev poll generation guard handles network recovery correctly, and confirms awaited-save data carry-through when a retrying autosave is dropped.
+**FRs covered:** FR-36.1, FR-36.2, FR-36.3, FR-36.4
+**Stories:** 36.1 — Fix false-positive reconcile warning in `mmria_reconcile_live_save_state_after_success`, 36.2 — Verify rev poll generation guard during transient network outage, 36.3 — Verify autosave-drop data carry-through when inactivity save is awaited, 36.4 (optional) — Change stack snapshot deduplication on enqueue
 
 ---
 
@@ -4871,9 +4890,9 @@ So that future generator changes do not reintroduce invalid dates, non-numeric n
 
 ---
 
-## Epic 34: Case Narrative PDF Spacing Fidelity
+## Epic 34: Case Narrative PDF Spacing Fidelity and Paste Content Fidelity
 
-Reviewers can edit a case narrative, add a new line, and export the Narrative PDF without the PDF adding extra paragraph spacing throughout the document. The implementation preserves the stored Trumbowyg HTML exactly and fixes only how `pdf-version/index.js` interprets that HTML for pdfMake.
+Reviewers can edit a case narrative, paste content from plain-text sources with line structure intact, use Enter to continue numbered paragraphs, and export the Narrative PDF — all without extra spacing, collapsed line breaks, or numbered-list handling issues. PDF fixes stay in `pdf-version/index.js`; paste fixes stay in `attach_narrative_paste_handler` in `textarea.js`.
 
 ### Story 34.1: Normalize Case Narrative PDF Whitespace Conversion
 
@@ -4960,14 +4979,108 @@ So that section headings are not pushed apart by duplicate blank rows after edit
 - The QA editor screenshot shows compact editor spacing, supporting the conclusion that the remaining defect is in PDF interpretation rather than editor display.
 - Story 34.1 was marked complete, and the QA symptom still reproduces with a new fixture shape.
 
+### Story 34.3: Preserve Line Structure When Pasting Plain Text
+
+As a case reviewer,
+I want pasted plain-text content to maintain its line breaks in the case narrative editor,
+So that text copied from notes, email, or other plain-text sources does not collapse into a single paragraph.
+
+**Acceptance Criteria:**
+
+**Given** clipboard contains `text/plain` only (no `text/html`) with content such as "Line 1\nLine 2\nLine 3"
+**When** the reviewer pastes into the narrative editor
+**Then** each line appears as a separate `<p>` paragraph — the line structure of the pasted content is preserved
+
+**Given** clipboard plain text contains an empty line between content (e.g., "Line 1\n\nLine 3")
+**When** the reviewer pastes
+**Then** the empty line becomes `<p><br></p>`, consistent with Trumbowyg's standard blank-line representation
+
+**Given** clipboard plain text contains manually-numbered items (e.g., "1. First item\n2. Second item\n3. Third item")
+**When** the reviewer pastes
+**Then** each numbered item appears on its own line (separate `<p>` element), preserving the number prefix
+
+**Given** the clipboard contains rich-text HTML (e.g., from Word or a browser)
+**When** the reviewer pastes
+**Then** the existing `text/html` paste path is unchanged — no regression to rich-text paste behavior
+
+**Given** the paste produces multiple `<p>` paragraphs and `tbw_onchange` serializes the result
+**When** the content is saved
+**Then** the stored HTML contains `<p>` elements for each pasted line — no raw `\n` characters embedded in text node content
+
+**Implementation Notes:**
+
+- Change is confined to the `else if (pastedText)` branch in `attach_narrative_paste_handler` in `textarea.js`
+- Split `pastedText` by `/\r?\n/`; non-empty lines → `createElement('p')` with `textContent`; empty lines → `createElement('p')` with `innerHTML = '<br>'`
+- Use the block-safe sibling insertion path (same as the existing `fragmentHasBlocks` path) — do NOT use `range.insertNode` for multi-paragraph plain text
+- Do NOT insert `<br>` tags as line separators — `<p>` elements only, so the PDF spacing behavior from Stories 34.1 and 34.2 is not disturbed
+- Do NOT change `textarea_control_strip_html_attributes`, the save path, or `pdf-version/index.js`
+
+**Files:** `source-code/mmria/mmria-server/wwwroot/scripts/editor/page_renderer/textarea.js`
+
+| Dependency                                                                                             | Risk |
+| ------------------------------------------------------------------------------------------------------ | ---- |
+| Stories 34.1 and 34.2 complete — `<p>` paragraphs created here will not produce new PDF spacing issues | Low  |
+| Story 1.1 save-path fix — structural tags preserved on save path, no regression                        | Low  |
+
+### Story 34.4: Numbered-Paragraph Keyboard Continuation
+
+As a case reviewer,
+I want the case narrative editor to recognize manually-numbered paragraphs and continue the sequence when I press Enter,
+So that I can build numbered items efficiently without typing the next number manually.
+
+**Acceptance Criteria:**
+
+**Given** a paragraph in the editor begins with `\d+. ` (a number, period, space) followed by real content (e.g., "3. Some text")
+**And** the cursor is at the END of that paragraph
+**When** the reviewer presses Enter (no Shift, Ctrl, or Alt modifier keys)
+**Then** a new paragraph is inserted immediately after, beginning with the next sequential number followed by ". " (e.g., "4. ")
+**And** the cursor is placed immediately after that prefix, ready for typing
+
+**Given** the cursor is mid-paragraph (not at the end) in a numbered paragraph
+**When** the reviewer presses Enter
+**Then** standard paragraph-split behavior applies — no number prefix is auto-inserted
+
+**Given** a paragraph begins with `\d+. ` but its content after the prefix is empty or whitespace-only (e.g., "3. " with nothing following)
+**When** the reviewer presses Enter
+**Then** auto-continuation does NOT fire — standard Enter behavior applies, signaling exit from the numbered sequence
+
+**Given** a paragraph begins with a number prefix (e.g., "1. text")
+**When** the reviewer clicks or keyboards to any character position in that paragraph, including position 0 (before the digit)
+**Then** the cursor moves freely to that position without restriction
+**Note:** If implementation investigation finds a browser or Trumbowyg mechanism preventing cursor-at-position-0, it must be identified and removed. Document findings either way.
+
+**Given** a reviewer types a number prefix manually (e.g., "4. text") and saves
+**When** the case is reopened
+**Then** the paragraph `<p>4. text</p>` is preserved exactly — no structure change occurs on save
+
+**Implementation Notes:**
+
+- Attach a `keydown` listener on the editor element within the same init block as the paste handler in `attach_narrative_paste_handler`
+- Pattern to match: current paragraph `textContent` matches `/^(\d+)\.\s\S/` (digit(s) + period + space + at least one non-whitespace character)
+- If AC-1 triggers: call `event.preventDefault()`, create a new `<p>` element with text `(parsedN + 1) + '. '`, insert it after the current paragraph using `insertBefore` / `appendChild` on the parent, then move caret to end of new `<p>` via `Range`
+- AC-3 exit guard: if `paragraph.textContent.trim()` matches only the prefix with no further content, skip auto-continuation
+- Do NOT use `<ol>/<li>` structure — numbers remain plain text in `<p>` elements, consistent with the no-new-tags constraint
+- Verify cursor-at-position-0 behavior; remove any blocking mechanism found; add a comment if no blocker exists
+
+**Files:** `source-code/mmria/mmria-server/wwwroot/scripts/editor/page_renderer/textarea.js`
+
+| Dependency                                                                                       | Risk |
+| ------------------------------------------------------------------------------------------------ | ---- |
+| Story 34.3 (plain-text paste creates numbered `<p>` paragraphs that this story then operates on) | Low  |
+
 ## Epic 34 - Story Sequencing
 
-| Story                                                     | Risk   | Dependencies                                                                                               |
-| --------------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------- |
-| 34.1 - Normalize case narrative PDF whitespace conversion | Medium | Existing case narrative editor fidelity behavior from Epic 1; supplied spacing fixtures                    |
-| 34.2 - Collapse BR plus empty paragraph separators        | Medium | Story 34.1 PDF converter changes; QA spacing fixture in `docs/ai/local/case-narrative-spacing/qa/html.txt` |
 
-Story 34.1 remains the initial PDF-renderer correction. Story 34.2 reopens Epic 34 for the QA-specific separator shape and should remain a single surgical PDF conversion follow-up with regression coverage for all three fixture shapes before manual PDF comparison.
+| Story | Risk | Dependencies |
+|---|---|---|
+| 34.1 - Normalize case narrative PDF whitespace conversion | Medium | Existing case narrative editor fidelity behavior from Epic 1; supplied spacing fixtures |
+| 34.2 - Collapse BR plus empty paragraph separators | Medium | Story 34.1 PDF converter changes; QA spacing fixture in `docs/ai/local/case-narrative-spacing/qa/html.txt` |
+| 34.3 - Preserve line structure when pasting plain text | Low | Stories 34.1 and 34.2 complete; Story 1.1 save-path fix |
+| 34.4 - Numbered-paragraph keyboard continuation | Low | Story 34.3 (paste creates numbered paragraphs that 34.4 operates on) |
+
+Stories 34.1 and 34.2 (complete) address PDF rendering. Story 34.3 fixes the editor paste path and is independent of PDF behavior. Story 34.4 builds on the clean numbered paragraphs that Story 34.3 produces and should follow it.
+
+---
 
 ## Epic 35: Offline Exit/Go Online UX Cleanup (Rel 4.1 P-Immediate)
 
@@ -4982,7 +5095,7 @@ So that I am not tempted into an escape hatch that discards my offline changes, 
 **Acceptance Criteria:**
 
 **Given** a user is in offline mode (`isOfflineModeActive()`, `isProcessingOfflineCases()`, or `isOfflineModeServerSession()` is true)
-**When** any page renders a `[data-offline-exit-host]` widget host (Home/Index, Account/OfflineLogin, Shared/\_BreadCrumbs)
+**When** any page renders a `[data-offline-exit-host]` widget host (Home/Index, Account/OfflineLogin, Shared/_BreadCrumbs)
 **Then** no "Exit Offline Mode" button is visible anywhere on the page.
 
 **Given** a user is in offline mode
@@ -5002,7 +5115,6 @@ So that I am not tempted into an escape hatch that discards my offline changes, 
 **Then** `finishPendingCleanup()` still runs unaffected, since only the button's rendering is suppressed, not the cleanup pipeline.
 
 **Implementation Notes:**
-
 - Primary file: `source-code/mmria/mmria-server/wwwroot/scripts/offline/offline-exit-manager.js`.
 - Fix point is `renderWidgetMarkup()`: remove the `<button data-action="show-exit-offline-mode">` element from the returned template string; keep the icon + `<span>You're Offline</span>` div. Do **not** change `shouldShowExitWidget()` — it correctly continues to gate the remaining indicator's visibility to "while offline."
 - Add right-alignment styling to the outer `.mmria-offline-exit-widget` wrapper (e.g. `width: 100%; justify-content: flex-end;`) so the remaining text/icon sits flush right now that the button no longer occupies that space — most impactful on `Views/Home/Index.cshtml`, whose host `<div>` has no existing flex/alignment styling of its own.
@@ -5010,7 +5122,6 @@ So that I am not tempted into an escape hatch that discards my offline changes, 
 - Do not delete `offline-modals.js`'s `show_exit_offline_mode_modal`, `OfflineExitManager.confirmExitOfflineMode`, or any server cleanup call (`/api/OfflineCase/update-offline-state`, `/api/OfflineCase/release-case-locks`) — this is a hide-only change per explicit user decision.
 
 **Evidence:**
-
 - `offline-exit-manager.js:404-421` (`renderWidgetMarkup`), `:426-441` (`initializeWidgetHosts`), `:576-580` (`shouldShowExitWidget`).
 - Host divs: `Views/Home/Index.cshtml:167`, `Views/Account/OfflineLogin.cshtml:43`, `Views/Shared/_BreadCrumbs.cshtml:25`.
 
@@ -5035,13 +5146,11 @@ So that it's clear the action both reconnects me and syncs my offline work.
 **Then** both read "Go Online & Sync Changes" (or a natural title-cased variant of it), consistent with the button label.
 
 **Implementation Notes:**
-
 - Files to update in lockstep: `wwwroot/scripts/editor/page_renderer/app.mmria.js` (2 static button labels, lines ~728 and ~790), `wwwroot/scripts/offline/offline-transition-manager.js` (`set_go_online_button_state`, line ~208), `wwwroot/scripts/offline/offline-network-monitor.js` (connectivity state text, lines ~69 and ~80), `wwwroot/scripts/offline/offline-modals.js` (`show_go_online_modal` title line ~416 and confirm button line ~434).
 - Do not change the busy-state string `"Going Online..."` unless separately requested.
 - No server-side or metadata changes — this is a client-side JS string change only, consistent with project-context.md's no-build-step vanilla JS rule for `wwwroot/`.
 
 **Evidence:**
-
 - `app.mmria.js:728,790` (`id="go-online-btn"`, two independent render sites).
 - `offline-transition-manager.js:196-209`, `offline-network-monitor.js:54-86` (dynamic state text writers on the same DOM elements).
 - `offline-modals.js:409-459` (`show_go_online_modal`, modal title + confirm button).
@@ -5067,21 +5176,157 @@ So that going online and syncing changes is predictable no matter where I trigge
 **Then** existing connectivity checks, diagnostic logging, and sync behavior are unchanged — only the missing confirmation step is added to the second entry point.
 
 **Implementation Notes:**
-
 - Primary file: `source-code/mmria/mmria-server/wwwroot/scripts/editor/page_renderer/app.mmria.js`.
 - Change the second button's `onclick` from `go_online_clicked(event)` to `show_go_online_modal(event)`, matching the first button, so both routes go through the confirmation modal before syncing.
 - No change to `go_online_clicked` itself or to the modal's own confirm handler.
 
 **Evidence:**
-
 - Side finding from the Epic 35 investigation case file: the two "Go Online" buttons in `app.mmria.js` have inconsistent click handlers — one confirms via modal, one does not.
 
 ## Epic 35 — Story Sequencing
 
-| Story                                               | Risk | Dependencies                                                                                |
-| --------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
-| 35.1 - Hide Exit Offline Mode widget                | Low  | None — pure visibility change, code untouched otherwise                                     |
-| 35.2 - Rename Go Online to Go Online & Sync Changes | Low  | None — string-only change across 4 files                                                    |
-| 35.3 - Align Go Online confirmation behavior        | Low  | Story 35.2 label change should land first so the aligned button shows the correct new label |
+| Story | Risk | Dependencies |
+|---|---|---|
+| 35.1 - Hide Exit Offline Mode widget | Low | None — pure visibility change, code untouched otherwise |
+| 35.2 - Rename Go Online to Go Online & Sync Changes | Low | None — string-only change across 4 files |
+| 35.3 - Align Go Online confirmation behavior | Low | Story 35.2 label change should land first so the aligned button shows the correct new label |
 
 All three stories are low-risk, surgical, client-side-only changes with no server or metadata impact. Recommended sequencing: 35.1 and 35.2 can proceed in parallel; 35.3 should follow 35.2 so the newly-aligned button already carries the renamed label.
+
+---
+
+## Epic 36: Case Save Queue Reconcile — Idle Network Recovery Fix
+
+When a case is left idle during a transient network disruption, the autosave retry and the inactivity-triggered save (either the "Continue Editing" path after the warning threshold, or the lock-release path after the lock threshold) can both capture identical `g_change_stack` snapshots. When the autosave eventually succeeds and clears those items, the subsequent inactivity save's post-completion reconcile emits a false-positive warning implying edits were not saved. No data loss occurs, but the warning creates user and developer confusion.
+
+### Background: The Race Condition
+
+The save queue serializes HTTP requests one at a time. The active item is protected from pruning while its HTTP request is in-flight (`save_queue.active_item` is set). During a network disruption:
+
+1. Autosave A is sent — `active_item = A`. The request stalls (ERR_NETWORK_CHANGED / ERR_CONNECTION_RESET).
+2. The inactivity threshold passes (`case_edit_inactivity_warning_minutes_before_lock` and/or `case_edit_inactivity_lock_minutes`). An awaited save B is enqueued via `save_case_and_wait(...)`. Because A is still the active item, the prune guard protects A. Queue = `[A (active, in-flight), B (awaited)]`.
+3. A and B both snapshot `g_change_stack` at their respective enqueue times. Since no new edits were made during the idle period, both snapshots are identical.
+4. Network recovers. A's request succeeds. A reconciles: prefix match passes → `g_change_stack` items are spliced out.
+5. B then processes and succeeds. B reconciles: `g_change_stack` is now empty (shorter than B's snapshot) → `mmria_is_change_stack_prefix_match` returns false → **false-positive warning fires**.
+
+Note: When A is in its retry backoff window (`active_item = null`), the prune guard does NOT protect A, and enqueuing B would instead drop A. In that case the warning does not fire. The race window exists only while A's HTTP request is actively in-flight.
+
+### Story 36.1: Fix False-Positive Reconcile Warning
+
+As a case reviewer,
+I want to have confidence that the absence of console warnings means my edits may not be saved,
+So that developers and reviewers are not misled by false-positive "unmatched edits" alerts during normal network-recovery save sequences.
+
+**Acceptance Criteria:**
+
+**Given** autosave A succeeds and reconciles, clearing `g_change_stack` to `[]`
+**And** a second save B (inactivity-triggered) has a snapshot of the same items A cleared
+**When** B completes and `mmria_reconcile_live_save_state_after_success` runs for B
+**Then** no `console.warn` is emitted — the function recognises the snapshot items are already committed and treats the reconcile as clean
+
+**Given** a save completes and `g_change_stack` currently has items `[D, E]` (not matching the save's snapshot `[A, B, C]`)
+**When** `mmria_reconcile_live_save_state_after_success` runs
+**Then** the warning **is** emitted and the items are left intact (genuine mismatch path unchanged)
+
+**Given** a save completes and `g_change_stack` is empty but the snapshot is also empty (`snapshot_items.length === 0`)
+**When** `mmria_reconcile_live_save_state_after_success` runs
+**Then** no warning is emitted and no splice is attempted
+
+**Implementation note:** The distinction between "already-committed" and "genuine mismatch" is:
+- **Already-committed**: `g_change_stack.length < snapshot_items.length` AND the items at the live stack head do not match snapshot position 0 (or the live stack is empty). Treat as clean — no warn.
+- **Genuine mismatch**: `g_change_stack.length >= snapshot_items.length` but at least one position differs. Warn and leave intact.
+
+All changes are in `wwwroot/scripts/case/index.js`. No server-side changes.
+
+**Files:** `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js`
+
+| Dependency | Risk |
+|---|---|
+| None — isolated reconcile function change | Low |
+
+### Story 36.2: Verify Rev Poll Generation Guard During Network Outage
+
+As a case reviewer,
+I want assurance that a brief network outage does not trigger a false "This case was updated" stale-case banner,
+So that I am not forced to reload a case that I was the only one editing.
+
+**Acceptance Criteria:**
+
+**Given** a case is in edit mode and the rev poll is running
+**When** the network drops and one or more poll requests return `TypeError: Failed to fetch`
+**Then** only `console.warn('[CaseRevPoll] poll failed:', err)` is logged — no stale-case banner is shown
+
+**Given** the network recovers and autosave succeeds, calling `mmria_sync_case_rev_polling()` with the new `_rev`
+**When** an in-flight poll response from before the save arrives late
+**Then** the generation guard (`_caseRevPollGeneration`) discards the stale response — no false-positive banner fires
+
+**Given** the above two scenarios hold at the `case_edit_inactivity_warning_minutes_before_lock` threshold (configurable) and at the `case_edit_inactivity_lock_minutes` threshold (configurable)
+**Then** behaviour is identical regardless of those configuration values
+
+**Implementation note:** No code change expected. Developer reads `case-rev-check.js` `startCaseRevPolling` and confirms the generation-guard assignment (`var myGeneration = _caseRevPollGeneration`) and the discard check (`if (_caseRevPollGeneration !== myGeneration) return`) cover the late-arrival scenario. If any gap is found, fix it in `case-rev-check.js`. Add a comment confirming the guard is intentional.
+
+**Files:** `source-code/mmria/mmria-server/wwwroot/scripts/case/case-rev-check.js`
+
+| Dependency | Risk |
+|---|---|
+| None — read/verify only unless gap found | Low |
+
+### Story 36.3: Verify Autosave-Drop Data Carry-Through
+
+As a case reviewer,
+I want assurance that when a retrying autosave is dropped in favour of an awaited inactivity save, none of my edits are silently lost,
+So that I can trust the inactivity save captures my full work.
+
+**Acceptance Criteria:**
+
+**Given** autosave A is retrying and an awaited inactivity save B is enqueued
+**When** `schedule_retry_or_fail` detects the awaited save and drops A (`awaited_save_is_queued` guard)
+**Then** B's `data` clone (captured from `g_data` at B's enqueue time) contains all field values present in `g_data` at that moment — no values from A's earlier snapshot are preferenced over B's
+
+**Given** B processes and the server returns `ok: true`
+**Then** `g_data._rev` is updated to the new revision and `g_change_stack` is correctly reconciled against B's snapshot
+
+**Given** both the inactivity warning path (`save_case_and_wait(..., 'edit_inactivity_continue')`) and the lock-release path (`save_case_and_wait(..., 'edit_inactivity_lock_release', { authRefreshPolicy: 'suppress' })`)
+**Then** data carry-through holds for both — the configuration values `case_edit_inactivity_warning_minutes_before_lock` and `case_edit_inactivity_lock_minutes` do not affect this property
+
+**Implementation note:** Verification story. Developer traces `get_new_save_queue_item` → `mmria_safe_clone(p_data)` and confirms `p_data` is always `g_data` (not A's stale clone) when B is enqueued. If `g_data` is correctly the live reference in both inactivity paths, no code change is needed — add a confirming code comment. If a gap is found, fix it.
+
+**Files:** `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js`, `source-code/mmria/mmria-server/wwwroot/scripts/case/edit-inactivity-manager.js`
+
+| Dependency | Risk |
+|---|---|
+| Story 36.1 (reconcile fix in same file) | Low |
+
+### Story 36.4 (Optional): Change Stack Snapshot Deduplication on Enqueue
+
+As a developer,
+I want the save queue to avoid capturing overlapping `g_change_stack` snapshots when an active save is already committed to those items,
+So that the reconcile false-positive cannot occur even if Story 36.1's reconcile fix is ever removed or regressed.
+
+**Acceptance Criteria:**
+
+**Given** autosave A is the active item with `change_stack_items: [item1, item2, item3]` (in-flight)
+**When** an inactivity save B is enqueued via `get_new_save_queue_item`
+**Then** B's `change_stack_items` snapshot starts from the offset after the items already captured in A (i.e., captures only items added after A's snapshot — or is empty if no new items exist)
+
+**Given** no active save exists for the case when B is enqueued
+**Then** B captures the full `g_change_stack` as normal (existing behaviour preserved)
+
+**Implementation note:** This story is a defence-in-depth optimization. It is blocked on Story 36.1 and should only be scheduled if the team decides the two-layer defence is worth the added complexity. Developer must ensure the offset logic handles the edge case where the active save's snapshot is a prefix of `g_change_stack` but new items have since been appended.
+
+**Files:** `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js`
+
+| Dependency | Risk |
+|---|---|
+| Story 36.1 must be complete | Medium — offset logic must be tested against all enqueue paths |
+
+## Epic 36 - Story Sequencing
+
+| Story | Risk | Dependencies |
+|---|---|---|
+| 36.1 — Fix false-positive reconcile warning | Low | None |
+| 36.2 — Verify rev poll generation guard | Low | None (parallel with 36.1) |
+| 36.3 — Verify autosave-drop data carry-through | Low | 36.1 (same file) |
+| 36.4 — Snapshot deduplication on enqueue (optional) | Medium | 36.1 complete |
+
+Stories 36.1 and 36.2 are independent and can be implemented in parallel. Story 36.3 should follow 36.1 since both touch `index.js`. Story 36.4 is optional and should only be scheduled if the team decides the defence-in-depth layer is warranted.
