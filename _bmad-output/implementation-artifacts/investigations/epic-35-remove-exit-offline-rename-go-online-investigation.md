@@ -217,3 +217,33 @@ Story 35.1 file and Epic 35 / FR-35.1 in `epics.md` updated to reflect: button r
 ### Updated Conclusion
 
 **Confidence:** High. Story 35.1 ([\_bmad-output/implementation-artifacts/35-1-hide-exit-offline-mode-widget.md](../35-1-hide-exit-offline-mode-widget.md)) and `epics.md` Epic 35 Story 35.1 are both updated and in sync. No further investigation required; ready for implementation.
+
+## Follow-up: 2026-08-04 #3
+
+### New Evidence
+
+While preparing to implement Story 35.3, traced the two flags its ACs depend on in `app.mmria.js`:
+
+- `isOfflineMode` (line ~300) and `isOfflineStatus` (line ~461) are both declared as `const ... = localStorage.getItem('is_offline') || 'false';`, inside the same synchronous `app_render` function (no `await` anywhere in it).
+- Grepped the entire file for `localStorage.setItem('is_offline', ...)` — zero matches.
+
+### Additional Findings
+
+**Confirmed (High confidence): the two flags are provably always equal for the duration of any single `app_render` call**, since nothing in the file ever mutates the `is_offline` localStorage key and the function runs synchronously start-to-finish.
+
+This directly disproves Story 35.3's premise. The "Cases Selected for Offline Work" table's outer render gate is `is_offline_mode_enabled && isOfflineMode !== 'true' && isProcessingOfflineCases !== 'true'`. Its inner button ternary is `isOfflineStatus === 'true' ? <Go Online & Sync Changes, onclick="go_online_clicked(event)"> : <Go Offline>`. Since `isOfflineStatus` always equals `isOfflineMode`, and the table can only render when `isOfflineMode !== 'true'`, the inner ternary's `true` branch (the "Go Online & Sync Changes" / `go_online_clicked` variant Story 35.3 targeted) is **unreachable dead code** — that table always renders "Go Offline" instead. There is no live "missing confirmation" inconsistency between the two buttons to fix, because the second button in question never actually shows a "Go Online" variant at all.
+
+### Updated Hypotheses
+
+N/A — this is a Confirmed finding (High confidence), not a hypothesis; see the grep/trace evidence above.
+
+### Backlog Changes
+
+| #   | Path to Explore                                                                                                                                                                                                                                                            | Priority | Status             | Notes                                                                                                                                                                                |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 5   | Story 35.3 premise verification before implementation                                                                                                                                                                                                                      | High     | **Done — INVALID** | Disproved via static trace; no code changed. Story 35.3, `epics.md` (Epic 35 detail, Story Sequencing, FR-35.3, FR Coverage Map), and `sprint-status.yaml` all updated to `invalid`. |
+| 6   | (New, not yet scheduled) Decide whether the dead `isOfflineStatus === 'true'` conditional in the "Cases Selected for Offline Work" table is a latent bug (e.g., should check a per-case/session flag instead of the global `is_offline`) or intentional-but-abandoned code | Medium   | Open               | Out of scope for Epic 35 as currently defined; needs a product/dev decision before any fix is scoped.                                                                                |
+
+### Updated Conclusion
+
+**Confidence:** High. Story 35.3 ([\_bmad-output/implementation-artifacts/35-3-align-go-online-confirmation-behavior.md](../35-3-align-go-online-confirmation-behavior.md)) is marked `invalid` with the full proof in its Dev Agent Record. Epic 35 is now effectively complete via Stories 35.1 and 35.2 (both `review`); Story 35.3 closes as invalid rather than done. The dead-conditional cleanup (Backlog item #6) is a new, separate, unscheduled finding for the team to triage.

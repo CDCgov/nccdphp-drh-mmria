@@ -1,6 +1,8 @@
 # Story 35.3: Align Go Online Confirmation Behavior
 
-Status: ready-for-dev
+Status: invalid — premise disproved, no code changed
+
+> **INVALID (2026-08-04):** This story's premise does not hold. The "Cases Selected for Offline Work" table's `isOfflineStatus === 'true'` branch (the "Go Online & Sync Changes" / `go_online_clicked` variant this story targeted) is **unreachable dead code** — see Dev Agent Record below for the proof. That button variant never renders in practice; the table always shows "Go Offline" instead. There is no live inconsistency between the two buttons to fix. No implementation was performed. See the investigation case file's Follow-up #3 for full detail and recommended next steps.
 
 ## Story
 
@@ -68,8 +70,23 @@ so that going online and syncing changes is predictable no matter where I trigge
 
 ### Agent Model Used
 
+Claude Sonnet 4.6 (bmad-agent-dev / Amelia)
+
 ### Debug Log References
+
+- Verified via `grep` that `source-code/mmria/mmria-server/wwwroot/scripts/editor/page_renderer/app.mmria.js` contains no `localStorage.setItem('is_offline', ...)` call anywhere in the file.
 
 ### Completion Notes List
 
+- **Story invalidated (2026-08-04) — no implementation performed.** Before implementing the one-line `onclick` change, traced both flags this story's AC depends on:
+  - `isOfflineMode` (line ~300) and `isOfflineStatus` (line ~461) are both declared as `const ... = localStorage.getItem('is_offline') || 'false';` inside the **same synchronous function**, `app_render` (no `await` anywhere in that function, confirmed by inspection).
+  - Since `app_render` runs to completion synchronously and nothing in the file ever calls `localStorage.setItem('is_offline', ...)`, `isOfflineMode` and `isOfflineStatus` are **guaranteed identical** for the entire duration of any single `app_render` invocation.
+  - The "Cases Selected for Offline Work" table only renders when `is_offline_mode_enabled && isOfflineMode !== 'true' && isProcessingOfflineCases !== 'true'` (outer gate). Its inner button ternary checks `isOfflineStatus === 'true' ? <Go Online button, onclick="go_online_clicked(event)"> : <Go Offline button>`.
+  - Because `isOfflineStatus` always equals `isOfflineMode`, and the outer gate already requires `isOfflineMode !== 'true'` to enter the block, the inner `isOfflineStatus === 'true'` condition is **always false** whenever this code executes. The "Go Online & Sync Changes" branch this story targeted (AC 2, line ~790) can never render — the table always shows "Go Offline" instead.
+  - This means there is no reachable "Go Online" button in that table missing a confirmation step, so AC 2 and AC 3 (which depend on that button existing and being clickable) cannot be satisfied or verified, because the code path they describe is dead.
+- No files were modified. No `onclick` change was made to avoid "fixing" a branch that can never execute, which would be a no-op change presented as if it resolved a real inconsistency.
+- **Recommendation for the team:** decide whether this dead conditional is a leftover bug (e.g., `isOfflineStatus` should check something case-specific rather than the global `is_offline` flag) or intentional-but-then-abandoned code, and whether it's worth a small cleanup story on its own. That decision is out of scope for Epic 35 as currently defined.
+
 ### File List
+
+_(none — no code changes made)_

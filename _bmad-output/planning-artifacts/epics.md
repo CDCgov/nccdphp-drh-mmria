@@ -59,7 +59,7 @@ FR-34.5: When clipboard content contains `text/plain` only (no `text/html`), pas
 FR-34.6: When the cursor is at the end of a narrative paragraph whose text begins with the pattern `^\d+\.\s` followed by non-whitespace content, pressing Enter (no modifier keys) inserts a new paragraph beginning with the next sequential integer followed by `. `, with the cursor positioned immediately after that prefix.
 FR-35.1: While a user is in offline mode, the "Exit Offline Mode" button is not shown on any page, while the "You're Offline" text/icon indicator remains visible and is right-aligned within its host container. The underlying widget, modal, and cleanup code are preserved (hidden, not deleted) for potential reuse in a future release.
 FR-35.2: Every user-visible occurrence of the "Go Online" label — both primary action buttons, their busy/connectivity state text, and the confirmation modal title and button — reads "Go Online & Sync Changes" instead.
-FR-35.3: Both "Go Online & Sync Changes" entry points (Offline Case List table and Cases Selected for Offline Work table) show the same confirmation modal before syncing changes and returning online; neither entry point bypasses confirmation.
+FR-35.3: **INVALID (2026-08-04)** — Both "Go Online & Sync Changes" entry points (Offline Case List table and Cases Selected for Offline Work table) were meant to show the same confirmation modal before syncing changes and returning online. Disproved: the "Cases Selected for Offline Work" table's "Go Online" button variant is unreachable dead code (`isOfflineStatus` always equals `isOfflineMode`, and the table's outer gate already requires `isOfflineMode !== 'true'`), so that table only ever renders "Go Offline" — there is no missing-confirmation entry point to align. See Story 35.3 detail for full proof.
 
 ### NonFunctional Requirements
 
@@ -97,7 +97,7 @@ NFR-35.1: The Epic 35 change is UI/copy-scoped only — no server-side changes, 
 - FR-35 scope decisions confirmed with the user (2026-08-03): (1) hide only — do not delete `OfflineExitManager`, the exit-offline confirmation modal, or the server cleanup calls; (2) rename "Go Online" everywhere, including the confirmation modal in `offline-modals.js`, not just the two primary buttons; (3) also fix the confirmation-modal inconsistency between the two "Go Online" entry points as part of this epic.
 - FR-35.1 host locations: `Views/Home/Index.cshtml`, `Views/Account/OfflineLogin.cshtml`, `Views/Shared/_BreadCrumbs.cshtml` (all render `[data-offline-exit-host]` divs populated by `offline-exit-manager.js`).
 - FR-35.2 rename sites: `wwwroot/scripts/editor/page_renderer/app.mmria.js` (2 static button labels), `wwwroot/scripts/offline/offline-transition-manager.js` (`set_go_online_button_state`), `wwwroot/scripts/offline/offline-network-monitor.js` (connectivity-driven state text), `wwwroot/scripts/offline/offline-modals.js` (`show_go_online_modal` title + confirm button). The busy-state text `'Going Online...'` is unchanged unless the user requests otherwise at implementation time.
-- FR-35.3: `app.mmria.js` line ~728 (`show_go_online_modal(event)`) already goes through the confirmation modal; line ~790 (`go_online_clicked(event)` called directly) bypasses it. Align the second entry point to route through the same confirmation modal as the first, rather than removing confirmation from the first.
+- FR-35.3: **INVALID** — `app.mmria.js` line ~728 (`show_go_online_modal(event)`) already goes through the confirmation modal; line ~790's `isOfflineStatus === 'true'` branch (which would call `go_online_clicked(event)` directly) can never be true when that table is rendered, since `isOfflineStatus` and `isOfflineMode` are provably always equal and the table's outer gate already requires `isOfflineMode !== 'true'`. That branch is dead code — the table always renders "Go Offline" instead. No alignment work is possible or needed against a button that never renders.
 
 ### UX Design Requirements
 
@@ -165,7 +165,7 @@ FR-34.6: Epic 34 — Numbered-paragraph Enter continuation in the narrative edit
 
 FR-35.1: Epic 35 — Hide 'Exit Offline Mode' widget while offline (code preserved, not deleted)
 FR-35.2: Epic 35 — Rename 'Go Online' to 'Go Online & Sync Changes' everywhere, including the confirmation modal
-FR-35.3: Epic 35 — Align the two 'Go Online & Sync Changes' entry points to both confirm via modal before syncing
+FR-35.3: Epic 35 — **INVALID**, not implemented — Align the two 'Go Online & Sync Changes' entry points to both confirm via modal before syncing
 
 FR-36.1: Epic 36 — Reconcile false-positive suppression: distinguish already-committed items from genuine mismatch
 FR-36.2: Epic 36 — Change stack snapshot deduplication on enqueue (optional optimization)
@@ -278,9 +278,9 @@ The case narrative PDF export renders edited rich-text narrative HTML without ad
 
 ### Epic 35: Offline Exit/Go Online UX Cleanup (Rel 4.1 P-Immediate)
 
-While a user is in offline mode, the confusing "Exit Offline Mode" escape hatch is hidden (not deleted) so it can be revisited in a future release. The "Go Online" action is renamed everywhere to "Go Online & Sync Changes" for clarity, and both entry points to that action now consistently confirm via modal before syncing.
-**FRs covered:** FR-35.1, FR-35.2, FR-35.3
-**Stories:** 35.1 — Hide Exit Offline Mode widget, 35.2 — Rename Go Online to Go Online & Sync Changes, 35.3 — Align Go Online confirmation behavior
+While a user is in offline mode, the confusing "Exit Offline Mode" escape hatch is hidden (not deleted) so it can be revisited in a future release. The "Go Online" action is renamed everywhere to "Go Online & Sync Changes" for clarity. Story 35.3 (aligning the two entry points' confirmation behavior) was found **invalid** — the targeted button variant is unreachable dead code; see Story 35.3 detail.
+**FRs covered:** FR-35.1, FR-35.2 (FR-35.3 invalid, not implemented)
+**Stories:** 35.1 — Hide Exit Offline Mode widget (done), 35.2 — Rename Go Online to Go Online & Sync Changes (done), 35.3 — Align Go Online confirmation behavior (**INVALID**, no implementation)
 
 ### Epic 36: Case Save Queue Reconcile — Idle Network Recovery Fix
 
@@ -5070,13 +5070,12 @@ So that I can build numbered items efficiently without typing the next number ma
 
 ## Epic 34 - Story Sequencing
 
-
-| Story | Risk | Dependencies |
-|---|---|---|
-| 34.1 - Normalize case narrative PDF whitespace conversion | Medium | Existing case narrative editor fidelity behavior from Epic 1; supplied spacing fixtures |
-| 34.2 - Collapse BR plus empty paragraph separators | Medium | Story 34.1 PDF converter changes; QA spacing fixture in `docs/ai/local/case-narrative-spacing/qa/html.txt` |
-| 34.3 - Preserve line structure when pasting plain text | Low | Stories 34.1 and 34.2 complete; Story 1.1 save-path fix |
-| 34.4 - Numbered-paragraph keyboard continuation | Low | Story 34.3 (paste creates numbered paragraphs that 34.4 operates on) |
+| Story                                                     | Risk   | Dependencies                                                                                               |
+| --------------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------- |
+| 34.1 - Normalize case narrative PDF whitespace conversion | Medium | Existing case narrative editor fidelity behavior from Epic 1; supplied spacing fixtures                    |
+| 34.2 - Collapse BR plus empty paragraph separators        | Medium | Story 34.1 PDF converter changes; QA spacing fixture in `docs/ai/local/case-narrative-spacing/qa/html.txt` |
+| 34.3 - Preserve line structure when pasting plain text    | Low    | Stories 34.1 and 34.2 complete; Story 1.1 save-path fix                                                    |
+| 34.4 - Numbered-paragraph keyboard continuation           | Low    | Story 34.3 (paste creates numbered paragraphs that 34.4 operates on)                                       |
 
 Stories 34.1 and 34.2 (complete) address PDF rendering. Story 34.3 fixes the editor paste path and is independent of PDF behavior. Story 34.4 builds on the clean numbered paragraphs that Story 34.3 produces and should follow it.
 
@@ -5095,7 +5094,7 @@ So that I am not tempted into an escape hatch that discards my offline changes, 
 **Acceptance Criteria:**
 
 **Given** a user is in offline mode (`isOfflineModeActive()`, `isProcessingOfflineCases()`, or `isOfflineModeServerSession()` is true)
-**When** any page renders a `[data-offline-exit-host]` widget host (Home/Index, Account/OfflineLogin, Shared/_BreadCrumbs)
+**When** any page renders a `[data-offline-exit-host]` widget host (Home/Index, Account/OfflineLogin, Shared/\_BreadCrumbs)
 **Then** no "Exit Offline Mode" button is visible anywhere on the page.
 
 **Given** a user is in offline mode
@@ -5115,6 +5114,7 @@ So that I am not tempted into an escape hatch that discards my offline changes, 
 **Then** `finishPendingCleanup()` still runs unaffected, since only the button's rendering is suppressed, not the cleanup pipeline.
 
 **Implementation Notes:**
+
 - Primary file: `source-code/mmria/mmria-server/wwwroot/scripts/offline/offline-exit-manager.js`.
 - Fix point is `renderWidgetMarkup()`: remove the `<button data-action="show-exit-offline-mode">` element from the returned template string; keep the icon + `<span>You're Offline</span>` div. Do **not** change `shouldShowExitWidget()` — it correctly continues to gate the remaining indicator's visibility to "while offline."
 - Add right-alignment styling to the outer `.mmria-offline-exit-widget` wrapper (e.g. `width: 100%; justify-content: flex-end;`) so the remaining text/icon sits flush right now that the button no longer occupies that space — most impactful on `Views/Home/Index.cshtml`, whose host `<div>` has no existing flex/alignment styling of its own.
@@ -5122,6 +5122,7 @@ So that I am not tempted into an escape hatch that discards my offline changes, 
 - Do not delete `offline-modals.js`'s `show_exit_offline_mode_modal`, `OfflineExitManager.confirmExitOfflineMode`, or any server cleanup call (`/api/OfflineCase/update-offline-state`, `/api/OfflineCase/release-case-locks`) — this is a hide-only change per explicit user decision.
 
 **Evidence:**
+
 - `offline-exit-manager.js:404-421` (`renderWidgetMarkup`), `:426-441` (`initializeWidgetHosts`), `:576-580` (`shouldShowExitWidget`).
 - Host divs: `Views/Home/Index.cshtml:167`, `Views/Account/OfflineLogin.cshtml:43`, `Views/Shared/_BreadCrumbs.cshtml:25`.
 
@@ -5146,22 +5147,26 @@ So that it's clear the action both reconnects me and syncs my offline work.
 **Then** both read "Go Online & Sync Changes" (or a natural title-cased variant of it), consistent with the button label.
 
 **Implementation Notes:**
+
 - Files to update in lockstep: `wwwroot/scripts/editor/page_renderer/app.mmria.js` (2 static button labels, lines ~728 and ~790), `wwwroot/scripts/offline/offline-transition-manager.js` (`set_go_online_button_state`, line ~208), `wwwroot/scripts/offline/offline-network-monitor.js` (connectivity state text, lines ~69 and ~80), `wwwroot/scripts/offline/offline-modals.js` (`show_go_online_modal` title line ~416 and confirm button line ~434).
 - Do not change the busy-state string `"Going Online..."` unless separately requested.
 - No server-side or metadata changes — this is a client-side JS string change only, consistent with project-context.md's no-build-step vanilla JS rule for `wwwroot/`.
 
 **Evidence:**
+
 - `app.mmria.js:728,790` (`id="go-online-btn"`, two independent render sites).
 - `offline-transition-manager.js:196-209`, `offline-network-monitor.js:54-86` (dynamic state text writers on the same DOM elements).
 - `offline-modals.js:409-459` (`show_go_online_modal`, modal title + confirm button).
 
-### Story 35.3: Align Go Online Confirmation Behavior
+### Story 35.3: Align Go Online Confirmation Behavior — **INVALID, not implemented**
+
+> **Status: INVALID (2026-08-04).** This story's premise does not hold. `isOfflineMode` and `isOfflineStatus` in `app.mmria.js` are both `localStorage.getItem('is_offline') || 'false'`, declared in the same synchronous `app_render` function with no mutation between them. The "Cases Selected for Offline Work" table only renders when `isOfflineMode !== 'true'`, but its inner button ternary requires `isOfflineStatus === 'true'` to show the "Go Online & Sync Changes" / `go_online_clicked` variant this story targeted — since the two flags are always equal, that condition can never be true inside the block. The button this story meant to align always renders as "Go Offline" instead; there is no reachable, missing-confirmation "Go Online" button in that table. No code was changed. See `_bmad-output/implementation-artifacts/35-3-align-go-online-confirmation-behavior.md` Dev Agent Record for the full proof, and the investigation case file's Follow-up #3 for the original finding.
 
 As a case reviewer working in offline mode,
 I want the same confirmation experience regardless of which table's button I click,
 So that going online and syncing changes is predictable no matter where I trigger it from.
 
-**Acceptance Criteria:**
+**Acceptance Criteria (unmet — premise invalid):**
 
 **Given** the "Go Online & Sync Changes" button in the "Offline Case List" table (`show_go_online_modal(event)`, line ~728)
 **When** it is clicked
@@ -5175,23 +5180,26 @@ So that going online and syncing changes is predictable no matter where I trigge
 **When** `go_online_clicked` executes
 **Then** existing connectivity checks, diagnostic logging, and sync behavior are unchanged — only the missing confirmation step is added to the second entry point.
 
-**Implementation Notes:**
+**Implementation Notes (not executed — story invalidated before implementation):**
+
 - Primary file: `source-code/mmria/mmria-server/wwwroot/scripts/editor/page_renderer/app.mmria.js`.
 - Change the second button's `onclick` from `go_online_clicked(event)` to `show_go_online_modal(event)`, matching the first button, so both routes go through the confirmation modal before syncing.
 - No change to `go_online_clicked` itself or to the modal's own confirm handler.
 
 **Evidence:**
+
 - Side finding from the Epic 35 investigation case file: the two "Go Online" buttons in `app.mmria.js` have inconsistent click handlers — one confirms via modal, one does not.
+- **Invalidating evidence:** `app.mmria.js` line ~300 (`isOfflineMode`) and line ~461 (`isOfflineStatus`) both read `localStorage.getItem('is_offline') || 'false'` inside the same synchronous `app_render` function, with no `localStorage.setItem('is_offline', ...)` call anywhere in the file (confirmed via grep) — so the two flags are provably always equal, making the targeted button branch unreachable dead code.
 
 ## Epic 35 — Story Sequencing
 
-| Story | Risk | Dependencies |
-|---|---|---|
-| 35.1 - Hide Exit Offline Mode widget | Low | None — pure visibility change, code untouched otherwise |
-| 35.2 - Rename Go Online to Go Online & Sync Changes | Low | None — string-only change across 4 files |
-| 35.3 - Align Go Online confirmation behavior | Low | Story 35.2 label change should land first so the aligned button shows the correct new label |
+| Story                                               | Risk        | Dependencies                                                                                                                              |
+| --------------------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| 35.1 - Hide Exit Offline Mode widget                | Low         | None — pure visibility change, code untouched otherwise                                                                                   |
+| 35.2 - Rename Go Online to Go Online & Sync Changes | Low         | None — string-only change across 4 files                                                                                                  |
+| 35.3 - Align Go Online confirmation behavior        | **INVALID** | Premise disproved 2026-08-04 — targeted button branch is unreachable dead code (see Story 35.3 detail above); no implementation performed |
 
-All three stories are low-risk, surgical, client-side-only changes with no server or metadata impact. Recommended sequencing: 35.1 and 35.2 can proceed in parallel; 35.3 should follow 35.2 so the newly-aligned button already carries the renamed label.
+Stories 35.1 and 35.2 are low-risk, surgical, client-side-only changes with no server or metadata impact and are complete (`review`). Story 35.3 is invalid as scoped — the "Cases Selected for Offline Work" table's `isOfflineStatus === 'true'` branch can never render given `isOfflineMode`/`isOfflineStatus` are provably always equal, so there is no reachable inconsistency to fix. A future team decision is needed on whether the dead conditional itself warrants a separate cleanup story.
 
 ---
 
@@ -5233,6 +5241,7 @@ So that developers and reviewers are not misled by false-positive "unmatched edi
 **Then** no warning is emitted and no splice is attempted
 
 **Implementation note:** The distinction between "already-committed" and "genuine mismatch" is:
+
 - **Already-committed**: `g_change_stack.length < snapshot_items.length` AND the items at the live stack head do not match snapshot position 0 (or the live stack is empty). Treat as clean — no warn.
 - **Genuine mismatch**: `g_change_stack.length >= snapshot_items.length` but at least one position differs. Warn and leave intact.
 
@@ -5240,9 +5249,9 @@ All changes are in `wwwroot/scripts/case/index.js`. No server-side changes.
 
 **Files:** `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js`
 
-| Dependency | Risk |
-|---|---|
-| None — isolated reconcile function change | Low |
+| Dependency                                | Risk |
+| ----------------------------------------- | ---- |
+| None — isolated reconcile function change | Low  |
 
 ### Story 36.2: Verify Rev Poll Generation Guard During Network Outage
 
@@ -5267,9 +5276,9 @@ So that I am not forced to reload a case that I was the only one editing.
 
 **Files:** `source-code/mmria/mmria-server/wwwroot/scripts/case/case-rev-check.js`
 
-| Dependency | Risk |
-|---|---|
-| None — read/verify only unless gap found | Low |
+| Dependency                               | Risk |
+| ---------------------------------------- | ---- |
+| None — read/verify only unless gap found | Low  |
 
 ### Story 36.3: Verify Autosave-Drop Data Carry-Through
 
@@ -5293,9 +5302,9 @@ So that I can trust the inactivity save captures my full work.
 
 **Files:** `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js`, `source-code/mmria/mmria-server/wwwroot/scripts/case/edit-inactivity-manager.js`
 
-| Dependency | Risk |
-|---|---|
-| Story 36.1 (reconcile fix in same file) | Low |
+| Dependency                              | Risk |
+| --------------------------------------- | ---- |
+| Story 36.1 (reconcile fix in same file) | Low  |
 
 ### Story 36.4 (Optional): Change Stack Snapshot Deduplication on Enqueue
 
@@ -5316,17 +5325,17 @@ So that the reconcile false-positive cannot occur even if Story 36.1's reconcile
 
 **Files:** `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js`
 
-| Dependency | Risk |
-|---|---|
+| Dependency                  | Risk                                                           |
+| --------------------------- | -------------------------------------------------------------- |
 | Story 36.1 must be complete | Medium — offset logic must be tested against all enqueue paths |
 
 ## Epic 36 - Story Sequencing
 
-| Story | Risk | Dependencies |
-|---|---|---|
-| 36.1 — Fix false-positive reconcile warning | Low | None |
-| 36.2 — Verify rev poll generation guard | Low | None (parallel with 36.1) |
-| 36.3 — Verify autosave-drop data carry-through | Low | 36.1 (same file) |
-| 36.4 — Snapshot deduplication on enqueue (optional) | Medium | 36.1 complete |
+| Story                                               | Risk   | Dependencies              |
+| --------------------------------------------------- | ------ | ------------------------- |
+| 36.1 — Fix false-positive reconcile warning         | Low    | None                      |
+| 36.2 — Verify rev poll generation guard             | Low    | None (parallel with 36.1) |
+| 36.3 — Verify autosave-drop data carry-through      | Low    | 36.1 (same file)          |
+| 36.4 — Snapshot deduplication on enqueue (optional) | Medium | 36.1 complete             |
 
 Stories 36.1 and 36.2 are independent and can be implemented in parallel. Story 36.3 should follow 36.1 since both touch `index.js`. Story 36.4 is optional and should only be scheduled if the team decides the defence-in-depth layer is warranted.

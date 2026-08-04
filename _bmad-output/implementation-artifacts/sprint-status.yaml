@@ -1,5 +1,5 @@
 # generated: 2026-07-14
-last_updated: 2026-08-03
+last_updated: 2026-08-04
 # project: mmria
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@ last_updated: 2026-08-03
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-07-14
-last_updated: 2026-08-03
+last_updated: 2026-08-04
 project: mmria
 project_key: NOKEY
 tracking_system: file-system
@@ -301,5 +301,5 @@ development_status:
   epic-35: in-progress
   35-1-hide-exit-offline-mode-widget: review
   35-2-rename-go-online-to-go-online-and-sync-changes: review
-  35-3-align-go-online-confirmation-behavior: ready-for-dev
+  35-3-align-go-online-confirmation-behavior: invalid # premise disproved 2026-08-04 — dead code, see story file Dev Agent Record
   epic-35-retrospective: optional
