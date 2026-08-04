@@ -5,6 +5,10 @@ FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-imag
 
 USER root
 
+# Remove curl packages that are not used by the S2I assemble/run scripts to
+# eliminate inherited curl/libcurl high findings from the builder image.
+RUN dnf remove -y curl-minimal libcurl-minimal && dnf clean all
+
 # Update libacl to address CVE-2026-54369 (symlink traversal privilege escalation;
 # fixed in libacl-2.4.0-1.el9_8)
 RUN dnf update -y libacl && dnf clean all
