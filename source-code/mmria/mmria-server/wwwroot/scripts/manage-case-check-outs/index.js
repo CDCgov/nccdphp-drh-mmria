@@ -9,7 +9,7 @@ var case_view_request = {
     page :1,
     skip : 0,
     take : 100,
-    sort : "by_date_created",
+    sort : "by_date_last_updated",
     search_key : null,
     descending : true,
     get_query_string : function(){
