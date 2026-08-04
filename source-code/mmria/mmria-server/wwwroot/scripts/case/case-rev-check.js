@@ -35,8 +35,9 @@ function mmria_do_case_reload() {
  * Called when a case save returns a 409 conflict.
  */
 function showStaleCaseModal() {
-    var existingModal = document.getElementById('mmria-stale-case-modal');
-    if (existingModal && existingModal.parentNode) existingModal.parentNode.removeChild(existingModal);
+    // If either stale modal is already visible, don't stack another one.
+    if (document.getElementById('mmria-stale-case-modal')) return;
+    if (document.getElementById('mmria-stale-case-banner')) return;
     var existingBackdrop = document.getElementById('mmria-stale-case-modal-backdrop');
     if (existingBackdrop && existingBackdrop.parentNode) existingBackdrop.parentNode.removeChild(existingBackdrop);
 
@@ -51,7 +52,7 @@ function showStaleCaseModal() {
         '            style="margin:0; font-weight:600; font-size:17px;">This case was updated</h4>' +
         '      </div>' +
         '      <div class="modal-body" style="padding:20px;">' +
-        '        <p id="mmria-stale-case-modal-msg" style="font-size:16px; color:#333; margin:0;">' +
+        '        <p id="mmria-stale-case-modal-msg" style="font-size:16px; color:#333; margin:0;" aria-live="assertive">' +
         '          This case was updated elsewhere. Reload to get the latest version before saving.' +
         '        </p>' +
         '      </div>' +
@@ -68,6 +69,15 @@ function showStaleCaseModal() {
 
     var modal = document.getElementById('mmria-stale-case-modal');
     var backdrop = document.getElementById('mmria-stale-case-modal-backdrop');
+
+    // Focus trap — keep Tab within the modal (single focusable element).
+    modal.addEventListener('keydown', function (e) {
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            var btn = document.getElementById('mmria-stale-case-reload-btn');
+            if (btn) btn.focus();
+        }
+    });
 
     setTimeout(function () {
         if (modal) { modal.classList.add('show'); modal.style.display = 'block'; }
@@ -93,6 +103,11 @@ function showStaleCaseModal() {
  */
 function showStaleCaseBanner() {
     if (document.getElementById('mmria-stale-case-banner')) return;
+    if (document.getElementById('mmria-stale-case-modal')) return;
+
+    // Stop polling now — no point continuing once the case is known stale.
+    // The reload will restart polling with the fresh _rev.
+    stopCaseRevPolling();
 
     if (typeof window.mmria_mark_case_stale === 'function') window.mmria_mark_case_stale();
 
@@ -107,7 +122,7 @@ function showStaleCaseBanner() {
         '            style="margin:0; font-weight:600; font-size:17px;">This case was updated</h4>' +
         '      </div>' +
         '      <div class="modal-body" style="padding:20px;">' +
-        '        <p id="mmria-stale-case-banner-msg" style="font-size:16px; color:#333; margin:0;">' +
+        '        <p id="mmria-stale-case-banner-msg" style="font-size:16px; color:#333; margin:0;" aria-live="assertive">' +
         '          This case has been updated. Reload to see the latest version.' +
         '        </p>' +
         '      </div>' +
@@ -130,9 +145,18 @@ function showStaleCaseBanner() {
         if (backdrop && backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
     }
 
+    // Focus trap — keep Tab within the modal (single focusable element).
+    modal.addEventListener('keydown', function (e) {
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            var btn = document.getElementById('mmria-stale-case-banner-reload');
+            if (btn) btn.focus();
+        }
+    });
+
     setTimeout(function () {
         if (modal) { modal.classList.add('show'); modal.style.display = 'block'; }
-        if (backdrop) { backdrop.classList.add('show'); }
+        if (backdrop) { backdrop.classList.add('show'); };
         var reloadBtn = document.getElementById('mmria-stale-case-banner-reload');
         if (reloadBtn) reloadBtn.focus();
     }, 10);
