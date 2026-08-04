@@ -5,6 +5,8 @@ using System.Collections.Generic;
 using System.Linq;
 using Akka.Actor;
 using mmria.server.model.actor;
+using mmria.common.SharedLibraries.DeIdentified;
+using mmria.common.SharedLibraries.Report;
 
 namespace mmria.server.model.actor;
 public sealed class Sync_Document_Message
@@ -54,19 +56,25 @@ public sealed class Synchronize_Case : UntypedActor
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly mmria.common.couchdb.OverridableConfiguration _configuration;
     private readonly string _host_prefix;
+    private readonly IDeIdentifiedRepository _deIdentifiedRepository;
+    private readonly IReportRepository _reportRepository;
 
     public Synchronize_Case
     (
         mmria.common.couchdb.DBConfigurationDetail _db_config,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
         mmria.common.couchdb.OverridableConfiguration configuration = null,
-        string host_prefix = null
+        string host_prefix = null,
+        IDeIdentifiedRepository deIdentifiedRepository = null,
+        IReportRepository reportRepository = null
     )
     {
         db_config = _db_config;
         _couchDbHttpClient = couchDbHttpClient;
         _configuration = configuration;
         _host_prefix = host_prefix;
+        _deIdentifiedRepository = deIdentifiedRepository;
+        _reportRepository = reportRepository;
     }
     protected override void OnReceive(object message)
     {
@@ -84,6 +92,8 @@ public sealed class Synchronize_Case : UntypedActor
                 sync_document_message.metadata_version,
                 db_config,
                 _couchDbHttpClient,
+                deIdentifiedRepository: _deIdentifiedRepository,
+                reportRepository: _reportRepository,
                 configuration: _configuration,
                 host_prefix: _host_prefix
             );

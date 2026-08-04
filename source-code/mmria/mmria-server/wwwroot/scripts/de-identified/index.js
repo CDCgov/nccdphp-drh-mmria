@@ -140,7 +140,7 @@ var g_ui = {
     page :1,
     skip : 0,
     take : 100,
-    sort : "date_last_updated",
+    sort : "by_date_created",
     search_key : null,
     descending : true,
     case_status: "3",

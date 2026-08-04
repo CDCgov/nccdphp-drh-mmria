@@ -30,7 +30,8 @@ public sealed class caseController: ControllerBase
     private readonly mmria.common.SharedLibraries.Case.ICaseRepository _caseRepository;
 
     private readonly IAuthorizationService _authorizationService;
-    //private readonly IDocumentRepository _documentRepository;
+    private readonly mmria.common.SharedLibraries.DeIdentified.IDeIdentifiedRepository _deIdentifiedRepository;
+    private readonly mmria.common.SharedLibraries.Report.IReportRepository _reportRepository;
 
     public caseController
     ( 
@@ -39,7 +40,9 @@ public sealed class caseController: ControllerBase
         IAuthorizationService authorizationService,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
         mmria.common.SharedLibraries.Case.Manager.CaseManager caseManager,
-        mmria.common.SharedLibraries.Case.ICaseRepository caseRepository
+        mmria.common.SharedLibraries.Case.ICaseRepository caseRepository,
+        mmria.common.SharedLibraries.DeIdentified.IDeIdentifiedRepository deIdentifiedRepository,
+        mmria.common.SharedLibraries.Report.IReportRepository reportRepository
     )
     {
         configuration = tenantRuntime.RequireConfiguration();
@@ -49,6 +52,8 @@ public sealed class caseController: ControllerBase
         _couchDbHttpClient = couchDbHttpClient;
         _caseManager = caseManager;
         _caseRepository = caseRepository;
+        _deIdentifiedRepository = deIdentifiedRepository;
+        _reportRepository = reportRepository;
 
         host_prefix = tenantRuntime.EffectiveHostPrefix;
     }
@@ -192,7 +197,7 @@ public sealed class caseController: ControllerBase
                     configuration.GetString("metadata_version", host_prefix)
                 );
 
-                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(Sync_Document_Message);
+                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix, _deIdentifiedRepository, _reportRepository)).Tell(Sync_Document_Message);
             }
 
             return saveResult.Response;
@@ -241,7 +246,7 @@ public sealed class caseController: ControllerBase
                 configuration.GetString("metadata_version", host_prefix)
             );
 
-            _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(Sync_Document_Message);
+            _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix, _deIdentifiedRepository, _reportRepository)).Tell(Sync_Document_Message);
         }
 
         return Ok(new { ok = true });
@@ -299,7 +304,7 @@ public sealed class caseController: ControllerBase
                         configuration.GetString("metadata_version", host_prefix)
                     );
 
-                    _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(Sync_Document_Message);
+                    _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix, _deIdentifiedRepository, _reportRepository)).Tell(Sync_Document_Message);
                 }
             }
 
@@ -350,7 +355,7 @@ public sealed class caseController: ControllerBase
                     configuration.GetString("metadata_version", host_prefix)
                 );
 
-                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(Sync_Document_Message);
+                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix, _deIdentifiedRepository, _reportRepository)).Tell(Sync_Document_Message);
 
                 return Ok(new { success = true, is_offline = toggleResult.IsOffline, message = toggleResult.Message });
             }
@@ -407,7 +412,7 @@ public sealed class caseController: ControllerBase
                     configuration.GetString("metadata_version", host_prefix)
                 );
 
-                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(Sync_Document_Message);
+                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix, _deIdentifiedRepository, _reportRepository)).Tell(Sync_Document_Message);
 
                 return Ok(new
                 {
@@ -455,7 +460,7 @@ public sealed class caseController: ControllerBase
                         configuration.GetString("metadata_version", host_prefix)
                     );
 
-                    _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(Sync_Document_Message);
+                    _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix, _deIdentifiedRepository, _reportRepository)).Tell(Sync_Document_Message);
                 }
 
                 return deleteResult.Result;
