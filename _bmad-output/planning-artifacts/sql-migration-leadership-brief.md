@@ -62,16 +62,19 @@ Today, each release requires updating configuration and metadata stored across 7
 ### 2. Application Complexity
 The codebase carries years of accumulated complexity from supporting both single-tenant and multi-tenant modes, as well as the evolution from a centralized to a decentralized architecture and back. This makes the application difficult to maintain and especially difficult for new team members to learn. SQL migration is an opportunity to remove that complexity at its source.
 
-### 3. Technology Supportability
+### 3. Resource Consumption at Scale
+CouchDB is memory-intensive by nature — it loads data into memory aggressively and does not release it. Each jurisdiction's database instance consumes approximately **800 MB of memory at idle**, and that figure grows over time even when no users are active. Across 72 database pods, this means MMRIA is consuming over **57 GB of memory at a minimum, around the clock, regardless of user activity**. A single SQL database instance serving all jurisdictions would eliminate this compounding idle cost.
+
+### 4. Technology Supportability
 CouchDB is a capable database, but it is a niche technology with a narrower talent pool and tooling ecosystem than SQL. SQL is the most widely supported database technology in the industry. This improves hiring options, vendor support, and long-term maintainability.
 
-### 4. Data Integrity
+### 5. Data Integrity
 SQL databases provide mature, well-tested tools for enforcing data integrity — constraints, transactions, foreign keys. These reduce the risk of data inconsistency and make auditing and reporting more reliable.
 
-### 5. Developer Onboarding
+### 6. Developer Onboarding
 The current architecture — multiple databases, spread configuration, single-tenant/multi-tenant toggle code — creates a steep learning curve for new developers. A simpler, SQL-backed architecture is easier to understand, test, and extend.
 
-### 6. Development and Testing Environment Costs
+### 7. Development and Testing Environment Costs
 The production architecture does not exist in isolation. Development, QA, and Integration environments each require their own set of pods to support the application — and while those environments do not mirror production one-to-one, they still carry a significantly larger footprint than necessary. That excess has a direct impact on cloud resource costs and environment setup time. The future state model of one application, one database, and one services component would make standing up or tearing down any environment fast and inexpensive.
 
 ---
@@ -84,6 +87,7 @@ The production architecture does not exist in isolation. Development, QA, and In
 | Release surface area | 72 databases to update | 1 |
 | Configuration management | Distributed across 72 DBs | Centralized |
 | Technology familiarity | Niche (CouchDB) | Universal (SQL) |
+| Idle memory consumption | ~57 GB minimum (72 × ~800 MB), growing | Fraction of that, consolidated |
 | Developer onboarding difficulty | High | Moderate |
 | Dev/QA/INT environment footprint | Excess pods across all environments | 3 components per environment |
 
