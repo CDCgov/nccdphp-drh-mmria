@@ -39,9 +39,12 @@ FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-imag
 WORKDIR /app
 
 # Update libacl to address CVE-2026-54369 (symlink traversal privilege escalation;
-# fixed in libacl-2.4.0-1.el9_8). Fall back to microdnf for UBI-minimal variants.
+# fixed in libacl-2.4.0-1.el9_8) and curl-minimal/libcurl-minimal to address
+# CVE-2026-11352, CVE-2026-11586, CVE-2026-8286, CVE-2026-8925, CVE-2026-9547.
+# Fall back to microdnf for UBI-minimal variants.
 USER root
-RUN (dnf update -y libacl && dnf clean all) || (microdnf update -y libacl && microdnf clean all)
+RUN (dnf update -y libacl curl-minimal libcurl-minimal && dnf clean all) || \
+    (microdnf update -y libacl curl-minimal libcurl-minimal && microdnf clean all)
 
 # Copy published output from build image
 COPY --from=publish /app/publish .
