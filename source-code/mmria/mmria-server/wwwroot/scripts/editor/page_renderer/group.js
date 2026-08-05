@@ -20,7 +20,11 @@ function group_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obj
         p_result.push(get_only_size_and_position_string(style_object.control.style));
     }
 
-    if(g_data.created_by != "vitals-import" && vital_group_set[p_dictionary_path])
+    if(p_dictionary_path == "/social_and_environmental_profile/gender_identity")
+    {
+        p_result.push(";display:none;");
+    }
+    else if(g_data.created_by != "vitals-import" && vital_group_set[p_dictionary_path])
     {
         p_result.push(";display:none;");
     }

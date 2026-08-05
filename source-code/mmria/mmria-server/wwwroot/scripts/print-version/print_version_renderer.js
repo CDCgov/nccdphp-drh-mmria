@@ -25,6 +25,7 @@ function print_version_render
   switch (p_metadata.type.toLowerCase()) 
   {
     case 'group':
+      if (p_metadata.name == 'gender_identity') break;
       result.push('<fieldset>');
       //result.push(p_path)
       result.push('<legend><strong>');

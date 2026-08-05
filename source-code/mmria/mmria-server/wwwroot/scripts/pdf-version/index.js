@@ -2154,6 +2154,7 @@ function print_pdf_render_content(ctx) {
 					ctx.metadata.name == 'vitals_import_group') {
 					showIt = ctx.createdBy == 'vitals-import' ? true : false;
 				}
+				if (ctx.metadata.name == 'gender_identity') showIt = false;
 				if (showIt) {
 					if (ctx.groupLevel == 0) {
 						ctx.content.push([
