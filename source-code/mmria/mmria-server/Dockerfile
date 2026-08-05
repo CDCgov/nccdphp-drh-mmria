@@ -1,6 +1,6 @@
 # ----- Stage 1: Build -----
 # https://catalog.redhat.com/en/software/containers/ubi8/dotnet-90/672bc9015e6e9c0c6f7d2ff7
-FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100:9.8-1785401075@sha256:25cd4f9ebda2abe0f7c83a536437d246b39ca6837f97b669bd2f4b0f029fa7bd AS build
+FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100:9.8-1785892712@sha256:05a11063b0915667415a1b57b8aff2e69b45df16341f29258ae56a0dafdcd74d AS build
 WORKDIR /src
 
 # Copy only the csproj for dependency caching
