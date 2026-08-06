@@ -14,6 +14,8 @@ using mmria.common.SharedLibraries.OfflineCase.Model;
 using mmria.common.couchdb;
 using mmria.common.model.couchdb;
 using mmria.common.utils;
+using mmria.common.SharedLibraries.DeIdentified;
+using mmria.common.SharedLibraries.Report;
 namespace mmria.server;
 
 [Route("api/[controller]")]
@@ -26,6 +28,8 @@ public sealed class OfflineCaseController: ControllerBase
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly DBConfigurationDetail db_config;
     private string host_prefix = null;
+    private readonly IDeIdentifiedRepository _deIdentifiedRepository;
+    private readonly IReportRepository _reportRepository;
 
     public OfflineCaseController
     (
@@ -33,7 +37,9 @@ public sealed class OfflineCaseController: ControllerBase
         IOfflineCaseManager manager,
         ActorSystem actorSystem,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
-        mmria.server.util.RequestTenantRuntime tenantRuntime
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        IDeIdentifiedRepository deIdentifiedRepository,
+        IReportRepository reportRepository
     )
     {
         _httpContextAccessor = httpContextAccessor;
@@ -43,6 +49,8 @@ public sealed class OfflineCaseController: ControllerBase
         host_prefix = tenantRuntime.EffectiveHostPrefix;
         _configuration = tenantRuntime.RequireConfiguration();
         db_config = tenantRuntime.RequireDbConfig();
+        _deIdentifiedRepository = deIdentifiedRepository;
+        _reportRepository = reportRepository;
     }
 
     private string GetUserName()
@@ -312,7 +320,7 @@ public sealed class OfflineCaseController: ControllerBase
                     _configuration.GetString("metadata_version", host_prefix)
                 );
 
-                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, _configuration, host_prefix)).Tell(syncDocumentMessage);
+                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, _configuration, host_prefix, _deIdentifiedRepository, _reportRepository)).Tell(syncDocumentMessage);
             }
 
             return saveResult.Response;

@@ -184,7 +184,7 @@ prenatal/routine_monitoring/date_and_time
 
         var gs = new migrate.C_Get_Set_Value(new ());
         
-        var metadata = await _metadataRepository.GetAppDocumentAsync(metadata_version, db_config);
+        var metadata = _metadata ?? await _metadataRepository.GetAppDocumentAsync(metadata_version, db_config);
 
 		System.Dynamic.ExpandoObject source_object = _source_object ?? Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (source_json);
 

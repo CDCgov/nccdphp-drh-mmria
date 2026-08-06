@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using mmria.common.metadata;
 using mmria.common.SharedLibraries.CaseValidation.Model;
+using mmria.common.SharedLibraries.DeIdentified;
+using mmria.common.SharedLibraries.Report;
 using mmria.server.extension;
 using mmria.server.util;
 using Newtonsoft.Json;
@@ -21,13 +23,17 @@ public sealed class case_validationController : ControllerBase
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly mmria.common.SharedLibraries.MetadataVersion.Manager.MetadataVersionManager _metadataVersionManager;
     private readonly mmria.common.SharedLibraries.CaseValidation.Manager.CaseValidationManager _caseValidationManager;
+    private readonly IDeIdentifiedRepository _deIdentifiedRepository;
+    private readonly IReportRepository _reportRepository;
 
     public case_validationController(
         RequestTenantRuntime tenantRuntime,
         ActorSystem actorSystem,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
         mmria.common.SharedLibraries.MetadataVersion.Manager.MetadataVersionManager metadataVersionManager,
-        mmria.common.SharedLibraries.CaseValidation.Manager.CaseValidationManager caseValidationManager)
+        mmria.common.SharedLibraries.CaseValidation.Manager.CaseValidationManager caseValidationManager,
+        IDeIdentifiedRepository deIdentifiedRepository,
+        IReportRepository reportRepository)
     {
         _configuration = tenantRuntime.RequireConfiguration();
         _dbConfig = tenantRuntime.RequireDbConfig();
@@ -36,6 +42,8 @@ public sealed class case_validationController : ControllerBase
         _couchDbHttpClient = couchDbHttpClient;
         _metadataVersionManager = metadataVersionManager;
         _caseValidationManager = caseValidationManager;
+        _deIdentifiedRepository = deIdentifiedRepository;
+        _reportRepository = reportRepository;
     }
 
     [Authorize(Roles = "abstractor, data_analyst, form_designer")]
@@ -192,7 +200,7 @@ public sealed class case_validationController : ControllerBase
                     "PUT",
                     metadataVersion);
 
-                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(_dbConfig, _couchDbHttpClient, _configuration, _hostPrefix)).Tell(syncDocumentMessage);
+                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(_dbConfig, _couchDbHttpClient, _configuration, _hostPrefix, _deIdentifiedRepository, _reportRepository)).Tell(syncDocumentMessage);
             }
 
             return Ok(new
