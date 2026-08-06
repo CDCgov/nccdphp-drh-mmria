@@ -1,5 +1,5 @@
 # generated: 2026-07-14
-last_updated: 2026-08-03
+last_updated: 2026-08-05
 # project: mmria
 # project_key: NOKEY
 # tracking_system: file-system
@@ -292,14 +292,32 @@ development_status:
   epic-33-retrospective: optional
 
   # ── Epic 34: Case Narrative PDF Spacing Fidelity ──────────────────────────
-  epic-34: in-progress
+  epic-34: done
   34-1-normalize-case-narrative-pdf-whitespace-conversion: done
-  34-2-collapse-br-empty-paragraph-separators: ready-for-dev
+  34-2-collapse-br-empty-paragraph-separators: done
   epic-34-retrospective: optional
 
   # ── Epic 35: Offline Exit/Go Online UX Cleanup (Rel 4.1 P-Immediate) ──────
-  epic-35: in-progress
-  35-1-hide-exit-offline-mode-widget: review
-  35-2-rename-go-online-to-go-online-and-sync-changes: review
-  35-3-align-go-online-confirmation-behavior: ready-for-dev
+  epic-35: done
+  35-1-hide-exit-offline-mode-widget: done
+  35-2-rename-go-online-to-go-online-and-sync-changes: done
+  35-3-align-go-online-confirmation-behavior: done
   epic-35-retrospective: optional
+
+  # ── Epic 36: Case Save Queue Reconcile — Idle Network Recovery Fix ────────
+  epic-36: done
+  36-1-fix-false-positive-reconcile-warning: done
+  36-2-verify-rev-poll-generation-guard: done
+  36-3-verify-autosave-drop-data-carry-through: done
+  36-4-change-stack-snapshot-deduplication-on-enqueue: done
+  epic-36-retrospective: optional
+
+  # ── Epic 37: Form Designer Removal — Static HTML Form Rendering ───────────
+  epic-37: backlog
+  37-1-html-generator-build-tool: backlog
+  37-2-form-binder-js-data-binding-layer: backlog
+  37-3-wire-case-editor-view: backlog
+  37-4-wire-read-only-views: backlog
+  37-5-remove-form-designer: backlog
+  37-6-remove-js-rendering-engine: backlog
+  epic-37-retrospective: optional

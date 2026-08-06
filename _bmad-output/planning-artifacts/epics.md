@@ -70,6 +70,17 @@ NFR-33.1: Generator improvements must remain a low-impact utilities change: no m
 NFR-34.1: The case narrative PDF spacing fix remains surgical, with no new client-side dependencies, no bundler changes, no storage migration, and no broad rewrite of `pdf-version/index.js`.
 NFR-34.2: The plain-text paste fix (FR-34.5) is scoped to the `else if (pastedText)` branch in `attach_narrative_paste_handler` in `textarea.js`. The `text/html` paste path, `textarea_control_strip_html_attributes`, the save path, and `pdf-version/index.js` are not changed.
 NFR-35.1: The Epic 35 change is UI/copy-scoped only — no server-side changes, no CouchDB schema changes, and no removal of `OfflineExitManager`, `offline-modals.js` exit-modal markup, or their cleanup/audit behavior. All hidden code remains fully intact and reachable via a future toggle.
+FR-37.1: A C# console application (`mmria-form-html-generator`) in `nccdphp-drh-mmria-utilities` reads `metadata.json` and `ui_specification.json` from configurable file paths and generates one HTML fragment file per top-level form section (14 sections). Output is written to a configurable output directory, committed to `mmria-server/wwwroot/generated-forms/`.
+FR-37.2: Each generated HTML fragment renders all fields with inline `position:absolute` styles sourced from `ui_specification.form_design[path].control.style`. Every input, select, and textarea carries `data-path` (slash-separated metadata path), `data-field-type` (metadata type string), and `data-prompt` attributes. Conditionally visible fields carry `data-show-when="path=value"`. Label elements carry positioning from `ui_specification.form_design[path].prompt.style`.
+FR-37.3: Grid controls (`metadata.type == "grid"`) are generated with a `<tbody data-grid-body="path">` container and a `<template data-grid-template="path">` row template. Multi-cardinality forms (`cardinality == "+"` or `"*"`) are generated with a `<template data-form-template="path">` instance template and a `[data-form-instances="path"]` container. `{{index}}` is used as the array-index placeholder in data-path values inside templates. List fields carry `data-list-id` matching the metadata list name so the binder can resolve option values at runtime.
+FR-37.4: The generator logs any metadata path that has no entry in `ui_specification.form_design` to stderr. Chart fields (`metadata.type == "chart"`) are emitted as `<div data-field-type="chart" data-path="...">` placeholder elements. The existing `chart.js` is retained as a specialized component invoked by the data binder for those elements only.
+FR-37.5: A new `wwwroot/scripts/form-binder.js` exposes `formBinder.bind(sectionEl, gData, options)` and `formBinder.collect(sectionEl, gData)`. `bind()` walks all `[data-path]` elements in the section, populates values from gData, evaluates `[data-show-when]` rules, clones grid and multi-form templates for array data, and delegates `[data-field-type="chart"]` elements to the existing chart rendering code. `collect()` reads all `[data-path]` element current values and writes them back to gData with type coercion appropriate to `data-field-type`. `options.readOnly = true` disables all inputs after binding and suppresses change listener wiring.
+FR-37.6: When `options.readOnly` is not set, `formBinder.bind()` attaches a single delegated `change`/`input` listener on the section container that writes changed values back to `g_data` at the correct path immediately. This replaces per-field onChange wiring done by the type renderers. Dependent list filtering (parent-child dropdowns) and `[data-show-when]` re-evaluation are triggered by the same listener.
+FR-37.7: All three case rendering contexts — Case editor (`Case/Index.cshtml`), analyst read-only (`AnalystCase/Index.cshtml`), and committee member (`CaseVRO/Index.cshtml`) — embed all 14 generated section HTML fragments in the initial page load. Section navigation shows/hides the target section div and calls `formBinder.bind(sectionEl, g_data)` (edit) or `formBinder.bind(sectionEl, g_data, {readOnly: true})` (read-only). No call to `page_render()` or any type renderer remains in any case view JS.
+FR-37.8: `de-identified/index.js` uses the same static HTML sections with `formBinder.bind(..., {readOnly: true})`. `case/search_view.js` rendering that uses `g_default_ui_specification` for field display is replaced with position-independent rendering (field prompt + value text) that does not depend on layout coordinates.
+FR-37.9: The `/form-designer` route, `form_designerController.cs`, `Views/form_designer/Index.cshtml`, all JS in `wwwroot/scripts/form-designer/`, and all assets in `wwwroot/form-designer/` are deleted. The single nav link `<li><a href="/form-designer">Open form designer</a></li>` in `Views/Home/Index.cshtml` is removed. The `form_designer` role and its authorization policy in `Program.cs` are **not removed** — the role gates access to the entire Form Designer admin section (Metadata Management, De-Identified List, Data Migration, Substance Lists, Session Logs, and more).
+FR-37.10: The POST `/api/ui_specification/{id}` action is removed from `ui_specificationController.cs`. The POST `/api/metadata` action is removed from `metadataController.cs`. GET actions on both controllers are retained until Story 37.6 confirms no consumers remain, then `ui_specificationController.cs` is deleted entirely.
+FR-37.11: `page_renderer.js`, `page_renderer.committee_member.js`, and all 30 files in `wwwroot/scripts/editor/page_renderer/` are deleted. `g_default_ui_specification`, the `/api/version/{ver}/ui_specification` fetch, and all calls to `page_render()`, `app_render()`, `form_render()`, `group_render()`, `grid_render()`, and individual type renderer functions are removed from `case/index.js`, `de-identified/index.js`, and `case/search_view.js`. `ui_specificationController.cs` is deleted.
 
 ### Additional Requirements
 
@@ -171,6 +182,18 @@ FR-36.1: Epic 36 — Reconcile false-positive suppression: distinguish already-c
 FR-36.2: Epic 36 — Change stack snapshot deduplication on enqueue (optional optimization)
 FR-36.3: Epic 36 — Rev poll generation guard verification and regression test during transient network outage
 FR-36.4: Epic 36 — Autosave-drop awaited-save data carry-through verification
+
+FR-37.1: Epic 37 — HTML generator tool: reads metadata + ui_specification, outputs 14 static HTML section fragments
+FR-37.2: Epic 37 — Generated HTML attribute contract: data-path, data-field-type, data-show-when, inline position styles
+FR-37.3: Epic 37 — Grid and multi-cardinality form template patterns in generated HTML
+FR-37.4: Epic 37 — Generator diagnostic: unmapped path logging; chart field placeholder delegation
+FR-37.5: Epic 37 — form-binder.js: bind(), collect(), readOnly mode
+FR-37.6: Epic 37 — form-binder.js: delegated change listener, dependent list re-evaluation, show-when re-evaluation
+FR-37.7: Epic 37 — Wire Case editor view: static HTML sections + formBinder, remove page_render() calls
+FR-37.8: Epic 37 — Wire read-only views (AnalystCase, CaseVRO, de-identified, search_view)
+FR-37.9: Epic 37 — Remove /form-designer route, controller, views, JS assets, CSS assets, auth policy
+FR-37.10: Epic 37 — Remove form designer write endpoints (POST ui_specification, POST metadata)
+FR-37.11: Epic 37 — Remove page_renderer.js + 30 type renderers, g_default_ui_specification, ui_specificationController
 
 ## Epic List
 
@@ -5330,3 +5353,326 @@ So that the reconcile false-positive cannot occur even if Story 36.1's reconcile
 | 36.4 — Snapshot deduplication on enqueue (optional) | Medium | 36.1 complete |
 
 Stories 36.1 and 36.2 are independent and can be implemented in parallel. Story 36.3 should follow 36.1 since both touch `index.js`. Story 36.4 is optional and should only be scheduled if the team decides the defence-in-depth layer is warranted.
+
+---
+
+### Epic 37: Form Designer Removal — Static HTML Form Rendering
+
+The `/form-designer` WYSIWYG tool, its supporting JavaScript and CSS assets, its API write endpoints, and the case form's runtime dependency on `g_default_ui_specification` are permanently removed. A standalone build-time generator replaces the dynamic JS rendering engine by producing static HTML fragments from the metadata and UI specification. A lightweight `form-binder.js` handles data population, conditional visibility, grid row cloning, and change tracking for all case form views. The rendered form is pixel-identical to the current output. The OMB-certified layout is preserved exactly.
+
+**FRs covered:** FR-37.1 through FR-37.11
+**Stories:** 37.1 — HTML generator, 37.2 — form-binder.js, 37.3 — Wire case editor view, 37.4 — Wire read-only views, 37.5 — Remove form designer, 37.6 — Remove rendering engine
+
+**Architecture constraints:**
+- Generated HTML files are committed as permanent source artifacts in `wwwroot/generated-forms/`. Generation is a **one-time operation** run during Story 37.1. After that, the committed HTML files are the source of truth for form layout. Any future label or layout change is made by editing the HTML files directly.
+- Field labels in the generated HTML come from the `prompt` property in the versioned metadata (`metadata_26.06.15.json`). The versioning concept will be simplified in a future effort; for this epic the versioned metadata document is the authoritative label source.
+- `chart.js` is the only type-renderer file retained; it is called as a specialized component by form-binder.js.
+- `page_renderer.js` and all 30 files in `editor/page_renderer/` are deleted on completion of Story 37.4.
+- Metadata API endpoints (`/api/metadata`, `/api/version/{ver}/metadata`) are not touched — they remain for validation and other consumers.
+
+---
+
+### Story 37.1: HTML Generator — Build Tool
+
+As a developer,
+I want a build-time code generator in the utilities repo that produces static HTML form sections from the metadata and UI specification,
+So that case form rendering no longer depends on a runtime JavaScript rendering engine and the OMB-certified layout is captured as a versioned source artifact.
+
+**Acceptance Criteria:**
+
+**Given** metadata.json and ui_specification.json file paths are provided as command-line arguments
+**When** `mmria-form-html-generator` runs
+**Then** one HTML fragment file per top-level form section is written to the output directory — 14 files named `{section-name}.html`
+
+**Given** a metadata field with an entry in `ui_specification.form_design`
+**When** the generator emits that field
+**Then** the HTML element carries the exact inline CSS from `ui_specification.form_design[path].control.style` (position:absolute, top, left, width, height)
+**And** the element carries `data-path="{slash/separated/path}"`, `data-field-type="{metadata.type}"`, and `data-prompt="{metadata.prompt}"`
+**And** the corresponding label element carries inline CSS from `ui_specification.form_design[path].prompt.style`
+
+**Given** a list field (`metadata.type == "list"`)
+**When** the generator emits it
+**Then** a `<select data-path="..." data-list-id="{metadata.name}">` is emitted
+**And** `<option>` elements are populated from `metadata.values` with their display text and stored value
+**And** if `metadata.is_multiselect == true` or `control_style` contains `"checkbox"`, the control is emitted as a checkbox group with `data-multiselect="true"`
+
+**Given** a grid control (`metadata.type == "grid"`)
+**When** the generator emits it
+**Then** the output contains a `<fieldset class="grid-control" data-path="{path}">` with a `<tbody data-grid-body="{path}">` container
+**And** a `<template data-grid-template="{path}">` element containing one row, with `{{index}}` as the array index placeholder in all data-path values within the template row
+
+**Given** a form section with `metadata.cardinality == "+"` or `"*"` (multi-cardinality)
+**When** the generator emits it
+**Then** a `<div data-form-instances="{path}">` container and a `<template data-form-template="{path}">` containing one complete form instance are emitted
+**And** the template contains all child field HTML for that form instance, with `{{formIndex}}` as the instance index placeholder in data-path values
+
+**Given** a metadata path with no entry in `ui_specification.form_design`
+**When** the generator encounters it
+**Then** the field is still emitted (positioned at 0,0) and the unmapped path is written to stderr with format: `UNMAPPED: {path}`
+
+**Given** a field with `metadata.type == "chart"`
+**When** the generator emits it
+**Then** a `<div data-field-type="chart" data-path="{path}" class="chart-placeholder">` is emitted instead of an input control
+
+**Implementation note:** Generator is a new project at `nccdphp-drh-mmria-utilities/mmria-form-html-generator/`. This is a **one-time-use tool**. It runs once, the output is reviewed and committed, and the tool is then archived — it will not be run again as a build step or pipeline.
+
+The generator accepts `--base-url` (e.g. `https://tenant1-mmria.local:12345`) and `--output` directory as arguments. At startup it calls `GET {base-url}/api/version/release-version` to resolve the current version string dynamically — the version is never hardcoded. It then fetches `GET {base-url}/api/version/{version}/metadata` and `GET {base-url}/api/version/{version}/ui_specification` using that resolved version. The locally saved `artifacts/metadata_26.06.15.json` and `artifacts/ui_specification_26.06.15.json` are reference snapshots only. Output: `{output}/generated-forms/{section-name}.html` (14 files); default output targets `wwwroot/generated-forms/` in `mmria-server`.
+
+The metadata tree is the primary structural input. The generator recursively walks `metadata.children` at each node level. Each node carries: `name` (used to build the slash-separated path, e.g. `home_record/date_of_death/month`), `type` (determines HTML element), `prompt` (label text), `children` (sub-nodes for group/form/grid types), `values` (option list for list-type fields), `max_length`, `is_read_only`, `cardinality`, `is_multiselect`, `control_style`, and `other_specify_list`. The ui_specification is consulted as a secondary lookup: for each path the generator builds from the metadata tree, it reads `ui_specification.form_design["{path}"]` to get `.control.style` (input position/size) and `.prompt.style` (label position/size). Handles all types dispatched by `page_renderer.js`: string, textarea/address, date, datetime, time, number, boolean, list, grid, group, form, label, button, always_enabled_button, html_area, hidden, jurisdiction, chart. Developer reviews stderr output at the end to confirm no critical fields are unmapped.
+
+**Files (new):** `nccdphp-drh-mmria-utilities/mmria-form-html-generator/mmria-form-html-generator.csproj`, `Program.cs`, `HtmlGenerator.cs`, `FieldRenderer.cs`
+
+| Dependency | Risk |
+|---|---|
+| None — standalone utility | Low |
+
+---
+
+### Story 37.2: form-binder.js — Data Binding Layer
+
+As a developer,
+I want a lightweight JavaScript data binding module that replaces page_renderer.js's data binding responsibility,
+So that the static HTML form sections can display, edit, and collect case data without the rendering engine infrastructure.
+
+**Acceptance Criteria:**
+
+**Given** a section HTML element and a `g_data` object
+**When** `formBinder.bind(sectionEl, g_data)` is called
+**Then** every `[data-path]` `<input>`, `<select>`, and `<textarea>` in the section is populated with the value at the corresponding path in `g_data`
+**And** list `<select>` elements have the correct `option` selected
+**And** multi-select checkbox groups reflect the stored array values
+**And** datetime, date, and time inputs are formatted using the same display format as the current renderers
+
+**Given** an element with `data-show-when="path=value"` or `data-show-when="path!=value"`
+**When** `formBinder.bind()` is called
+**Then** the element's visibility matches the condition evaluated against `g_data`
+**And** when any field matching a `data-show-when` condition path changes, all dependent elements in the section are re-evaluated immediately
+
+**Given** a `<tbody data-grid-body="path">` and a `<template data-grid-template="path">` in the section
+**When** `formBinder.bind()` is called and `g_data` contains an array at `path`
+**Then** one `<tr>` row is cloned from the template for each array item
+**And** each row's `[data-path]` values have `{{index}}` replaced with the actual array index
+**And** each row's fields are bound to the corresponding array item values
+**And** add/remove row buttons on the grid operate correctly, updating the `g_data` array and re-rendering the body
+
+**Given** a `[data-form-instances="path"]` container and a `[data-form-template="path"]`
+**When** `formBinder.bind()` is called and `g_data` contains an array at `path`
+**Then** one form instance div is cloned from the template for each array item
+**And** `{{formIndex}}` placeholders in cloned data-path values are replaced with the instance index
+**And** add/remove instance buttons operate correctly
+
+**Given** `options.readOnly == true` is passed to `formBinder.bind()`
+**When** binding completes
+**Then** all `<input>`, `<select>`, and `<textarea>` elements in the section have the `disabled` attribute applied
+**And** no change event listeners are wired
+
+**Given** an input or select with a `data-path` attribute and `options.readOnly` is not set
+**When** the user changes the value
+**Then** a single delegated listener on the section container writes the new value back to `g_data` at the correct path immediately
+**And** dependent-list child dropdowns are re-filtered if the changed field is a `data-parent-list` parent
+
+**Given** `formBinder.collect(sectionEl, g_data)` is called before a save
+**When** the function runs
+**Then** all current input values are written back to `g_data` with type coercion appropriate to `data-field-type` (string stays string, number fields are parsed as float/int, boolean fields are parsed as bool)
+
+**Given** a `[data-field-type="chart"]` placeholder element
+**When** `formBinder.bind()` encounters it
+**Then** the existing `chart.js` rendering function is called with the element and the data at `data-path`, producing the chart in-place (no change to chart.js internals)
+
+**Implementation note:** `form-binder.js` is a plain JS module (no build step, consistent with the existing no-bundler convention). Path navigation into `g_data` uses a `getByPath(obj, 'section/group/field')` helper that splits on `/` and walks the object tree. `data-show-when` evaluation uses the same helper. Dependent parent-child list re-filtering replaces the logic currently in `list.js` that reads `g_dependent_parent_to_child` and `g_dependent_child_to_parent` — those maps are retained and consulted by the binder's change listener. Developer audits all existing per-field onChange patterns in `case/index.js` and the type renderers to ensure full coverage before Story 37.3 begins.
+
+**Files (new):** `source-code/mmria/mmria-server/wwwroot/scripts/form-binder.js`
+
+| Dependency | Risk |
+|---|---|
+| Story 37.1 must be complete (binder tested against real generated HTML) | Low |
+
+---
+
+### Story 37.3: Wire Case Editor View
+
+As an abstractor,
+I want the case data entry form to render from static HTML sections using form-binder.js,
+So that the form displays and behaves identically to today without the JS rendering engine.
+
+**Acceptance Criteria:**
+
+**Given** an abstractor opens a case in edit mode
+**When** a form section is selected from the navigation sidebar
+**Then** the corresponding pre-loaded static HTML section div is shown
+**And** `formBinder.bind(sectionEl, g_data)` is called to populate all field values
+**And** the form is visually pixel-identical to the current JS-rendered output
+
+**Given** the case page has loaded
+**When** the developer inspects the Network tab in DevTools
+**Then** no request to `/api/version/{ver}/ui_specification` is made
+**And** `g_default_ui_specification` is not declared or referenced in `case/index.js`
+
+**Given** the abstractor changes a field value
+**When** the change event fires via form-binder's delegated listener
+**Then** `g_data` is updated at the correct path
+**And** the change is queued via the existing `g_change_stack` mechanism (unchanged)
+
+**Given** the developer audits all calls to `page_render()`, `app_render()`, `form_render()`, `group_render()`, `grid_render()` in `case/index.js` and all scripts loaded by `Case/Index.cshtml`
+**When** the audit is complete
+**Then** zero calls to those functions remain — all are replaced by `formBinder.bind()` invocations
+
+**Given** all 14 generated section HTML files
+**When** `Case/Index.cshtml` renders
+**Then** all 14 section fragments are embedded in the initial page HTML (via Razor `@Html.Partial` or static `<div>` includes), initially hidden, with their section-name as the `id`
+
+**Implementation note:** Developer loads all 14 `wwwroot/generated-forms/{section}.html` files as Razor partials in `Case/Index.cshtml`. The existing section-navigation logic in `case/index.js` that shows/hides section containers is adapted to target the static divs by section name. Per-field `onChange` wiring from type renderers is replaced entirely by the form-binder delegated listener. Existing validation integration, `g_change_stack`, save/load, checkout/checkin, and inactivity management in `case/index.js` are not changed. Developer runs Playwright E2E tests after wiring each section before proceeding to the next.
+
+**Files:** `source-code/mmria/mmria-server/Views/Case/Index.cshtml`, `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js`
+
+| Dependency | Risk |
+|---|---|
+| Story 37.1 (generated HTML must exist) | — |
+| Story 37.2 (form-binder.js must exist) | — |
+
+---
+
+### Story 37.4: Wire Read-Only Views (AnalystCase, CaseVRO, De-identified, Search View)
+
+As an analyst, committee member, or de-identification reviewer,
+I want the read-only case views to render from static HTML sections using form-binder.js,
+So that they display correct case data without the JS rendering engine.
+
+**Acceptance Criteria:**
+
+**Given** an analyst opens a case in the AnalystCase view
+**When** a form section is selected
+**Then** `formBinder.bind(sectionEl, g_data, {readOnly: true})` populates all fields
+**And** all inputs are disabled
+**And** the display is visually identical to the current rendered output
+
+**Given** a committee member opens a case in the CaseVRO view
+**Then** the same static HTML sections and read-only binding apply
+**And** no reference to `page_renderer.committee_member.js` or its type renderer variants (`datetime.committee_member.js`, `grid.committee_member.js`, `form.committee_member.mmria.js`, `form.committee_member.pmss.js`) remains in the CaseVRO JS
+
+**Given** the de-identified view is rendered
+**Then** the same static HTML sections and `formBinder.bind(..., {readOnly: true})` apply
+**And** `de-identified/index.js` no longer fetches or references `g_default_ui_specification`
+
+**Given** the case search view (`case/search_view.js`) currently uses `g_default_ui_specification` for field display in search results
+**When** this story is implemented
+**Then** search result rendering is replaced with position-independent display (field prompt + value, without absolute-positioned layout)
+**And** `case/search_view.js` contains no reference to `g_default_ui_specification` or `form_design`
+
+**Given** each of these four view contexts has been migrated
+**When** the developer greps those view files for `g_default_ui_specification`, `page_render`, `form_render`, `group_render`, `grid_render`
+**Then** zero matches are found
+
+**Files:** `source-code/mmria/mmria-server/Views/AnalystCase/Index.cshtml`, `source-code/mmria/mmria-server/Views/CaseVRO/Index.cshtml`, `source-code/mmria/mmria-server/wwwroot/scripts/de-identified/index.js`, `source-code/mmria/mmria-server/wwwroot/scripts/case/search_view.js`, and their corresponding JS index files
+
+| Dependency | Risk |
+|---|---|
+| Story 37.3 complete (pattern established) | Low |
+
+---
+
+### Story 37.5: Remove Form Designer
+
+As a developer,
+I want the /form-designer admin tool and all its supporting code deleted from the codebase,
+So that there is no dead code, no unused admin role, and no API write surface for form layout.
+
+**Acceptance Criteria:**
+
+**Given** the form designer has been removed
+**When** a browser navigates to `/form-designer` (even as a `form_designer`-role user)
+**Then** a 404 response is returned
+
+**Given** all form designer assets have been deleted
+**When** the developer greps the repository for `form_designerController` or `href="/form-designer"`
+**Then** zero matches remain in any C# file or Razor view
+
+**Given** the `form_designer` role and policy are deliberately preserved
+**When** the developer opens the application as a form_designer-role user
+**Then** the Form Designer admin section is still visible in the navigation
+**And** the "Open form designer" link no longer appears in that section
+**And** all other links (Metadata Management, De-Identified List, etc.) continue to work
+
+**Given** the POST endpoints have been removed
+**When** `dotnet build` runs
+**Then** the build succeeds with zero errors
+
+**Delete list:**
+- `Controllers/form_designerController.cs`
+- `Views/form_designer/Index.cshtml` (entire directory)
+- `wwwroot/scripts/form-designer/` (entire directory — all JS files including `app.js`, `index.js`, `dataService.js`, `spec.js`, `canvas/`, `interact-*.js`)
+- `wwwroot/form-designer/` (entire directory — `app.html`, `style-formDesigner.css`, `style-interact.css`, `style-multiselection.css`)
+- The single `<li><a href="/form-designer">Open form designer</a></li>` line from `Views/Home/Index.cshtml` (line 461)
+- POST action on `ui_specificationController.cs` (`[HttpPost("{id}")]`)
+- POST action on `metadataController.cs`
+
+**Do NOT remove:**
+- The `form_designer` role or its authorization policy in `Program.cs` — it gates the entire Form Designer admin panel section, which includes Metadata Management, De-Identified List, Data Migration, Substance Lists, Export List Manager, Session Activity Report, and Offline Session Logs. These features remain.
+- Any `[Authorize(Roles = "form_designer")]` attribute on other controllers
+
+**Files:** `source-code/mmria/mmria-server/Controllers/form_designerController.cs`, `source-code/mmria/mmria-server/Controllers/api/ui_specificationController.cs`, `source-code/mmria/mmria-server/Controllers/api/metadataController.cs`, `source-code/mmria/mmria-server/Views/Home/Index.cshtml`
+
+| Dependency | Risk |
+|---|---|
+| None — independent deletion pass | Low |
+
+---
+
+### Story 37.6: Remove JS Rendering Engine
+
+As a developer,
+I want `page_renderer.js`, all 30 type renderer files, `g_default_ui_specification`, and `ui_specificationController` deleted from the codebase,
+So that the dynamic JS rendering engine is completely eliminated and the codebase carries no orphaned rendering infrastructure.
+
+**Acceptance Criteria:**
+
+**Given** Stories 37.3 and 37.4 are complete
+**When** the developer greps the entire `wwwroot/scripts/` tree for `g_default_ui_specification`
+**Then** zero matches are found
+
+**Given** all rendering engine files have been deleted
+**When** the developer greps for `page_render(`, `group_render(`, `grid_render(`, `form_render(`, `list_render(`, `string_render(`, `date_render(`, `boolean_render(`, `label_render(`, `chart_render(`
+**Then** zero matches are found in any file outside the generator utility
+
+**Given** `ui_specificationController.cs` has been deleted
+**When** `dotnet build` runs on `mmria-server.csproj`
+**Then** the build succeeds with zero errors
+
+**Given** the case form is exercised in a browser after all changes
+**When** the developer inspects the Network tab
+**Then** no request to `/api/version/{ver}/ui_specification` is made
+**And** no request to `/api/ui_specification` is made
+
+**Delete list:**
+- `wwwroot/scripts/editor/page_renderer.js`
+- `wwwroot/scripts/editor/page_renderer.committee_member.js`
+- All 30 files in `wwwroot/scripts/editor/page_renderer/` (confirm count before deleting)
+- `Controllers/api/ui_specificationController.cs` (entire file)
+
+**Remove from `case/index.js`:**
+- `var g_default_ui_specification = null;` declaration
+- The `/api/version/{ver}/ui_specification` fetch and `g_default_ui_specification` assignment
+- All `<script>` tags referencing `page_renderer.js` or any `page_renderer/` file (remove from `Case/Index.cshtml`, `AnalystCase/Index.cshtml`, `CaseVRO/Index.cshtml`, and any Shared layout that loads them)
+
+**Remove from `de-identified/index.js` and `case/search_view.js`:**
+- Any remaining `g_default_ui_specification` declarations and fetches (should be zero if Story 37.4 was complete, but verify)
+
+**Implementation note:** Run `dotnet build` and then exercise each case view context (edit, analyst, committee, de-identified) with a real case before marking done. Playwright E2E suite should pass before this story is closed.
+
+**Files:** All files in `wwwroot/scripts/editor/page_renderer/`, `wwwroot/scripts/editor/page_renderer.js`, `wwwroot/scripts/editor/page_renderer.committee_member.js`, `Controllers/api/ui_specificationController.cs`, `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js`, `Views/Case/Index.cshtml`, `Views/AnalystCase/Index.cshtml`, `Views/CaseVRO/Index.cshtml`
+
+| Dependency | Risk |
+|---|---|
+| Stories 37.3 and 37.4 must be complete | High — deleting before views are wired breaks the app |
+| Story 37.5 (form designer deleted) | Low — independent, but cleaner to complete first |
+
+## Epic 37 — Story Sequencing
+
+| Story | Risk | Dependencies |
+|---|---|---|
+| 37.1 — HTML generator build tool | Medium | None — standalone utility |
+| 37.2 — form-binder.js | Medium | 37.1 (test against real generated HTML) |
+| 37.5 — Remove form designer | Low | None — independent deletion |
+| 37.3 — Wire case editor view | High | 37.1, 37.2 complete |
+| 37.4 — Wire read-only views | Medium | 37.3 pattern established |
+| 37.6 — Remove rendering engine | High | 37.3, 37.4 complete; verify all views before deleting |
