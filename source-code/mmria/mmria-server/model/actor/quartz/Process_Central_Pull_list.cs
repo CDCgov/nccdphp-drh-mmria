@@ -330,7 +330,7 @@ public sealed class Process_Central_Pull_list : ReceiveActor
                                             scheduleInfo.version_number
                                         );
 
-                                        Context.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, _configuration, _host_prefix)).Tell(Sync_Document_Message);
+                                        Context.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, _configuration, _host_prefix, _deIdentifiedRepository, _reportRepository)).Tell(Sync_Document_Message);
                                     }
 
                                 }
