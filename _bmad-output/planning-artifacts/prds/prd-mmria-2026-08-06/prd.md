@@ -171,7 +171,7 @@ The following user-visible behaviors from the current implementation are preserv
 - **Unmatchable path**: When TAMU returns no match or an error, all 15 geocode fields are cleared to empty string. No error dialog is shown — the field clear and reload communicate the result.
 
 **FR-1.6 — TAMU API key never in client-side code**
-The TAMU API key is not present in any file served to the browser. `mmria.committee_member.js` currently calls `geoservices.tamu.edu` directly with the key embedded; this is corrected to route through the existing server proxy (`tamuGeoCodeController`).
+The TAMU API key is not present in any file served to the browser. `mmria.committee_member.js` contains a `get_geocode_info` implementation that calls `geoservices.tamu.edu` directly with the key embedded. However, the committee member view is read-only — the validate-address button is always disabled in that context, making this code unreachable. The fix is to remove the dead code and the embedded API key from `mmria.committee_member.js`; no functional replacement is required for that view.
 
 **FR-1.7 — Vital import batch service uses shared implementation**
 The vital import batch service (`BatchItemProcessingService`) geocodes cases during IJE import. This path uses the same shared `GeocodingManager` and `CaseGeocodingManager` from SharedLibraries as the web layer. Duplicated field-mapping and urban-status logic in the batch service is eliminated.
