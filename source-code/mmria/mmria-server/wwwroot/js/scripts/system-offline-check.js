@@ -331,6 +331,8 @@ function scheduleOfflineCheckAtDates(config) {
 function startOfflineStatusPolling(intervalMs) {
     var ms = (typeof intervalMs === 'number' && intervalMs > 0) ? intervalMs : 120000;
     return setInterval(function () {
+        // Skip while user is in intentional offline mode — server is unreachable by design.
+        if (window.OfflineSessionValidator && window.OfflineSessionValidator.isOfflineMode()) return;
         fetch('/api/system-offline/status', { credentials: 'same-origin' })
             .then(function (response) {
                 if (!response.ok) return null;

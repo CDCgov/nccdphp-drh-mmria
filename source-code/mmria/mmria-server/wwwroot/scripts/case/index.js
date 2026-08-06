@@ -8,6 +8,9 @@ var g_data = null;
 
 function mmria_is_case_rev_polling_allowed()
 {
+  // Do not poll while in intentional offline mode — server is unreachable by design.
+  if (typeof is_offline_mode === 'function' && is_offline_mode()) return false;
+
   return (
     g_is_data_analyst_mode == null &&
     g_data_is_checked_out === true &&
