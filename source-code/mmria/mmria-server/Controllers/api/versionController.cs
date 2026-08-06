@@ -11,6 +11,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using mmria.common.utils;
+using Newtonsoft.Json.Linq;
 
 using  mmria.server.extension; 
 using mmria.server.util;
@@ -164,6 +165,10 @@ public sealed class versionController: ControllerBase
         try
         {
             string responseString = await _metadataVersionManager.GetVersionDocumentAsync(version_specification_id, document_name, db_config);
+            if (string.Equals(document_name, "metadata", StringComparison.OrdinalIgnoreCase))
+            {
+                responseString = ApplyOmbExpirationDateToMetadata(responseString);
+            }
 
             string type="javascript";
             if(!string.IsNullOrWhiteSpace(document_name))
@@ -189,6 +194,57 @@ public sealed class versionController: ControllerBase
 
         return result;
     } 
+
+    private string ApplyOmbExpirationDateToMetadata(string metadataJson)
+    {
+        if (string.IsNullOrWhiteSpace(metadataJson))
+        {
+            return metadataJson;
+        }
+
+        try
+        {
+            var metadata = JToken.Parse(metadataJson);
+            ApplyOmbExpirationDateToMetadataToken(metadata, GetOmbExpirationDate());
+            return metadata.ToString(Newtonsoft.Json.Formatting.None);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error applying OMB expiration date to version metadata: {ex}");
+            return metadataJson;
+        }
+    }
+
+    private void ApplyOmbExpirationDateToMetadataToken(JToken token, string ombExpirationDate)
+    {
+        if (token is JObject metadataObject)
+        {
+            if (string.Equals(
+                metadataObject.Value<string>("name"),
+                "omb_expiration_label",
+                StringComparison.OrdinalIgnoreCase))
+            {
+                metadataObject["prompt"] = $"Exp. Date {ombExpirationDate}";
+            }
+
+            foreach (var property in metadataObject.Properties().ToList())
+            {
+                ApplyOmbExpirationDateToMetadataToken(property.Value, ombExpirationDate);
+            }
+        }
+        else if (token is JArray metadataArray)
+        {
+            foreach (var item in metadataArray)
+            {
+                ApplyOmbExpirationDateToMetadataToken(item, ombExpirationDate);
+            }
+        }
+    }
+
+    private string GetOmbExpirationDate()
+    {
+        return configuration.GetString("omb_expiration_date", host_prefix) ?? "05/31/2026";
+    }
 
     public static byte[] ReadFully(System.IO.Stream input)
     {
