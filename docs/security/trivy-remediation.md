@@ -27,6 +27,8 @@ Records are prepended — newest scan block at the top.
 |---|---:|---:|---:|---:|---:|---:|
 | HIGH | 14 | 0 | 0 | 11 | 3 | 11 |
 
+`Remaining` is the count still open after removing only Fixed and Not applicable findings; for this scan it equals the Residual count because there are no Fixed or Pending image update High findings.
+
 - `⏳ EVIDENCE WOULD UPGRADE — dotnet-host / CVE-2026-48779`: `oc rsh <mmria-s2i-pod> sh -lc "find / -path '*/node_modules/ws*' 2>/dev/null"` proving the `ws` package is absent from the image would upgrade this finding to `Not applicable / false positive`.
 
 #### Finding inventory — HIGH
