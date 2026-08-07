@@ -1,6 +1,6 @@
 # ----- Stage 1: Build -----
 # https://catalog.redhat.com/en/software/containers/ubi8/dotnet-90/672bc9015e6e9c0c6f7d2ff7
-FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100:9.8-1785892712@sha256:05a11063b0915667415a1b57b8aff2e69b45df16341f29258ae56a0dafdcd74d AS build
+FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100:9.8-1786023496@sha256:13e5b45d9a8769be1635ca7db0c9ef3136db83a6403f0bc7868c99f31b20ce54 AS build
 WORKDIR /src
 
 # Copy only the csproj for dependency caching
@@ -27,7 +27,7 @@ USER 1001
 
 # ----- Stage 3: Runtime -----
 # https://console-openshift-console.apps.ecpaas-dev.cdc.gov/k8s/ns/trusted-images/imagestreamtags/dotnet-100-aspnet%3A9.7-1776776188
-FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100-aspnet:9.8-1785861844@sha256:d3606705050f499b0911bbd54dce2103e5df428f54f0c1a77d450eb1f6437e1a AS runtime
+FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100-aspnet:9.8-1785990857@sha256:ab99f2c8dff035754f2109257f53c71710be108d730d854574658451e56a7694 AS runtime
 
 # Switch to root temporarily to create directories and patch OS packages
 USER root
