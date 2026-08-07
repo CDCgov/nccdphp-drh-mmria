@@ -12,6 +12,10 @@ Records are prepended — newest scan block at the top.
 - **Severity totals:** C:0  H:14  M:104
 - **Scanned image:** `mmria/mmria-s2i:latest (redhat 9.8)`
 
+> **Scope:** This scan block addresses Critical and High findings only, consistent with the
+> automated remediation workflow. The 104 Medium findings are not triaged here; they are
+> tracked by the scanning pipeline and addressed in a separate review cycle.
+
 ### Triage summary
 
 | Severity | Original | Fixed | Pending image update | Residual | Not applicable | Remaining |
@@ -62,7 +66,6 @@ Red Hat Advisory status: all five CVEs have no published fixed RPM version for R
 | libcurl-minimal | CVE-2026-8925 | Residual risk – no fix available |
 | libcurl-minimal | CVE-2026-9547 | Residual risk – no fix available |
 
-```
 ### curl-minimal / libcurl-minimal — CVE-2026-11352
 
 **Target:** mmria/mmria-s2i:latest (redhat 9.8)
@@ -79,7 +82,6 @@ external communication uses HTTPS/1.1 or HTTPS/2. The dnf update layer added in
 
 **Verification:** Rescan after next image rebuild once
 `access.redhat.com/security/cve/CVE-2026-11352` lists a fixed version.
-```
 
 #### dotnet-host (4 findings)
 
