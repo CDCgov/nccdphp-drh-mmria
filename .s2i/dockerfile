@@ -5,8 +5,11 @@ FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-imag
 
 USER root
 
-# Update libacl to address CVE-2026-54369 (symlink traversal privilege escalation;
-# fixed in libacl-2.4.0-1.el9_8)
-RUN dnf update -y libacl && dnf clean all
+# Update OS packages to pull in latest security fixes:
+#   libacl: CVE-2026-54369 (symlink traversal privilege escalation; fixed in libacl-2.4.0-1.el9_8)
+#   curl-minimal / libcurl-minimal: CVE-2026-11352, CVE-2026-11586, CVE-2026-8286,
+#     CVE-2026-8925, CVE-2026-9547 (DoS / TLS-reuse / double-free; no upstream fix
+#     released yet — update ensures fix is applied automatically when available)
+RUN dnf update -y libacl curl-minimal libcurl-minimal && dnf clean all
 
 USER 1001
