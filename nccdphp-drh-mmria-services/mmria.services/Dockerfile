@@ -38,10 +38,16 @@ USER 1001
 FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100-aspnet:9.8-1785990857@sha256:ab99f2c8dff035754f2109257f53c71710be108d730d854574658451e56a7694 AS runtime
 WORKDIR /app
 
-# Update libacl to address CVE-2026-54369 (symlink traversal privilege escalation;
-# fixed in libacl-2.4.0-1.el9_8). Fall back to microdnf for UBI-minimal variants.
+# Update runtime OS packages so the image picks up published Red Hat errata during
+# rebuilds:
+#   libacl: CVE-2026-54369 (fixed in libacl-2.4.0-1.el9_8)
+#   curl-minimal / libcurl-minimal: CVE-2026-11352, CVE-2026-11586,
+#     CVE-2026-8286, CVE-2026-8925, CVE-2026-9547
+#   dotnet-host: CVE-2024-38081, CVE-2025-26682, CVE-2025-59144,
+#     CVE-2026-48779
+# Fall back to microdnf for UBI-minimal variants.
 USER root
-RUN (dnf update -y libacl && dnf clean all) || (microdnf update -y libacl && microdnf clean all)
+RUN (dnf update -y libacl curl-minimal libcurl-minimal dotnet-host && dnf clean all) || (microdnf update -y libacl curl-minimal libcurl-minimal dotnet-host && microdnf clean all)
 
 # Copy published output from build image
 COPY --from=publish /app/publish .
