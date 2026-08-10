@@ -2,7 +2,7 @@
 title: "PRD: MMRIA V4.2"
 status: draft
 created: 2026-08-06
-updated: 2026-08-06
+updated: 2026-08-07
 ---
 
 # PRD: MMRIA V4.2
@@ -217,7 +217,89 @@ When a re-upload is detected (all cases in the file are already present in `vita
 
 ---
 
-NFR-1: All changes must function correctly in Microsoft Edge and Google Chrome.
+### FR-10 — STEVE Download: Structured Logging
+
+The `SteveAPI_Instance` Akka actor uses bare `Console.WriteLine` calls with swallowed exception details. The `ILogger` injected into `steveMMRIAController` is never threaded through to the actor. An operator diagnosing a stuck or failed STEVE download has no structured log output to work from — only coarse lifecycle markers and a few plain-text failure strings with no exception detail. The only visible failure signals are a directory aging to "Cancelled" after one hour or a missing `.zip` file.
+
+**FR-10.1 — Structured logging replaces Console.WriteLine throughout the actor pipeline**
+All bare `Console.WriteLine` calls in `SteveAPI_Instance` and `SteveAPISupervisor` are replaced with `ILogger` calls at appropriate log levels. The logger is resolved via Akka.NET's DI integration or constructor injection on the actor.
+
+**FR-10.2 — Exception details are captured in error logs**
+The three catch blocks in `SteveAPI_Instance` (file download failure, mark-as-read failure, and zip compression failure) currently swallow the exception and emit only a plain string. Each catch block logs the full exception using `logger.LogError(exception, ...)` so that root-cause diagnosis does not require a debugger or direct filesystem inspection.
+
+**FR-10.3 — Key lifecycle events produce structured log entries**
+At minimum, the following events produce a named log entry at the stated level:
+
+| Event | Level |
+|---|---|
+| Download request received by supervisor, user and mailbox logged | Information |
+| STEVE auth request sent | Information |
+| STEVE auth token received | Information |
+| Mailbox list retrieved, matching mailbox count logged | Information |
+| Staging directory created, path logged | Information |
+| Each file download started (messageId, fileName) | Information |
+| Each file download completed (messageId, byte count) | Information |
+| Each file download failed (messageId) | Error |
+| Each mark-as-read succeeded (messageId) | Information |
+| Each mark-as-read failed (messageId) | Warning |
+| Zip compression started | Information |
+| Zip compression completed, output path logged | Information |
+| Zip compression failed | Error |
+| Actor stopping after successful completion | Information |
+
+**FR-10.4 — Debug leftover removed**
+The `Console.WriteLine("here")` at the end of the `ReceiveAsync` handler in `SteveAPI_Instance` is removed.
+
+**FR-10.5 — No behavioral or UI changes**
+All changes are confined to the logging layer. The download workflow, the filesystem-based status mechanism (`GetQueueResult`), and the UI are unchanged.
+
+---
+
+### FR-11 — STEVE PRAMS Download: Structured Logging
+
+`stevePRAMSController` has the same logging gaps as `steveMMRIAController`: `ILogger<stevePRAMSController>` is injected but never used, and all download processing runs through the same `SteveAPI_Instance` actor with the same bare `Console.WriteLine` / swallowed-exception pattern described in FR-10.
+
+Because both `/steveMMRIA` and `/stevePRAMS` dispatch to the same shared `SteveAPI_Instance` actor via `steve-api-supervisor`, the actor-side changes in FR-10.1 through FR-10.4 cover the PRAMS download path automatically. FR-11 records the PRAMS-specific scope and differences so the implementing epic is unambiguous.
+
+**FR-11.1 — Actor-side logging covered by FR-10**
+The `SteveAPI_Instance` and `SteveAPISupervisor` changes specified in FR-10.1 through FR-10.4 apply equally to PRAMS downloads. No additional actor changes are required for FR-11.
+
+**FR-11.2 — stevePRAMSController ILogger usage aligned with steveMMRIAController**
+The `ILogger<stevePRAMSController>` injected into the controller is unused. Its usage is aligned with whatever controller-level logging pattern is established for `steveMMRIAController` under FR-10 — at minimum, logging when a download request is received and dispatched.
+
+**FR-11.3 — PRAMS is single-mailbox; no multi-mailbox loop**
+Unlike `steveMMRIAController`, the PRAMS controller only supports the `PRAMS` mailbox — there is no "All" option and no multi-mailbox iteration. The FR-10.3 log event for "mailbox count" is trivially 1 for PRAMS; no special handling is needed.
+
+**FR-11.4 — No debug leftover to remove**
+The `Console.WriteLine("here")` present in `steveMMRIAController` is already commented out in `stevePRAMSController`. FR-10.4 has no equivalent action for PRAMS.
+
+**FR-11.5 — No behavioral or UI changes**
+All changes are confined to the logging layer. The PRAMS download workflow, filesystem-based status mechanism, and UI are unchanged.
+
+> **Implementation note:** FR-10 and FR-11 share the actor-side fix. They may be delivered as a single epic or as two sequential stories within one epic — the actor story ships first, the controller-level story for each route follows.
+
+---
+
+### FR-12 — Case Excel Export: Column Width Auto-Fit
+
+The case `.xlsx` export (generated via `WriteCSV.WriteToExcel()`) produces columns at Excel's default narrow width. Users must manually widen every column to read the data. The root cause is that the current library, FastExcel 3.0.13, has no column width API.
+
+**FR-12.1 — Replace FastExcel with ClosedXML for the case export write path**
+`WriteCSV.WriteToExcel()` is rewritten using ClosedXML (MIT license). ClosedXML is added as a NuGet dependency to `mmria-server.csproj`. FastExcel is retained for the other export paths that use it (`ije_messageController`, `vro_exportController`, `manage_usersController`) — they are not changed.
+
+**FR-12.2 — All columns auto-fit to content**
+After writing the data, `worksheet.Columns().AdjustToContents()` is called so that each column is sized to the width of its widest cell value (including the header row). No column requires manual resizing to read its content.
+
+**FR-12.3 — Column width is capped at a readable maximum**
+Columns whose widest value exceeds 80 characters are capped at 80 characters wide. This prevents narrative or free-text columns from producing columns so wide they make the sheet unusable. The cap does not truncate data — it only limits the displayed column width.
+
+**FR-12.4 — `Template.xlsx` dependency is removed from the case export path**
+ClosedXML creates the workbook directly in memory — no template file is needed. The `database-scripts/Template.xlsx` file is retained on disk (still used by other paths) but is no longer loaded by `WriteCSV.WriteToExcel()`.
+
+**FR-12.5 — No behavioral changes to CSV or other export formats**
+The change is scoped to `WriteCSV.WriteToExcel()`. The CSV write path, the data content, the column set, the export queue flow, and the UI are unchanged.
+
+--- All changes must function correctly in Microsoft Edge and Google Chrome.
 
 NFR-2: The geocoding refactor introduces no new client-side dependencies, no bundler changes, and no metadata schema changes.
 
@@ -231,6 +313,8 @@ NFR-4: The TAMU API key is resolved at server startup from the existing CouchDB 
 
 - OI-1: Additional bug fix epics to be identified and added. List is not final.
 - OI-2: Confirm Epic 30 story amendments needed for server-side CVS and case-reload behavior vs. the field-update-in-place design in existing Epic 30 stories.
+- OI-6 (FR-10): Determine how `ILogger` is injected into `SteveAPI_Instance`. The actor currently uses a parameterless constructor and is spawned via `Context.ActorOf<SteveAPI_Instance>()` with no DI wiring. Options: (a) pass the logger through `Props.Create(() => new SteveAPI_Instance(logger))` from the supervisor, or (b) wire Akka.NET's `ServiceProvider` integration if already available in the actor system setup. Confirm at implementation time. Either approach is acceptable; the story author decides.
+- OI-7 (FR-10): The FR-10.3 log entry for "STEVE auth token received" must confirm receipt only — the token value itself must not appear in any log output.
 
 ---
 
@@ -244,4 +328,7 @@ FR-5.1 – FR-5.3: Epic TBD — Update Year of Death Record ID Regression Fix
 FR-6.1 – FR-6.3: Epic TBD — CouchDB `/_users/` URL Encoding Fix  
 FR-7.1 – FR-7.6: Epic TBD — Session Expiry Automatic Logout Redirect on 401  
 FR-8.1 – FR-8.5: Epic TBD — Per-Tenant Authentication Mode (SAMS + Password Co-existence)  
-FR-9.1 – FR-9.2: Epic TBD — Case Narrative Post-v4.1 Tweaks (Emoji Strip, Strikethrough Strip)
+FR-9.1 – FR-9.2: Epic TBD — Case Narrative Post-v4.1 Tweaks (Emoji Strip, Strikethrough Strip)  
+FR-10.1 – FR-10.5: Epic TBD — STEVE Download Structured Logging  
+FR-11.1 – FR-11.5: Epic TBD — STEVE PRAMS Download Structured Logging  
+FR-12.1 – FR-12.5: Epic TBD — Case Excel Export Column Width Auto-Fit (ClosedXML)
