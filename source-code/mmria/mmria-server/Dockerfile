@@ -1,6 +1,6 @@
 # ----- Stage 1: Build -----
 # https://catalog.redhat.com/en/software/containers/ubi8/dotnet-90/672bc9015e6e9c0c6f7d2ff7
-FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100:9.8-1786023496@sha256:13e5b45d9a8769be1635ca7db0c9ef3136db83a6403f0bc7868c99f31b20ce54 AS build
+FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100:9.8-1786438823@sha256:5e17d5b16b55828defad53f99e85cdec6ec90e6821c5f4f1a731c669a8509bce AS build
 WORKDIR /src
 
 # Copy only the csproj for dependency caching
@@ -26,8 +26,8 @@ RUN dotnet publish mmria-server.csproj -c Release -f net10.0 -o /app/publish
 USER 1001
 
 # ----- Stage 3: Runtime -----
-# https://console-openshift-console.apps.ecpaas-dev.cdc.gov/k8s/ns/trusted-images/imagestreamtags/dotnet-100-aspnet%3A9.7-1776776188
-FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100-aspnet:9.8-1785990857@sha256:ab99f2c8dff035754f2109257f53c71710be108d730d854574658451e56a7694 AS runtime
+# https://console-openshift-console.apps.ecpaas-dev.cdc.gov/k8s/ns/trusted-images/imagestreamtags/dotnet-100-aspnet%3A9.8-1786442384
+FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100-aspnet:9.8-1786442384@sha256:4c6dc7a25515d540eb5672287078d0c042075c8963ba9306f770032277ee8206 AS runtime
 
 # Switch to root temporarily to create directories and patch OS packages
 USER root
