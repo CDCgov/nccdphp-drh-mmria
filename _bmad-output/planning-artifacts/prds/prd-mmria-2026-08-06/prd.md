@@ -38,23 +38,6 @@ The fix applies equally to the `cdc_admin` and `jurisdiction_admin` role variant
 
 ---
 
-### FR-6 — CouchDB `/_users/` URL Encoding Fix (Plus-Sign Username Support)
-
-`AccountDAL` constructs `/_users/org.couchdb.user:{username}` paths using incorrect or absent encoding. `GetCouchDbUserAsync` uses `HtmlEncode` (which encodes HTML characters, not URL path characters). `CheckUserAsync`, `GetAsync`, and `PutUserAsync` use raw string interpolation with no encoding. Both patterns happen to work for common usernames but are semantically wrong and will break for usernames containing characters that require percent-encoding.
-
-The practical motivator is enabling Gmail-style `+` test accounts (e.g., `testaccount+abstractor@gmail.com`) — a common pattern for creating multiple test identities from one inbox.
-
-**FR-6.1 — `Uri.EscapeDataString` applied to all `/_users/` path construction**
-`GetCouchDbUserAsync`, `CheckUserAsync`, `GetAsync`, and `PutUserAsync` in `AccountDAL` use `Uri.EscapeDataString(userDocId)` when constructing `/_users/` URL path segments. No other encoding function (`HtmlEncode`, `UrlEncode`, raw interpolation) is used for this purpose.
-
-**FR-6.2 — Login payload encoding is not changed**
-`BuildSessionAuthFormPayload` correctly encodes `+` as `%2B` in the `application/x-www-form-urlencoded` request body via `WriteFormUrlEncoded`. This behavior is preserved unchanged.
-
-**FR-6.3 — Usernames containing `+` are fully supported**
-After the fix, a user with the email address `testaccount+abstractor@gmail.com` can be created in the `_users` database and authenticate without URL construction errors.
-
----
-
 ### FR-7 — Session Expiry: Automatic Logout Redirect on 401
 
 When a user leaves the application with the browser open and returns after the session has expired (e.g., overnight with a locked workstation), the browser resumes background polling and the user may click UI elements — all of which receive HTTP 401 responses. Currently 401 responses from both `window.fetch` and jQuery `$.ajax` calls are swallowed silently: the UI freezes or shows blank panels with no guidance. The user must manually navigate to the login page.
@@ -325,7 +308,6 @@ FR-2.1 – FR-2.3: Epic 29 — Record ID Uniqueness Enforcement
 FR-3.1 – FR-3.11: Epic 37 — Form Designer Removal — Static HTML Form Rendering  
 FR-4.1 – FR-4.3: Epic TBD — IJE Upload Duplicate Prevention and Logging  
 FR-5.1 – FR-5.3: Epic TBD — Update Year of Death Record ID Regression Fix  
-FR-6.1 – FR-6.3: Epic TBD — CouchDB `/_users/` URL Encoding Fix  
 FR-7.1 – FR-7.6: Epic TBD — Session Expiry Automatic Logout Redirect on 401  
 FR-8.1 – FR-8.5: Epic TBD — Per-Tenant Authentication Mode (SAMS + Password Co-existence)  
 FR-9.1 – FR-9.2: Epic TBD — Case Narrative Post-v4.1 Tweaks (Emoji Strip, Strikethrough Strip)  

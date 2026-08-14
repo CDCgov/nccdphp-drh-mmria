@@ -1210,7 +1210,209 @@ dev this story _bmad-output/implementation-artifacts/36-4-change-stack-snapshot-
 
 ---
 
-## Open Items — Resolve Before Affected Story
+## Epic 29: Record ID Uniqueness Enforcement _(v4.2)_
+
+| Story | File | Status |
+|---|---|---|
+| 29.1 — Server-Side Record ID Format Validation and Uniqueness Guard | `29-1-server-side-format-validation-and-uniqueness-guard.md` | ready-for-dev |
+| 29.2 — Client-Side Per-Candidate Uniqueness Check via API | `29-2-client-side-per-candidate-api-check.md` | ready-for-dev |
+| 29.3 — Add `record_id_list` CouchDB View and Remove Dead Bulk-List Code | `29-3-add-record-id-list-view-remove-broken-bulk-list-call.md` | backlog |
+
+**Sequencing:** 29.1 and 29.2 are independent and can proceed in parallel. 29.3 depends on 29.2 (confirms `Get_Record_Id_List` has no remaining call sites before deletion).
+
+> ℹ️ Defense-in-depth: 29.1 is the server-side last-line guard; 29.2 eliminates the client-side race condition. Both must ship before 29.3 removes dead code.
+
+**Story 29.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/29-1-server-side-format-validation-and-uniqueness-guard.md
+```
+
+**Story 29.2 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/29-2-client-side-per-candidate-api-check.md
+```
+
+**Story 29.3 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/29-3-add-record-id-list-view-remove-broken-bulk-list-call.md
+```
+
+---
+
+## Epic 30: Unified Server-Side Geocoding — TAMU Refactor _(v4.2)_
+
+| Story | File | Status |
+|---|---|---|
+| 30.1 — Create `GeocodingManager` in SharedLibraries | `30-1-create-geocoding-manager.md` | ready-for-dev |
+| 30.2 — Create `CaseGeocodingManager` with Per-Location Apply Methods | `30-2-create-case-geocoding-manager-apply-methods.md` | backlog |
+| 30.3 — New API Endpoint: `POST /api/case-geocode/{caseId}/{locationKey}` | `30-3-new-api-endpoint-case-geocode.md` | backlog |
+| 30.4 — Refactor `MMRIA_calculations.js` Geocode Button Handlers | `30-4-refactor-mmria-calculations-geocode-functions.md` | backlog |
+| 30.5 — Refactor `BatchItemProcessingService` to Use Shared `GeocodingManager` | `30-5-refactor-batch-item-processing-service.md` | backlog |
+| 30.6 — Fix Legacy Geocode Calls in `mmria-check-code.js` and `validator.js` | `30-6-fix-legacy-geocode-calls-check-code-validator.md` | backlog |
+| 30.7 — Remove Dead TAMU Code from `mmria.committee_member.js` | `30-7-remove-dead-tamu-code-committee-member.md` | ready-for-dev |
+
+**Sequencing:** 30.1 → 30.2 → 30.3 is the critical path. 30.5 can run in parallel with 30.3 once 30.1 and 30.2 are done. 30.4 and 30.6 follow 30.3 and can run in parallel. 30.7 is fully independent — can be done at any time.
+
+> ⚠️ **v4.2 amendments** applied in these story files (differ from the original Epic 30 design in `epics.md`):
+> - **30.3**: Endpoint returns `{ ok: true }` — client reloads the case rather than applying fields from the response. CVS lookup runs server-side inside the endpoint (dc_place_of_last_residence only).
+> - **30.4**: Client shows busy modal, POSTs to endpoint, then reloads in edit mode. CVS call removed from client.
+> - **30.7**: Dead code removal only — committee member view is read-only, button always disabled.
+
+**Story 30.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/30-1-create-geocoding-manager.md
+```
+
+**Story 30.2 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/30-2-create-case-geocoding-manager-apply-methods.md
+```
+
+**Story 30.3 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/30-3-new-api-endpoint-case-geocode.md
+```
+
+**Story 30.4 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/30-4-refactor-mmria-calculations-geocode-functions.md
+```
+
+**Story 30.5 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/30-5-refactor-batch-item-processing-service.md
+```
+
+**Story 30.6 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/30-6-fix-legacy-geocode-calls-check-code-validator.md
+```
+
+**Story 30.7 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/30-7-remove-dead-tamu-code-committee-member.md
+```
+
+---
+
+## Epic 35: Offline Exit/Go Online UX Cleanup _(v4.1 P-Immediate)_
+
+| Story | File | Status |
+|---|---|---|
+| 35.1 — Hide Exit Offline Mode Widget | `35-1-hide-exit-offline-mode-widget.md` | done |
+| 35.2 — Rename "Go Online" to "Go Online & Sync Changes" | `35-2-rename-go-online-to-go-online-and-sync-changes.md` | done |
+| 35.3 — Align Go Online Confirmation Behavior | `35-3-align-go-online-confirmation-behavior.md` | done |
+
+**Story 35.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/35-1-hide-exit-offline-mode-widget.md
+```
+
+**Story 35.2 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/35-2-rename-go-online-to-go-online-and-sync-changes.md
+```
+
+**Story 35.3 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/35-3-align-go-online-confirmation-behavior.md
+```
+
+---
+
+## Epic 38: IJE Upload Duplicate Prevention and Logging _(v4.2)_
+
+| Story | File | Status |
+|---|---|---|
+| 38.1 — IJE Upload Duplicate Prevention and Logging | `38-1-ije-upload-duplicate-prevention-and-logging.md` | ready-for-dev |
+
+**Sequencing:** Single story. Independent.
+
+> ⚠️ **OI-3 must be resolved before starting:** Confirm with Nick whether partial-batch uploads (some new, some duplicate cases) should (a) process new cases and skip duplicates, or (b) reject the entire batch. Story 38.1 implements option (b) as the conservative default — update if option (a) is chosen.
+
+**Story 38.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/38-1-ije-upload-duplicate-prevention-and-logging.md
+```
+
+---
+
+## Epic 39: Update Year of Death — Record ID Regression Fix _(v4.2)_
+
+| Story | File | Status |
+|---|---|---|
+| 39.1 — Year of Death Record ID Regression Fix | `39-1-year-of-death-record-id-regression-fix.md` | ready-for-dev |
+
+**Sequencing:** Single story. Independent.
+
+> ℹ️ Fixes two bugs introduced by v4.1 refactoring of `GetRecordIdReplacementForYearOfDeathAsync` in `CaseManager.cs`. Applies to both `cdc_admin` and `jurisdiction_admin` role variants.
+
+**Story 39.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/39-1-year-of-death-record-id-regression-fix.md
+```
+
+---
+
+## Epic 40: Session Expiry Automatic Logout Redirect on 401 _(v4.2)_
+
+| Story | File | Status |
+|---|---|---|
+| 40.1 — Session Expiry 401 Redirect | `40-1-session-expiry-401-redirect.md` | ready-for-dev |
+
+**Sequencing:** Single story. Independent.
+
+> ℹ️ Client-side only. Adds a `window.fetch` interceptor and `$(document).ajaxError()` handler to `_LayoutBase.cshtml` — covers all ~85 fetch and ~149 jQuery AJAX call sites on every page. Redirects to `/Account/Logout` (not login) to ensure the expired CouchDB session is cleaned up.
+
+**Story 40.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/40-1-session-expiry-401-redirect.md
+```
+
+---
+
+## Epic 41: Per-Tenant Authentication Mode — SAMS + Password Co-existence _(v4.2)_
+
+| Story | File | Status |
+|---|---|---|
+| 41.1 — Per-Tenant Auth Investigation | `41-1-per-tenant-auth-investigation.md` | ready-for-dev |
+| 41.2 — Per-Tenant Auth Implementation | `41-2-per-tenant-auth-implementation.md` | backlog |
+
+**Sequencing:** 41.1 must complete first. 41.2 cannot begin until `docs/ai/per-tenant-auth-findings.md` is written.
+
+> ℹ️ `use_sams` in `AccountController` is already resolved per-tenant via `OverridableConfiguration.GetBoolean("sams:is_enabled", host_prefix)`. Story 41.1 confirms whether setting this key in the per-tenant CouchDB config doc is sufficient, or whether additional code changes are needed. Story 41.2 scope is defined by the findings.
+
+**Story 41.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/41-1-per-tenant-auth-investigation.md
+```
+
+**Story 41.2 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/41-2-per-tenant-auth-implementation.md
+```
+
+---
+
+
 
 | OI       | Affects               | What to resolve                                                                                                                                                                                                                                                                                                                                                                                        |
 | -------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -1221,3 +1423,4 @@ dev this story _bmad-output/implementation-artifacts/36-4-change-stack-snapshot-
 | OI-dev-B | Story 2.5             | **Resolved** — Edit-mode hook confirmed during Story 2.5 implementation.                                                                                                                                                                                                                                                                                                                               |
 | OI-dev-C | Story 2.5             | **Resolved** — Chart.js DOM target confirmed during Story 2.5 implementation.                                                                                                                                                                                                                                                                                                                          |
 | OI-PRD-4 | Stories 4.0, 4.1, 5.1 | **Resolved** — Dedicated version-scoped `case-validation-rules` CouchDB document; `severity: hard` for active-input blur; `severity: warning` for historical load-time scan; soft-acknowledgment print gate (UI-only, no persist); POC `CaseValidationManager` field_rules path ported in Story 4.0 (vitals-scoped). FR-2.1, FR-2.3, FR-2.6, FR-6 updated in PRD. Stories 4.0, 4.1, and 5.1 unblocked. |
+| OI-v42-3 | Story 38.1 | **Open** — Confirm partial-batch behavior for IJE re-uploads: (a) skip duplicate cases and process new ones, or (b) reject the entire batch. Story 38.1 implements option (b) as the conservative default. Confirm with Nick before starting. |
