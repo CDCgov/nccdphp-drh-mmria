@@ -5,6 +5,42 @@ var g_user_name = null;
 var g_is_data_analyst_mode = null;
 var g_data_is_checked_out = false;
 var g_data = null;
+
+function mmria_is_case_rev_polling_allowed()
+{
+  // Do not poll while in intentional offline mode — server is unreachable by design.
+  if (typeof is_offline_mode === 'function' && is_offline_mode()) return false;
+
+  return (
+    g_is_data_analyst_mode == null &&
+    g_data_is_checked_out === true &&
+    g_data != null &&
+    g_data._id != null &&
+    g_data._id !== '' &&
+    g_data._rev != null &&
+    g_data._rev !== ''
+  );
+}
+
+function mmria_sync_case_rev_polling()
+{
+  if(mmria_is_case_rev_polling_allowed())
+  {
+    if(typeof window.startCaseRevPolling === 'function')
+    {
+      window.startCaseRevPolling(g_data._id, g_data._rev);
+    }
+    return;
+  }
+
+  if(typeof window.stopCaseRevPolling === 'function')
+  {
+    window.stopCaseRevPolling();
+  }
+}
+
+window.mmria_is_case_rev_polling_allowed = mmria_is_case_rev_polling_allowed;
+
 var g_source_db = null;
 var g_jurisdiction_list = [];
 var g_user_role_jurisdiction_list = [];
@@ -26,6 +62,7 @@ var g_use_position_information = true;
 var g_look_up = {};
 var g_release_version = null;
 var g_autosave_interval = null;
+var g_is_case_stale = false; // true when a rev conflict has been detected — pauses autosave until reload
 var g_value_to_display_lookup = {};
 var g_name_to_value_lookup = {};
 var g_display_to_value_lookup = {};
@@ -441,6 +478,19 @@ function mmria_get_save_queue_item_policy(p_options)
   };
 }
 
+// Returns the number of g_change_stack items already captured in the active save's
+// snapshot for the given case ID. Used by get_new_save_queue_item to compute an
+// offset so that a newly enqueued save does not re-snapshot items the active save
+// has already committed to submitting.
+function mmria_get_active_save_snapshot_length(p_case_id)
+{
+  if (!p_case_id) return 0;
+  const active = save_queue.active_item;
+  if (!active || !active.data || active.data._id !== p_case_id) return 0;
+  if (!Array.isArray(active.change_stack_items)) return 0;
+  return active.change_stack_items.length;
+}
+
 function get_new_save_queue_item
 (
   p_data,
@@ -450,6 +500,9 @@ function get_new_save_queue_item
 )
 {
   const policy = mmria_get_save_queue_item_policy(p_options);
+  // Deep-clone the live case data at enqueue time. If a prior queued save is later
+  // dropped (e.g. schedule_retry_or_fail's awaited_save_is_queued guard), this item's
+  // data still reflects the complete case state at the moment this save was requested.
   const cloned_data = mmria_safe_clone(p_data);
 
   if
@@ -461,12 +514,23 @@ function get_new_save_queue_item
     cloned_data.host_state = window.location.host.split('-')[0];
   }
 
+  // Compute snapshot offset: exclude change stack items already captured in the
+  // active save's snapshot. This prevents the reconcile from seeing duplicate items
+  // across two consecutive saves. If there is no active save (or it is for a
+  // different case), offset is 0 and the full stack is snapshotted as before.
+  const active_snapshot_length = mmria_get_active_save_snapshot_length(
+    p_data && p_data._id
+  );
+  const change_stack_to_snapshot = Array.isArray(g_change_stack)
+    ? g_change_stack.slice(active_snapshot_length)
+    : [];
+
   return {
     id: $mmria.get_new_guid(),
     date_created: new Date(),
     date_completed: null,
     data: cloned_data, 
-    change_stack_items: mmria_safe_clone(Array.isArray(g_change_stack) ? g_change_stack : []),
+    change_stack_items: mmria_safe_clone(change_stack_to_snapshot),
     narrative_snapshot: mmria_get_narrative_save_snapshot(cloned_data),
     continuation_callback: p_call_back,
     note: p_note,
@@ -655,6 +719,7 @@ function mmria_handle_case_save_auth_expired(p_err, p_item)
   }
 
   g_data_is_checked_out = false;
+  mmria_sync_case_rev_polling();
   mmria_abort_case_save_queue_items(p_err, case_id);
   mmria_redirect_case_page_to_autologin_summary();
 }
@@ -783,14 +848,20 @@ function mmria_reconcile_live_save_state_after_success(p_item)
   {
     if(mmria_is_change_stack_prefix_match(g_change_stack, snapshot_items))
     {
+      // Normal path: snapshot items are still at the head of the live stack — remove them.
       g_change_stack.splice(0, snapshot_items.length);
     }
-    else
+    else if(g_change_stack.length >= snapshot_items.length)
     {
+      // Genuine mismatch: the live stack has enough items but they don't match
+      // the snapshot prefix. Items were modified or reordered between enqueue
+      // and completion. Leave intact and warn.
       console.warn(
         'Save completed, but live change stack no longer matched the queued snapshot. Leaving unmatched edits intact.'
       );
     }
+    // else: live stack is shorter than the snapshot — a prior save already committed
+    // those items. Treat as clean; no warn, no splice needed.
   }
 
   mmria_reconcile_live_narrative_state_after_success(p_item);
@@ -1062,6 +1133,25 @@ async function g_set_data_object_from_path
 
       //g_data.last_updated_by = g_uid;
 
+      // Range validation: if the new value violates a min/max rule, restore the old value and show the Out of Range modal.
+      if (window.mmria_validation_rules && metadata.type && metadata.type.toLowerCase() === 'number') {
+        var _fieldName = p_object_path.split('/').pop();
+        var _rangeRule = window.mmria_validation_rules[_fieldName];
+        if (!_rangeRule) {
+          for (var _rk in window.mmria_validation_rules) {
+            if (_rk.endsWith('/' + _fieldName)) { _rangeRule = window.mmria_validation_rules[_rk]; break; }
+          }
+        }
+        var _numVal = parseFloat(value);
+        if (_rangeRule && !isNaN(_numVal) &&
+            (_numVal < parseFloat(_rangeRule.min_value) || _numVal > parseFloat(_rangeRule.max_value))) {
+          var _ctrlEl = document.getElementById(convert_object_path_to_jquery_id(p_object_path) + '_control');
+          if (typeof mmria_vitals_show_field_modal === 'function') {
+            mmria_vitals_show_field_modal(_rangeRule, _ctrlEl || { focus: function(){} });
+          }
+        }
+      }
+
       g_change_stack.push({
         _id: g_data._id,
         _rev: g_data._rev,
@@ -1106,6 +1196,9 @@ async function g_set_data_object_from_path
                 }
 
                 apply_validation();
+                if (window.mmria_validation_state && typeof window.mmria_validation_state.runHistoricalScan === 'function') {
+                  window.mmria_validation_state.runHistoricalScan();
+                }
             }
         );
     } 
@@ -1125,6 +1218,41 @@ async function g_set_data_object_from_path
 
     if(metadata === null)
       return;
+
+    // Range validation: if this is a number field with a min/max rule violation, show the Out of Range modal and reject.
+    if (window.mmria_validation_rules && metadata.type && metadata.type.toLowerCase() === 'number' && value !== '') {
+      var _dpath = p_dictionary_path ? p_dictionary_path.replace(/^\//, '') : '';
+      var _rangeRule = _dpath ? window.mmria_validation_rules[_dpath] : null;
+      // Normalized-path fallback: strip array indices from _dpath and compare against rule field_path keys.
+      // This is form-scoped (matches by full path minus indices, not just field name), preventing
+      // cross-form rule bleeding where an enabled rule on Form A would fire on Form B's same-named
+      // field when Form B's own rule is disabled (Bug #4 fix).
+      if (!_rangeRule && _dpath) {
+        var _dnorm = _dpath.replace(/\/\d+/g, '');
+        for (var _rk2 in window.mmria_validation_rules) {
+          if (_dnorm.endsWith(_rk2) || _rk2.endsWith(_dnorm)) {
+            _rangeRule = window.mmria_validation_rules[_rk2]; break;
+          }
+        }
+      }
+      var _numVal = parseFloat(value);
+      if (_rangeRule && !isNaN(_numVal) &&
+          (_numVal < parseFloat(_rangeRule.min_value) || _numVal > parseFloat(_rangeRule.max_value))) {
+        // Only block if the user actually changed the value.
+        // If the stored value is already the same (historical invalid data), leave it alone.
+        var _storedNum = parseFloat(current_value);
+        var _isNewValue = isNaN(_storedNum) || _numVal !== _storedNum;
+        if (_isNewValue) {
+          var _ctrlEl = document.getElementById(convert_object_path_to_jquery_id(p_object_path) + '_control');
+          // Restore the previously stored value instead of blanking the field (fixes Bug #1 and Bug #2).
+          if (_ctrlEl) { _ctrlEl.value = (current_value !== null && current_value !== undefined) ? String(current_value) : ''; }
+          if (typeof mmria_vitals_show_field_modal === 'function') {
+            mmria_vitals_show_field_modal(_rangeRule, _ctrlEl || { focus: function(){} });
+          }
+          return;
+        }
+      }
+    }
 
     if(metadata.type.toLowerCase() == 'html_area')
     {
@@ -1640,6 +1768,9 @@ else
             }
 
             apply_validation();
+            if (window.mmria_validation_state && typeof window.mmria_validation_state.runHistoricalScan === 'function') {
+              window.mmria_validation_state.runHistoricalScan();
+            }
 
 
         }
@@ -2538,6 +2669,19 @@ async function load_and_set_data()
     window.onhashchange = window_on_hash_change;
     window.onbeforeunload = navigation_away;
 
+    // Expose case data reload for stale-case modal/banner (Story 12.4)
+    window.mmria_reload_case_data = function () {
+        if (typeof get_specific_case === 'function' && g_data && g_data._id) {
+            g_is_case_stale = false;
+            return get_specific_case(g_data._id);
+        }
+    };
+
+    // Allow case-rev-check.js to mark the case stale (pauses autosave)
+    window.mmria_mark_case_stale = function () {
+        g_is_case_stale = true;
+    };
+
     // Load the case set - hash changes will be handled naturally by browser navigation
     await get_case_set();
 }
@@ -2980,6 +3124,17 @@ async function window_on_hash_change(e)
       var new_url = e.newURL || window.location.href;
       g_ui.url_state = url_monitor.get_url_state(new_url);
 
+      // Stop _rev polling when navigating away from a case to a non-case view (e.g. summary list).
+      // get_specific_case will restart polling when the user opens a different case.
+      const isLeavingCaseView = !(
+        g_ui.url_state.path_array &&
+        g_ui.url_state.path_array.length > 0 &&
+        parseInt(g_ui.url_state.path_array[0]) >= 0
+      );
+      if (isLeavingCaseView && typeof window.stopCaseRevPolling === 'function') {
+        window.stopCaseRevPolling();
+      }
+
       if 
       (
         g_ui.url_state.path_array &&
@@ -3100,6 +3255,7 @@ async function window_on_hash_change(e)
             g_data.last_checked_out_by = null;
             g_data.checked_out_by_tab_id = release_tab_id;
             g_data_is_checked_out = false;
+            mmria_sync_case_rev_polling();
 
             g_apply_sort(g_metadata, g_data, "","", "");
 
@@ -3125,6 +3281,7 @@ async function window_on_hash_change(e)
                 g_data.checked_out_by_tab_id = old_checked_out_by_tab_id;
                 g_data_is_checked_out = true;
                 sync_edit_mode_auto_timers();
+                mmria_sync_case_rev_polling();
                 restore_case_hash_after_failed_save(previous_url);
             }
         }
@@ -3300,6 +3457,7 @@ async function get_specific_case(p_id)
       g_data_is_checked_out = false; // Not checked out in processing mode
       
       stop_edit_mode_auto_timers();
+      mmria_sync_case_rev_polling();
       
       if (!g_is_pmss_enhanced) {
         g_case_narrative_original_value = offlineCase.case_narrative?.case_opening_overview;
@@ -3355,6 +3513,9 @@ async function get_specific_case(p_id)
         g_data = case_response;
         g_data_is_checked_out = is_case_checked_out(g_data);
 
+        // Sync _rev polling with active edit-lock ownership.
+        mmria_sync_case_rev_polling();
+
         if (g_autosave_interval != null && g_data_is_checked_out == false) 
         {
             stop_edit_mode_auto_timers();
@@ -3372,6 +3533,7 @@ async function get_specific_case(p_id)
     console.log('get_specific_case:', e);
     g_data = null;
     g_data_is_checked_out = false;
+    mmria_sync_case_rev_polling();
     alert('Unable to load this case. Please return to the summary list and try again.');
     window.location.hash = '#/summary';
     return;
@@ -3534,12 +3696,17 @@ async function process_save_case()
       const delay_ms = mmria_get_save_retry_delay_ms(item.attempt_count);
       item.next_attempt_ms = Date.now() + delay_ms;
 
-      const dialog_cooldown_ms = 30000;
-      const last_shown = item.last_error_dialog_shown_ms || 0;
-      if(Date.now() - last_shown > dialog_cooldown_ms)
+      // Autosave is a silent background operation — never interrupt the user for it.
+      const is_autosave = item.intent === 'autosave';
+      if(!is_autosave)
       {
-        item.last_error_dialog_shown_ms = Date.now();
-        try { $mmria.unstable_network_dialog_show(err, item.note); } catch(_ex) { /* ignore */ }
+        const dialog_cooldown_ms = 30000;
+        const last_shown = item.last_error_dialog_shown_ms || 0;
+        if(Date.now() - last_shown > dialog_cooldown_ms)
+        {
+          item.last_error_dialog_shown_ms = Date.now();
+          try { $mmria.unstable_network_dialog_show(err, item.note); } catch(_ex) { /* ignore */ }
+        }
       }
 
       finalize_queue_state();
@@ -3547,7 +3714,10 @@ async function process_save_case()
       return;
     }
 
-    try { $mmria.unstable_network_dialog_show(err, item.note); } catch(_ex) { /* ignore */ }
+    if(item.intent !== 'autosave')
+    {
+      try { $mmria.unstable_network_dialog_show(err, item.note); } catch(_ex) { /* ignore */ }
+    }
     fail_item(err);
   };
 
@@ -3771,8 +3941,9 @@ async function process_save_case()
           err_object.responseText.indexOf("(409) Conflict") > -1
         )
         {
-          err_object.responseText = "Unable to save document Conflict";
-          $mmria.save_error_500_dialog_show(err_object, `${item.note} (409) Conflict`);
+          // Pause autosave and show the stale-case modal (AC-1, Story 12.4)
+          g_is_case_stale = true;
+          if (typeof window.showStaleCaseModal === 'function') window.showStaleCaseModal();
           fail_item(err_object);
           return;
         }
@@ -3800,6 +3971,7 @@ async function process_save_case()
 
       g_data.last_updated_by = g_user_name;
       g_data_is_checked_out = is_case_checked_out(g_data);
+      mmria_sync_case_rev_polling();
 
       if (g_data_is_checked_out)
       {
@@ -3988,6 +4160,11 @@ function g_render()
     {
       console.log(ex);
     }
+  }
+
+  // Story 5.1: Run historical vitals scan and refresh validation button after render.
+  if (window.mmria_validation_state && typeof window.mmria_validation_state.runHistoricalScan === 'function') {
+    window.mmria_validation_state.runHistoricalScan();
   }
 
   var section_list = document.getElementsByTagName('section');
@@ -4242,39 +4419,42 @@ function pdf_case_onclick(event, type_output)
 
   if (section_name) 
   {
-    if (section_name == 'core-summary') 
-    {
-
-        window.setTimeout(function()
-        {
-            openTab('./pdf-version', unique_tab_name, section_name, type_output);
-        }, 1000);	
-    } 
-    else 
-    {
         // data-record of selected option
         const selectedOption = dropdown.options[dropdown.options.selectedIndex];
         const record_number = selectedOption.dataset.record;
 				
 
-        if(section_name == "all_hidden")
-        {
-            section_name = 'all';
+        const is_all_hidden_pdf = section_name == "all_hidden";
+        if (is_all_hidden_pdf) { section_name = 'all'; }
 
-            window.setTimeout(function()
-            {
-                openTab('./pdf-version',  unique_tab_name, section_name, type_output, record_number, true);
-            }, 1000);	
+        function performPdfAction() {
+            window.setTimeout(function() {
+                if (is_all_hidden_pdf) {
+                    openTab('./pdf-version', unique_tab_name, section_name, type_output, record_number, true);
+                } else {
+                    openTab('./pdf-version', unique_tab_name, section_name, type_output, record_number);
+                }
+            }, 1000);
         }
-        else
-        {
-            window.setTimeout(function()
-            {
-                openTab('./pdf-version',  unique_tab_name, section_name, type_output, record_number);
-            }, 1000);	
+
+        if (mmria_vitals_case_is_closed()) {
+            performPdfAction();
+            return;
         }
-      
-    }
+
+        if (mmria_vitals_has_hard_violations()) {
+            var actionLabel = type_output === 'view' ? 'View PDF' : 'Save PDF';
+            mmria_vitals_show_print_gate_modal(actionLabel, true, null);
+            return;
+        }
+
+        if (mmria_vitals_revalidate_all()) {
+            var actionLabel = type_output === 'view' ? 'View PDF' : 'Save PDF';
+            mmria_vitals_show_print_gate_modal(actionLabel, false, performPdfAction);
+            return;
+        }
+
+        performPdfAction();
   }
 
 }
@@ -4289,41 +4469,39 @@ function print_case_onclick(event)
   
 	if (section_name) 
 	{
-	  if (section_name == 'core-summary') 
-	  {
-  
-		  window.setTimeout(function()
-		  {
-			  openTab('./core-elements', unique_tab_name, 'all', 'print');
-		  }, 1000);	
-  
-		
-	  } 
-	  else 
-	  {
 		// data-record of selected option
 		const selectedOption = dropdown.options[dropdown.options.selectedIndex];
 		const record_number = selectedOption.dataset.record;
   
-        if(section_name == "all_hidden")
-        {
-            section_name = 'all';
+        const is_all_hidden_print = section_name == "all_hidden";
+        if (is_all_hidden_print) { section_name = 'all'; }
 
-            window.setTimeout(function()
-            {
-                openTab('./print-version', unique_tab_name, section_name, 'print', record_number, true);
-            }, 1000);	
+        function performPrintAction() {
+            window.setTimeout(function() {
+                if (is_all_hidden_print) {
+                    openTab('./print-version', unique_tab_name, section_name, 'print', record_number, true);
+                } else {
+                    openTab('./print-version', unique_tab_name, section_name, 'print', record_number);
+                }
+            }, 1000);
         }
-        else
-        {
-  
-            window.setTimeout(function()
-            {
-                openTab('./print-version', unique_tab_name, section_name, 'print', record_number);
-            }, 1000);	
+
+        if (mmria_vitals_case_is_closed()) {
+            performPrintAction();
+            return;
         }
-		
-	  }
+
+        if (mmria_vitals_has_hard_violations()) {
+            mmria_vitals_show_print_gate_modal('View', true, null);
+            return;
+        }
+
+        if (mmria_vitals_revalidate_all()) {
+            mmria_vitals_show_print_gate_modal('View', false, performPrintAction);
+            return;
+        }
+
+        performPrintAction();
 	}
   
 }
@@ -4353,9 +4531,6 @@ function openTab(pageRoute, tabName, p_section, p_type_output, p_number, p_show_
 	// console.log('p_type_output: ', p_type_output);
 
 
-   // g_data.case_narrative.case_opening_overview = textarea_control_strip_html_attributes(g_data.case_narrative.case_opening_overview);
-
-
    let sorted_data = clone(g_data);
 
    g_apply_sort(g_metadata, sorted_data, "","", "");
@@ -4372,7 +4547,8 @@ function openTab(pageRoute, tabName, p_section, p_type_output, p_number, p_show_
 		p_type_output,
         p_number,
         g_metadata_summary,
-        p_show_hidden
+        p_show_hidden,
+        window.mmria_validation_rules
       );
     });
   } 
@@ -4386,7 +4562,8 @@ function openTab(pageRoute, tabName, p_section, p_type_output, p_number, p_show_
 	p_type_output,
       p_number,
       g_metadata_summary,
-      p_show_hidden
+      p_show_hidden,
+      window.mmria_validation_rules
     );
   }
 }
@@ -4478,6 +4655,7 @@ async function enable_edit_click()
       }
       g_data_is_checked_out = false;
       stop_edit_mode_auto_timers();
+      mmria_sync_case_rev_polling();
       g_render();
       return;
     }
@@ -4511,6 +4689,7 @@ async function enable_edit_click()
       // Ensure we remain in view mode in this tab.
       g_data_is_checked_out = false;
       stop_edit_mode_auto_timers();
+      mmria_sync_case_rev_polling();
       g_render();
       return;
     }
@@ -4563,12 +4742,14 @@ async function enable_edit_click()
       }
 
       stop_edit_mode_auto_timers();
+      mmria_sync_case_rev_polling();
 
       g_render();
       return;
     }
 
     g_data_is_checked_out = true;
+    mmria_sync_case_rev_polling();
     g_render();
 
     if ($global.case_document_begin_edit != null) 
@@ -4609,6 +4790,7 @@ async function save_and_finish_click()
   current_data.last_checked_out_by = null;
   current_data.checked_out_by_tab_id = release_tab_id;
   g_data_is_checked_out = false;
+  mmria_sync_case_rev_polling();
   g_apply_sort(g_metadata, current_data, "", "", "");
   
   // Mark for cleanup before saving
@@ -4623,6 +4805,7 @@ async function save_and_finish_click()
       clear_case_from_local_storage(case_id);
       g_case_cleanup_pending.delete(case_id);
       stop_edit_mode_auto_timers();
+      mmria_sync_case_rev_polling();
       create_save_message();
       g_render();
     });
@@ -4636,6 +4819,7 @@ async function save_and_finish_click()
     current_data.checked_out_by_tab_id = old_checked_out_by_tab_id;
     g_data_is_checked_out = true;
     sync_edit_mode_auto_timers();
+    mmria_sync_case_rev_polling();
     g_render();
   }
 }
@@ -4750,6 +4934,7 @@ async function save_case_before_full_navigation(target_url)
       g_case_cleanup_pending.add(case_id);
       g_apply_sort(g_metadata, current_data, '', '', '');
       stop_edit_mode_auto_timers();
+      mmria_sync_case_rev_polling();
 
       await save_case_and_wait(current_data, null, 'leave_case_navigation');
 
@@ -4767,6 +4952,7 @@ async function save_case_before_full_navigation(target_url)
     current_data.checked_out_by_tab_id = old_checked_out_by_tab_id;
     g_data_is_checked_out = true;
     sync_edit_mode_auto_timers();
+    mmria_sync_case_rev_polling();
     g_render();
     g_case_navigation_save_in_progress = false;
   }
@@ -4957,6 +5143,7 @@ function mmria_get_case_edit_auto_save_freq_minutes()
 function autosave() 
 {
     if (g_case_session_autologin_in_progress === true) return;
+    if (g_is_case_stale) return; // paused until user reloads the latest version
 
     const split_one = window.location.href.split('#');
 
@@ -5224,6 +5411,9 @@ function g_textarea_oninput
 
 function navigation_away(e) 
 {
+
+  // Stop _rev polling on page unload (AC-5, Story 12.4)
+  if (typeof window.stopCaseRevPolling === 'function') window.stopCaseRevPolling();
 
   // BACKUP: Finalize unload cleanup using sendBeacon when page is unloading.
   // - Releases current case edit lock (tab-validated)

@@ -2,6 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using mmria.common.getset;
+using mmria.common.SharedLibraries.Case;
+using mmria.common.SharedLibraries.Case.DAL;
+using mmria.common.SharedLibraries.ExportQueue;
+using mmria.common.SharedLibraries.Jurisdiction;
+using mmria.common.SharedLibraries.Jurisdiction.DAL;
+using mmria.common.SharedLibraries.MetadataVersion;
+using mmria.common.SharedLibraries.MetadataVersion.DAL;
 using mmria.services.Models;
 
 namespace mmria.services.Utilities.Exporter;
@@ -61,13 +68,20 @@ private ScheduleInfoMessage Configuration;
 
 mmria.common.couchdb.DBConfigurationDetail db_config;
 private mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+private readonly IMetadataRepository _metadataRepository;
+private ICaseRepository _caseRepository;
+    private readonly IJurisdictionRepository _jurisdictionRepository;
+    private IExportQueueRepository _exportQueueRepository;
 
-public exporter(ScheduleInfoMessage configuration, mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+public exporter(ScheduleInfoMessage configuration, mmria.common.getset.CouchDbHttpClient couchDbHttpClient, IExportQueueRepository exportQueueRepository)
 {
     this.Configuration = configuration;
     _couchDbHttpClient = couchDbHttpClient;
-
-    db_config = new()
+    _exportQueueRepository = exportQueueRepository;
+    _caseRepository = new CaseDAL(_couchDbHttpClient);
+    _metadataRepository = new MetadataVersionDAL(_couchDbHttpClient);
+    _jurisdictionRepository = new JurisdictionDAL(_couchDbHttpClient);
+    db_config = new mmria.common.couchdb.DBConfigurationDetail
     {
         url = configuration.couch_db_url,
         prefix = configuration.db_prefix,
@@ -150,14 +164,7 @@ public async System.Threading.Tasks.Task<bool> Execute(export_queue_item queue_i
     this.qualitativeStreamWriter[2] = new System.IO.StreamWriter(System.IO.Path.Combine(export_directory, "informant-interview.txt"), true);
 
 
-/*
-    string URL = this.database_url + $"/{db_config.prefix}mmrds/_all_docs";
-    string urlParameters = "?include_docs=true";
-    cURL document_curl = new cURL("GET", null, URL + urlParameters, null, this.user_name, this.value_string);
-    object all_cases = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(document_curl.execute());
-*/
-    string metadata_url = this.database_url + $"/metadata/version_specification-{this.Configuration.version_number}/metadata";
-    mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, this.user_name, this.value_string));
+    mmria.common.metadata.app metadata = await _metadataRepository.GetAppDocumentAsync(this.Configuration.version_number, db_config);
     this.current_metadata = metadata;
 
 
@@ -386,7 +393,7 @@ if(multiform_field_list.Count > 0)
         this.clearTextStreamWriter[1] = new System.IO.StreamWriter(System.IO.Path.Combine(export_root_directory, "informant-interview-plaintext.txt"), true);
     }
     #if !IS_PMSS_ENHANCED
-    var jurisdiction_hashset = await mmria.services.authorization.get_current_jurisdiction_id_set_for(db_config, this.juris_user_name, _couchDbHttpClient);
+    var jurisdiction_hashset = await mmria.services.authorization.get_current_jurisdiction_id_set_for(db_config, this.juris_user_name, _jurisdictionRepository);
     #endif
     #if IS_PMSS_ENHANCED
     var jurisdiction_hashset = await mmria.pmss.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, this.juris_user_name, _couchDbHttpClient);
@@ -404,7 +411,7 @@ if(multiform_field_list.Count > 0)
             yield break;
         }
 
-        await foreach (var caseId in PagedCaseIdLoader.GetCaseIdsAsync(db_config, _couchDbHttpClient))
+        await foreach (var caseId in PagedCaseIdLoader.GetCaseIdsAsync(db_config, _caseRepository))
         {
             yield return caseId;
         }
@@ -531,11 +538,10 @@ if(multiform_field_list.Count > 0)
     }
 
 
+    var _utcSettings = new Newtonsoft.Json.JsonSerializerSettings { DateTimeZoneHandling = Newtonsoft.Json.DateTimeZoneHandling.RoundtripKind };
     await foreach(string case_id in get_case_ids_to_process())
     {
-        string URL = $"{this.database_url}/{db_config.prefix}mmrds/{case_id}";
-
-        System.Dynamic.ExpandoObject case_row = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(await _couchDbHttpClient.ExecuteAsync("GET", URL, null, this.user_name, this.value_string));
+        System.Dynamic.ExpandoObject case_row = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(await _caseRepository.GetCaseDocumentJsonAsync(case_id, db_config), _utcSettings);
 
         IDictionary<string, object> case_doc = case_row as IDictionary<string, object>;
 
@@ -905,7 +911,7 @@ if(multiform_field_list.Count > 0)
                 }
 
                 string file_field_name = MetaDataNode_Dictionary[path].sass_export_name;
-                row[file_field_name] = val;
+                row[file_field_name] = val is System.DateTime dt ? dt.ToString("MM/dd/yyyy HH:mm:ss") : val;
 
                 }
                 break;
@@ -1362,8 +1368,8 @@ if(multiform_field_list.Count > 0)
     );
 
 
-    string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}export_queue/" + this.item_id, null, this.user_name, this.value_string);
-    export_queue_item export_queue_item = Newtonsoft.Json.JsonConvert.DeserializeObject<export_queue_item>(responseFromServer);
+    export_queue_item export_queue_item;
+    export_queue_item = await _exportQueueRepository.GetQueueDocumentAsync<export_queue_item>(this.item_id, db_config);
 
     export_queue_item.status = "Download";
 
@@ -1371,7 +1377,7 @@ if(multiform_field_list.Count > 0)
     Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings();
     settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
     string object_string = Newtonsoft.Json.JsonConvert.SerializeObject(export_queue_item, settings);
-    responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue/" + export_queue_item._id, object_string, this.user_name, this.value_string);
+    await _exportQueueRepository.SaveQueueDocumentAsync(export_queue_item._id, object_string, db_config);
 
 
     Console.WriteLine("{0} Export Finished", System.DateTime.Now);
@@ -1384,15 +1390,15 @@ if(multiform_field_list.Count > 0)
     catch (Exception ex)
     {
 
-    string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}export_queue/" + this.item_id, null, this.user_name, this.value_string);
-    export_queue_item export_queue_item = Newtonsoft.Json.JsonConvert.DeserializeObject<export_queue_item>(responseFromServer);
+    export_queue_item export_queue_item;
+    export_queue_item = await _exportQueueRepository.GetQueueDocumentAsync<export_queue_item>(this.item_id, db_config);
 
     export_queue_item.status = "Queue Failed:" + ex.ToString();
 
     Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings();
     settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
     string object_string = Newtonsoft.Json.JsonConvert.SerializeObject(export_queue_item, settings);
-    responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue/" + export_queue_item._id, object_string, this.user_name, this.value_string);
+    await _exportQueueRepository.SaveQueueDocumentAsync(export_queue_item._id, object_string, db_config);
 
 
     return false;
@@ -2232,11 +2238,11 @@ private void WriteQualitativeData
 
     if (this.qualitativeStreamCount[index] == 0)
     {
-        this.qualitativeStreamWriter[index].WriteLine($"{record_split}\nid={p_record_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}");
+        this.qualitativeStreamWriter[index].Write($"{record_split}\nid={p_record_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}\n");
     }
     else
     {
-        this.qualitativeStreamWriter[index].WriteLine($"\n{record_split}\nid={p_record_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}");
+        this.qualitativeStreamWriter[index].Write($"\n{record_split}\nid={p_record_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}\n");
     }
     this.qualitativeStreamCount[index] += 1;
 }
@@ -2272,11 +2278,11 @@ private void WriteClearTextData
 
     if (this.clearTextStreamCount[index] == 0)
     {
-        this.clearTextStreamWriter[index].WriteLine($"{record_split}\nid={p_record_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}");
+        this.clearTextStreamWriter[index].Write($"{record_split}\nid={p_record_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}\n");
     }
     else
     {
-        this.clearTextStreamWriter[index].WriteLine($"\n{record_split}\nid={p_record_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}");
+        this.clearTextStreamWriter[index].Write($"\n{record_split}\nid={p_record_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}\n");
     }
     this.clearTextStreamCount[index] += 1;
 }

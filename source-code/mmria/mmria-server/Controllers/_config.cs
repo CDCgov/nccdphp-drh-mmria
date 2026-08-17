@@ -23,19 +23,18 @@ public sealed class _configController : Controller
     mmria.common.couchdb.OverridableConfiguration overridable_configuration;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
-
+    private readonly mmria.common.SharedLibraries.SystemConfig.IConfigurationRepository _configRepository;
     string shared_config_id = null;
     public _configController
     (
         IConfiguration p_configuration, 
         IHttpContextAccessor httpContextAccessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.SharedLibraries.SystemConfig.IConfigurationRepository configRepository
     )
     {
         configuration = p_configuration;
-        _couchDbHttpClient = couchDbHttpClient;
+        _configRepository = configRepository;
 
         host_prefix = tenantRuntime.EffectiveHostPrefix;
         overridable_configuration = tenantRuntime.RequireConfiguration();
@@ -84,22 +83,11 @@ public sealed class _configController : Controller
 
         try
         {
+            System.Console.WriteLine($"GetConfiguration: configId={shared_config_id}");
 
-            
-            string request_string = $"{db_config.url}/configuration/{shared_config_id}";
+            string responseFromServer = await _configRepository.GetConfigurationJsonAsync(shared_config_id, db_config);
 
-
-            System.Console.WriteLine($"GetConfiguration: request_string {request_string}");
-
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                "GET",
-                request_string,
-                null,
-                db_config.user_name,
-                db_config.user_value
-            );
-
-            app_config = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.couchdb.Configuration> (responseFromServer);
+            app_config = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.couchdb.Configuration>(responseFromServer);
 
         }
         catch(System.Exception ex)
@@ -117,19 +105,11 @@ public sealed class _configController : Controller
 
         try
         {
-            string request_string = $"{db_config.url}/configuration/{shared_config_id}";
+            System.Console.WriteLine($"GetConfigurationMaster: configId={shared_config_id}");
 
-            System.Console.WriteLine($"GetConfigurationMaster: request_string {request_string}");
+            string responseFromServer = await _configRepository.GetConfigurationJsonAsync(shared_config_id, db_config);
 
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                "GET",
-                request_string,
-                null,
-                db_config.user_name,
-                db_config.user_value
-            );
-
-            app_config = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.couchdb.OverridableConfiguration> (responseFromServer);
+            app_config = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.couchdb.OverridableConfiguration>(responseFromServer);
         }
         catch(System.Exception ex)
         {
@@ -168,17 +148,9 @@ public sealed class _configController : Controller
             settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
             var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(sanitizedConfiguration, settings);
 
-            string request_string = $"{db_config.url}/configuration/{shared_config_id}";
-            
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                "PUT",
-                request_string,
-                object_string,
-                db_config.user_name,
-                db_config.user_value
-            );
+            string responseFromServer = await _configRepository.PutConfigurationAsync(shared_config_id, object_string, db_config);
 
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response> (responseFromServer);
+            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
             if (result == null || !result.ok)
             {
                 System.Console.WriteLine(
@@ -306,6 +278,8 @@ public sealed class _configController : Controller
             result.integer_keys["shared"].Add("unsuccessful_login_attempts_within_number_of_minutes", unsuccessful_login_attempts_within_number_of_minutes);
             result.integer_keys["shared"].Add("unsuccessful_login_attempts_lockout_number_of_minutes", unsuccessful_login_attempts_lockout_number_of_minutes);
             result.integer_keys["shared"].Add("tenant_database_counts_mmrds_watch_threshold", tenant_database_counts_mmrds_watch_threshold);
+            result.integer_keys["shared"].Add("CVS_MAX_ATTEMPTS", 10);
+            result.integer_keys["shared"].Add("CVS_RETRY_DELAY_SECONDS", 60);
 
         }
         catch(System.Exception ex)

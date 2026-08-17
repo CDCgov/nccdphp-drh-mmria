@@ -207,7 +207,7 @@ function form_multi_render
 				p_result.push(set_character_limit(g_data.home_record.first_name, 20));
 				p_result.push(`</p>`);
 			}
-            p_result.push(`<p><button type="button"   onclick="show_audit_click('${g_data._id}')"${audit_button_disabled}>View Audit Log</button></p>`);
+            p_result.push(`<div class="d-flex align-items-center mb-2"><button type="button" onclick="show_audit_click('${g_data._id}')"${audit_button_disabled}>View Audit Log</button><div class="validation-errors-button-area ml-2"></div></div>`);
 
             p_result.push(" <p class='construct__info mb-0'><strong>Case Folder:</strong> ")
             if(g_data.home_record.jurisdiction_id == "/")
@@ -756,7 +756,7 @@ function form_multi_render
 				p_result.push(set_character_limit(g_data.home_record.first_name, 20));
 				p_result.push(`</p>`);
 			}
-            p_result.push(`<p><button type="button"  onclick="show_audit_click('${g_data._id}')"${audit_button_disabled}>View Audit Log</button></p>`);
+            p_result.push(`<div class="d-flex align-items-center mb-2"><button type="button" onclick="show_audit_click('${g_data._id}')"${audit_button_disabled}>View Audit Log</button><div class="validation-errors-button-area ml-2"></div></div>`);
 			
             p_result.push(" <p class='construct__info mb-0'><strong>Case Folder:</strong> ")
             if(g_data.home_record.jurisdiction_id == "/")
@@ -1102,7 +1102,7 @@ function form_multi_render
 				p_result.push(`</p>`);
             }
     
-            p_result.push(`<p><button type="button"  onclick="show_audit_click('${g_data._id}')"${audit_button_disabled}>View Audit Log</button></p>`);
+            p_result.push(`<div class="d-flex align-items-center mb-2"><button type="button" onclick="show_audit_click('${g_data._id}')"${audit_button_disabled}>View Audit Log</button><div class="validation-errors-button-area ml-2"></div></div>`);
     
             p_result.push(" <p class='construct__info mb-0'><strong>Case Folder:</strong> ")
             if(g_data.home_record.jurisdiction_id == "/")
@@ -1341,11 +1341,7 @@ function form_multi_render
                     if (!isNullOrUndefined(caseNarrativeLabel)) 
                     {
                         // Insert new HTML/TEXT
-                        caseNarrativeLabel.innerHTML =`<h2 id="case-narrative-heading" class="h3 mb-2 mt-0 font-weight-bold">Case Narrative ${render_data_analyst_dictionary_link
-                            (
-                                p_metadata, 
-                                "/case_narrative/case_opening_overview"
-                            )} </h2><p class="mb-0" style="line-height: normal">Use the pre-fill text below, and copy and paste from Reviewer's Notes below to create a comprehensive case narrative. Whatever you type here is what will be printed in the Print Version.</p>`;
+                        caseNarrativeLabel.style.display = 'none';
                         // Stop the scanning
                         clearInterval(scan_for_narrative_label);
                     }
@@ -1388,7 +1384,7 @@ function form_multi_render
                 }
 
     
-                p_result.push(`<h3 class="font-weight-bold mb-2">MMRIA Form Status</h3>
+                p_result.push(`<h2 class="font-weight-bold mb-2">MMRIA Form Status</h2>
                 <ul>
                     <li>Death Certificate - ${get_progress_label(g_data.home_record.case_progress_report.death_certificate)}</li>
                     <li>Birth/Fetal Death Certificate- Parent Section - ${get_progress_label(g_data.home_record.case_progress_report.birth_certificate_parent_section)}</li>
@@ -1417,7 +1413,7 @@ function form_multi_render
                         notes = g_data[key];
     
                         p_result.push(
-                            `<h3 class="font-weight-bold mb-2">${noteTitle}</h3>
+                            `<h2 class="font-weight-bold mb-2">${noteTitle}</h2>
                             <p class="mb-2 font-weight-bold">Reviewer's Notes from <a href="${noteUrl}#content">Case Form</a></p>
                             <p>
                                 ${
@@ -1434,7 +1430,7 @@ function form_multi_render
                         notes = g_data[key];
     
                         p_result.push(
-                            `<h3 class="font-weight-bold mb-2">${noteTitle}</h3>
+                            `<h2 class="font-weight-bold mb-2">${noteTitle}</h2>
                             <p class="mb-2 font-weight-bold">Reviewer's Notes from <a href="${noteUrl}#content">Case Form</a></p>
                             <p>
                                 ${
@@ -1452,7 +1448,7 @@ function form_multi_render
                         notes = g_data[key];
     
                         p_result.push(
-                            `<h3 class="font-weight-bold mb-2">${noteTitle}</h3>
+                            `<h2 class="font-weight-bold mb-2">${noteTitle}</h2>
                             <ul class="list-unstyled">`
                         );
                         if (notes)
@@ -1490,7 +1486,7 @@ function form_multi_render
                         notes = g_data[key];
     
                         p_result.push(
-                            `<h3 class="font-weight-bold mb-2">${noteTitle}</h3>
+                            `<h2 class="font-weight-bold mb-2">${noteTitle}</h2>
                             <p class="mb-2 font-weight-bold">Reviewer's Notes from <a href="${noteUrl}#content">Case Form</a></p>
                             <p>
                                 ${
@@ -1508,7 +1504,7 @@ function form_multi_render
                         notes = g_data[key];
     
                         p_result.push(
-                            `<h3 class="font-weight-bold mb-2">${noteTitle}</h3>
+                            `<h2 class="font-weight-bold mb-2">${noteTitle}</h2>
                             <p class="mb-2 font-weight-bold">Reviewer's Notes from <a href="${noteUrl}#content">Case Form</a></p>
                             <p>${notes == null || (notes.reviewer_note != null && notes.reviewer_note.length < 1) ? "<em>No data entered</em>" : textarea_control_replace_return_with_br(notes.reviewer_note)}</p>`
                         );
@@ -1522,7 +1518,7 @@ function form_multi_render
                         notes = g_data[key];
     
                         p_result.push(
-                            `<h3 class="font-weight-bold mb-2">${noteTitle}</h3>
+                            `<h2 class="font-weight-bold mb-2">${noteTitle}</h2>
                             <ul class="list-unstyled">`
                         );
                         if (notes)
@@ -1595,7 +1591,7 @@ function form_multi_render
                         notes = g_data[key];
     
                         p_result.push(
-                            `<h3 class="font-weight-bold mb-2">${noteTitle}</h3>
+                            `<h2 class="font-weight-bold mb-2">${noteTitle}</h2>
                             <ul class="list-unstyled">`
                         );
                         if (notes) {
@@ -1674,7 +1670,7 @@ function form_multi_render
                         notes = g_data[key];
     
                         p_result.push(
-                            `<h3 class="font-weight-bold mb-2">${noteTitle}</h3>
+                            `<h2 class="font-weight-bold mb-2">${noteTitle}</h2>
                             <ul class="list-unstyled">`
                         );
                         if (notes)
@@ -1731,7 +1727,7 @@ function form_multi_render
                         notes = g_data[key];
     
                         p_result.push(
-                            `<h3 class="font-weight-bold mb-2">${noteTitle}</h3>
+                            `<h2 class="font-weight-bold mb-2">${noteTitle}</h2>
                             <p class="mb-2 font-weight-bold">Reviewer's Notes from <a href="${noteUrl}#content">Case Form</a></p>
                             <p>
                                 ${
@@ -1751,7 +1747,7 @@ function form_multi_render
                         notes = g_data[key];
     
                         p_result.push(
-                            `<h3 class="font-weight-bold mb-2">${noteTitle}</h3>
+                            `<h2 class="font-weight-bold mb-2">${noteTitle}</h2>
                             <p class="mb-2 font-weight-bold">Reviewer's Notes from <a href="${noteUrl}#content">Case Form</a></p>
                             <p>
                                 ${
@@ -1772,7 +1768,7 @@ function form_multi_render
                         noteUrl = window.location.hash.replace(p_metadata.name, key);
     
                         p_result.push(
-                            `<h3 class="font-weight-bold mb-2">${noteTitle}</h3>
+                            `<h2 class="font-weight-bold mb-2">${noteTitle}</h2>
                             <p class="mb-2 font-weight-bold">Reviewer's Notes from <a href="${noteUrl}#content">Case Form</a></p>
                             <p>
                                 ${
@@ -1793,7 +1789,7 @@ function form_multi_render
                         notes = g_data[key]; // array of forms
     
                         p_result.push(
-                            `<h3 class="font-weight-bold mb-2">${noteTitle}</h3>
+                            `<h2 class="font-weight-bold mb-2">${noteTitle}</h2>
                             <ul class="list-unstyled">`
                         );
                         if (notes)
@@ -1949,7 +1945,7 @@ function quick_edit_header_render(
 	}
     const isOfflineMode = localStorage.getItem('is_offline') === 'true';
     const audit_button_disabled = isOfflineMode ? ' disabled' : '';
-    p_result.push(`<p><button type="button"  onclick="show_audit_click('${g_data._id}')"${audit_button_disabled}>View Audit Log</button></p>`);
+    p_result.push(`<div class="d-flex align-items-center mb-2"><button type="button" onclick="show_audit_click('${g_data._id}')"${audit_button_disabled}>View Audit Log</button><div class="validation-errors-button-area ml-2"></div></div>`);
     
     p_result.push(" <p class='construct__info mb-0'><strong>Case Folder:</strong> ")
     if(g_data.home_record.jurisdiction_id == "/")
@@ -2044,7 +2040,6 @@ function render_print_form_control(p_result, p_ui, p_metadata, p_data) {
 		p_result.push("</optgroup>");
 
 		p_result.push('<optgroup label="Other">');
-		p_result.push('<option value="core-summary">Core Elements Only</option>');
 		p_result.push('<option value="all">All Case Forms</option>');
         if(g_is_data_analyst_mode != null && g_is_data_analyst_mode)
         {

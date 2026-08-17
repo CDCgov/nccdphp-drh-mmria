@@ -10,9 +10,10 @@ using System.Dynamic;
 using mmria.common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Configuration;
-using Microsoft.AspNetCore.Http;
 
-using  mmria.server.extension; 
+using  mmria.server.extension;
+using mmria.common.SharedLibraries.Jurisdiction;
+
 namespace mmria.server;
 
 [Authorize(Roles  = "committee_member")]
@@ -22,17 +23,19 @@ public sealed class de_id_viewController: ControllerBase
     mmria.common.couchdb.OverridableConfiguration configuration;
     common.couchdb.DBConfigurationDetail db_config;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IJurisdictionRepository _jurisdictionRepository;
 
     string host_prefix = null;
 
     public de_id_viewController
     (
-        IHttpContextAccessor httpContextAccessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        IJurisdictionRepository jurisdictionRepository
     )
     {
         _couchDbHttpClient = couchDbHttpClient;
+        _jurisdictionRepository = jurisdictionRepository;
         host_prefix = tenantRuntime.EffectiveHostPrefix;
 
         configuration = tenantRuntime.RequireConfiguration();
@@ -62,7 +65,8 @@ public sealed class de_id_viewController: ControllerBase
             User,
             is_identefied_case,
             false,
-            _couchDbHttpClient
+            _couchDbHttpClient,
+            _jurisdictionRepository
         );
         
 

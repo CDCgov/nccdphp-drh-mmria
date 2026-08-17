@@ -25,6 +25,8 @@ namespace mmria.server;
 public sealed class passwordChangeController: ControllerBase 
 { 
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.Account.IUserRepository _userRepository;
+    private readonly mmria.common.SharedLibraries.Session.ISessionRepository _sessionRepository;
     mmria.common.SharedLibraries.Session.Manager.SessionManager _sessionManager;
     IHttpContextAccessor accessor;
     
@@ -37,10 +39,14 @@ public sealed class passwordChangeController: ControllerBase
         mmria.common.SharedLibraries.Session.Manager.SessionManager sessionManager,
         IHttpContextAccessor _accessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.Account.IUserRepository userRepository,
+        mmria.common.SharedLibraries.Session.ISessionRepository sessionRepository
     )
     {
         _couchDbHttpClient = couchDbHttpClient;
+        _userRepository = userRepository;
+        _sessionRepository = sessionRepository;
 
         _sessionManager = sessionManager;
         accessor = _accessor;
@@ -72,12 +78,9 @@ public sealed class passwordChangeController: ControllerBase
                     u => u.IsAuthenticated && 
                     u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
 
-                var session_event_request_url = db_config.Get_Prefix_DB_Url($"session/_design/session_event_sortable/_view/by_user_id?startkey=\"{userName}\"&endkey=\"{userName}\"");
-
-                string response_from_server = await _couchDbHttpClient.ExecuteAsync("GET", session_event_request_url, null, db_config.user_name, db_config.user_value);
+                var session_event_response = await _sessionRepository.GetSessionEventsByUserIdAsync(userName, db_config);
 
                 //var session_event_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_object_key_header<mmria.common.model.couchdb.session_event>>(response_from_server);
-                var session_event_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.session_event>>(response_from_server);
 
                 DateTime first_item_date = DateTime.Now;
                 DateTime last_item_date = DateTime.Now;
@@ -125,7 +128,6 @@ public sealed class passwordChangeController: ControllerBase
         var user = await mmria.server.util.JsonRequestBodyReader.ReadAsync<ApplicationUser>(Request);
 
         var safeRequest = CreateSanitizedPasswordChangeRequest(user);
-        string object_string = null;
         mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response ();
 
         var userName = User.Identities.First(
@@ -134,13 +136,11 @@ public sealed class passwordChangeController: ControllerBase
 
         try
         {
-            string user_db_url = db_config.url + "/_users/org.couchdb.user:" + userName;
-            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", user_db_url, object_string, db_config.user_name, db_config.user_value);
-            var user_object = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.user>(responseFromServer);
+            var user_object = await _userRepository.CheckUserAsync("org.couchdb.user:" + userName, db_config);
 
             if
             (
-                user_object == null ||
+                string.IsNullOrWhiteSpace(user_object._id) ||
                 safeRequest == null ||
                 !safeRequest.UserName.Equals(userName, StringComparison.OrdinalIgnoreCase)
             )
@@ -150,12 +150,7 @@ public sealed class passwordChangeController: ControllerBase
 
             user_object.password = safeRequest.Value;
 
-            Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-            settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-            object_string = Newtonsoft.Json.JsonConvert.SerializeObject(user_object, settings);
-
-            responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", user_db_url, object_string, db_config.user_name, db_config.user_value);
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
+            result = await _userRepository.PutUserAsync(user_object, db_config);
 
             if (result.ok) 
             {

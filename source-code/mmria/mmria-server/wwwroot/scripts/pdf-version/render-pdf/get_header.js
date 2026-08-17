@@ -25,10 +25,7 @@ async function get_header(currentPage, pageCount, section_name)
             writeText = (doc.content[index].stack[l].pageHeaderText !== undefined) ? doc.content[index].stack[l].pageHeaderText : writeText;
         }
     }
-    else if (section_name === 'core-summary') 
-    {
-        writeText = 'CORE SUMMARY';
-    } else 
+    else 
     {
         //writeText = getSectionTitle(section_name);
         writeText = section_name;

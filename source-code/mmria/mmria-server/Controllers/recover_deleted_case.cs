@@ -6,48 +6,30 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 
-using  mmria.server.extension; 
+using mmria.server.extension;
 using mmria.server.util;
+using mmria.common.SharedLibraries.CaseWorkflowAdmin.Manager;
+
 namespace mmria.server.Controllers;
 
-[Authorize(Roles  = "installation_admin,cdc_admin")]
+[Authorize(Roles = "installation_admin,cdc_admin")]
 [Route("recover-deleted-case/{action=Index}")]
 public sealed class recover_deleted_caseController : Controller
 {
-
-    struct tombstone_struct
-    {
-
-        public string _id;
-        public string _rev;
-    }
-    struct Selector_Struc
-    {
-        //public System.Dynamic.ExpandoObject selector;
-        public System.Collections.Generic.Dictionary<string,System.Collections.Generic.Dictionary<string,string>> selector;
-        public string[] fields;
-
-        public string use_index;
-
-        public int limit;
-    }
-
     mmria.common.couchdb.OverridableConfiguration configuration;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     readonly mmria.common.couchdb.ConfigurationSet _dbConfigSet;
-
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
-
+    private readonly CaseWorkflowAdminManager _manager;
 
     public recover_deleted_caseController
     (
-        IHttpContextAccessor httpContextAccessor, 
+        IHttpContextAccessor httpContextAccessor,
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        CaseWorkflowAdminManager manager
     )
     {
-        _couchDbHttpClient = couchDbHttpClient;
+        _manager = manager;
         host_prefix = tenantRuntime.EffectiveHostPrefix;
 
         configuration = tenantRuntime.RequireConfiguration();
@@ -55,7 +37,7 @@ public sealed class recover_deleted_caseController : Controller
         db_config = tenantRuntime.RequireDbConfig();
         _dbConfigSet = tenantRuntime.RequireConfigurationSet();
 
-        if(_dbConfigSet.detail_list.ContainsKey("vital_import"))
+        if (_dbConfigSet.detail_list.ContainsKey("vital_import"))
         {
             _dbConfigSet.detail_list.Remove("vital_import");
         }
@@ -81,15 +63,11 @@ public sealed class recover_deleted_caseController : Controller
             var isCdcAdmin = AuthorizedWorkflowScopeHelper.IsCdcAdmin(User);
             var effectiveStateDatabase = AuthorizedWorkflowScopeHelper.ResolveAuthorizedStateDatabase(User, Model.StateDatabase, host_prefix, _dbConfigSet);
             var effectiveDbConfig = AuthorizedWorkflowScopeHelper.ResolveAuthorizedDbConfig(User, Model.StateDatabase, host_prefix, db_config, _dbConfigSet);
-            string responseFromServer  = null;
             model.is_cdc_admin = isCdcAdmin;
-            string request_string = $"{effectiveDbConfig.url}/{effectiveDbConfig.prefix}audit/_design/sortable/_view/by_deleted?skip=0&limit=25000&descending=true";
-            responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, effectiveDbConfig.user_name, effectiveDbConfig.user_value);
 
+            var audit_view_response = await _manager.GetDeletedCasesViewAsync(effectiveDbConfig);
 
-            var audit_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.audit.Audit_Detail_View>>(responseFromServer);
-
-            foreach(var item in audit_view_response.rows)
+            foreach (var item in audit_view_response.rows)
             {
                 try
                 {
@@ -168,10 +146,6 @@ public sealed class recover_deleted_caseController : Controller
             is_problem_deleting = false
         };
 
-        Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-        settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-
-
         try
         {
             var userName = "";
@@ -185,59 +159,11 @@ public sealed class recover_deleted_caseController : Controller
 
             var effectiveDbConfig = AuthorizedWorkflowScopeHelper.ResolveAuthorizedDbConfig(User, Model.StateDatabase, host_prefix, db_config, _dbConfigSet);
 
-            string audit_url = $"{effectiveDbConfig.url}/{effectiveDbConfig.prefix}audit/{Model._id}";
-            var audit_response = await _couchDbHttpClient.ExecuteAsync("GET", audit_url, null, effectiveDbConfig.user_name, effectiveDbConfig.user_value);
-            var audit_object = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.Change_Stack>(audit_response);
-
-
-            string get_revs_url = $"{effectiveDbConfig.url}/{effectiveDbConfig.prefix}mmrds/{audit_object.case_id}?revs=true&open_revs=all";
-            var get_revs_curl_response = await _couchDbHttpClient.ExecuteAsync("GET", get_revs_url, null, effectiveDbConfig.user_name, effectiveDbConfig.user_value);
-            var start_index = get_revs_curl_response.IndexOf("_rev");
-            var end_index = get_revs_curl_response.IndexOf(",", start_index);
-            var pre_current_rev = get_revs_curl_response.Substring(start_index,end_index - start_index);
-            var current_rev = pre_current_rev.Replace("\"", "").Replace("_rev:","");
-
-
-            var tombstone = new tombstone_struct();
-            tombstone._id = audit_object._id;
-            tombstone._rev = current_rev;
-
-
-
-            string get_case_url = $"{effectiveDbConfig.url}/{effectiveDbConfig.prefix}mmrds/{audit_object.case_id}?rev={audit_object.delete_rev}";
-            var get_case_response = await _couchDbHttpClient.ExecuteAsync("GET", get_case_url, null, effectiveDbConfig.user_name, effectiveDbConfig.user_value);
-            var get_case_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(get_case_response);
-            
-            IDictionary<string, object> result_dictionary = get_case_object as IDictionary<string, object>;
-
-            if(result_dictionary.ContainsKey("_rev"))
+            var (ok, errorMessage) = await _manager.RecoverDeletedCaseAsync(effectiveDbConfig, Model._id, userName);
+            if (!ok)
             {
-                result_dictionary.Remove("_rev");
-            }
-
-            result_dictionary["date_last_updated"] = DateTime.Now;
-            result_dictionary["last_updated_by"] = userName;
-
-            var put_case_object_string = Newtonsoft.Json.JsonConvert.SerializeObject(get_case_object, settings);
-             
-            //string put_case_url = $"{effectiveDbConfig.url}/{effectiveDbConfig.prefix}mmrds/{audit_object.case_id}?rev={current_rev}";
-            string put_case_url = $"{effectiveDbConfig.url}/{effectiveDbConfig.prefix}mmrds/{audit_object.case_id}";
-            
-            try
-            {
-                var put_case_response = await _couchDbHttpClient.ExecuteAsync("PUT", put_case_url, put_case_object_string, effectiveDbConfig.user_name, effectiveDbConfig.user_value);
-                var put_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(put_case_response);
-                if(put_result.ok)
-                {
-                    string delete_audit_url = $"{effectiveDbConfig.url}/{effectiveDbConfig.prefix}audit/{Model._id}?rev={audit_object._rev}";
-                    var  delete_response = await _couchDbHttpClient.ExecuteAsync("DELETE", delete_audit_url, null, effectiveDbConfig.user_name, effectiveDbConfig.user_value);
-                }
-            }
-            catch(Exception ex)
-            {
-                Console.Write("problem restoring deleted case\n{0}", ex);
-                result.problem_description = ex.Message;
-
+                result.is_problem_deleting = true;
+                result.problem_description = errorMessage;
             }
 
             

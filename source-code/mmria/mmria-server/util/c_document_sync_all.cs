@@ -8,6 +8,9 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using mmria.server.util;
+using mmria.common.SharedLibraries.Case;
+using mmria.common.SharedLibraries.DeIdentified;
+using mmria.common.SharedLibraries.Report;
 using Newtonsoft.Json.Linq;
 
 namespace mmria.server.utils;
@@ -163,6 +166,9 @@ public sealed class c_document_sync_all
     private readonly string _host_prefix;
     private readonly mmria.server.util.TenantRebuildCoordinator.TenantRebuildLease _tenant_rebuild_lease;
     private readonly string _rebuild_source;
+    private readonly ICaseRepository _caseRepository;
+    private readonly IDeIdentifiedRepository _deIdentifiedRepository;
+    private readonly IReportRepository _reportRepository;
     public c_document_sync_all 
     (
         string p_couchdb_url, 
@@ -174,7 +180,10 @@ public sealed class c_document_sync_all
         mmria.common.couchdb.OverridableConfiguration configuration = null,
         string host_prefix = null,
         mmria.server.util.TenantRebuildCoordinator.TenantRebuildLease tenant_rebuild_lease = null,
-        string rebuild_source = "startup"
+        string rebuild_source = "startup",
+        ICaseRepository caseRepository = null,
+        IDeIdentifiedRepository deIdentifiedRepository = null,
+        IReportRepository reportRepository = null
     )
     {
         this.couchdb_url = p_couchdb_url;
@@ -188,6 +197,9 @@ public sealed class c_document_sync_all
         _host_prefix = host_prefix;
         _tenant_rebuild_lease = tenant_rebuild_lease;
         _rebuild_source = rebuild_source;
+        _caseRepository = caseRepository;
+        _deIdentifiedRepository = deIdentifiedRepository;
+        _reportRepository = reportRepository;
     }
 
 
@@ -787,6 +799,32 @@ public sealed class c_document_sync_all
         }
     }
 
+    private async Task reset_de_id_database_async()
+    {
+        if(_deIdentifiedRepository != null)
+        {
+            await _deIdentifiedRepository.DropAndResetAsync(db_config);
+            System.Console.WriteLine($">>> DELETED+CREATED {db_config.prefix}de_id database via IDeIdentifiedRepository at {DateTime.Now:HH:mm:ss.fff} <<<");
+        }
+        else
+        {
+            await ensure_database_exists_async("de_id", true);
+        }
+    }
+
+    private async Task reset_report_database_async()
+    {
+        if(_reportRepository != null)
+        {
+            await _reportRepository.DropAndResetWithSystemDocPreservationAsync(db_config);
+            System.Console.WriteLine($">>> DELETED+CREATED {db_config.prefix}report database via IReportRepository at {DateTime.Now:HH:mm:ss.fff} <<<");
+        }
+        else
+        {
+            await ensure_database_exists_async("report", true);
+        }
+    }
+
     private async Task ensure_database_exists_async(string database_name, bool resetExistingDatabase)
     {
         string database_url = this.couchdb_url + $"/{db_config.prefix}{database_name}";
@@ -821,6 +859,29 @@ public sealed class c_document_sync_all
     private async Task ensure_de_id_sortable_design_async(bool forceRestore)
     {
         string design_url = this.couchdb_url + $"/{db_config.prefix}de_id/_design/sortable";
+
+        if(_deIdentifiedRepository != null)
+        {
+            try
+            {
+                string sortable_design = await read_database_script_async("case_design_sortable.json");
+                await _deIdentifiedRepository.EnsureDesignDocumentAsync("sortable", sortable_design, db_config);
+                System.Console.WriteLine($">>> RESTORED {db_config.prefix}de_id/_design/sortable at {DateTime.Now:HH:mm:ss.fff} <<<");
+            }
+            catch (Exception ex)
+            {
+                System.Console.WriteLine();
+                System.Console.WriteLine("========== ERROR RESTORING _design/sortable ==========");
+                System.Console.WriteLine($"ERROR: Failed to restore de_id/_design/sortable: {ex.Message}");
+                System.Console.WriteLine($"Current Directory (BaseDirectory): {AppContext.BaseDirectory}");
+                System.Console.WriteLine($"Target URL: {design_url}");
+                System.Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                System.Console.WriteLine("======================================================");
+                System.Console.WriteLine();
+            }
+            return;
+        }
+
         if(!forceRestore && await url_endpoint_exists_async(design_url))
         {
             return;
@@ -850,7 +911,10 @@ public sealed class c_document_sync_all
         string report_url = this.couchdb_url + $"/{db_config.prefix}report";
         bool report_created_or_reset = forceRestore || !await url_endpoint_exists_async(report_url);
 
-        await ensure_database_exists_async("report", forceRestore);
+        if(forceRestore)
+            await reset_report_database_async();
+        else
+            await ensure_database_exists_async("report", false);
 
         if(forceRestore || report_created_or_reset)
         {
@@ -858,7 +922,10 @@ public sealed class c_document_sync_all
             {
                 var report_opioid_index = new Report_Opioid_Index_Struct();
                 string index_json = Newtonsoft.Json.JsonConvert.SerializeObject(report_opioid_index);
-                await _couchDbHttpClient.ExecuteAsync("POST", report_url + "/_index", index_json, this.user_name, this.user_value);
+                if(_reportRepository != null)
+                    await _reportRepository.EnsureIndexAsync(index_json, db_config);
+                else
+                    await _couchDbHttpClient.ExecuteAsync("POST", report_url + "/_index", index_json, this.user_name, this.user_value);
             }
             catch (Exception ex)
             {
@@ -869,7 +936,10 @@ public sealed class c_document_sync_all
             {
                 var report_powerbi_index = new Report_PowerBI_Index_Struct();
                 string index_json = Newtonsoft.Json.JsonConvert.SerializeObject(report_powerbi_index);
-                await _couchDbHttpClient.ExecuteAsync("POST", report_url + "/_index", index_json, this.user_name, this.user_value);
+                if(_reportRepository != null)
+                    await _reportRepository.EnsureIndexAsync(index_json, db_config);
+                else
+                    await _couchDbHttpClient.ExecuteAsync("POST", report_url + "/_index", index_json, this.user_name, this.user_value);
             }
             catch (Exception ex)
             {
@@ -883,7 +953,10 @@ public sealed class c_document_sync_all
             try
             {
                 string interactive_report_view = await read_database_script_async("interactive-aggregate-report-view.json");
-                await _couchDbHttpClient.ExecuteAsync("PUT", interactive_report_view_url, interactive_report_view, this.user_name, this.user_value);
+                if(_reportRepository != null)
+                    await _reportRepository.EnsureDesignDocumentAsync("interactive_aggregate_report", interactive_report_view, db_config);
+                else
+                    await _couchDbHttpClient.ExecuteAsync("PUT", interactive_report_view_url, interactive_report_view, this.user_name, this.user_value);
             }
             catch (Exception ex)
             {
@@ -897,7 +970,10 @@ public sealed class c_document_sync_all
             try
             {
                 string data_summary_view = await read_database_script_async("data-summary-view.json");
-                await _couchDbHttpClient.ExecuteAsync("PUT", data_summary_view_url, data_summary_view, this.user_name, this.user_value);
+                if(_reportRepository != null)
+                    await _reportRepository.EnsureDesignDocumentAsync("data_summary_view_report", data_summary_view, db_config);
+                else
+                    await _couchDbHttpClient.ExecuteAsync("PUT", data_summary_view_url, data_summary_view, this.user_name, this.user_value);
             }
             catch (Exception ex)
             {
@@ -908,13 +984,24 @@ public sealed class c_document_sync_all
 
     private async Task ensure_target_databases_async(bool resetExistingDatabases)
     {
-        await ensure_database_exists_async("de_id", resetExistingDatabases);
+        if(resetExistingDatabases)
+            await reset_de_id_database_async();
+        else
+            await ensure_database_exists_async("de_id", false);
         await ensure_de_id_sortable_design_async(forceRestore: resetExistingDatabases);
         await ensure_report_views_and_indexes_async(forceRestore: resetExistingDatabases);
     }
 
     private async Task<List<case_batch_document>> get_case_batch_async(string start_after_id, int take)
     {
+        if(_caseRepository != null)
+        {
+            var page = await _caseRepository.GetCasesPagedAsync(start_after_id, take, db_config);
+            return page.Documents
+                .Select(doc => new case_batch_document { id = doc.Value<string>("_id"), document_json = doc.ToString(Newtonsoft.Json.Formatting.None) })
+                .ToList();
+        }
+
         var result = new List<case_batch_document>();
         string next_start_key = start_after_id;
 
@@ -1005,6 +1092,22 @@ public sealed class c_document_sync_all
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         if(ids == null || ids.Count == 0)
         {
+            return result;
+        }
+
+        if(string.Equals(database_name, "de_id", StringComparison.OrdinalIgnoreCase) && _deIdentifiedRepository != null)
+        {
+            var bulk_revisions = await _deIdentifiedRepository.GetRevisionBulkAsync(ids, db_config);
+            foreach(var pair in bulk_revisions)
+                result[pair.Key] = pair.Value;
+            return result;
+        }
+
+        if(string.Equals(database_name, "report", StringComparison.OrdinalIgnoreCase) && _reportRepository != null)
+        {
+            var bulk_revisions = await _reportRepository.GetRevisionBulkAsync(ids, db_config);
+            foreach(var pair in bulk_revisions)
+                result[pair.Key] = pair.Value;
             return result;
         }
 
@@ -1204,6 +1307,17 @@ public sealed class c_document_sync_all
         {
             try
             {
+                if(string.Equals(database_name, "de_id", StringComparison.OrdinalIgnoreCase) && _deIdentifiedRepository != null)
+                {
+                    var repo_result = await _deIdentifiedRepository.UpsertDocumentAsync(document_id, document, db_config);
+                    return repo_result?.ok == true;
+                }
+                if(string.Equals(database_name, "report", StringComparison.OrdinalIgnoreCase) && _reportRepository != null)
+                {
+                    var repo_result = await _reportRepository.UpsertDocumentAsync(document_id, document, db_config);
+                    return repo_result?.ok == true;
+                }
+
                 string response = await _couchDbHttpClient.ExecuteAsync(
                     "PUT",
                     url,
@@ -1290,7 +1404,7 @@ public sealed class c_document_sync_all
         {
             try
             {
-                var sync_document = new c_sync_document(row.id, row.document_json, "PUT", metadata_version, db_config, _couchDbHttpClient, _configuration, _host_prefix, rebuild_context, skip_revision_lookup: true);
+                var sync_document = new c_sync_document(row.id, row.document_json, "PUT", metadata_version, db_config, _couchDbHttpClient, configuration: _configuration, host_prefix: _host_prefix, rebuild_context: rebuild_context, skip_revision_lookup: true);
                 var build_result = await sync_document.build_documents_async();
 
                 if(!string.IsNullOrWhiteSpace(build_result.de_identified_json))
@@ -1354,7 +1468,7 @@ public sealed class c_document_sync_all
             try
             {
                 var build_stopwatch = Stopwatch.StartNew();
-                var sync_document = new c_sync_document(row.id, row.document_json, "PUT", metadata_version, db_config, _couchDbHttpClient, _configuration, _host_prefix, rebuild_context, skip_revision_lookup: true);
+                var sync_document = new c_sync_document(row.id, row.document_json, "PUT", metadata_version, db_config, _couchDbHttpClient, configuration: _configuration, host_prefix: _host_prefix, rebuild_context: rebuild_context, skip_revision_lookup: true);
                 var build_result = await sync_document.build_documents_async();
                 build_stopwatch.Stop();
 

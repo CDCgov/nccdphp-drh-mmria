@@ -79,7 +79,7 @@ public sealed class NAT_File_Record
     public string MARN;
 
     [Layout(91, 1)]
-    [MMRIA_Path("birth_fetal_death_certificate_parent/demographic_of_mother/If_mother_not_married_has_paternity_acknowledgement_been_signed_in_the_hospital", "bfdcpdom_Imnmhpabsit_hospi")]
+    [MMRIA_Path("birth_fetal_death_certificate_parent/demographic_of_mother/if_mother_not_married_has_paternity_acknowledgement_been_signed_in_the_hospital", "bfdcpdom_Imnmhpabsit_hospi")]
     [IJE_Name("ACKN")]
     public string ACKN;
 

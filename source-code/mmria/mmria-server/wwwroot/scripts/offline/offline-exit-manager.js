@@ -405,20 +405,11 @@
 
     function renderWidgetMarkup() {
         return `
-            <div class="mmria-offline-exit-widget" role="region" aria-label="Offline Status" style="display: inline-flex; align-items: center; gap: 16px; padding: 6px 0;">
+            <div class="mmria-offline-exit-widget" role="region" aria-label="Offline Status" style="display: inline-flex; align-items: center; gap: 16px; padding: 6px 0; width: 100%; justify-content: flex-end;">
                 <div style="display: inline-flex; align-items: center; color: #712177; font-weight: 600; font-size: 18px;">
                     <img src="/img/offline-info.svg" alt="" aria-hidden="true" style="width: 18px; height: 18px; margin-right: 8px;">
                     <span>You're Offline</span>
                 </div>
-                <button
-                    type="button"
-                    data-action="show-exit-offline-mode"
-                    class="btn"
-                    style="background-color: #e3d3e4; color: #712177; font-weight: 600; border: 1px solid #e3d3e4; padding: 8px 18px; display: inline-flex; align-items: center; border-radius: 4px;"
-                >
-                    <span aria-hidden="true" style="font-size: 16px; line-height: 1; margin-right: 8px;">&rarr;</span>
-                    <span>Exit Offline Mode</span>
-                </button>
             </div>
         `;
     }

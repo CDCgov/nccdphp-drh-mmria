@@ -725,8 +725,8 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                         </td>                    
                         <td class='td' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: right; vertical-align: middle;'>
                             ${isOfflineStatus === 'true' ? `
-                                <button type="button" id="go-online-btn" class="btn btn-primary" onclick="show_go_online_modal(event)" style="line-height: 1.15;" title="Go back online and sync your changes">
-                                    <img src="../img/online-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="" aria-hidden="true">Go Online
+                                <button type="button" id="go-online-btn" class="btn btn-primary" onclick="show_go_online_modal(event)" style="line-height: 1.3; display: inline-flex; align-items: center; justify-content: center; text-align: center;" title="Go back online and sync your changes">
+                                    <img src="../img/online-go.svg" style="width: 14px; height: 14px; margin-right: 8px; flex-shrink: 0;" alt="" aria-hidden="true"><span class="button-text" data-idle-label="Go Online &amp;<br>Sync Changes">Go Online &<br>Sync Changes</span>
                                 </button>
                             ` : `
                                 <button type="button" class="btn btn-primary" onclick="go_offline_clicked(event)" style="line-height: 1.15; ${g_offline_operation_in_progress ? 'opacity: 0.6; cursor: not-allowed;' : ''}" ${g_offline_operation_in_progress ? 'disabled' : ''}>
@@ -788,7 +788,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                                 <div style='flex-shrink: 0; display: flex; align-items: flex-start;'>
                                 ${isOfflineStatus === 'true' ? `
                                     <button type="button" id="go-online-btn" class="btn btn-primary" onclick="go_online_clicked(event)" style="line-height: 1.15;" title="Go back online and sync your changes">
-                                        <img src="../img/online-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="" aria-hidden="true">Go Online
+                                        <img src="../img/online-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="" aria-hidden="true"><span class="button-text" data-idle-label="Go Online &amp; Sync Changes">Go Online & Sync Changes</span>
                                     </button>
                                 ` : `
                                     <button type="button" class="btn btn-primary" onclick="go_offline_clicked(event)" style="line-height: 1.15; ${g_offline_operation_in_progress ? 'opacity: 0.6; cursor: not-allowed;' : ''}" ${g_offline_operation_in_progress ? 'disabled' : ''}>

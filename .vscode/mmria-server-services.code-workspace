@@ -12,6 +12,9 @@
   "settings": {
     "debug.showInStatusBar": "always",
     "dotnet.defaultSolution": "disable",
-    "dotnet-test-explorer.testProjectPath": "../nccdphp-drh-mmria-utilities/mmria-server.tests"
+    "dotnet-test-explorer.testProjectPath": "../nccdphp-drh-mmria-utilities/mmria-server.tests",
+    "chat.tools.terminal.autoApprove": {
+        "dotnet build": true
+    }
   }
 }

@@ -4,6 +4,7 @@ using Akka.Actor;
 using mmria.common.SharedLibraries.MMRIAServices.DAL;
 using mmria.common.SharedLibraries.MMRIAServices.Manager;
 using mmria.common.SharedLibraries.MMRIAServices.Model;
+using mmria.common.SharedLibraries.MetadataVersion.DAL;
 
 namespace mmria.services.populate_cdc_instance;
 
@@ -24,7 +25,7 @@ public sealed class PopulateCDCInstance : ReceiveActor
         PopulateCdcThrottleSettings populateCdcThrottleSettings)
     {
         _couchDbHttpClient = couchDbHttpClient;
-        _mmriaServicesManager = new MMRIAServicesManager(new MMRIAServicesDAL(_couchDbHttpClient), _couchDbHttpClient);
+        _mmriaServicesManager = new MMRIAServicesManager(new MMRIAServicesDAL(_couchDbHttpClient, new mmria.common.SharedLibraries.SystemConfig.DAL.SystemConfigDAL(_couchDbHttpClient), new MetadataVersionDAL(_couchDbHttpClient), new mmria.common.SharedLibraries.VitalImport.DAL.VitalImportDAL(_couchDbHttpClient, new mmria.common.SharedLibraries.Case.DAL.CaseDAL(_couchDbHttpClient))), _couchDbHttpClient);
         _populateCdcThrottleSettings = populateCdcThrottleSettings ?? PopulateCdcThrottleSettings.CreateDefaults();
         Become(Waiting);
     }

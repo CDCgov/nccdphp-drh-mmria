@@ -3,13 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
-using mmria.case_version.v260120;
+using mmria.case_version.v260615;
 using mmria.common.couchdb;
 using mmria.common.model.couchdb;
 using mmria.common.SharedLibraries.Session.Model;
 using mmria.common.SharedLibraries.Session.Manager;
 using mmria.common.SharedLibraries.OfflineCase.DAL;
-using mmria.common.SharedLibraries.Case.DAL;
+using mmria.common.SharedLibraries.Case;
 using mmria.common.SharedLibraries.Session.DAL;
 using mmria.common.SharedLibraries.OfflineCase.Model;
 using mmria.common.utils;
@@ -21,23 +21,26 @@ namespace mmria.common.SharedLibraries.OfflineCase.Manager;
 public class OfflineCaseManager : IOfflineCaseManager
 {
     private readonly OfflineCaseDAL _offlineCaseDal;
-    private readonly CaseDAL _caseDal;
+    private readonly ICaseRepository _caseRepository;
     private readonly SessionDAL _sessionDal;
     private readonly SessionManager _sessionManager;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.Audit.IAuditRepository _auditRepository;
 
     public OfflineCaseManager(
         OfflineCaseDAL offlineCaseDal,
-        CaseDAL caseDal,
+        ICaseRepository caseRepository,
         SessionDAL sessionDal,
         SessionManager sessionManager,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.Audit.IAuditRepository auditRepository)
     {
         _offlineCaseDal = offlineCaseDal;
-        _caseDal = caseDal;
+        _caseRepository = caseRepository;
         _sessionDal = sessionDal;
         _sessionManager = sessionManager;
         _couchDbHttpClient = couchDbHttpClient;
+        _auditRepository = auditRepository;
     }
 
     public Task<CacheVersionResponse> GetCacheVersionAsync()
@@ -71,7 +74,7 @@ public class OfflineCaseManager : IOfflineCaseManager
             return new document_put_response { ok = false, error_description = "tab_id is required to enter offline mode." };
         }
 
-        var conflictingSoftLockCaseId = await _caseDal.GetSoftLockedCaseIdForUserInAnotherTabAsync(userName, request.tab_id, dbConfig);
+        var conflictingSoftLockCaseId = await _caseRepository.GetSoftLockedCaseIdForUserInAnotherTabAsync(userName, request.tab_id, dbConfig);
         if (!string.IsNullOrWhiteSpace(conflictingSoftLockCaseId))
         {
             return new document_put_response { ok = false, error_description = "Cannot go into offline mode with cases added in another browser tab. Please try this tab from the original tab." };
@@ -101,8 +104,7 @@ public class OfflineCaseManager : IOfflineCaseManager
             try
             {
                 // Fetch the case document
-                var caseUrl = $"{dbConfig.url}/{dbConfig.prefix}mmrds/{caseId}";
-                var caseResponse = await _couchDbHttpClient.ExecuteAsync("GET", caseUrl, null, dbConfig.user_name, dbConfig.user_value);
+                var caseResponse = await _caseRepository.GetCaseDocumentJsonAsync(caseId, dbConfig);
                 
                 if (string.IsNullOrEmpty(caseResponse)) continue;
                 
@@ -116,7 +118,7 @@ public class OfflineCaseManager : IOfflineCaseManager
                     caseDocument["date_last_updated"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
                     
                     var json_string = Newtonsoft.Json.JsonConvert.SerializeObject(caseDocument);
-                    await _couchDbHttpClient.ExecuteAsync("PUT", caseUrl, json_string, dbConfig.user_name, dbConfig.user_value);
+                    await _caseRepository.PutCaseDocumentJsonAsync(caseId, json_string, dbConfig);
                 }
             }
             catch (Exception ex)
@@ -295,8 +297,7 @@ public class OfflineCaseManager : IOfflineCaseManager
 
         foreach (var caseId in caseIds)
         {
-            var caseUrl = $"{dbConfig.url}/{dbConfig.prefix}mmrds/{caseId}";
-            var caseJson = await _couchDbHttpClient.ExecuteAsync("GET", caseUrl, null, dbConfig.user_name, dbConfig.user_value);
+            var caseJson = await _caseRepository.GetCaseDocumentJsonAsync(caseId, dbConfig);
             var caseDocument = JObject.Parse(caseJson);
 
             var isOffline = caseDocument.Value<bool?>("is_offline") == true ||
@@ -321,12 +322,10 @@ public class OfflineCaseManager : IOfflineCaseManager
             caseDocument["date_last_updated"] = System.DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
             caseDocument["last_updated_by"] = userName;
 
-            var saveResponse = await _couchDbHttpClient.ExecuteAsync(
-                "PUT",
-                caseUrl,
+            var saveResponse = await _caseRepository.PutCaseDocumentJsonAsync(
+                caseId,
                 caseDocument.ToString(Formatting.None),
-                dbConfig.user_name,
-                dbConfig.user_value);
+                dbConfig);
 
             lastResponse = JsonConvert.DeserializeObject<document_put_response>(saveResponse) ?? new document_put_response { ok = false, error_description = "Failed to update case." };
             if (!lastResponse.ok)
@@ -395,8 +394,7 @@ public class OfflineCaseManager : IOfflineCaseManager
 
         foreach (var caseId in caseIds)
         {
-            var caseUrl = $"{dbConfig.url}/{dbConfig.prefix}mmrds/{caseId}";
-            var caseJson = await _couchDbHttpClient.ExecuteAsync("GET", caseUrl, null, dbConfig.user_name, dbConfig.user_value);
+            var caseJson = await _caseRepository.GetCaseDocumentJsonAsync(caseId, dbConfig);
 
             if (string.IsNullOrWhiteSpace(caseJson))
             {
@@ -424,12 +422,10 @@ public class OfflineCaseManager : IOfflineCaseManager
             caseDocument["date_last_updated"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
             caseDocument["last_updated_by"] = userName;
 
-            var saveResponse = await _couchDbHttpClient.ExecuteAsync(
-                "PUT",
-                caseUrl,
+            var saveResponse = await _caseRepository.PutCaseDocumentJsonAsync(
+                caseId,
                 caseDocument.ToString(Formatting.None),
-                dbConfig.user_name,
-                dbConfig.user_value);
+                dbConfig);
 
             lastResponse = JsonConvert.DeserializeObject<document_put_response>(saveResponse) ??
                 new document_put_response { ok = false, error_description = $"Failed to update case {caseId}." };
@@ -528,7 +524,7 @@ public class OfflineCaseManager : IOfflineCaseManager
 
         try
         {
-            currentCaseJson = await _caseDal.GetCaseDocumentJsonAsync(request.CaseId, dbConfig);
+            currentCaseJson = await _caseRepository.GetCaseDocumentJsonAsync(request.CaseId, dbConfig);
             currentCaseDocument = JObject.Parse(currentCaseJson);
             caseExistsInDatabase = currentCaseDocument["error"] == null;
         }
@@ -660,7 +656,7 @@ public class OfflineCaseManager : IOfflineCaseManager
             note = $"Offline sync: Document modified offline and synced from session {request.OfflineSessionId}"
         };
 
-        var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient);
+        var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient, _caseRepository, _auditRepository);
         var saveResult = await caseManager.SaveCaseAsync(
             modifiedDocument,
             changeStack,
@@ -678,11 +674,11 @@ public class OfflineCaseManager : IOfflineCaseManager
         if (currentCaseDocument != null &&
             !string.IsNullOrWhiteSpace(currentCaseDocument.Value<string>("offline_by_tab_id")))
         {
-            var savedCaseJson = await _caseDal.GetCaseDocumentJsonAsync(request.CaseId, dbConfig);
+            var savedCaseJson = await _caseRepository.GetCaseDocumentJsonAsync(request.CaseId, dbConfig);
             var savedCaseDocument = JObject.Parse(savedCaseJson);
             savedCaseDocument.Remove("offline_by_tab_id");
 
-            var cleanupResponseJson = await _caseDal.PutCaseDocumentJsonAsync(
+            var cleanupResponseJson = await _caseRepository.PutCaseDocumentJsonAsync(
                 request.CaseId,
                 savedCaseDocument.ToString(Formatting.None),
                 dbConfig);
@@ -764,7 +760,7 @@ public class OfflineCaseManager : IOfflineCaseManager
                 var caseId = docChange.DocumentId;
                 if (string.IsNullOrWhiteSpace(caseId)) continue;
 
-                var currentDoc = await _caseDal.GetCaseAsync(caseId, dbConfig);
+                var currentDoc = await _caseRepository.GetCaseAsync(caseId, dbConfig);
                 if (currentDoc == null)
                 {
                     validationErrors.Add($"Could not retrieve current document for case ID: {caseId}");
@@ -791,7 +787,7 @@ public class OfflineCaseManager : IOfflineCaseManager
                     continue;
                 }
 
-                var saveResult = await _caseDal.UpdateCaseAsync(caseId, updatedDoc, dbConfig);
+                var saveResult = await _caseRepository.UpdateCaseAsync(caseId, updatedDoc, dbConfig);
                 if (saveResult.ok)
                 {
                     enhancedChanges.Add(new { 

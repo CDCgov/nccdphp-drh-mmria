@@ -8,6 +8,10 @@ using System.Text;
 using Akka.Actor;
 using mmria.common.ije;
 using mmria.common.SharedLibraries.MMRIAServices.Model;
+using mmria.common.SharedLibraries.MetadataVersion;
+using mmria.common.SharedLibraries.MetadataVersion.DAL;
+using mmria.common.SharedLibraries.VitalImport;
+using mmria.common.couchdb;
 
 namespace mmria.services.populate_cdc_instance;
 
@@ -30,16 +34,21 @@ public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
     IConfiguration configuration;
     ILogger logger;
     mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IMetadataRepository _metadataRepository;
     private readonly PopulateCdcThrottleSettings _populateCdcThrottleSettings;
+    private readonly IVitalImportRepository? _vitalImportRepository;
 
     protected override void PreStart() => Console.WriteLine("Process_Message started");
     protected override void PostStop() => Console.WriteLine("Process_Message stopped");
     public PopulateCDCInstanceSupervisor(
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
-        PopulateCdcThrottleSettings populateCdcThrottleSettings)
+        PopulateCdcThrottleSettings populateCdcThrottleSettings,
+        IVitalImportRepository? vitalImportRepository = null)
     {
         _couchDbHttpClient = couchDbHttpClient;
+        _metadataRepository = new MetadataVersionDAL(couchDbHttpClient);
         _populateCdcThrottleSettings = populateCdcThrottleSettings ?? PopulateCdcThrottleSettings.CreateDefaults();
+        _vitalImportRepository = vitalImportRepository;
         
         //Context.ActorOf<PopulateCDCInstance>("child");
 
@@ -336,12 +345,25 @@ public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
     {
         var result = new mmria.common.model.couchdb.alldocs_response<mmria.common.ije.Batch>();
 
-        string url = $"{mmria.services.vitalsimport.Program.couchdb_url}/vital_import/_all_docs?include_docs=true";
         try
         {
-            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", url, null, mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.alldocs_response<mmria.common.ije.Batch>>(responseFromServer);
-            
+            var dbConfig = new DBConfigurationDetail
+            {
+                url = mmria.services.vitalsimport.Program.couchdb_url,
+                user_name = mmria.services.vitalsimport.Program.timer_user_name,
+                user_value = mmria.services.vitalsimport.Program.timer_value
+            };
+
+            if (_vitalImportRepository != null)
+            {
+                result = await _vitalImportRepository.GetAllBatchesAsync(dbConfig);
+            }
+            else
+            {
+                string url = $"{mmria.services.vitalsimport.Program.couchdb_url}/vital_import/_all_docs?include_docs=true";
+                var responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", url, null, mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
+                result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.alldocs_response<mmria.common.ije.Batch>>(responseFromServer);
+            }
         }
         catch(Exception ex)
         {
@@ -380,9 +402,13 @@ public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
         mmria.common.metadata.Populate_CDC_Instance result = new();
         try
         {
-            string request_string = $"{mmria.services.vitalsimport.Program.couchdb_url}/metadata/populate-cdc-instance";
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.Populate_CDC_Instance>(responseFromServer);
+            var metadata_db_config = new mmria.common.couchdb.DBConfigurationDetail
+            {
+                url = mmria.services.vitalsimport.Program.couchdb_url,
+                user_name = mmria.services.vitalsimport.Program.timer_user_name,
+                user_value = mmria.services.vitalsimport.Program.timer_value
+            };
+            result = await _metadataRepository.GetPopulateCDCInstanceDocumentAsync(metadata_db_config);
     
         }
         catch (Exception ex)
@@ -400,11 +426,13 @@ public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
         {
             if(data._id == "populate-cdc-instance")
             {
-                var json = Newtonsoft.Json.JsonConvert.SerializeObject(data);
-
-                string request_string = $"{mmria.services.vitalsimport.Program.couchdb_url}/metadata/populate-cdc-instance";
-                string responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", request_string, json, mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
-                result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
+                var metadata_db_config = new mmria.common.couchdb.DBConfigurationDetail
+                {
+                    url = mmria.services.vitalsimport.Program.couchdb_url,
+                    user_name = mmria.services.vitalsimport.Program.timer_user_name,
+                    user_value = mmria.services.vitalsimport.Program.timer_value
+                };
+                result = await _metadataRepository.SavePopulateCDCInstanceDocumentAsync(data, metadata_db_config);
             }
     
         }

@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
-
+using mmria.common.SharedLibraries.MetadataVersion;
 using  mmria.server.extension; 
 using mmria.server.util;
 namespace mmria.server.Controllers;
@@ -22,16 +22,16 @@ public sealed class abstractorDeidentifiedCaseController : Controller
     mmria.common.couchdb.OverridableConfiguration configuration;
     mmria.common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IMetadataRepository _metadataRepository;
 
     public abstractorDeidentifiedCaseController
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        IMetadataRepository metadataRepository
     )
     {
-        _couchDbHttpClient = couchDbHttpClient;
+        _metadataRepository = metadataRepository;
         host_prefix = tenantRuntime.EffectiveHostPrefix;
 
         configuration = tenantRuntime.RequireConfiguration();
@@ -53,6 +53,7 @@ public sealed class abstractorDeidentifiedCaseController : Controller
             sessionIdleTimeoutMinutes);
 
         TempData["metadata_version"] = configuration.GetString("metadata_version", host_prefix);
+        TempData["omb_expiration_date"] = configuration.GetString("omb_expiration_date", host_prefix) ?? "05/31/2026";
         TempData["case_edit_inactivity_lock_minutes"] = effectiveInactivityConfig.LockMinutes;
         TempData["case_edit_inactivity_warning_minutes_before_lock"] = effectiveInactivityConfig.WarningMinutes;
         TempData["case_edit_auto_save_freq"] = configuration.GetInteger("case_edit_auto_save_freq", host_prefix) ?? 2;
@@ -66,15 +67,7 @@ public sealed class abstractorDeidentifiedCaseController : Controller
 
         try
         {
-            string request_string = $"{db_config.url}/metadata/duplicate-multiform-list";
-
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                "GET",
-                request_string,
-                null,
-                db_config.user_name,
-                db_config.user_value
-            );
+            string responseFromServer = await _metadataRepository.GetDuplicateMultiFormListAsync(db_config);
 
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<DuplicateMultiformResult>(responseFromServer);
 

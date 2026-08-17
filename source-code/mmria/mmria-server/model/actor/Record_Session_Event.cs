@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Linq;
 using Akka.Actor;
+using mmria.common.SharedLibraries.Session;
 using mmria.common.SharedLibraries.Session.Model;
 
 namespace mmria.server.model.actor;
@@ -13,16 +14,16 @@ public sealed class Record_Session_Event : UntypedActor
     //protected override void PostStop() => Console.WriteLine("Session_Event_Message stopped");
 
 	mmria.common.couchdb.DBConfigurationDetail db_config = null;
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly ISessionRepository _sessionRepository;
 
     public Record_Session_Event
     (
         mmria.common.couchdb.DBConfigurationDetail _db_config,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        ISessionRepository sessionRepository
     )
     {
         db_config = _db_config;
-        _couchDbHttpClient = couchDbHttpClient;
+        _sessionRepository = sessionRepository;
     }
 
     protected override void OnReceive(object message)
@@ -63,10 +64,8 @@ public sealed class Record_Session_Event : UntypedActor
 
                 Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
                 settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-                var session_event_json = Newtonsoft.Json.JsonConvert.SerializeObject(se, settings);
 
-                var request_url = $"{db_config.url}/{db_config.prefix}session/{se._id}";
-                _ = _couchDbHttpClient.ExecuteAsync("PUT", request_url, session_event_json, db_config.user_name, db_config.user_value, "application/json");
+                _ = _sessionRepository.SaveSessionEventAsync(se, db_config);
 
                 //var session_event_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_object_key_header<mmria.common.model.couchdb.session_event>>(response_from_server);
 

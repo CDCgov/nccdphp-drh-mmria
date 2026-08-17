@@ -35,7 +35,6 @@ let TitleMap = {
 	"case_narrative": "Narrative",
 	"committee_review": "Decision",
 	"all": "ALL",
-	"core-summary": "Core",
     "tracking": "Tracking",
     "demographic": "Demographic",
     "outcome": "Outcome",
@@ -75,9 +74,13 @@ async function create_print_version
     p_number,
     p_metadata_summary,
     p_show_hidden,
+    p_validation_rules,
     p_is_de_identified = false
 ) 
 {
+	if (p_validation_rules !== undefined) {
+		window.mmria_validation_rules = p_validation_rules;
+	}
 	// Validate input parameters
 	if (!p_metadata) {
 		console.error('PDF Generation Error: metadata is missing');
@@ -347,10 +350,6 @@ async function print_pdf(ctx) {
                     //debugger;
                 }
 			}
-			else if (g_section_name == 'core-summary') 
-            {
-				g_writeText = 'CORE SUMMARY';
-			} 
             else 
             {
 				g_writeText = getSectionTitle(ctx.section_name);
@@ -698,6 +697,48 @@ function fmtStrDate(dt) {
 	return `${fmt2Digits(dtParts[1])}/${fmt2Digits(dtParts[2])}/${fmtYear(dtParts[0])}`;
 }
 
+// Like fmtDateTime but returns empty string for blank/invalid vitals dates (AC #3)
+function fmtDateTimeVitals(dt) {
+	if (dt == null || dt.length == 0 || dt == '0001-01-01T00:00:00') return '';
+	return fmtDateTime(dt);
+}
+
+// Returns true if fieldName is in the vital sign range config and value is out of range (AC #1, #2, #5)
+function mmria_vitals_is_out_of_range(fieldPath, value) {
+	if (!window.mmria_validation_rules) return false;
+	var rule = window.mmria_validation_rules[fieldPath];
+	if (!rule) {
+		// Try to find a rule by searching for a matching field path ending
+		for (var key in window.mmria_validation_rules) {
+			if (key.endsWith('/' + fieldPath) || key === fieldPath) {
+				rule = window.mmria_validation_rules[key];
+				break;
+			}
+		}
+	}
+	if (!rule) return false;
+	var v = parseFloat(value);
+	if (value === '' || value == null || isNaN(v)) return false;
+	return (v < parseFloat(rule.min_value) || v > parseFloat(rule.max_value));
+}
+
+// Builds the out-of-range notice string for a vitals record row.
+// p_meta_children: the metadata children array for the vitals grid
+// p_data_row: the data object for one vitals record
+// Returns '' if no values are out of range or if mmria_validation_rules is null.
+function mmria_vitals_build_out_of_range_notice(p_meta_children, p_data_row) {
+	if (!window.mmria_validation_rules) return '';
+	var clauses = '';
+	for (var i = 1; i < p_meta_children.length - 1; i++) {
+		var child = p_meta_children[i];
+		if (mmria_vitals_is_out_of_range(child.name, p_data_row[child.name])) {
+			clauses += child.prompt + ' removed. ';
+		}
+	}
+	if (!clauses) return '';
+	return '** Out of range. ' + clauses.trim();
+}
+
 // Get the header name
 function getHeaderName() 
 {
@@ -770,9 +811,6 @@ function getReportTabName(section) {
 			break;
 		case 'committee_review':
 			nm = 'Committee Review';
-			break;
-		case 'core-summary':
-			nm = 'Core Elements Only';
 			break;
 		case 'all':
 			nm = 'All Case Forms';
@@ -1144,11 +1182,6 @@ async function formatContent(p_ctx, arrMap) {
 			}
 			break;
 
-		// Core Summary
-		case 'core-summary':
-			retContent.push(await core_summary());
-			break;
-
 		// Show selected report
 		default:
 			if (p_ctx.metadata.children) {
@@ -1446,10 +1479,26 @@ function ConvertHTMLDOMWalker(p_result, p_node)
 			p_result.push(table);
 			return;
 			break;
-		case "#TEXT":
-			p_result.push({ text: p_node.textContent.trim().replace("<br>", "\n") });
+		case "#TEXT": {
+			// Do NOT use .trim() here: it strips &nbsp; (\u00a0) to empty string, losing
+			// the space between an inline element and the following text (e.g. the gap
+			// between <strong>The</strong> and &nbsp;decedent becomes "Thedecedent").
+			// Instead: replace &nbsp; with a regular space, remove HTML formatting
+			// line-breaks/tabs, and preserve all space characters.
+			const raw = p_node.textContent.replace(/\u00a0/g, ' ').replace(/[\n\r\t]/g, '').replace('<br>', '\n');
+			// Skip structural whitespace-only separator nodes. Trumbowyg v4.1 serializes
+			// narrative HTML as a single line with literal spaces between block-level siblings
+			// (e.g., "<br> <p>"). These become #TEXT children of BODY and produce visible
+			// blank rows in the PDF. Inline spaces inside <p>/<span>/etc. are unaffected
+			// because their parent is not BODY.
+			if (/^\s*$/.test(raw) && p_node.parentNode &&
+					p_node.parentNode.nodeName.toUpperCase() === 'BODY') {
+				return;
+			}
+			p_result.push({ text: raw });
 			return;
 			break;
+		}
 		case "P":
 		case "DIV":
 			let text_array = [];
@@ -1457,8 +1506,40 @@ function ConvertHTMLDOMWalker(p_result, p_node)
 				let child = p_node.childNodes[i];
 				ConvertHTMLDOMWalker(text_array, child);
 			}
+			// Duplicate-separator guard: <br><p>empty-or-whitespace</p> at body level creates
+			// two blank rows — one from the body-level BR and one from this empty paragraph.
+			// Trumbowyg normalizes section-break separators as either </p><br><p>\r\n</p>
+			// (pre-save) or </p><br><p><br></p> (post-save). Both shapes produce an empty
+			// paragraph whose walked text is whitespace-only (\n from BR satisfies /^\s*$/).
+			// This guard must run BEFORE the blank-paragraph guard so <p><br></p> preceded by
+			// a body-level BR is suppressed entirely rather than emitting a second top-level \n.
+			if (p_node.parentNode && p_node.parentNode.nodeName.toUpperCase() === 'BODY' &&
+					p_node.previousElementSibling &&
+					p_node.previousElementSibling.nodeName.toUpperCase() === 'BR' &&
+					(text_array.length === 0 ||
+						text_array.every(item => !item.canvas &&
+							typeof item.text === 'string' && /^\s*$/.test(item.text)))) {
+				return;
+			}
+			// Blank paragraph guard: <p><br></p> not preceded by a body-level BR produces one
+			// BR-derived newline in text_array. Without this the paragraph's own trailing "\n"
+			// stacks on top, creating a double blank line. Collapse to a single blank line.
+			if (text_array.length > 0 &&
+					text_array.every(item => Object.keys(item).length === 1 && item.text === '\n')) {
+				p_result.push({ text: '\n' });
+				return;
+			}
 			text_array.push({ text: "\n" });
-			p_result.push({ text: text_array, style: convert_attribute_to_pdf(p_node)});
+			{
+				// Canvas items (e.g. from <hr> inside <p>) cannot be inline text nodes;
+				// emit them as standalone blocks outside the paragraph text container.
+				const p_inlines = text_array.filter(item => !item.canvas);
+				const p_canvases = text_array.filter(item => !!item.canvas);
+				if (p_inlines.length > 0) {
+					p_result.push({ text: p_inlines, style: convert_attribute_to_pdf(p_node) });
+				}
+				p_canvases.forEach(c => p_result.push(c));
+			}
 			return;
         case "SPAN":
             let span_text_array = [];
@@ -1480,7 +1561,7 @@ function ConvertHTMLDOMWalker(p_result, p_node)
 		case "STRONG":
         case "B":
 			let strong_attr = { bold: true };
-			p_result.push({ text: p_node.textContent.trim(), style: convert_attribute_to_pdf(p_node, strong_attr) });
+			p_result.push({ text: p_node.textContent.replace(/\u00a0/g, ' '), style: convert_attribute_to_pdf(p_node, strong_attr) });
 			return;
 			break;
 		case "BR":
@@ -1489,7 +1570,20 @@ function ConvertHTMLDOMWalker(p_result, p_node)
 			break;
 		case "EM":
 			let em_attr = { italics: true };
-			p_result.push({ text: p_node.textContent.trim(), style: convert_attribute_to_pdf(p_node, em_attr) });
+			p_result.push({ text: p_node.textContent.replace(/\u00a0/g, ' '), style: convert_attribute_to_pdf(p_node, em_attr) });
+			return;
+			break;
+		case "U":
+			let u_text = p_node.textContent.replace(/\u00a0/g, ' ');
+			if (u_text.trim().length > 0) {
+				p_result.push({ text: u_text, style: 'isUnderlined' });
+			}
+			return;
+			break;
+		case "HR":
+			// Page width 612pt minus left/right margins (20+20) = 572pt usable width
+			p_result.push({ canvas: [{ type: 'line', x1: 0, y1: 5, x2: 572, y2: 5, lineWidth: 1 }] });
+			p_result.push({ text: '\n' });
 			return;
 			break;
 		case "UL":
@@ -1568,37 +1662,6 @@ function process_li_array(p_result, p_array)
 }
 
 // Core Summary - display all of the core summary fields
-async function core_summary() {
-	let body = [];
-	// let arrMap = getArrayMap();
-
-	// Record Core Fields
-	let retPage = [];
-
-	// let arrIndex = arrMap.findIndex((s) => s.name == 'home_record');
-	body = core_pdf_summary(g_md, g_d, '/', false, '');
-
-	// Show the table
-	retPage.push([
-		{
-			layout: {
-				defaultBorder: false,
-				paddingLeft: function (i, node) { return 1; },
-				paddingRight: function (i, node) { return 1; },
-				paddingTop: function (i, node) { return 2; },
-				paddingBottom: function (i, node) { return 2; },
-			},
-			table: {
-				headerRows: 0,
-				widths: [250, '*'],
-				body: body,
-			},
-		},
-	]);
-
-	return retPage;
-}
-
 function core_pdf_summary(p_metadata, p_data, p_path, p_is_core_summary, p_metadata_path) {
 	let is_core_summary = false;
 
@@ -2091,6 +2154,7 @@ function print_pdf_render_content(ctx) {
 					ctx.metadata.name == 'vitals_import_group') {
 					showIt = ctx.createdBy == 'vitals-import' ? true : false;
 				}
+				if (ctx.metadata.name == 'gender_identity') showIt = false;
 				if (showIt) {
 					if (ctx.groupLevel == 0) {
 						ctx.content.push([
@@ -2251,7 +2315,7 @@ function print_pdf_render_content(ctx) {
 					ctx.data.forEach((dataChild, dataIndex) => {
 						row = new Array();
 						row.push({ text: `${dataIndex + 1}`, style: ['tableDetail', 'isItalics', 'isBold'], alignment: 'center', },);
-						row.push({ text: fmtDateTime(dataChild[metaChild[0].name]), style: ['tableDetail'], },);
+						row.push({ text: fmtDateTimeVitals(dataChild[metaChild[0].name]), style: ['tableDetail'], },);
 						// Create a two column table for the Medical Info column - exclude the first (datetime) and last (comments)  
 						let colPrompt = new Array();
 						let colData = new Array();
@@ -2266,7 +2330,7 @@ function print_pdf_render_content(ctx) {
 								case 'time':
 								case 'hidden':
 									colPrompt.push({ text: `${metaChild[i].prompt.replace(" - ", "-")}: `, style: ['tableLabel'], alignment: 'right', },);
-									colData.push({ text: dataChild[metaChild[i].name] || '-', style: ['tableDetail'], },);
+									colData.push({ text: mmria_vitals_is_out_of_range(metaChild[i].name, dataChild[metaChild[i].name]) ? '' : (dataChild[metaChild[i].name] || '-'), style: ['tableDetail'], },);
 									break;
 								default:
 									colPrompt.push({ text: `${metaChild[i].prompt}: `, style: ['tableLabel'], alignment: 'right', },);
@@ -2277,7 +2341,10 @@ function print_pdf_render_content(ctx) {
 
 						// Put it into a table
 						row.push({ columns: [colPrompt, colData], },);
-						row.push({ text: chkNull(dataChild[metaChild[metaChild.length - 1].name]), style: ['tableDetail'], },);
+						var vitals_oor_notice = mmria_vitals_build_out_of_range_notice(metaChild, dataChild);
+						var vitals_comment_text = chkNull(dataChild[metaChild[metaChild.length - 1].name]);
+						if (vitals_oor_notice) { vitals_comment_text = vitals_comment_text ? vitals_comment_text + ' ' + vitals_oor_notice : vitals_oor_notice; }
+						row.push({ text: vitals_comment_text, style: ['tableDetail'], },);
 						gridBody.push(row)
 					});
 				}
@@ -2611,6 +2678,12 @@ function print_pdf_render_content(ctx) {
 								}, colSpan: '2',
 							}, {},
 						]);
+					} else if (narrative[i].hasOwnProperty('canvas') == true) {
+						// Canvas element (e.g. from <hr>) — cannot be wrapped in {text:}
+						ctx.content.push([
+							Object.assign({}, narrative[i], { colSpan: '2' }),
+							{},
+						]);
 					} else {
 						// Regular default - removed style: ['narrativeDetail'], 
 						ctx.content.push([
@@ -2733,7 +2806,8 @@ function print_pdf_render_content(ctx) {
                             (
                                 y[y_axis_parts[0][2]] != null &&
                                 y[y_axis_parts[0][2]] != '' &&
-                                y[y_axis_parts[0][2]] != 'null'
+                                y[y_axis_parts[0][2]] != 'null' &&
+                                !mmria_vitals_is_out_of_range(y_axis_parts[0][2], y[y_axis_parts[0][2]])
                             )
                             {
                                 y_is_valid.push(true);
@@ -2755,7 +2829,8 @@ function print_pdf_render_content(ctx) {
                                     (
                                         y[y_axis_parts[0][2]] != null &&
                                         y[y_axis_parts[0][2]] != '' &&
-                                        y[y_axis_parts[0][2]] != 'null' 
+                                        y[y_axis_parts[0][2]] != 'null' &&
+                                        !mmria_vitals_is_out_of_range(y_axis_parts[0][2], y[y_axis_parts[0][2]])
                                     )
                                     {
                                         y_is_valid_one.push(true);
@@ -2771,7 +2846,8 @@ function print_pdf_render_content(ctx) {
                                     (
                                         y[y_axis_parts[1][2]] != null &&
                                         y[y_axis_parts[1][2]] != '' &&
-                                        y[y_axis_parts[1][2]] != 'null'
+                                        y[y_axis_parts[1][2]] != 'null' &&
+                                        !mmria_vitals_is_out_of_range(y_axis_parts[1][2], y[y_axis_parts[1][2]])
                                     )
                                     {
                                         y_is_valid_two.push(true);

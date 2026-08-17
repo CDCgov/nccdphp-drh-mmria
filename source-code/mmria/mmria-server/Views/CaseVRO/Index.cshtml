@@ -21,6 +21,7 @@
   }
 
   var metadata_version = TempData["metadata_version"];
+  var omb_expiration_date = TempData["omb_expiration_date"] ?? "05/31/2026";
   var ui_role_mode = TempData["ui_role_mode"];
 }
 
@@ -28,6 +29,7 @@
 {
     <script>
         const g_is_pmss_enhanced = @is_pmss_enhanced;
+        window.mmria_omb_expiration_date = "@omb_expiration_date";
     </script>
   <link href="./styles/jquery/jquery.timepicker.css" type="text/css" rel="stylesheet" />
   <link href="./styles/jquery/jquery.datetimepicker.css" type="text/css" rel="stylesheet" />

@@ -27,9 +27,11 @@ public sealed class caseController: ControllerBase
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly mmria.common.SharedLibraries.Case.Manager.CaseManager _caseManager;
+    private readonly mmria.common.SharedLibraries.Case.ICaseRepository _caseRepository;
 
     private readonly IAuthorizationService _authorizationService;
-    //private readonly IDocumentRepository _documentRepository;
+    private readonly mmria.common.SharedLibraries.DeIdentified.IDeIdentifiedRepository _deIdentifiedRepository;
+    private readonly mmria.common.SharedLibraries.Report.IReportRepository _reportRepository;
 
     public caseController
     ( 
@@ -37,7 +39,10 @@ public sealed class caseController: ControllerBase
         ActorSystem actorSystem, 
         IAuthorizationService authorizationService,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
-        mmria.common.SharedLibraries.Case.Manager.CaseManager caseManager
+        mmria.common.SharedLibraries.Case.Manager.CaseManager caseManager,
+        mmria.common.SharedLibraries.Case.ICaseRepository caseRepository,
+        mmria.common.SharedLibraries.DeIdentified.IDeIdentifiedRepository deIdentifiedRepository,
+        mmria.common.SharedLibraries.Report.IReportRepository reportRepository
     )
     {
         configuration = tenantRuntime.RequireConfiguration();
@@ -46,6 +51,9 @@ public sealed class caseController: ControllerBase
         _authorizationService = authorizationService;
         _couchDbHttpClient = couchDbHttpClient;
         _caseManager = caseManager;
+        _caseRepository = caseRepository;
+        _deIdentifiedRepository = deIdentifiedRepository;
+        _reportRepository = reportRepository;
 
         host_prefix = tenantRuntime.EffectiveHostPrefix;
     }
@@ -55,7 +63,7 @@ public sealed class caseController: ControllerBase
     [HttpGet]
         [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     //public async Task<System.Dynamic.ExpandoObject> Get(string case_id) 
-    public async Task<mmria.case_version.v260120.mmria_case> Get(string case_id) 
+    public async Task<mmria.case_version.v260615.mmria_case> Get(string case_id) 
     { 
         try
         {
@@ -73,11 +81,75 @@ public sealed class caseController: ControllerBase
     } 
 
 
+    [Authorize(Roles = "abstractor, data_analyst")]
+    [HttpGet("{case_id}/rev")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<IActionResult> GetRev(string case_id)
+    {
+        try
+        {
+            var sanitizedId = SanitizeSingleLineText(case_id, 256);
+            if (string.IsNullOrWhiteSpace(sanitizedId))
+                return BadRequest();
+
+            string url = $"{db_config.url}/{db_config.prefix}mmrds/{Uri.EscapeDataString(sanitizedId)}";
+            var headResponse = await _couchDbHttpClient.ExecuteForResponseAsync(
+                "HEAD",
+                url,
+                null,
+                "application/json",
+                new mmria.common.getset.CouchDbRequestOptions
+                {
+                    UserName = db_config.user_name,
+                    Password = db_config.user_value,
+                    SuppressErrorLogging = true
+                });
+
+            if (headResponse.StatusCode == 404)
+                return NotFound();
+
+            var headRev = NormalizeCouchDbRevisionHeader(headResponse.GetFirstHeaderValue("ETag"));
+            if (headResponse.StatusCode >= 200 && headResponse.StatusCode < 300 && !string.IsNullOrWhiteSpace(headRev))
+            {
+                var headResult = new { _id = sanitizedId, _rev = headRev };
+
+                Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0";
+                Response.Headers["Pragma"] = "no-cache";
+
+                return mmria.server.util.EscapedJsonResultFactory.Create(headResult);
+            }
+
+            string responseFromServer = await _caseRepository.GetCaseDocumentJsonAsync(sanitizedId, db_config);
+
+            if (string.IsNullOrWhiteSpace(responseFromServer) || responseFromServer.Contains("\"not_found\""))
+                return NotFound();
+
+            var doc = Newtonsoft.Json.Linq.JObject.Parse(responseFromServer);
+            var id = doc["_id"]?.ToString();
+            var rev = doc["_rev"]?.ToString();
+
+            if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(rev))
+                return NotFound();
+
+            var result = new { _id = id, _rev = rev };
+
+            Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0";
+            Response.Headers["Pragma"] = "no-cache";
+
+            return mmria.server.util.EscapedJsonResultFactory.Create(result);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+            return StatusCode(500);
+        }
+    }
+
     public sealed class Save_Case_Request
     {
         public mmria.common.model.couchdb.Change_Stack Change_Stack {get;set;} = new();
 
-        public mmria.case_version.v260120.mmria_case Case_Data {get;set;}
+        public mmria.case_version.v260615.mmria_case Case_Data {get;set;}
         public Save_Case_Request()
         {
 
@@ -125,7 +197,7 @@ public sealed class caseController: ControllerBase
                     configuration.GetString("metadata_version", host_prefix)
                 );
 
-                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(Sync_Document_Message);
+                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix, _deIdentifiedRepository, _reportRepository)).Tell(Sync_Document_Message);
             }
 
             return saveResult.Response;
@@ -174,7 +246,7 @@ public sealed class caseController: ControllerBase
                 configuration.GetString("metadata_version", host_prefix)
             );
 
-            _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(Sync_Document_Message);
+            _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix, _deIdentifiedRepository, _reportRepository)).Tell(Sync_Document_Message);
         }
 
         return Ok(new { ok = true });
@@ -232,7 +304,7 @@ public sealed class caseController: ControllerBase
                         configuration.GetString("metadata_version", host_prefix)
                     );
 
-                    _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(Sync_Document_Message);
+                    _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix, _deIdentifiedRepository, _reportRepository)).Tell(Sync_Document_Message);
                 }
             }
 
@@ -283,7 +355,7 @@ public sealed class caseController: ControllerBase
                     configuration.GetString("metadata_version", host_prefix)
                 );
 
-                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(Sync_Document_Message);
+                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix, _deIdentifiedRepository, _reportRepository)).Tell(Sync_Document_Message);
 
                 return Ok(new { success = true, is_offline = toggleResult.IsOffline, message = toggleResult.Message });
             }
@@ -340,7 +412,7 @@ public sealed class caseController: ControllerBase
                     configuration.GetString("metadata_version", host_prefix)
                 );
 
-                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(Sync_Document_Message);
+                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix, _deIdentifiedRepository, _reportRepository)).Tell(Sync_Document_Message);
 
                 return Ok(new
                 {
@@ -388,7 +460,7 @@ public sealed class caseController: ControllerBase
                         configuration.GetString("metadata_version", host_prefix)
                     );
 
-                    _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(Sync_Document_Message);
+                    _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix, _deIdentifiedRepository, _reportRepository)).Tell(Sync_Document_Message);
                 }
 
                 return deleteResult.Result;
@@ -422,8 +494,8 @@ public sealed class caseController: ControllerBase
         };
     }
 
-    private static mmria.case_version.v260120.mmria_case CreateSanitizedCase(
-        mmria.case_version.v260120.mmria_case request,
+    private static mmria.case_version.v260615.mmria_case CreateSanitizedCase(
+        mmria.case_version.v260615.mmria_case request,
         string currentUserName)
     {
         if (request == null || string.IsNullOrWhiteSpace(request._id))
@@ -431,7 +503,7 @@ public sealed class caseController: ControllerBase
             return null;
         }
 
-        mmria.case_version.v260120.mmria_case sanitizedCase;
+        mmria.case_version.v260615.mmria_case sanitizedCase;
         try
         {
             sanitizedCase = CaseJsonSerialization.DeserializeMmriaCase(CaseJsonSerialization.SerializeMmriaCase(request));
@@ -630,6 +702,16 @@ public sealed class caseController: ControllerBase
         return sanitized.Length > maxLength
             ? sanitized[..maxLength]
             : sanitized;
+    }
+
+    private static string NormalizeCouchDbRevisionHeader(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return value.Trim().Trim('"');
     }
 
     private static string SanitizeMultilineText(string value, int maxLength = 2048)

@@ -413,7 +413,7 @@ function show_go_online_modal() {
             <div class="modal-dialog modal-lg" role="document">
                 <div class="modal-content">
                     <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
-                        <h2 id="go-online-modal-title" class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Go Online</h2>
+                        <h2 id="go-online-modal-title" class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Go Online & Sync Changes</h2>
                         <button type="button" class="close" aria-label="Close" onclick="window.OfflineModals.closeGoOnline()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
                             <span aria-hidden="true">&times;</span>
                         </button>
@@ -431,7 +431,7 @@ function show_go_online_modal() {
                             Cancel
                         </button>
                         <button type="button" class="btn btn-primary" onclick="go_online_clicked(event)" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">
-                            Go Online
+                            Go Online & Sync Changes
                         </button>
                     </div>
                 </div>

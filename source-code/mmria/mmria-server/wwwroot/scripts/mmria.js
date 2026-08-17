@@ -252,7 +252,8 @@ var $mmria = function()
                     lat,
                     lon,
                     year,
-                    record_id
+                    record_id,
+                    p_control
                 );
 
             }
@@ -311,7 +312,8 @@ var $mmria = function()
                             lat,
                             lon,
                             year,
-                            record_id
+                            record_id,
+                            p_control
                         );
                     }
                 }
@@ -333,7 +335,8 @@ var $mmria = function()
                     lat,
                     lon,
                     year,
-                    record_id
+                    record_id,
+                    p_control
                 );
 
             }
@@ -375,7 +378,8 @@ var $mmria = function()
                             lat,
                             lon,
                             year,
-                            record_id
+                            record_id,
+                            p_control
                         );
                     }
                 }
@@ -686,18 +690,20 @@ var $mmria = function()
             lon, 
             year,
             id,
+            p_control,
             p_success_call_back,
             p_error_call_back
         )
         {           
-            
-            http://localhost:12345/community-vital-signs?lat=33.880577&lon=-84.29106&year=2012&id=GA-2012-1234
+            const query = new URLSearchParams({
+                lat: lat ?? "",
+                lon: lon ?? "",
+                year: year ?? "",
+                id: id ?? ""
+            });
+            const base_url = `${location.protocol}//${location.host}/community-vital-signs?${query.toString()}`;
 
-
-
-            var base_url = `${location.protocol}//${location.host}/community-vital-signs?lat=${lat}&lon=${lon}&year=${year}&id=${id}`
-
-            window.open(base_url, target=id)
+            window.open(base_url, id);
 /*
             fetch
             (
@@ -1142,6 +1148,10 @@ var $mmria = function()
                 {
                     g_data._rev = case_response.rev;
                     set_local_case(g_data);
+                    // Sync rev polling so the new _rev is the baseline for stale-tab detection.
+                    // Without this, the interval started by the preceding save (e.g. enable_edit)
+                    // would keep running with the old loadedRev and falsely show the stale-case banner.
+                    if (typeof mmria_sync_case_rev_polling === 'function') mmria_sync_case_rev_polling();
                     //console.log('set_value save finished');
                 }
         

@@ -108,12 +108,77 @@ function render_form_filter(p_filter)
 	return result.join("");
 }
 
+function get_valid_field_names_for_selected_form(p_selected_form)
+{
+    // Union of field names available under the given form filter. When p_selected_form is
+    // "all" (or empty), every field across every form is valid; otherwise only fields that
+    // belong to that specific form are valid.
+    const result = new Set();
+
+    for(const [form_name, fields] of g_form_field_map)
+    {
+        if(p_selected_form && p_selected_form != '' && p_selected_form != 'all' && form_name != p_selected_form)
+        {
+            continue;
+        }
+
+        for(const [field_name] of fields)
+        {
+            result.add(field_name);
+        }
+    }
+
+    return result;
+}
+
+function update_any_field_multiselect_label()
+{
+    const any_field_multiselect = document.getElementById('any_field_multiselect');
+    if(!any_field_multiselect)
+    {
+        return;
+    }
+
+    if(!g_filter.field_selection || g_filter.field_selection.size == 0 || g_filter.field_selection.has("all"))
+    {
+        any_field_multiselect.innerHTML = "(Any Field)";
+    }
+    else
+    {
+        any_field_multiselect.innerHTML = `${g_filter.field_selection.size} Field(s) Selected`;
+    }
+}
+
 function on_form_filter_changed(value)
 {
     //g_filter.field_selection = new Set(['all']);
     //g_filter.field_selection.add(value);
 
     g_filter.selected_form = value;
+
+    // Prune any specific field selections that don't exist for the newly selected form so the
+    // "N Field(s) Selected" count doesn't keep counting fields that no longer apply (e.g. the
+    // user picked fields for one form, then switched to "(Any Form)" or a different form).
+    if(g_filter.field_selection && !g_filter.field_selection.has("all"))
+    {
+        const valid_field_names = get_valid_field_names_for_selected_form(value);
+
+        for(const field_name of [...g_filter.field_selection])
+        {
+            if(!valid_field_names.has(field_name))
+            {
+                g_filter.field_selection.delete(field_name);
+            }
+        }
+
+        if(g_filter.field_selection.size == 0)
+        {
+            g_filter.field_selection.add("all");
+        }
+    }
+
+    update_any_field_multiselect_label();
+
     const html = render_field_filter(g_filter);
     const el = document.getElementById("checkboxes");
 
@@ -267,7 +332,9 @@ function render_field_filter(p_filter)
     for(const [k, v] of g_form_field_map)
     {
         // Hide form groups that are filtered out so we render less HTML on each refresh.
-        if(!all_selected && selected_form && selected_form != '' && selected_form != 'all' && k != selected_form)
+        // NOTE: guard intentionally does NOT short-circuit on all_selected — the ALL toggle
+        // must still respect the active form filter (Story 9.1 fix).
+        if(selected_form && selected_form != '' && selected_form != 'all' && k != selected_form)
         {
             continue;
         }
@@ -365,11 +432,6 @@ async function reset_click()
     const search_text_control = document.getElementById("search_text");
     search_text_control.value = ""
 
-    const field_filter_checkboxes = document.getElementsByClassName("filter-field-checkbox");
-    Array.from(field_filter_checkboxes).forEach(element => {
-        element.checked = true;
-    });
-
     const form_filter_control = document.getElementById("form_filter");
     form_filter_control.value = "all";
 
@@ -438,6 +500,15 @@ async function reset_click()
     if (g_default_filter.date_of_death) {
         g_filter.date_of_death.begin = new Date(g_default_filter.date_of_death.begin);
         g_filter.date_of_death.end = new Date(g_default_filter.date_of_death.end);
+    }
+
+    // Re-render the Field list from the reset (form-unscoped) filter — g_filter.selected_form
+    // is now '' after the clone above, so render_field_filter's form guard passes and all
+    // forms' fields render again. Just toggling .checked on the existing checkboxes (as this
+    // used to do) left the Field list scoped to whichever form was selected before Reset.
+    const checkboxes_el = document.getElementById("checkboxes");
+    if (checkboxes_el) {
+        checkboxes_el.innerHTML = render_field_filter(g_filter);
     }
 
     let search_result_list = document.getElementById("search_result_list");
@@ -659,19 +730,14 @@ function render_search_result_item(p_result, p_metadata, p_path, p_selected_form
                 !g_filter.field_selection.has("all")
             )
             {
-                if(g_filter.field_selection.size == 1)
+                // Exclude fields outside the selection at any selection size (fixes
+                // multi-field selections rendering unfiltered).
+                if(!g_filter.field_selection.has(field_name))
                 {
-                    if(g_filter.field_selection.has(field_name))
-                    {
-                        is_single_field_filter = true;
-                    }
-                    else
-                    {
-                        return;
-                    }
-                    
+                    return;
                 }
 
+                is_single_field_filter = g_filter.field_selection.size == 1;
             }
 
 			if(p_search_text != null && p_search_text !="")

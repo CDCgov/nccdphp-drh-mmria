@@ -18,6 +18,7 @@ public sealed class update_maiden_nameController : Controller
     string host_prefix = null;
     private readonly mmria.common.couchdb.ConfigurationSet _dbConfigSet;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.Audit.IAuditRepository _auditRepository;
 
 
     private System.Collections.Generic.Dictionary<string, string> MaidenNameToDisplay;
@@ -25,11 +26,13 @@ public sealed class update_maiden_nameController : Controller
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.Audit.IAuditRepository auditRepository
     )
     {
 
         _couchDbHttpClient = couchDbHttpClient;
+        _auditRepository = auditRepository;
         host_prefix = tenantRuntime.EffectiveHostPrefix;
 
         configuration = tenantRuntime.RequireConfiguration();
@@ -71,7 +74,7 @@ public sealed class update_maiden_nameController : Controller
         try
         {
             var effectiveStateDatabase = AuthorizedWorkflowScopeHelper.ResolveAuthorizedStateDatabase(User, Model.StateDatabase, host_prefix, _dbConfigSet);
-            var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient);
+            var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient, new mmria.common.SharedLibraries.Case.DAL.CaseDAL(_couchDbHttpClient), _auditRepository);
 
             var items = await caseManager.FindYearOfDeathRecordsAsync(
                 Model.RecordId,
@@ -174,7 +177,7 @@ public sealed class update_maiden_nameController : Controller
         model.StateDatabase = effectiveStateDatabase;
         try
         {
-            var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient);
+            var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient, new mmria.common.SharedLibraries.Case.DAL.CaseDAL(_couchDbHttpClient), _auditRepository);
 
             // Best-effort: tab id is generated client-side per browser tab and posted
             // with the confirmation form. Used to enforce same-user/different-tab locks.
@@ -257,7 +260,7 @@ public sealed class update_maiden_nameController : Controller
 
     public async Task<HashSet<string>> GetExistingRecordIds(string p_server_url, string user_name,  string user_value, string p_prefix = "")
     {
-        var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient);
+        var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient, new mmria.common.SharedLibraries.Case.DAL.CaseDAL(_couchDbHttpClient), _auditRepository);
 
         var dbInfo = new mmria.common.couchdb.DBConfigurationDetail
         {

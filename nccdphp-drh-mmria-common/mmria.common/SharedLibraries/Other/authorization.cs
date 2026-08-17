@@ -4,6 +4,9 @@ using System.Linq;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Security.Claims;
+using mmria.common.SharedLibraries.Jurisdiction;
+using mmria.common.SharedLibraries.Jurisdiction.DAL;
+using mmria.common.SharedLibraries.Jurisdiction.Model;
 
 namespace mmria.common.SharedLibraries.Other;
 
@@ -31,7 +34,7 @@ public sealed class authorization
         return get_current_jurisdiction_id_set_for(
             db_config,
             p_claims_principal,
-            CreateCompatibilityCouchDbHttpClient());
+            CreateCompatibilityReader());
     }
 
 
@@ -40,6 +43,19 @@ public sealed class authorization
         mmria.common.couchdb.DBConfigurationDetail db_config,
         System.Security.Claims.ClaimsPrincipal p_claims_principal,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+    )
+    {
+        return get_current_jurisdiction_id_set_for(
+            db_config,
+            p_claims_principal,
+            new JurisdictionAuthorizationDAL(couchDbHttpClient));
+    }
+
+    public static HashSet<(string jurisdiction_id, ResourceRightEnum ResourceRight)> get_current_jurisdiction_id_set_for
+    (
+        mmria.common.couchdb.DBConfigurationDetail db_config,
+        System.Security.Claims.ClaimsPrincipal p_claims_principal,
+        IJurisdictionAuthorizationReader reader
     )
     {
         var result = new HashSet<(string jurisdiction_id, ResourceRightEnum ResourceRight)>();
@@ -62,7 +78,7 @@ public sealed class authorization
         }
 
         var user_name = p_claims_principal.Claims.Where(c => c.Type == ClaimTypes.Name).FirstOrDefault().Value;
-        foreach (var role in GetActiveUserRoleJurisdictions(db_config, user_name, couchDbHttpClient))
+        foreach (var role in GetActiveUserRoleJurisdictions(db_config, user_name, reader))
         {
             switch(role.role_name)
             {
@@ -113,7 +129,7 @@ public sealed class authorization
         return get_current_jurisdiction_id_set_for(
             db_config,
             p_user_name,
-            CreateCompatibilityCouchDbHttpClient());
+            CreateCompatibilityReader());
     }
 
 
@@ -124,9 +140,22 @@ public sealed class authorization
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
+        return get_current_jurisdiction_id_set_for(
+            db_config,
+            p_user_name,
+            new JurisdictionAuthorizationDAL(couchDbHttpClient));
+    }
+
+    public static HashSet<(string jurisdiction_id, ResourceRightEnum ResourceRight)> get_current_jurisdiction_id_set_for
+    (
+        mmria.common.couchdb.DBConfigurationDetail db_config,
+        string p_user_name,
+        IJurisdictionAuthorizationReader reader
+    )
+    {
         var result = new HashSet<(string jurisdiction_id, ResourceRightEnum ResourceRight)>();
 
-        foreach (var role in GetActiveUserRoleJurisdictions(db_config, p_user_name, couchDbHttpClient))
+        foreach (var role in GetActiveUserRoleJurisdictions(db_config, p_user_name, reader))
         {
             switch(role.role_name)
             {
@@ -178,7 +207,7 @@ public sealed class authorization
         return get_current_user_role_jurisdiction_set_for(
             db_config,
             p_user_name,
-            CreateCompatibilityCouchDbHttpClient());
+            CreateCompatibilityReader());
     }
 
     public static HashSet<(string jurisdiction_id, string user_id, string role_name)> get_current_user_role_jurisdiction_set_for
@@ -188,11 +217,24 @@ public sealed class authorization
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
+        return get_current_user_role_jurisdiction_set_for(
+            db_config,
+            p_user_name,
+            new JurisdictionAuthorizationDAL(couchDbHttpClient));
+    }
+
+    public static HashSet<(string jurisdiction_id, string user_id, string role_name)> get_current_user_role_jurisdiction_set_for
+    (
+        mmria.common.couchdb.DBConfigurationDetail db_config,
+        string p_user_name,
+        IJurisdictionAuthorizationReader reader
+    )
+    {
         var result = new HashSet<(string jurisdiction_id, string user_id, string role_name)>();
 
-        foreach (var role in GetActiveUserRoleJurisdictions(db_config, p_user_name, couchDbHttpClient))
+        foreach (var role in GetActiveUserRoleJurisdictions(db_config, p_user_name, reader))
         {
-            result.Add((role.jurisdiction_id, role.user_id, role.role_name));
+            result.Add((role.jurisdiction_id!, role.user_id!, role.role_name!));
         }
 
         return result;
@@ -232,108 +274,22 @@ public sealed class authorization
         return result;
     }
 
-    private static mmria.common.getset.CouchDbHttpClient CreateCompatibilityCouchDbHttpClient()
+    private static IJurisdictionAuthorizationReader CreateCompatibilityReader()
     {
-        return new mmria.common.getset.CouchDbHttpClient(new mmria.common.SimpleHttpClientFactory());
+        return new JurisdictionAuthorizationDAL(
+            new mmria.common.getset.CouchDbHttpClient(new mmria.common.SimpleHttpClientFactory()));
     }
 
-    private static List<mmria.common.model.couchdb.user_role_jurisdiction> GetActiveUserRoleJurisdictions(
+    private static IReadOnlyList<JurisdictionRoleEntry> GetActiveUserRoleJurisdictions(
         mmria.common.couchdb.DBConfigurationDetail db_config,
         string userName,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+        IJurisdictionAuthorizationReader reader)
     {
         return mmria.common.utils.AuthorizationRoleCache.GetOrLoadActiveUserRoles(
             db_config?.prefix,
             userName,
-            () => LoadActiveUserRoleJurisdictions(db_config, userName, couchDbHttpClient));
-    }
-
-    private static List<mmria.common.model.couchdb.user_role_jurisdiction> LoadActiveUserRoleJurisdictions(
-        mmria.common.couchdb.DBConfigurationDetail db_config,
-        string userName,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
-    {
-        var result = new List<mmria.common.model.couchdb.user_role_jurisdiction>();
-        string quotedUserName = $"\"{userName}\"";
-        string encodedUserName = Uri.EscapeDataString(quotedUserName);
-        string jurisdicion_view_url =
-            $"{db_config.url}/{db_config.prefix}jurisdiction/_design/sortable/_view/by_user_id?startkey={encodedUserName}&endkey={encodedUserName}";
-        string jurisdicion_result_string = null;
-
-        try
-        {
-            jurisdicion_result_string = couchDbHttpClient.ExecuteAsync(
-                "GET",
-                jurisdicion_view_url,
-                null,
-                db_config.user_name,
-                db_config.user_value,
-                "application/json").GetAwaiter().GetResult();
-        }
-        catch(Exception ex)
-        {
-            System.Console.WriteLine(
-                $"Current-user role lookup failed. user={userName}; prefix={db_config.prefix}; view={jurisdicion_view_url}; exceptionType={ex.GetType().FullName}; message={ex.Message}");
-            return result;
-        }
-
-        var jurisdiction_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<
-            mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.user_role_jurisdiction>>(
-            jurisdicion_result_string);
-
-        if (jurisdiction_view_response?.rows == null)
-        {
-            return result;
-        }
-
-        var now_date = DateTime.Now;
-        foreach (var jvi in jurisdiction_view_response.rows)
-        {
-            if (jvi?.key == null || jvi.value?.user_id != userName)
-            {
-                continue;
-            }
-
-            if (!IsActiveRole(jvi.value, now_date))
-            {
-                continue;
-            }
-
-            // Guard against jurisdiction documents with a missing role_name. Such rows
-            // would later be passed to new Claim(ClaimTypes.Role, role, ...), which
-            // throws ArgumentNullException and 500s the entire sign-in flow.
-            // Skip + log so the offending document can be located and corrected.
-            if (string.IsNullOrWhiteSpace(jvi.value.role_name))
-            {
-                System.Console.WriteLine(
-                    $"Skipping jurisdiction role with null/empty role_name. user={userName}; prefix={db_config.prefix}; jurisdiction_id={jvi.value.jurisdiction_id}; doc_id={jvi.value._id}");
-                continue;
-            }
-
-            result.Add(jvi.value);
-        }
-
-        return result;
-    }
-
-    private static bool IsActiveRole(mmria.common.model.couchdb.user_role_jurisdiction value, DateTime nowDate)
-    {
-        if (value == null ||
-            value.is_active == null ||
-            value.effective_start_date == null ||
-            !value.is_active.HasValue ||
-            !value.effective_start_date.HasValue)
-        {
-            return false;
-        }
-
-        var effectiveEndDate = value.effective_end_date.HasValue
-            ? value.effective_end_date.Value
-            : nowDate;
-
-        return value.is_active.Value &&
-            value.effective_start_date.Value <= nowDate &&
-            nowDate <= effectiveEndDate;
+            reader,
+            db_config);
     }
 
 }

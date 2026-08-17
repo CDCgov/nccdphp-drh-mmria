@@ -83,6 +83,21 @@ public sealed class Program
         });
 
         builder.Services.AddSingleton<mmria.common.getset.CouchDbHttpClient>();
+        builder.Services.AddScoped<mmria.common.SharedLibraries.SystemConfig.DAL.SystemConfigDAL>();
+        builder.Services.AddScoped<mmria.common.SharedLibraries.SystemConfig.IConfigurationRepository>(
+            sp => sp.GetRequiredService<mmria.common.SharedLibraries.SystemConfig.DAL.SystemConfigDAL>());
+        builder.Services.AddScoped<mmria.common.SharedLibraries.MetadataVersion.DAL.MetadataVersionDAL>();
+        builder.Services.AddScoped<mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository>(
+            sp => sp.GetRequiredService<mmria.common.SharedLibraries.MetadataVersion.DAL.MetadataVersionDAL>());
+        builder.Services.AddScoped<mmria.common.SharedLibraries.Case.DAL.CaseDAL>();
+        builder.Services.AddScoped<mmria.common.SharedLibraries.Case.ICaseRepository>(
+            sp => sp.GetRequiredService<mmria.common.SharedLibraries.Case.DAL.CaseDAL>());
+        builder.Services.AddScoped<mmria.common.SharedLibraries.ExportQueue.DAL.ExportQueueDAL>();
+        builder.Services.AddScoped<mmria.common.SharedLibraries.ExportQueue.IExportQueueRepository>(
+            sp => sp.GetRequiredService<mmria.common.SharedLibraries.ExportQueue.DAL.ExportQueueDAL>());
+        builder.Services.AddScoped<mmria.common.SharedLibraries.VitalImport.DAL.VitalImportDAL>();
+        builder.Services.AddScoped<mmria.common.SharedLibraries.VitalImport.IVitalImportRepository>(
+            sp => sp.GetRequiredService<mmria.common.SharedLibraries.VitalImport.DAL.VitalImportDAL>());
         builder.Services.AddScoped<MMRIAServicesDAL>();
         builder.Services.AddScoped<MMRIAServicesManager>();
         builder.Services.AddScoped<MMRIARebuildDAL>();
@@ -91,7 +106,8 @@ public sealed class Program
                 serviceProvider.GetRequiredService<MMRIARebuildDAL>(),
                 serviceProvider.GetRequiredService<mmria.common.getset.CouchDbHttpClient>(),
                 configuration,
-                serviceProvider.GetRequiredService<mmria.common.couchdb.ConfigurationSet>()));
+                serviceProvider.GetRequiredService<mmria.common.couchdb.ConfigurationSet>(),
+                serviceProvider.GetRequiredService<mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository>()));
 
         builder.Services.AddSingleton<ActorSystem>(serviceProvider =>
         {
@@ -104,10 +120,13 @@ public sealed class Program
             var actorSystem = Akka.Actor.ActorSystem.Create("mmria-actor-system");
             actorSystem.ActorOf(Akka.Actor.Props.Create<RecordsProcessor_Worker.Actors.BatchSupervisor>(couchDbHttpClient), "batch-supervisor");
             actorSystem.ActorOf(Akka.Actor.Props.Create<mmria.services.backup.BackupSupervisor>(couchDbHttpClient), "backup-supervisor");
+            var caseDAL = new mmria.common.SharedLibraries.Case.DAL.CaseDAL(couchDbHttpClient);
+            var vitalImportRepository = new mmria.common.SharedLibraries.VitalImport.DAL.VitalImportDAL(couchDbHttpClient, caseDAL);
             actorSystem.ActorOf(
                 Akka.Actor.Props.Create<mmria.services.populate_cdc_instance.PopulateCDCInstanceSupervisor>(
                     couchDbHttpClient,
-                    populateCdcThrottleSettings),
+                    populateCdcThrottleSettings,
+                    vitalImportRepository),
                 "populate-cdc-instance-supervisor");
 
             Program.ActorSystem = actorSystem;
@@ -170,6 +189,32 @@ public sealed class Program
             configuration["mmria_settings:vitals_service_key"] = vitals_service_key;
             configuration["mmria_settings:config_id"] = config_id;
             configuration["mmria_settings:vitals_import_additional_tenants"] = vitals_import_additional_tenants;
+
+            // populate_cdc_* throttle settings — only override if the env var is explicitly set
+            string[] populateCdcKeys = new[]
+            {
+                "populate_cdc_copy_page_size",
+                "populate_cdc_copy_max_parallelism",
+                "populate_cdc_copy_bulk_doc_chunk_size",
+                "populate_cdc_copy_batch_delay_ms",
+                "populate_cdc_copy_bulk_write_retry_count",
+                "populate_cdc_copy_bulk_write_retry_delay_ms",
+                "populate_cdc_rebuild_page_size",
+                "populate_cdc_rebuild_max_parallelism",
+                "populate_cdc_rebuild_bulk_doc_chunk_size",
+                "populate_cdc_rebuild_batch_delay_ms",
+                "populate_cdc_rebuild_bulk_write_retry_count",
+                "populate_cdc_rebuild_bulk_write_retry_delay_ms",
+            };
+            foreach (string cdcKey in populateCdcKeys)
+            {
+                string? envValue = System.Environment.GetEnvironmentVariable(cdcKey);
+                if (!string.IsNullOrWhiteSpace(envValue))
+                {
+                    configuration[$"mmria_settings:{cdcKey}"] = envValue;
+                }
+            }
+
             return;
         }
 

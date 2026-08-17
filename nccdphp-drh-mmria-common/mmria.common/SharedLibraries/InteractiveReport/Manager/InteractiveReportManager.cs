@@ -6,29 +6,24 @@ using Newtonsoft.Json;
 using mmria.common.couchdb;
 using mmria.common.getset;
 using mmria.common.Model.InteractiveReport;
+using mmria.common.SharedLibraries.Report;
 
 namespace mmria.common.Manager.InteractiveReport;
 
 public sealed class InteractiveReportManager
 {
-    private readonly CouchDbHttpClient _couchDbHttpClient;
+    private readonly IReportRepository _reportRepository;
 
-    public InteractiveReportManager(CouchDbHttpClient couchDbHttpClient)
+    public InteractiveReportManager(IReportRepository reportRepository)
     {
-        _couchDbHttpClient = couchDbHttpClient;
+        _reportRepository = reportRepository;
     }
 
     public async Task<IList<report_measure_value_struct>> Get(string indicator_id, DBConfigurationDetail db_config, IList<JurisdictionAccessInfo> jurisdictionAccessList)
     {
         var result = new List<report_measure_value_struct>();
         
-        var config_couchdb_url = db_config.url;
-        var config_timer_user_name = db_config.user_name;
-        var config_timer_value = db_config.user_value;
-        var config_db_prefix = db_config.prefix;
-        
-        string find_url = $"{config_couchdb_url}/{config_db_prefix}report/_design/interactive_aggregate_report/_view/indicator_id?skip=0&limit={30000}&key=\"{indicator_id}\"";
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", find_url, null, config_timer_user_name, config_timer_value);
+        string responseFromServer = await _reportRepository.GetIndicatorByIdAsync(indicator_id, db_config);
             
             var response_result = JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_header<report_measure_value_struct>>(responseFromServer);
             

@@ -5,6 +5,13 @@ using System.Net.Http.Headers;
 using System.Linq;
 using Microsoft.Extensions.Configuration;
 using mmria.common.getset;
+using mmria.common.SharedLibraries.Case;
+using mmria.common.SharedLibraries.Case.DAL;
+using mmria.common.SharedLibraries.ExportQueue;
+using mmria.common.SharedLibraries.Jurisdiction;
+using mmria.common.SharedLibraries.Jurisdiction.DAL;
+using mmria.common.SharedLibraries.MetadataVersion;
+using mmria.common.SharedLibraries.MetadataVersion.DAL;
 using mmria.services.Models;
 
 
@@ -55,15 +62,24 @@ public sealed class mmrds_exporter
 
     private ScheduleInfoMessage Configuration;
     private mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IMetadataRepository _metadataRepository;
+    private ICaseRepository _caseRepository;
+    private readonly IJurisdictionRepository _jurisdictionRepository;
+    private IExportQueueRepository _exportQueueRepository;
 
     public mmrds_exporter
     (
         ScheduleInfoMessage configuration,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        IExportQueueRepository exportQueueRepository
     )
     {
         this.Configuration = configuration;
         _couchDbHttpClient = couchDbHttpClient;
+        _exportQueueRepository = exportQueueRepository;
+        _caseRepository = new CaseDAL(_couchDbHttpClient);
+        _metadataRepository = new MetadataVersionDAL(_couchDbHttpClient);
+        _jurisdictionRepository = new JurisdictionDAL(_couchDbHttpClient);
 
         db_config = new()
         {
@@ -150,8 +166,7 @@ public sealed class mmrds_exporter
         #endif
 
 
-        string metadata_url = db_config.url + $"/metadata/version_specification-{this.Configuration.version_number}/metadata";
-        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, this.user_name, this.value_string));
+        mmria.common.metadata.app metadata = await _metadataRepository.GetAppDocumentAsync(this.Configuration.version_number, db_config);
         this.current_metadata = metadata;
 
         System.Collections.Generic.Dictionary<string, int> path_to_int_map = new Dictionary<string, int>();
@@ -248,7 +263,7 @@ public sealed class mmrds_exporter
             }
         }
         #if !IS_PMSS_ENHANCED
-        var jurisdiction_hashset = await mmria.services.authorization.get_current_jurisdiction_id_set_for(db_config, this.juris_user_name, _couchDbHttpClient);
+        var jurisdiction_hashset = await mmria.services.authorization.get_current_jurisdiction_id_set_for(db_config, this.juris_user_name, _jurisdictionRepository);
         #endif
         #if IS_PMSS_ENHANCED
         var jurisdiction_hashset = await mmria.pmss.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, this.juris_user_name, _couchDbHttpClient);
@@ -266,16 +281,16 @@ public sealed class mmrds_exporter
                 yield break;
             }
 
-            await foreach (var caseId in PagedCaseIdLoader.GetCaseIdsAsync(db_config, _couchDbHttpClient))
+            await foreach (var caseId in PagedCaseIdLoader.GetCaseIdsAsync(db_config, _caseRepository))
             {
                 yield return caseId;
             }
         }
 
+        var _utcSettings = new Newtonsoft.Json.JsonSerializerSettings { DateTimeZoneHandling = Newtonsoft.Json.DateTimeZoneHandling.RoundtripKind };
         await foreach(string case_id in get_case_ids_to_process())
         {
-            string URL = $"{db_config.url}/{db_config.prefix}mmrds/{case_id}";
-            System.Dynamic.ExpandoObject case_row = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(await _couchDbHttpClient.ExecuteAsync("GET", URL, null, this.user_name, this.value_string));
+            System.Dynamic.ExpandoObject case_row = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(await _caseRepository.GetCaseDocumentJsonAsync(case_id, db_config), _utcSettings);
 
             IDictionary<string, object> case_doc = case_row as IDictionary<string, object>;
 
@@ -681,7 +696,7 @@ public sealed class mmrds_exporter
                     }
 
                     string file_field_name = path_to_field_name_map[path];
-                    row[file_field_name] = val;
+                    row[file_field_name] = val is System.DateTime dt ? dt.ToString("MM/dd/yyyy HH:mm:ss") : val;
 
                     }
                     break;
@@ -1017,7 +1032,7 @@ public sealed class mmrds_exporter
 
 
 
-                                        grid_row[file_field_name] = val;
+                                        grid_row[file_field_name] = val is System.DateTime dt ? dt.ToString("MM/dd/yyyy HH:mm:ss") : val;
                                         break;
                                     }
                                 }
@@ -1441,12 +1456,12 @@ public sealed class mmrds_exporter
                             else
                             {
                                 form_row[file_field_name] = val;
-                            }							
+                            }						
                         }
                         else
                         {
                             // If regular row, then copy field
-                            form_row[file_field_name] = val;
+                            form_row[file_field_name] = val is System.DateTime fdt ? fdt.ToString("MM/dd/yyyy HH:mm:ss") : val;
                         }
                         }
                         break;
@@ -1785,8 +1800,8 @@ public sealed class mmrds_exporter
         );
 
 
-        string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}export_queue/" + this.item_id, null, this.user_name, this.value_string);
-        export_queue_item export_queue_item = Newtonsoft.Json.JsonConvert.DeserializeObject<export_queue_item>(responseFromServer);
+        export_queue_item export_queue_item;
+        export_queue_item = await _exportQueueRepository.GetQueueDocumentAsync<export_queue_item>(this.item_id, db_config);
 
         export_queue_item.status = "Download";
 
@@ -1794,7 +1809,7 @@ public sealed class mmrds_exporter
         Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings();
         settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
         string object_string = Newtonsoft.Json.JsonConvert.SerializeObject(export_queue_item, settings);
-        responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue/" + export_queue_item._id, object_string, this.user_name, this.value_string);
+        await _exportQueueRepository.SaveQueueDocumentAsync(export_queue_item._id, object_string, db_config);
 
 
         Console.WriteLine("{0} Export Finished", System.DateTime.Now);
@@ -1807,15 +1822,15 @@ public sealed class mmrds_exporter
         catch (Exception ex)
         {
 
-        string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}export_queue/" + this.item_id, null, this.user_name, this.value_string);
-        export_queue_item export_queue_item = Newtonsoft.Json.JsonConvert.DeserializeObject<export_queue_item>(responseFromServer);
+        export_queue_item export_queue_item;
+        export_queue_item = await _exportQueueRepository.GetQueueDocumentAsync<export_queue_item>(this.item_id, db_config);
 
         export_queue_item.status = "Queue Failed:" + ex.ToString();
 
         Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings();
         settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
         string object_string = Newtonsoft.Json.JsonConvert.SerializeObject(export_queue_item, settings);
-        responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue/" + export_queue_item._id, object_string, this.user_name, this.value_string);
+        await _exportQueueRepository.SaveQueueDocumentAsync(export_queue_item._id, object_string, db_config);
 
 
         return false;
@@ -2942,11 +2957,11 @@ public sealed class mmrds_exporter
 
         if (this.qualitativeStreamCount[index] == 0)
         {
-            this.qualitativeStreamWriter[index].WriteLine($"{record_split}\nhr_r_id={p_record_id}\nid={p_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}");
+            this.qualitativeStreamWriter[index].Write($"{record_split}\nhr_r_id={p_record_id}\nid={p_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}\n");
         }
         else
         {
-            this.qualitativeStreamWriter[index].WriteLine($"\n{record_split}\nhr_r_id={p_record_id}\nid={p_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}");
+            this.qualitativeStreamWriter[index].Write($"\n{record_split}\nhr_r_id={p_record_id}\nid={p_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}\n");
         }
         this.qualitativeStreamCount[index] += 1;
     }

@@ -11,7 +11,9 @@ using Akka.Actor;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 
-using  mmria.server.extension; 
+using  mmria.server.extension;
+using mmria.common.SharedLibraries.DeIdentified;
+using mmria.common.SharedLibraries.Report;
 namespace mmria.server;
 	
 [Route("api/[controller]")]
@@ -28,13 +30,17 @@ public sealed class vital_importController: ControllerBase
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly mmria.common.SharedLibraries.VitalImport.Manager.VitalImportManager _vitalImportManager;
+    private readonly IDeIdentifiedRepository _deIdentifiedRepository;
+    private readonly IReportRepository _reportRepository;
     public vital_importController
     (
         ActorSystem actorSystem, 
         IHttpContextAccessor httpContextAccessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
-        mmria.common.SharedLibraries.VitalImport.Manager.VitalImportManager vitalImportManager
+        mmria.common.SharedLibraries.VitalImport.Manager.VitalImportManager vitalImportManager,
+        IDeIdentifiedRepository deIdentifiedRepository,
+        IReportRepository reportRepository
     )
     {
         _couchDbHttpClient = couchDbHttpClient;
@@ -42,8 +48,9 @@ public sealed class vital_importController: ControllerBase
         _actorSystem = actorSystem;
         host_prefix = tenantRuntime.EffectiveHostPrefix;
         configuration = tenantRuntime.RequireConfiguration();
-
         db_config = tenantRuntime.RequireDbConfig();
+        _deIdentifiedRepository = deIdentifiedRepository;
+        _reportRepository = reportRepository;
     }
 
     private bool is_authorized()
@@ -155,7 +162,7 @@ public sealed class vital_importController: ControllerBase
                 configuration.GetString("metadata_version", host_prefix)
             );
 
-            _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(Sync_Document_Message);
+            _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix, _deIdentifiedRepository, _reportRepository)).Tell(Sync_Document_Message);
     
             /*
             var case_sync_actor = _actorSystem.ActorSelection("akka://mmria-actor-system/user/case_sync_actor");
@@ -205,7 +212,7 @@ public sealed class vital_importController: ControllerBase
                     configuration.GetString("metadata_version", host_prefix)
                 );
 
-                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(Sync_Document_Message);
+                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix, _deIdentifiedRepository, _reportRepository)).Tell(Sync_Document_Message);
                 /*
                 var case_sync_actor = _actorSystem.ActorSelection("akka://mmria-actor-system/user/case_sync_actor");
                 case_sync_actor.Tell(Sync_Document_Message);

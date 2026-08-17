@@ -30,6 +30,7 @@ public sealed class CaseVROController : Controller
     {
 
         TempData["metadata_version"] = configuration.GetString("metadata_version", host_prefix);
+        TempData["omb_expiration_date"] = configuration.GetString("omb_expiration_date", host_prefix) ?? "05/31/2026";
         return View();
     }
 

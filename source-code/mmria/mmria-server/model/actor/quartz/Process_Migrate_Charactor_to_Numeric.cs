@@ -5,6 +5,9 @@ using Akka.Actor;
 
 namespace mmria.server.model.actor.quartz;
 
+// Data migration actor — direct CouchDB access is intentional.
+// This actor performs one-time bulk data corrections and is not used in production case-management flows.
+// Excluded from the repository pattern by design. See epics.md §Epic 27 Story 27.2.
 public sealed class Process_Migrate_Charactor_to_Numeric : ReceiveActor
 {
     //protected override void PreStart() => Console.WriteLine("Process_Migrate_Charactor_to_Numeric started");

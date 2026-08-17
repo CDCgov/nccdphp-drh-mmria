@@ -6,7 +6,8 @@ using System.Dynamic;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
 
-using  mmria.server.extension; 
+using  mmria.server.extension;
+using mmria.common.SharedLibraries.Queue;
 
 namespace mmria.server;
 
@@ -17,11 +18,13 @@ public sealed class queueController: ControllerBase
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IQueueRepository _queueRepository;
     public queueController 
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        IQueueRepository queueRepository
     )
     {
         host_prefix = tenantRuntime.EffectiveHostPrefix;
@@ -30,6 +33,7 @@ public sealed class queueController: ControllerBase
 
         db_config = tenantRuntime.RequireDbConfig();
         _couchDbHttpClient = couchDbHttpClient;
+        _queueRepository = queueRepository;
     }
 
     [HttpPost]
@@ -51,10 +55,6 @@ public sealed class queueController: ControllerBase
         queue_item.action = safeRequest.action;
         queue_item.case_list = safeRequest.case_list;
 
-        string queue_url = db_config.url + "/queue/"  + queue_item.queue_id;
-
-        string object_string = Newtonsoft.Json.JsonConvert.SerializeObject(queue_item);
-
         var requestOptions = new mmria.common.getset.CouchDbRequestOptions();
         if(!string.IsNullOrWhiteSpace(safeRequest.security_token))
         {
@@ -75,8 +75,7 @@ public sealed class queueController: ControllerBase
 
         try
         {
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", queue_url, object_string, "application/json", requestOptions);
-            put_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
+            put_response = await _queueRepository.SaveQueueItemAsync(queue_item, db_config, requestOptions);
             result.Ok = put_response?.ok == true;
             result.Queue_Id = queue_item.queue_id;
             result.message = put_response?.error_description;

@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using mmria.common.getset;
+using mmria.common.SharedLibraries.Jurisdiction;
 
 namespace mmria.services;
 
@@ -30,7 +31,7 @@ public sealed class authorization
     (
         mmria.common.couchdb.DBConfigurationDetail db_config,
         System.Security.Claims.ClaimsPrincipal p_claims_principal,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        IJurisdictionRepository jurisdictionRepository
     )
     {
         var result = new HashSet<(string jurisdiction_id, ResourceRightEnum ResourceRight)>();
@@ -55,18 +56,16 @@ public sealed class authorization
         var user_name = p_claims_principal.Claims.Where(c => c.Type == ClaimTypes.Name).FirstOrDefault().Value; 
 
         string jurisdicion_view_url = $"{db_config.url}/{db_config.prefix}jurisdiction/_design/sortable/_view/by_user_id";
-        string jurisdicion_result_string = null;
+        mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.user_role_jurisdiction> jurisdiction_view_response;
         try
         {
-            jurisdicion_result_string = await couchDbHttpClient.ExecuteAsync("GET", jurisdicion_view_url, null, db_config.user_name, db_config.user_value);
+            jurisdiction_view_response = await jurisdictionRepository.GetUserRoleJurisdictionSortableViewAsync(jurisdicion_view_url, db_config);
         }
         catch(Exception ex)
         {
             System.Console.WriteLine(ex);
             return result;
         }
-        
-        var jurisdiction_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.user_role_jurisdiction>>(jurisdicion_result_string);
         foreach(mmria.common.model.couchdb.get_sortable_view_response_item<mmria.common.model.couchdb.user_role_jurisdiction> jvi in jurisdiction_view_response.rows)
         {
             if(jvi.key!=null && jvi.value.user_id == user_name)
@@ -161,25 +160,23 @@ public sealed class authorization
     (
         mmria.common.couchdb.DBConfigurationDetail db_config,
         string p_user_name,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        IJurisdictionRepository jurisdictionRepository
     )
     {
 
         var result = new HashSet<(string jurisdiction_id, ResourceRightEnum ResourceRight)>();
 
         string jurisdicion_view_url = $"{db_config.url}/{db_config.prefix}jurisdiction/_design/sortable/_view/by_user_id";
-        string jurisdicion_result_string = null;
+        mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.user_role_jurisdiction> jurisdiction_view_response;
         try
         {
-            jurisdicion_result_string = await couchDbHttpClient.ExecuteAsync("GET", jurisdicion_view_url, null, db_config.user_name, db_config.user_value);
+            jurisdiction_view_response = await jurisdictionRepository.GetUserRoleJurisdictionSortableViewAsync(jurisdicion_view_url, db_config);
         }
         catch(Exception ex)
         {
             System.Console.WriteLine(ex);
             return result;
         }            
-
-        var jurisdiction_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.user_role_jurisdiction>>(jurisdicion_result_string);
         foreach(mmria.common.model.couchdb.get_sortable_view_response_item<mmria.common.model.couchdb.user_role_jurisdiction> jvi in jurisdiction_view_response.rows)
         {
             if(jvi.key!=null && jvi.value.user_id == p_user_name)
@@ -273,25 +270,23 @@ public sealed class authorization
     (
         mmria.common.couchdb.DBConfigurationDetail db_config,
         string p_user_name,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        IJurisdictionRepository jurisdictionRepository
     )
     {
         var result = new HashSet<(string jurisdiction_id, string user_id, string role_name)>();
 
 
         string jurisdicion_view_url = $"{db_config.url}/{db_config.prefix}jurisdiction/_design/sortable/_view/by_user_id";
-        string jurisdicion_result_string = null;
+        mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.user_role_jurisdiction> jurisdiction_view_response;
         try
         {
-            jurisdicion_result_string = await couchDbHttpClient.ExecuteAsync("GET", jurisdicion_view_url, null, db_config.user_name, db_config.user_value);
+            jurisdiction_view_response = await jurisdictionRepository.GetUserRoleJurisdictionSortableViewAsync(jurisdicion_view_url, db_config);
         }
         catch(Exception ex)
         {
             System.Console.WriteLine(ex);
             return result;
         }
-        
-        var jurisdiction_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.user_role_jurisdiction>>(jurisdicion_result_string);
         foreach(mmria.common.model.couchdb.get_sortable_view_response_item<mmria.common.model.couchdb.user_role_jurisdiction> jvi in jurisdiction_view_response.rows)
         {
             if(jvi.key!=null && jvi.value.user_id == p_user_name)

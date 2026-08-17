@@ -1,3 +1,8 @@
+// Clear offline modal gates so both modals can re-fire on the next login,
+// even if the user never closed the tab (e.g. was signed out and returned to this page).
+try { localStorage.removeItem('offline_modal_shown'); } catch (e) { /* storage unavailable */ }
+try { sessionStorage.removeItem('warn_modal_shown'); } catch (e) { /* storage unavailable */ }
+
 const login_button = document.getElementById('login_button');
 const username_element = document.getElementById('login_name');
 const password_element = document.getElementById('login_value');

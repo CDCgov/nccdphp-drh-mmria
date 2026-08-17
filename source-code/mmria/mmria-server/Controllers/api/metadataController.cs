@@ -36,7 +36,7 @@ public sealed class metadataController: ControllerBase
     
     [AllowAnonymous] 
     [HttpGet]
-    public async System.Threading.Tasks.Task<System.Dynamic.ExpandoObject> Get()
+    public async System.Threading.Tasks.Task<IActionResult> Get()
     {
         //System.Console.WriteLine ("Recieved message.");
         string result = null;
@@ -50,14 +50,17 @@ public sealed class metadataController: ControllerBase
             Console.WriteLine (ex);
         }
 
-        return json_result;
+        var omb_date = configuration.GetString("omb_expiration_date", host_prefix) ?? "05/31/2026";
+        var json_string = Newtonsoft.Json.JsonConvert.SerializeObject(json_result);
+        json_string = json_string.Replace("{{omb_expiration_date}}", omb_date);
+        return Content(json_string, "application/json");
     }
 
 
     [AllowAnonymous] 
     [Route("{id}")]
     [HttpGet]
-    public async System.Threading.Tasks.Task<System.Dynamic.ExpandoObject> Get(string id)
+    public async System.Threading.Tasks.Task<IActionResult> Get(string id)
     {
         //System.Console.WriteLine ("Recieved message.");
         string result = null;
@@ -71,7 +74,10 @@ public sealed class metadataController: ControllerBase
             Console.WriteLine (ex);
         }
 
-        return json_result;
+        var omb_date = configuration.GetString("omb_expiration_date", host_prefix) ?? "05/31/2026";
+        var json_string = Newtonsoft.Json.JsonConvert.SerializeObject(json_result);
+        json_string = json_string.Replace("{{omb_expiration_date}}", omb_date);
+        return Content(json_string, "application/json");
     }
 
 

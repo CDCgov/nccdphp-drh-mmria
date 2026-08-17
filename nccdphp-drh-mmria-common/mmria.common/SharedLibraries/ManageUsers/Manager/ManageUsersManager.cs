@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
-using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using mmria.common.couchdb;
@@ -309,9 +308,8 @@ public class ManageUsersManager
         }
 
         var jurisdiction_hashset = authorization.get_current_jurisdiction_id_set_for(db_config, claimsPrincipal, _couchDbHttpClient);
-        var user_role_response = await _dal.GetUserRoleJurisdictionSortableViewAsync(
-            $"{db_config.url}/{db_config.prefix}jurisdiction/_design/sortable/_view/by_user_id?{user.name}",
-            db_config);
+        var user_role_response = await _dal.GetUserRoleJurisdictionSortableViewByParamsAsync(
+            skip: 0, take: -1, sortView: "by_user_id", hasSearchKey: false, descending: false, db_config);
 
         foreach (get_sortable_view_response_item<user_role_jurisdiction> cvi in user_role_response.rows)
         {
@@ -350,7 +348,8 @@ public class ManageUsersManager
                 if
                 (
                     item.data_type != null &&
-                    item.data_type == user_role_jurisdiction.user_role_jursidiction_const &&
+                    (item.data_type == user_role_jurisdiction.user_role_jursidiction_const ||
+                     item.data_type == "user_role_jurisdiction") &&
                     authorization.is_authorized_to_handle_jurisdiction_id(jurisdiction_hashset, ResourceRightEnum.ReadUser, item)
                 )
                 {
@@ -364,7 +363,8 @@ public class ManageUsersManager
             if
             (
                 item.data_type != null &&
-                item.data_type == user_role_jurisdiction.user_role_jursidiction_const &&
+                (item.data_type == user_role_jurisdiction.user_role_jursidiction_const ||
+                 item.data_type == "user_role_jurisdiction") &&
                 authorization.is_authorized_to_handle_jurisdiction_id(jurisdiction_hashset, ResourceRightEnum.ReadUser, item)
             )
             {
@@ -402,9 +402,8 @@ public class ManageUsersManager
         DBConfigurationDetail db_config)
     {
         string search_key = GetCurrentUserName(user);
-        string request_string = $"{db_config.url}/{db_config.prefix}jurisdiction/_design/sortable/_view/by_date_created?skip=0";
-
-        var case_view_response = await _dal.GetUserRoleJurisdictionSortableViewAsync(request_string, db_config);
+        var case_view_response = await _dal.GetUserRoleJurisdictionSortableViewByParamsAsync(
+            skip: 0, take: -1, sortView: "by_date_created", hasSearchKey: false, descending: false, db_config);
 
         var result = new get_sortable_view_reponse_header<user_role_jurisdiction>();
         result.offset = case_view_response.offset;
@@ -478,41 +477,13 @@ public class ManageUsersManager
                 break;
         }
 
-        var request_builder = new StringBuilder();
-        request_builder.Append(db_config.url);
-        request_builder.Append($"/{db_config.prefix}jurisdiction/_design/sortable/_view/{sort_view}?");
-
-        if (string.IsNullOrWhiteSpace(search_key))
-        {
-            if (skip > -1)
-            {
-                request_builder.Append($"?skip={skip}");
-            }
-            else
-            {
-                request_builder.Append("skip=0");
-            }
-
-            if (take > -1)
-            {
-                request_builder.Append($"?&limit={take}");
-            }
-
-            if (descending)
-            {
-                request_builder.Append("?&descending=true");
-            }
-        }
-        else
-        {
-            request_builder.Append("?skip=0");
-            if (descending)
-            {
-                request_builder.Append("?&descending=true");
-            }
-        }
-
-        var case_view_response = await _dal.GetUserRoleJurisdictionSortableViewAsync(request_builder.ToString(), db_config);
+        var case_view_response = await _dal.GetUserRoleJurisdictionSortableViewByParamsAsync(
+            skip: skip,
+            take: take,
+            sortView: sort_view,
+            hasSearchKey: !string.IsNullOrWhiteSpace(search_key),
+            descending: descending,
+            db_config);
 
         if (string.IsNullOrWhiteSpace(search_key))
         {
@@ -706,9 +677,8 @@ public class ManageUsersManager
         }
 
         var user_name = claimsPrincipal.Claims.Where(c => c.Type == ClaimTypes.Name).FirstOrDefault().Value;
-        var jurisdiction_view_response = await _dal.GetUserRoleJurisdictionSortableViewAsync(
-            $"{db_config.url}/{db_config.prefix}jurisdiction/_design/sortable/_view/by_user_id?{user_name}",
-            db_config);
+        var jurisdiction_view_response = await _dal.GetUserRoleJurisdictionSortableViewByParamsAsync(
+            skip: 0, take: -1, sortView: "by_user_id", hasSearchKey: false, descending: false, db_config);
 
         var now = DateTime.Now;
         foreach (get_sortable_view_response_item<user_role_jurisdiction> jvi in jurisdiction_view_response.rows)

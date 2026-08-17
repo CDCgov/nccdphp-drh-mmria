@@ -36,27 +36,20 @@ System.Collections.Generic.Dictionary<string, string> path_to_field_name_map = n
     private const string over_limit_message = "Over the qualitative limit. check the over-the-qualitative-limit.txt file for details.";
 
     private common.couchdb.DBConfigurationDetail db_config;
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository _metadataRepository;
 
     public export_all_generate_name_map(
         common.couchdb.DBConfigurationDetail _db_config,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository metadataRepository
     )
     {
         this.db_config = _db_config;
-        _couchDbHttpClient = couchDbHttpClient;
+        _metadataRepository = metadataRepository;
     }
     public async System.Threading.Tasks.Task<Dictionary<string, Dictionary<string, string>>> ExecuteAsync(string p_version, string p_export_type = "all")
     {
     
-        string metadata_url = $"{db_config.url}/metadata/{p_version}/metadata";
-        var curl_result = await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, db_config.user_name, db_config.user_value);
-
-        
-        //System.Console.WriteLine("Execute(string p_version, string p_export_type = all)");
-        //System.Console.WriteLine(curl_result);
-        
-        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(curl_result);
+        mmria.common.metadata.app metadata = await _metadataRepository.GetAppDocumentAsync(p_version, db_config);
 
 
 

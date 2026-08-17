@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using Microsoft.Extensions.Configuration;
+using mmria.common.SharedLibraries.Session;
 
 namespace mmria.server.utils;
 
@@ -92,11 +93,13 @@ public sealed class SessionSummary
 
     mmria.common.couchdb.ConfigurationSet ConfigDB;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly ISessionRepository _sessionRepository;
 
-    public SessionSummary(mmria.common.couchdb.ConfigurationSet p_config_db, mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+    public SessionSummary(mmria.common.couchdb.ConfigurationSet p_config_db, mmria.common.getset.CouchDbHttpClient couchDbHttpClient, ISessionRepository sessionRepository)
     {
         ConfigDB = p_config_db;
         _couchDbHttpClient = couchDbHttpClient;
+        _sessionRepository = sessionRepository;
     }
 
     public async Task<List<SessionSummaryItem>> execute(System.Threading.CancellationToken cancellationToken)
@@ -162,15 +165,10 @@ public sealed class SessionSummary
     { 
         try
         {
-            string request_string = $"{p_config_detail.url}/{p_config_detail.prefix}session/_design/session_sortable/_view/by_date_created?descending=true&limit=500";
-
+            cancellationToken.ThrowIfCancellationRequested();
+            var case_view_response = await _sessionRepository.GetSessionByDateCreatedViewAsync(true, 500, p_config_detail);
 
             cancellationToken.ThrowIfCancellationRequested();
-            string responseFromServer = await couchDbHttpClient.ExecuteAsync("GET", request_string, null, p_config_detail.user_name, p_config_detail.user_value, "application/json");
-
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.view_response<SessionItem>>(responseFromServer);
 
             var current_day = System.DateTime.Now.Day;
 

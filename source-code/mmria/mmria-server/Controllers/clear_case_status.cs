@@ -5,12 +5,13 @@ using Microsoft.AspNetCore.Authorization;
 using System.Threading.Tasks;
 using System.Linq;
 using Microsoft.AspNetCore.Http;
-using  mmria.server.extension;
+using mmria.server.extension;
 using mmria.server.util;
+using mmria.common.SharedLibraries.CaseWorkflowAdmin.Manager;
 
 namespace mmria.server.Controllers;
 
-[Authorize(Roles  = "cdc_admin,jurisdiction_admin")]
+[Authorize(Roles = "cdc_admin,jurisdiction_admin")]
 public sealed class clear_case_statusController : Controller
 {
     private readonly IAuthorizationService _authorizationService;
@@ -19,32 +20,32 @@ public sealed class clear_case_statusController : Controller
     mmria.common.couchdb.OverridableConfiguration configuration;
     mmria.common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly CaseWorkflowAdminManager _manager;
 
-    private System.Collections.Generic.Dictionary<string, string> CaseStatusToDisplay;
+    private readonly System.Collections.Generic.Dictionary<string, string> CaseStatusToDisplay;
     public clear_case_statusController
     (
-        IHttpContextAccessor httpContextAccessor, 
+        IHttpContextAccessor httpContextAccessor,
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        CaseWorkflowAdminManager manager
     )
     {
         _dbConfigSet = tenantRuntime.RequireConfigurationSet();
-        _couchDbHttpClient = couchDbHttpClient;
+        _manager = manager;
 
         host_prefix = tenantRuntime.EffectiveHostPrefix;
 
         configuration = tenantRuntime.RequireConfiguration();
 
         db_config = tenantRuntime.RequireDbConfig();
-        if(_dbConfigSet.detail_list.ContainsKey("vital_import"))
+        if (_dbConfigSet.detail_list.ContainsKey("vital_import"))
         {
             _dbConfigSet.detail_list.Remove("vital_import");
         }
 
         CaseStatusToDisplay = new System.Collections.Generic.Dictionary<string, string>();
         CaseStatusToDisplay["9999"] = "(blank)";
-        CaseStatusToDisplay["1"] = "Abstracting (Incomplete)";	
+        CaseStatusToDisplay["1"] = "Abstracting (Incomplete)";
         CaseStatusToDisplay["2"] = "Abstraction Complete";
         CaseStatusToDisplay["3"] = "Ready for Review";
         CaseStatusToDisplay["4"] = "Review Complete and Decision Entered";
@@ -74,13 +75,9 @@ public sealed class clear_case_statusController : Controller
             var effectiveRole = isCdcAdmin ? "cdc_admin" : "jurisdiction_admin";
             var effectiveStateDatabase = AuthorizedWorkflowScopeHelper.ResolveAuthorizedStateDatabase(User, Model.StateDatabase, host_prefix, _dbConfigSet);
             var effectiveDbConfig = AuthorizedWorkflowScopeHelper.ResolveAuthorizedDbConfig(User, Model.StateDatabase, host_prefix, db_config, _dbConfigSet);
-            string responseFromServer = null;
             model.is_cdc_admin = isCdcAdmin;
-            string request_string = $"{effectiveDbConfig.url}/{effectiveDbConfig.prefix}mmrds/_design/sortable/_view/by_date_last_updated?skip=0&limit=25000&descending=true";
-            responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, effectiveDbConfig.user_name, effectiveDbConfig.user_value);
 
-
-            mmria.common.model.couchdb.case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(responseFromServer);
+            var case_view_response = await _manager.GetCasesByDateAsync(effectiveDbConfig);
 
             var Locked_status_list = new List<int>() { 4, 5, 6 };
             foreach (var item in case_view_response.rows)
@@ -95,13 +92,6 @@ public sealed class clear_case_statusController : Controller
                             item.value.record_id.IndexOf(Model.RecordId, System.StringComparison.OrdinalIgnoreCase) > -1 ||
                             Model.RecordId.IndexOf(item.value.record_id, System.StringComparison.OrdinalIgnoreCase) > -1
                         )
-                    /*
-                    &&
-                    (
-                        item.value.case_status.HasValue &&
-                        Locked_status_list.IndexOf(item.value.case_status.Value) > -1
-                    )*/
-
                     )
                     {
                         var x = new mmria.server.model.casestatus.CaseStatusDetail()
@@ -211,71 +201,17 @@ public sealed class clear_case_statusController : Controller
             }
 
 
-            string responseFromServer = null;
-            string request_string = $"{effectiveDbConfig.url}/{effectiveDbConfig.prefix}mmrds/{model._id}";
-            responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, effectiveDbConfig.user_name, effectiveDbConfig.user_value);
-            var case_response = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(responseFromServer);
+            var (ok, oldCaseStatus, errorMessage) = await _manager.ClearCaseStatusAsync(effectiveDbConfig, model._id, userName);
 
-            
-            var dictionary = case_response as IDictionary<string,object>;
-            if(dictionary != null)
+            if (ok)
             {
-                var home_record = dictionary["home_record"] as IDictionary<string,object>;
-                if(home_record != null)
-                {
-                    var case_status = home_record["case_status"] as IDictionary<string,object>;
-                    if(case_status != null)
-                    {
-                        case_status["overall_case_status"] = 9999;
-                        case_status["case_locked_date"] = "";
-
-                        dictionary["last_updated_by"] = userName;
-                        dictionary["date_last_updated"] = DateTime.Now;
-
-                        model.LastUpdatedBy = userName;
-                        model.DateLastUpdated = (DateTime) dictionary["date_last_updated"];
-
-
-                        Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-                        settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-                        var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(case_response, settings);
-
-                        string put_request_string = "";
-                        put_request_string = $"{effectiveDbConfig.url}/{effectiveDbConfig.prefix}mmrds/{model._id}";
-
-                        var document_put_response = new mmria.common.model.couchdb.document_put_response();
-                        try
-                        {
-                            responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", put_request_string, object_string, effectiveDbConfig.user_name, effectiveDbConfig.user_value);
-                            document_put_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
-                        }
-                        catch(Exception ex)
-                        {
-                            model.CaseStatusDisplay = $"Problem Setting Status to (blank)\n{ex}";
-                        }
-
-                        if(document_put_response.ok)
-                        {
-                            model.CaseStatusDisplay = "(blank)";
-                        }
-                        else
-                        {
-                            model.CaseStatusDisplay = "Problem Setting Status to (blank)";
-                        }
-                    }
-                    else
-                    {
-                        model.CaseStatusDisplay = "Problem Setting Status to (blank)";
-                    }   
-                }
-                else
-                {
-                    model.CaseStatusDisplay = "Problem Setting Status to (blank)";
-                }
+                model.CaseStatusDisplay = "(blank)";
+                model.LastUpdatedBy = userName;
+                model.DateLastUpdated = DateTime.Now;
             }
             else
             {
-                model.CaseStatusDisplay = "Problem Setting Status to (blank)";
+                model.CaseStatusDisplay = errorMessage ?? "Problem Setting Status to (blank)";
             }
             
         }

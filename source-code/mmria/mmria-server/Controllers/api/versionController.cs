@@ -11,6 +11,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using mmria.common.utils;
+using Newtonsoft.Json.Linq;
 
 using  mmria.server.extension; 
 using mmria.server.util;
@@ -25,17 +26,20 @@ public sealed class versionController: ControllerBase
     string host_prefix = null;
     private readonly mmria.common.SharedLibraries.MetadataVersion.Manager.MetadataVersionManager _metadataVersionManager;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository _metadataRepository;
     public Dictionary<string, string> formName = new Dictionary<string, string>();
     public versionController
 (
         IHttpContextAccessor httpContextAccessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
-        mmria.common.SharedLibraries.MetadataVersion.Manager.MetadataVersionManager metadataVersionManager
+        mmria.common.SharedLibraries.MetadataVersion.Manager.MetadataVersionManager metadataVersionManager,
+        mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository metadataRepository
     )
     {
         _couchDbHttpClient = couchDbHttpClient;
         _metadataVersionManager = metadataVersionManager;
+        _metadataRepository = metadataRepository;
         host_prefix = tenantRuntime.EffectiveHostPrefix;
 
         configuration = tenantRuntime.RequireConfiguration();
@@ -139,7 +143,7 @@ public sealed class versionController: ControllerBase
     )
     {
 
-        var export_all_generate_name_map = new mmria.server.utils.export_all_generate_name_map(db_config, _couchDbHttpClient);
+        var export_all_generate_name_map = new mmria.server.utils.export_all_generate_name_map(db_config, _metadataRepository);
 
         var result = await export_all_generate_name_map.ExecuteAsync(version_specification_id, type);
 
@@ -161,6 +165,10 @@ public sealed class versionController: ControllerBase
         try
         {
             string responseString = await _metadataVersionManager.GetVersionDocumentAsync(version_specification_id, document_name, db_config);
+            if (string.Equals(document_name, "metadata", StringComparison.OrdinalIgnoreCase))
+            {
+                responseString = ApplyOmbExpirationDateToMetadata(responseString);
+            }
 
             string type="javascript";
             if(!string.IsNullOrWhiteSpace(document_name))
@@ -186,6 +194,57 @@ public sealed class versionController: ControllerBase
 
         return result;
     } 
+
+    private string ApplyOmbExpirationDateToMetadata(string metadataJson)
+    {
+        if (string.IsNullOrWhiteSpace(metadataJson))
+        {
+            return metadataJson;
+        }
+
+        try
+        {
+            var metadata = JToken.Parse(metadataJson);
+            ApplyOmbExpirationDateToMetadataToken(metadata, GetOmbExpirationDate());
+            return metadata.ToString(Newtonsoft.Json.Formatting.None);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error applying OMB expiration date to version metadata: {ex}");
+            return metadataJson;
+        }
+    }
+
+    private void ApplyOmbExpirationDateToMetadataToken(JToken token, string ombExpirationDate)
+    {
+        if (token is JObject metadataObject)
+        {
+            if (string.Equals(
+                metadataObject.Value<string>("name"),
+                "omb_expiration_label",
+                StringComparison.OrdinalIgnoreCase))
+            {
+                metadataObject["prompt"] = $"Exp. Date {ombExpirationDate}";
+            }
+
+            foreach (var property in metadataObject.Properties().ToList())
+            {
+                ApplyOmbExpirationDateToMetadataToken(property.Value, ombExpirationDate);
+            }
+        }
+        else if (token is JArray metadataArray)
+        {
+            foreach (var item in metadataArray)
+            {
+                ApplyOmbExpirationDateToMetadataToken(item, ombExpirationDate);
+            }
+        }
+    }
+
+    private string GetOmbExpirationDate()
+    {
+        return configuration.GetString("omb_expiration_date", host_prefix) ?? "05/31/2026";
+    }
 
     public static byte[] ReadFully(System.IO.Stream input)
     {

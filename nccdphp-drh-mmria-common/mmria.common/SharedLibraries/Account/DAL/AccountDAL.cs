@@ -2,15 +2,18 @@
 
 using System;
 using System.Collections.Generic;
+using System.Dynamic;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using mmria.common.getset;
 using mmria.common.couchdb;
 using mmria.common.model.couchdb;
+using mmria.common.SharedLibraries.Session;
 
 namespace mmria.common.SharedLibraries.Account.DAL;
 
@@ -19,13 +22,20 @@ namespace mmria.common.SharedLibraries.Account.DAL;
 /// Contains ALL CouchDB calls for authentication, session events, and session management.
 /// No business logic - only data operations.
 /// </summary>
-public class AccountDAL
+public class AccountDAL : mmria.common.SharedLibraries.Account.IUserRepository
 {
-    private readonly CouchDbHttpClient _httpClient;
+    private static readonly System.Text.Json.JsonSerializerOptions SensitiveJsonPayloadOptions = new()
+    {
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
 
-    public AccountDAL(CouchDbHttpClient httpClient)
+    private readonly CouchDbHttpClient _httpClient;
+    private readonly ISessionRepository _sessionRepository;
+
+    public AccountDAL(CouchDbHttpClient httpClient, ISessionRepository sessionRepository)
     {
         _httpClient = httpClient;
+        _sessionRepository = sessionRepository;
     }
 
     /// <summary>
@@ -210,6 +220,99 @@ public class AccountDAL
         return (userName ?? string.Empty).Trim().ToLowerInvariant();
     }
 
+    // -----------------------------------------------------------------------
+    // IUserRepository — canonical _users CRUD methods
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// Get a CouchDB user document by full user_id (e.g. "org.couchdb.user:someone").
+    /// </summary>
+    public async Task<user> GetUserAsync(
+        string userId,
+        DBConfigurationDetail dbConfig)
+    {
+        string requestUrl = $"{dbConfig.url}/_users/{userId}";
+        string responseFromServer = await _httpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value);
+        return JsonConvert.DeserializeObject<user>(responseFromServer);
+    }
+
+    /// <summary>
+    /// Check if a CouchDB user document exists by full user_id.
+    /// Returns an empty user object if not found or on error — never returns null.
+    /// </summary>
+    public async Task<user> CheckUserAsync(
+        string userId,
+        DBConfigurationDetail dbConfig)
+    {
+        try
+        {
+            string requestUrl = $"{dbConfig.url}/_users/{userId}";
+            string responseFromServer = await _httpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value);
+
+            if (string.IsNullOrWhiteSpace(responseFromServer))
+            {
+                return new user();
+            }
+
+            if (responseFromServer.Contains("\"error\"") && responseFromServer.Contains("not_found"))
+            {
+                return new user();
+            }
+
+            return JsonConvert.DeserializeObject<user>(responseFromServer) ?? new user();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+            return new user();
+        }
+    }
+
+    /// <summary>
+    /// Create or update a CouchDB user document via PUT.
+    /// </summary>
+    public async Task<document_put_response> PutUserAsync(
+        user user,
+        DBConfigurationDetail dbConfig)
+    {
+        string userDbUrl = $"{dbConfig.url}/_users/{user._id}";
+        string responseFromServer = await _httpClient.ExecuteJsonAsync(
+            "PUT",
+            userDbUrl,
+            user,
+            SensitiveJsonPayloadOptions,
+            dbConfig.user_name,
+            dbConfig.user_value,
+            "application/json");
+        return JsonConvert.DeserializeObject<document_put_response>(responseFromServer);
+    }
+
+    /// <summary>
+    /// Delete a CouchDB user document via DELETE.
+    /// </summary>
+    public async Task<System.Dynamic.ExpandoObject> DeleteUserAsync(
+        string userId,
+        string rev,
+        DBConfigurationDetail dbConfig)
+    {
+        string requestUrl = $"{dbConfig.url}/_users/{userId}?rev={rev}";
+        string responseFromServer = await _httpClient.ExecuteAsync("DELETE", requestUrl, null, dbConfig.user_name, dbConfig.user_value);
+        return JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(responseFromServer);
+    }
+
+    /// <summary>
+    /// Get all users from _all_docs with pagination.
+    /// </summary>
+    public async Task<get_response_header<user>> GetAllUsersAsync(
+        int skip,
+        int take,
+        DBConfigurationDetail dbConfig)
+    {
+        string requestUrl = $"{dbConfig.url}/_users/_all_docs?include_docs=true&skip={skip}&limit={take}";
+        string responseFromServer = await _httpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value);
+        return JsonConvert.DeserializeObject<get_response_header<user>>(responseFromServer);
+    }
+
     /// <summary>
     /// Get session events for a user within a time range to check for failed login attempts
     /// </summary>
@@ -219,18 +322,7 @@ public class AccountDAL
     {
         try
         {
-            var url = dbConfig.Get_Prefix_DB_Url(
-                $"session/_design/session_event_sortable/_view/by_user_id?startkey=\"{userName}\"&endkey=\"{userName}\"");
-
-            var response = await _httpClient.ExecuteAsync(
-                "GET",
-                url,
-                null,
-                dbConfig.user_name,
-                dbConfig.user_value);
-
-            var viewResponse = JsonConvert.DeserializeObject<
-                get_sortable_view_reponse_header<session_event>>(response);
+            var viewResponse = await _sessionRepository.GetSessionEventsByUserIdAsync(userName, dbConfig);
 
             if (viewResponse?.rows != null)
             {
@@ -270,18 +362,8 @@ public class AccountDAL
                 ip = ipAddress
             };
 
-            var json = JsonConvert.SerializeObject(sessionEvent);
-            var url = dbConfig.Get_Prefix_DB_Url($"session/{sessionEventId}");
-
-            var response = await _httpClient.ExecuteAsync(
-                "PUT",
-                url,
-                json,
-                dbConfig.user_name,
-                dbConfig.user_value);
-
-            var result = JsonConvert.DeserializeObject<document_put_response>(response);
-            return result?.ok ?? false;
+            await _sessionRepository.SaveSessionEventAsync(sessionEvent, dbConfig);
+            return true;
         }
         catch (Exception ex)
         {
@@ -300,17 +382,7 @@ public class AccountDAL
     {
         try
         {
-            var url = dbConfig.Get_Prefix_DB_Url($"session/{sessionId}");
-
-            var response = await _httpClient.ExecuteAsync(
-                "PUT",
-                url,
-                sessionJson,
-                dbConfig.user_name,
-                dbConfig.user_value);
-
-            var result = JsonConvert.DeserializeObject<document_put_response>(response);
-            return result;
+            return await _sessionRepository.SaveSessionRawAsync(sessionId, sessionJson, dbConfig);
         }
         catch (Exception ex)
         {
@@ -328,16 +400,7 @@ public class AccountDAL
     {
         try
         {
-            var url = dbConfig.Get_Prefix_DB_Url($"session/{sessionId}");
-
-            var response = await _httpClient.ExecuteAsync(
-                "GET",
-                url,
-                null,
-                dbConfig.user_name,
-                dbConfig.user_value);
-
-            return response;
+            return await _sessionRepository.GetSessionDocumentRawAsync(sessionId, dbConfig);
         }
         catch (Exception ex)
         {

@@ -7,9 +7,12 @@ using mmria.common.model.couchdb;
 
 namespace mmria.common.SharedLibraries.ExportQueue.DAL;
 
-public sealed class ExportQueueDAL
+public sealed class ExportQueueDAL : IExportQueueRepository
 {
     private readonly CouchDbHttpClient _httpClient;
+
+    private const string SecurityDocument =
+        "{\"admins\":{\"names\":[],\"roles\":[\"abstractor\"]},\"members\":{\"names\":[],\"roles\":[\"abstractor\"]}}";
 
     public ExportQueueDAL(CouchDbHttpClient httpClient)
     {
@@ -51,5 +54,16 @@ public sealed class ExportQueueDAL
             {
                 VitalServiceKey = vitalServiceKey
             });
+    }
+
+    public async Task PurgeAndReinitializeAsync(DBConfigurationDetail dbConfig)
+    {
+        string dbUrl = dbConfig.Get_Prefix_DB_Url("export_queue");
+        string securityUrl = dbConfig.Get_Prefix_DB_Url("export_queue/_security");
+
+        System.Console.WriteLine(await _httpClient.ExecuteAsync("DELETE", dbUrl, null, dbConfig.user_name, dbConfig.user_value, "application/json"));
+        System.Console.WriteLine("Creating export_queue db.");
+        System.Console.WriteLine(await _httpClient.ExecuteAsync("PUT", dbUrl, null, dbConfig.user_name, dbConfig.user_value, "application/json"));
+        await _httpClient.ExecuteAsync("PUT", securityUrl, SecurityDocument, dbConfig.user_name, dbConfig.user_value, "application/json");
     }
 }

@@ -262,6 +262,284 @@ evahmrvs_b_dias Diastolic 40 20
 
 */
 
+function mmria_vitals_is_out_of_range(fieldPath, value) {
+    if (!window.mmria_validation_rules) return false;
+    var rule = window.mmria_validation_rules[fieldPath];
+    if (!rule) {
+        // Try to find a rule by searching for a matching field path ending
+        for (var key in window.mmria_validation_rules) {
+            if (key.endsWith('/' + fieldPath) || key === fieldPath) {
+                rule = window.mmria_validation_rules[key];
+                break;
+            }
+        }
+    }
+    if (!rule) return false;
+    var v = parseFloat(value);
+    if (value === '' || value == null || isNaN(v)) return false;
+    return (v < parseFloat(rule.min_value) || v > parseFloat(rule.max_value));
+}
+
+function mmria_vitals_validate_field(inputEl)
+{
+    if (!window.mmria_validation_rules) { return; }
+    var fieldName = inputEl.name;
+    var chartFormPath = (inputEl.dataset && inputEl.dataset.chartFormPath) ? inputEl.dataset.chartFormPath : null;
+    var rule = null;
+
+    if (chartFormPath) {
+        // Form-scoped lookup: match only rules whose field_path prefix equals chartFormPath.
+        // Prevents an enabled rule on Form A from firing on Form B's same-named field (Bug #4).
+        for (var key in window.mmria_validation_rules) {
+            var kParts = key.split('/');
+            if (kParts[kParts.length - 1] !== fieldName) { continue; }
+            var kPrefix = kParts.slice(0, -1).join('/');
+            if (kPrefix === chartFormPath) { rule = window.mmria_validation_rules[key]; break; }
+        }
+    } else {
+        // No form context (e.g. called from validation-state.js focusout on a non-chart input).
+        // Non-chart saves are separately guarded by the normalized-path lookup in index.js Block 2.
+        if (window.mmria_validation_rules[fieldName]) {
+            rule = window.mmria_validation_rules[fieldName];
+        } else {
+            for (var key2 in window.mmria_validation_rules) {
+                if (key2.endsWith('/' + fieldName) || key2 === fieldName) {
+                    rule = window.mmria_validation_rules[key2];
+                    break;
+                }
+            }
+        }
+    }
+
+    if (!rule) { return; }
+    if (inputEl.value === '' || inputEl.value === null) { return; }
+    // Skip the modal if the value has not changed from the originally rendered value
+    // (i.e. this is historical invalid data — the user just tabbed through without editing).
+    if (inputEl.value === inputEl.defaultValue) { return; }
+    var value = parseFloat(inputEl.value);
+    if (isNaN(value)) { return; }
+    if (value < parseFloat(rule.min_value) || value > parseFloat(rule.max_value))
+    {
+        mmria_vitals_show_field_modal(rule, inputEl);
+    }
+}
+
+function mmria_vitals_show_field_modal(range, inputEl)
+{
+    var existingModal = document.getElementById('vitals-range-modal');
+    if (existingModal && existingModal.parentNode) { existingModal.parentNode.removeChild(existingModal); }
+    var existingBackdrop = document.getElementById('vitals-range-backdrop');
+    if (existingBackdrop && existingBackdrop.parentNode) { existingBackdrop.parentNode.removeChild(existingBackdrop); }
+
+    var modalHtml =
+        '<div id="vitals-range-modal" class="modal fade" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="vitals-range-modal-title" style="z-index: 1050;">'
+        + '<div class="modal-dialog" role="document">'
+        + '<div class="modal-content">'
+        + '<div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">'
+        + '<h4 id="vitals-range-modal-title" class="modal-title" style="margin: 0; font-weight: 600; font-size: 17px;">Out of Range</h4>'
+        + '</div>'
+        + '<div class="modal-body" style="padding: 20px;">'
+        + '<p id="vitals-range-modal-msg" style="font-size: 16px; color: #333; margin: 0;"></p>'
+        + '</div>'
+        + '<div class="modal-footer" style="padding: 15px 20px; text-align: right;">'
+        + '<button type="button" id="vitals-range-modal-ok" class="btn btn-primary" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">OK</button>'
+        + '</div>'
+        + '</div>'
+        + '</div>'
+        + '</div>'
+        + '<div id="vitals-range-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>';
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    var msgEl = document.getElementById('vitals-range-modal-msg');
+    if (msgEl)
+    {
+        msgEl.textContent = range.message
+            || ('The value entered falls outside of the permitted range.'
+                + ' Please enter a valid input between ' + range.min_value + '\u2013' + range.max_value + '.');
+    }
+
+    var modal = document.getElementById('vitals-range-modal');
+    var backdrop = document.getElementById('vitals-range-backdrop');
+
+    setTimeout(function()
+    {
+        if (modal) { modal.classList.add('show'); modal.style.display = 'block'; }
+        if (backdrop) { backdrop.classList.add('show'); }
+        var okBtn = document.getElementById('vitals-range-modal-ok');
+        if (okBtn) { okBtn.focus(); }
+    }, 10);
+
+    function closeVitalsModal()
+    {
+        if (modal) { modal.classList.remove('show'); }
+        if (backdrop) { backdrop.classList.remove('show'); }
+        setTimeout(function()
+        {
+            if (modal && modal.parentNode) { modal.parentNode.removeChild(modal); }
+            if (backdrop && backdrop.parentNode) { backdrop.parentNode.removeChild(backdrop); }
+        }, 150);
+        if (inputEl && typeof inputEl.focus === 'function') { inputEl.focus(); }
+    }
+
+    var okBtn = document.getElementById('vitals-range-modal-ok');
+    if (okBtn) { okBtn.onclick = closeVitalsModal; }
+
+    if (modal)
+    {
+        modal.addEventListener('keydown', function(e)
+        {
+            if (e.key === 'Escape') { e.preventDefault(); closeVitalsModal(); }
+        });
+    }
+}
+
+
+
+function mmria_vitals_revalidate_all()
+{
+    if (!window.mmria_validation_rules) { return false; }
+    var records = window.g_data && window.g_data.er_visit_and_hospital_medical_records;
+    if (!records || !Array.isArray(records)) { return false; }
+    var rule_keys = Object.keys(window.mmria_validation_rules);
+    for (var i = 0; i < records.length; i++)
+    {
+        var vital_signs = records[i] && records[i].vital_signs;
+        if (!vital_signs || !Array.isArray(vital_signs)) { continue; }
+        for (var j = 0; j < vital_signs.length; j++)
+        {
+            var measurement = vital_signs[j];
+            for (var k = 0; k < rule_keys.length; k++)
+            {
+                // Extract field name from the full path (e.g., "temperature" from "er_visit_and_hospital_medical_records/vital_signs/temperature")
+                var fieldName = rule_keys[k].split('/').pop();
+                if (mmria_vitals_is_out_of_range(rule_keys[k], measurement[fieldName]))
+                {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+function mmria_vitals_case_is_closed()
+{
+    if (!window.g_data) { return false; }
+    var hr = g_data.home_record;
+    if (!hr || !hr.case_status || !hr.case_status.overall_case_status) { return false; }
+    var status = Number(hr.case_status.overall_case_status);
+    return status === 4 || status === 5 || status === 6;
+}
+
+function mmria_vitals_has_hard_violations()
+{
+    if (!window.g_data || !window.mmria_validation_rules) { return false; }
+    var records = window.g_data.er_visit_and_hospital_medical_records;
+    if (!records || !Array.isArray(records)) { return false; }
+    var rule_keys = Object.keys(window.mmria_validation_rules);
+    for (var i = 0; i < records.length; i++)
+    {
+        var vital_signs = records[i] && records[i].vital_signs;
+        if (!vital_signs || !Array.isArray(vital_signs)) { continue; }
+        for (var j = 0; j < vital_signs.length; j++)
+        {
+            var measurement = vital_signs[j];
+            for (var k = 0; k < rule_keys.length; k++)
+            {
+                var rule = window.mmria_validation_rules[rule_keys[k]];
+                if (!rule || rule.severity !== 'hard') { continue; }
+                var fieldName = rule_keys[k].split('/').pop();
+                if (mmria_vitals_is_out_of_range(rule_keys[k], measurement[fieldName]))
+                {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+function mmria_vitals_show_print_gate_modal(actionLabel, isHardBlock, onConfirm)
+{
+    var existingModal = document.getElementById('vitals-print-gate-modal');
+    if (existingModal && existingModal.parentNode) { existingModal.parentNode.removeChild(existingModal); }
+    var existingBackdrop = document.getElementById('vitals-print-gate-backdrop');
+    if (existingBackdrop && existingBackdrop.parentNode) { existingBackdrop.parentNode.removeChild(existingBackdrop); }
+
+    var message = isHardBlock
+        ? 'This case contains vital sign records with values outside the permitted range. These values must be corrected before printing or viewing.'
+        : 'This case contains vital sign records with values outside the permitted range. These values are excluded from graphs, tables, print and pdf views.';
+
+    var proceedButtonHtml = isHardBlock
+        ? ''
+        : '<button type="button" id="vitals-print-gate-modal-proceed" class="btn btn-primary" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">' + actionLabel + '</button>';
+
+    var modalHtml =
+        '<div id="vitals-print-gate-modal" class="modal fade" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="vitals-print-gate-modal-title" style="z-index: 1050;">'
+        + '<div class="modal-dialog" role="document">'
+        + '<div class="modal-content">'
+        + '<div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">'
+        + '<h4 id="vitals-print-gate-modal-title" class="modal-title" style="margin: 0; font-weight: 600; font-size: 17px;">Vital Signs Out of Range</h4>'
+        + '</div>'
+        + '<div class="modal-body" style="padding: 20px;">'
+        + '<p style="font-size: 16px; color: #333; margin: 0;">' + message + '</p>'
+        + '</div>'
+        + '<div class="modal-footer" style="padding: 15px 20px; text-align: right;">'
+        + '<button type="button" id="vitals-print-gate-modal-close" class="btn btn-default" style="padding: 8px 20px; margin-right: 8px;">Close</button>'
+        + proceedButtonHtml
+        + '</div>'
+        + '</div>'
+        + '</div>'
+        + '</div>'
+        + '<div id="vitals-print-gate-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>';
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    var modal = document.getElementById('vitals-print-gate-modal');
+    var backdrop = document.getElementById('vitals-print-gate-backdrop');
+
+    setTimeout(function()
+    {
+        if (modal) { modal.classList.add('show'); modal.style.display = 'block'; }
+        if (backdrop) { backdrop.classList.add('show'); }
+        var closeBtn = document.getElementById('vitals-print-gate-modal-close');
+        if (closeBtn) { closeBtn.focus(); }
+    }, 10);
+
+    function closeGateModal()
+    {
+        if (modal) { modal.classList.remove('show'); }
+        if (backdrop) { backdrop.classList.remove('show'); }
+        setTimeout(function()
+        {
+            if (modal && modal.parentNode) { modal.parentNode.removeChild(modal); }
+            if (backdrop && backdrop.parentNode) { backdrop.parentNode.removeChild(backdrop); }
+        }, 150);
+    }
+
+    var closeBtn = document.getElementById('vitals-print-gate-modal-close');
+    if (closeBtn) { closeBtn.onclick = closeGateModal; }
+
+    var proceedBtn = document.getElementById('vitals-print-gate-modal-proceed');
+    if (proceedBtn)
+    {
+        proceedBtn.onclick = function()
+        {
+            closeGateModal();
+            if (typeof onConfirm === 'function') { onConfirm(); }
+        };
+    }
+
+    if (modal)
+    {
+        modal.addEventListener('keydown', function(e)
+        {
+            if (e.key === 'Escape') { e.preventDefault(); closeGateModal(); }
+        });
+    }
+}
+
 function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_object_path, p_dictionary_path, p_is_grid_context, p_post_html_render, p_search_ctx, p_ctx, p_is_de_identified = false)
 {
 	let style_object = g_default_ui_specification.form_design[p_dictionary_path.substring(1)];
@@ -282,6 +560,8 @@ function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obj
 
   const map_key = convert_object_path_to_jquery_id(p_object_path);
   chart_function_params_map.set(map_key, function_params);
+
+
 
 	p_result.push
 	(
@@ -304,7 +584,7 @@ function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obj
               </th>
             </tr>
             <tr align=center><td>
-			<div id='${map_key}_chart'>
+		<div id='${map_key}_chart'>
             
             </div>
             </td></tr>
@@ -593,6 +873,30 @@ function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obj
 	p_post_html_render.push("  }");
     p_post_html_render.push("  }));");
 
+    p_post_html_render.push(
+        "(function() {" +
+        " var chartEl = document.getElementById('" + map_key + "');" +
+        " if (!chartEl) { return; }" +
+        " var parent = chartEl.parentElement;" +
+        " if (!parent) { return; }" +
+        // Compute the form path prefix for rule scoping: strip array indices so
+        // 'er_visit_and_hospital_medical_records/0/vital_signs' becomes
+        // 'er_visit_and_hospital_medical_records/vital_signs', matching the
+        // field_path prefix used in mmria_validation_rules keys (Bug #4 fix).
+        " var chartFormPath = '" + p_object_path.replace(/\/\d+/g, '') + "';" +
+        " var inputs = parent.querySelectorAll('input.number');" +
+        " for (var i = 0; i < inputs.length; i++) {" +
+        "  var inp = inputs[i];" +
+        "  if (inp.dataset.vitalsValidationAttached) { continue; }" +
+        "  inp.dataset.vitalsValidationAttached = '1';" +
+        "  inp.dataset.chartFormPath = chartFormPath;" +
+        "  inp.addEventListener('blur', function(e) { mmria_vitals_validate_field(e.target); });" +
+        "  inp.addEventListener('keydown', function(e) { if (e.key === 'Tab') { mmria_vitals_validate_field(e.target); } });" +
+        "  inp.addEventListener('paste', (function(t) { return function() { setTimeout(function() { mmria_vitals_validate_field(t); }, 0); }; })(inp));" +
+        " }" +
+        "})();"
+    );
+
 	g_chart_data.set
     (
         `${chart_gen_name}`, 
@@ -718,8 +1022,15 @@ function get_chart_y_range_from_path(p_metadata, p_metadata_path, p_ui, p_label)
 			const val = array[i][field];
 			if(val)
 			{
-                const parsed_value = Number.parseFloat(val);
-                result.push(Number.isFinite(parsed_value) ? parsed_value.toFixed(2) : 'null');
+                if (mmria_vitals_is_out_of_range(field, val))
+                {
+                    result.push('null');
+                }
+                else
+                {
+                    const parsed_value = Number.parseFloat(val);
+                    result.push(Number.isFinite(parsed_value) ? parsed_value.toFixed(2) : 'null');
+                }
 			}
 			else
 			{
@@ -757,10 +1068,17 @@ function get_chart_y_values_from_path(p_metadata, p_metadata_path, p_multiform_i
 			const val = array[i][field];
 			if(val)
 			{
-                const parsed_value = Number.parseFloat(val);
-                if(Number.isFinite(parsed_value))
+                if (mmria_vitals_is_out_of_range(field, val))
                 {
-				    result.push(parsed_value.toFixed(2));
+                    // skip out-of-range values from axis range calculation
+                }
+                else
+                {
+                    const parsed_value = Number.parseFloat(val);
+                    if(Number.isFinite(parsed_value))
+                    {
+                        result.push(parsed_value.toFixed(2));
+                    }
                 }
 			}		
 		}
@@ -1019,10 +1337,14 @@ data.forEach(row => {
   }
   data_table_body_html.push(`<tr><td style="padding-left: 5px;">${date_string.replace(",", "")}</td>`)
   y_axis.forEach(col => {
-    data_table_body_html.push(`<td style="padding-left: 5px;">${row[col.replace(graph_prefix, "")]}</td>`)
+    const fieldName = col.replace(graph_prefix, "");
+    const rawVal = row[fieldName];
+    data_table_body_html.push(`<td style="padding-left: 5px;">${mmria_vitals_is_out_of_range(fieldName, rawVal) ? '<span style="color:#b87a00;font-style:italic;font-size:small;">Out of range</span>' : rawVal}</td>`)
   });
   data_table_body_html.push(`</tr>`);
 });
+
+
 
     el.outerHTML = 	`
         <div id='${convert_object_path_to_jquery_id(params.p_object_path)}'

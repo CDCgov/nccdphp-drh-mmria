@@ -230,6 +230,14 @@ public static class ContainedPathHelper
             throw new ArgumentException("Only a single file or directory name is allowed.", paramName);
         }
 
+        foreach (var character in trimmedValue)
+        {
+            if (!char.IsLetterOrDigit(character) && character is not '-' and not '_' and not '.')
+            {
+                throw new ArgumentException("Path segment contains unsupported characters.", paramName);
+            }
+        }
+
         if (trimmedValue.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
         {
             throw new ArgumentException("Path segment contains invalid filename characters.", paramName);

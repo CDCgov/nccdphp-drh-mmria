@@ -106,7 +106,82 @@ if (top !== self) top.location.replace(self.location.href);
   }
   
   <script src="/scripts/shared/logout-handler.js"></script>
-  
+
+  <!-- System Offline: Warning modal (dismissable) -->
+  <div id="mmria-warn-modal-backdrop" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1040;" aria-hidden="true"></div>
+  <div id="mmria-warn-modal" role="dialog" aria-labelledby="mmria-warn-modal-title" aria-modal="true" aria-describedby="mmria-warn-modal-message" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:1050; overflow:auto;">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header" style="background-color:#7b2d8e; color:white; padding:10px 15px; display:flex; align-items:center; justify-content:space-between;">
+          <h5 class="modal-title" id="mmria-warn-modal-title" style="margin:0; font-weight:600; font-size:17px;">System Notice</h5>
+          <button type="button" class="mmria-warn-close-btn" onclick="closeWarnModal()" aria-label="Close"
+            style="background:none; border:none; color:white; font-size:24px; line-height:1; cursor:pointer; padding:0; opacity:0.9;">
+            &times;
+          </button>
+        </div>
+        <div class="modal-body" style="padding:15px 20px;">
+          <p id="mmria-warn-modal-message" style="margin:0; white-space:pre-wrap;"></p>
+        </div>
+        <div class="modal-footer" style="padding:10px 15px;">
+          <button type="button" class="btn btn-primary mmria-warn-close-btn" onclick="closeWarnModal()">Dismiss</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- System Offline: Going-offline modal (non-dismissable) -->
+  <div id="mmria-offline-modal-backdrop" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1040;" aria-hidden="true"></div>
+  <div id="mmria-offline-modal" role="alertdialog" aria-labelledby="mmria-offline-modal-title" aria-modal="true" aria-describedby="mmria-offline-modal-message" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:1050; overflow:auto;">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header" style="background-color:#7b2d8e; color:white; padding:10px 15px;">
+          <h5 class="modal-title" id="mmria-offline-modal-title" style="margin:0; font-weight:600; font-size:17px;">System Going Offline</h5>
+        </div>
+        <div class="modal-body" style="padding:15px 20px;">
+          <p id="mmria-offline-modal-message" style="margin:0; white-space:pre-wrap;"></p>
+          <p id="mmria-offline-modal-countdown" style="margin:10px 0 0; font-weight:bold; font-size:0.9em;" aria-live="polite"></p>
+        </div>
+        <div class="modal-footer" style="padding:10px 15px;">
+          <button type="button" id="mmria-offline-modal-ok" class="btn btn-primary" onclick="mmria_offline_modal_ok_handler()">OK</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/scripts/system-offline-check.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      // Dismiss warning modal when backdrop is clicked.
+      var warnBackdrop = document.getElementById('mmria-warn-modal-backdrop');
+      if (warnBackdrop) {
+        warnBackdrop.addEventListener('click', function () {
+          if (typeof window.closeWarnModal === 'function') window.closeWarnModal();
+        });
+      }
+
+      // Initial page load: fetch offline status and show modal if threshold is crossed.
+      fetch('/api/system-offline/status', { credentials: 'same-origin' })
+        .then(function (response) {
+          if (!response.ok) return null;
+          return response.json();
+        })
+        .then(function (config) {
+          if (!config) return;
+          // On initial page load/refresh: if the app is already offline, redirect
+          // immediately rather than relying on the modal gate (which blocks re-show).
+          var initialResult = window.checkOfflineStatus(config);
+          if (initialResult.state === 'offline') {
+            window.location.href = '/Account/AppOffline';
+            return;
+          }
+          // runOfflineCheck stores config as last-known fallback and applies state.
+          window.runOfflineCheck(config);
+        })
+        .catch(function () { /* silently ignore network / parse errors */ });
+      // Poll every 2 minutes while the user is on the page.
+      window.startOfflineStatusPolling(120000);    });
+  </script>
+
   @*Html.ReactGetScriptPaths()*@
   @RenderSection("Scripts", false)
   @*Html.ReactInitJavaScript()*@

@@ -8,7 +8,9 @@ using mmria.common.couchdb;
 using mmria.common.model.couchdb;
 using mmria.common.model.couchdb.audit;
 using mmria.common.SharedLibraries.ManageUsers.Model;
+using mmria.common.SharedLibraries.Jurisdiction;
 using System.Text.Json.Serialization;
+using mmria.common.SharedLibraries.Audit;
 
 namespace mmria.common.SharedLibraries.ManageUsers.DAL;
 
@@ -25,211 +27,151 @@ public class ManageUsersDAL
     };
 
     private readonly CouchDbHttpClient _httpClient;
+    private readonly mmria.common.SharedLibraries.Account.IUserRepository _userRepository;
+    private readonly IJurisdictionRepository _jurisdictionRepository;
+    private readonly IAuditRepository _auditRepository;
 
-    public ManageUsersDAL(CouchDbHttpClient httpClient)
+    public ManageUsersDAL(
+        CouchDbHttpClient httpClient,
+        mmria.common.SharedLibraries.Account.IUserRepository userRepository,
+        IJurisdictionRepository jurisdictionRepository,
+        IAuditRepository auditRepository)
     {
         _httpClient = httpClient;
+        _userRepository = userRepository;
+        _jurisdictionRepository = jurisdictionRepository;
+        _auditRepository = auditRepository;
     }
 
     /// <summary>
     /// Get a CouchDB user document by user_id (e.g. "org.couchdb.user:someone").
+    /// Delegates to IUserRepository.
     /// </summary>
-    public async Task<user> GetUserAsync(
+    public Task<user> GetUserAsync(
         string user_id,
         DBConfigurationDetail db_config)
     {
-        string request_string = db_config.url + "/_users/" + user_id;
-        string responseFromServer = await _httpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
-        var result = JsonConvert.DeserializeObject<user>(responseFromServer);
-        return result;
+        return _userRepository.GetUserAsync(user_id, db_config);
     }
 
     /// <summary>
     /// Check if a CouchDB user document exists by user_id.
     /// Returns the user if found, or an empty user object if not found or on error.
-    /// Never returns null.
+    /// Never returns null. Delegates to IUserRepository.
     /// </summary>
-    public async Task<user> CheckUserAsync(
+    public Task<user> CheckUserAsync(
         string user_id,
         DBConfigurationDetail db_config)
     {
-        try
-        {
-            string request_string = db_config.url + "/_users/" + user_id;
-            string responseFromServer = await _httpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
-
-            if(string.IsNullOrWhiteSpace(responseFromServer))
-            {
-                // Empty response (treat as not found)
-                return new user();
-            }
-            else if(responseFromServer.Contains("\"error\"") && responseFromServer.Contains("not_found"))
-            {
-                // CouchDB not_found JSON – return empty object so caller can treat as "available"
-                return new user();
-            }
-            else
-            {
-                return JsonConvert.DeserializeObject<user>(responseFromServer) 
-                       ?? new user();
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine(ex);
-            // Fall back to empty object rather than null
-            return new user();
-        }
+        return _userRepository.CheckUserAsync(user_id, db_config);
     }
 
     /// <summary>
     /// Create or update a CouchDB user document via PUT.
     /// Caller is responsible for setting app_prefix_list before calling.
+    /// Delegates to IUserRepository.
     /// </summary>
-    public async Task<document_put_response> PutUserAsync(
+    public Task<document_put_response> PutUserAsync(
         user user,
         DBConfigurationDetail db_config)
     {
-        string user_db_url = db_config.url + "/_users/" + user._id;
-        string responseFromServer = await _httpClient.ExecuteJsonAsync(
-            "PUT",
-            user_db_url,
-            user,
-            SensitiveJsonPayloadOptions,
-            db_config.user_name,
-            db_config.user_value,
-            "application/json");
-
-        var result = JsonConvert.DeserializeObject<document_put_response>(responseFromServer);
-        return result;
+        return _userRepository.PutUserAsync(user, db_config);
     }
 
     /// <summary>
     /// Delete a CouchDB user document via DELETE.
+    /// Delegates to IUserRepository.
     /// </summary>
-    public async Task<System.Dynamic.ExpandoObject> DeleteUserAsync(
+    public Task<System.Dynamic.ExpandoObject> DeleteUserAsync(
         string user_id,
         string rev,
         DBConfigurationDetail db_config)
     {
-        string request_string = db_config.url + "/_users/" + user_id + "?rev=" + rev;
-        string responseFromServer = await _httpClient.ExecuteAsync("DELETE", request_string, null, db_config.user_name, db_config.user_value);
-        var result = JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(responseFromServer);
-        return result;
+        return _userRepository.DeleteUserAsync(user_id, rev, db_config);
     }
 
     /// <summary>
     /// Bulk create/update user_role_jurisdiction documents via CouchDB _bulk_docs.
     /// </summary>
-    public async Task<List<document_put_response>> BulkUpsertUserRoleJurisdictionsAsync(
+    public Task<List<document_put_response>> BulkUpsertUserRoleJurisdictionsAsync(
         List<user_role_jurisdiction> user_role_jurisdictions,
         DBConfigurationDetail db_config)
     {
-        JsonSerializerSettings settings = new JsonSerializerSettings();
-        settings.NullValueHandling = NullValueHandling.Ignore;
-        string user_role_jurisdictions_json = JsonConvert.SerializeObject(new { docs = user_role_jurisdictions }, settings);
-
-        string bulk_docs_url = db_config.url + $"/{db_config.prefix}jurisdiction/_bulk_docs";
-
-        string responseFromServer = await _httpClient.ExecuteAsync("POST", bulk_docs_url, user_role_jurisdictions_json, db_config.user_name, db_config.user_value);
-        var results = JsonConvert.DeserializeObject<List<document_put_response>>(responseFromServer);
-        return results;
+        return _jurisdictionRepository.BulkUpsertUserRoleJurisdictionsAsync(user_role_jurisdictions, db_config);
     }
 
-    public async Task<get_response_header<user>> GetAllUsersAsync(
+    public Task<get_response_header<user>> GetAllUsersAsync(
         int skip,
         int take,
         DBConfigurationDetail db_config)
     {
-        string request_string = $"{db_config.url}/_users/_all_docs?include_docs=true&skip={skip}&limit={take}";
-        string responseFromServer = await _httpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
-        return JsonConvert.DeserializeObject<get_response_header<user>>(responseFromServer);
+        return _userRepository.GetAllUsersAsync(skip, take, db_config);
     }
 
-    public async Task<get_response_header<user_role_jurisdiction>> GetAllUserRoleJurisdictionsAsync(DBConfigurationDetail db_config)
+    public Task<get_response_header<user_role_jurisdiction>> GetAllUserRoleJurisdictionsAsync(DBConfigurationDetail db_config)
     {
-        string request_string = $"{db_config.url}/{db_config.prefix}jurisdiction/_all_docs?include_docs=true";
-        string responseFromServer = await _httpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
-        return JsonConvert.DeserializeObject<get_response_header<user_role_jurisdiction>>(responseFromServer);
+        return _jurisdictionRepository.GetAllUserRoleJurisdictionsAsync(db_config);
     }
 
-    public async Task<user_role_jurisdiction> GetUserRoleJurisdictionAsync(
+    public Task<user_role_jurisdiction> GetUserRoleJurisdictionAsync(
         string id,
         DBConfigurationDetail db_config)
     {
-        string request_string = $"{db_config.url}/{db_config.prefix}jurisdiction/{id}";
-        string responseFromServer = await _httpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
-        return JsonConvert.DeserializeObject<user_role_jurisdiction>(responseFromServer);
+        return _jurisdictionRepository.GetUserRoleJurisdictionAsync(id, db_config);
     }
 
-    public async Task<document_put_response> PutUserRoleJurisdictionAsync(
+    public Task<document_put_response> PutUserRoleJurisdictionAsync(
         user_role_jurisdiction item,
         DBConfigurationDetail db_config)
     {
-        JsonSerializerSettings settings = new JsonSerializerSettings();
-        settings.NullValueHandling = NullValueHandling.Ignore;
-        string object_string = JsonConvert.SerializeObject(item, settings);
-
-        string request_string = $"{db_config.url}/{db_config.prefix}jurisdiction/{item._id}";
-        string responseFromServer = await _httpClient.ExecuteAsync("PUT", request_string, object_string, db_config.user_name, db_config.user_value);
-        return JsonConvert.DeserializeObject<document_put_response>(responseFromServer);
+        return _jurisdictionRepository.PutUserRoleJurisdictionAsync(item, db_config);
     }
 
-    public async Task<document_put_response> DeleteUserRoleJurisdictionAsync(
+    public Task<document_put_response> DeleteUserRoleJurisdictionAsync(
         string id,
         string rev,
         DBConfigurationDetail db_config)
     {
-        string request_string = $"{db_config.url}/{db_config.prefix}jurisdiction/{id}?rev={rev}";
-        string responseFromServer = await _httpClient.ExecuteAsync("DELETE", request_string, null, db_config.user_name, db_config.user_value);
-        return JsonConvert.DeserializeObject<document_put_response>(responseFromServer);
+        return _jurisdictionRepository.DeleteUserRoleJurisdictionAsync(id, rev, db_config);
     }
 
-    public async Task<get_sortable_view_reponse_header<user_role_jurisdiction>> GetUserRoleJurisdictionSortableViewAsync(
+    public Task<get_sortable_view_reponse_header<user_role_jurisdiction>> GetUserRoleJurisdictionSortableViewAsync(
         string request_string,
         DBConfigurationDetail db_config)
     {
-        string responseFromServer = await _httpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
-        return JsonConvert.DeserializeObject<get_sortable_view_reponse_header<user_role_jurisdiction>>(responseFromServer);
+        return _jurisdictionRepository.GetUserRoleJurisdictionSortableViewAsync(request_string, db_config);
     }
 
-    public async Task<jurisdiction_tree> GetJurisdictionTreeAsync(DBConfigurationDetail db_config)
+    public Task<get_sortable_view_reponse_header<user_role_jurisdiction>> GetUserRoleJurisdictionSortableViewByParamsAsync(
+        int skip,
+        int take,
+        string sortView,
+        bool hasSearchKey,
+        bool descending,
+        DBConfigurationDetail db_config)
     {
-        string request_string = db_config.Get_Prefix_DB_Url("jurisdiction/jurisdiction_tree");
-        string responseFromServer = await _httpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
-        return JsonConvert.DeserializeObject<jurisdiction_tree>(responseFromServer);
+        return _jurisdictionRepository.GetUserRoleJurisdictionSortableViewByParamsAsync(skip, take, sortView, hasSearchKey, descending, db_config);
     }
 
-    public async Task<Audit_Manage_User> GetAuditManageUserAsync(DBConfigurationDetail db_config)
+    public Task<jurisdiction_tree> GetJurisdictionTreeAsync(DBConfigurationDetail db_config)
     {
-        string request_string = $"{db_config.url}/{db_config.prefix}audit/audit-manage-user";
-        string responseFromServer = await _httpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
-
-        if (!string.IsNullOrWhiteSpace(responseFromServer) && responseFromServer.Contains("\"error\":\"not_found\""))
-        {
-            return null;
-        }
-
-        return JsonConvert.DeserializeObject<Audit_Manage_User>(responseFromServer);
+        return _jurisdictionRepository.GetJurisdictionTreeAsync(db_config);
     }
 
-    public async Task<FormAccessSpecification> GetFormAccessAsync(DBConfigurationDetail db_config)
+    public Task<Audit_Manage_User?> GetAuditManageUserAsync(DBConfigurationDetail db_config)
     {
-        string request_string = db_config.Get_Prefix_DB_Url("jurisdiction/form-access-list");
-        string responseFromServer = await _httpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
-        return JsonConvert.DeserializeObject<FormAccessSpecification>(responseFromServer);
+        return _auditRepository.GetAuditManageUserAsync(db_config);
     }
 
-    public async Task<document_put_response> SaveFormAccessAsync(
+    public Task<FormAccessSpecification> GetFormAccessAsync(DBConfigurationDetail db_config)
+    {
+        return _jurisdictionRepository.GetFormAccessAsync(db_config);
+    }
+
+    public Task<document_put_response> SaveFormAccessAsync(
         FormAccessSpecification request,
         DBConfigurationDetail db_config)
     {
-        JsonSerializerSettings settings = new JsonSerializerSettings();
-        settings.NullValueHandling = NullValueHandling.Ignore;
-        string object_string = JsonConvert.SerializeObject(request, settings);
-
-        string request_string = db_config.Get_Prefix_DB_Url("jurisdiction/form-access-list");
-        string responseFromServer = await _httpClient.ExecuteAsync("PUT", request_string, object_string, db_config.user_name, db_config.user_value);
-        return JsonConvert.DeserializeObject<document_put_response>(responseFromServer);
+        return _jurisdictionRepository.SaveFormAccessAsync(request, db_config);
     }
 }

@@ -5,6 +5,8 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Security.Claims;
 using mmria.common.SharedLibraries.Other;
+using mmria.common.SharedLibraries.Jurisdiction;
+using mmria.common.SharedLibraries.Jurisdiction.DAL;
 
 
 namespace mmria.common.utils;
@@ -16,7 +18,7 @@ public static bool is_authorized_to_handle_jurisdiction_id
         mmria.common.couchdb.DBConfigurationDetail db_config,
         System.Security.Claims.ClaimsPrincipal p_claims_principal, 
         mmria.common.SharedLibraries.Other.ResourceRightEnum p_resoure_right_enum,
-        mmria.case_version.v260120.mmria_case p_mmria_case
+        mmria.case_version.v260615.mmria_case p_mmria_case
     )
     {
         return is_authorized_to_handle_jurisdiction_id(
@@ -32,7 +34,7 @@ public static bool is_authorized_to_handle_jurisdiction_id
         mmria.common.couchdb.DBConfigurationDetail db_config,
         System.Security.Claims.ClaimsPrincipal p_claims_principal, 
         mmria.common.SharedLibraries.Other.ResourceRightEnum p_resoure_right_enum,
-        mmria.case_version.v260120.mmria_case p_mmria_case,
+        mmria.case_version.v260615.mmria_case p_mmria_case,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
@@ -203,40 +205,11 @@ public static bool is_authorized_to_handle_jurisdiction_id
         mmria.common.couchdb.DBConfigurationDetail db_config,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
+        var reader = new JurisdictionAuthorizationDAL(couchDbHttpClient);
         return mmria.common.utils.AuthorizationRoleCache.GetOrLoadTenantUserRoles(
             db_config?.prefix,
-            () => LoadUserJurisdictionSet(db_config, couchDbHttpClient));
-    }
-
-    private static HashSet<(string jurisdiction_id, string user_id, string role_name)> LoadUserJurisdictionSet(
-        mmria.common.couchdb.DBConfigurationDetail db_config,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
-    {
-        HashSet<(string,string,string)> result = new HashSet<(string,string,string)>();
-
-        string jurisdicion_view_url = $"{db_config.url}/{db_config.prefix}jurisdiction/_design/sortable/_view/by_user_id";
-        string jurisdicion_result_string = null;
-        try
-        {
-            jurisdicion_result_string = couchDbHttpClient.ExecuteAsync("GET", jurisdicion_view_url, null, db_config.user_name, db_config.user_value, "application/json").Result;
-        }
-        catch(Exception ex)
-        {
-            System.Console.WriteLine(ex);
-            return result;
-        }
-        
-        var jurisdiction_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.user_role_jurisdiction>>(jurisdicion_result_string);
-        foreach(mmria.common.model.couchdb.get_sortable_view_response_item<mmria.common.model.couchdb.user_role_jurisdiction> jvi in jurisdiction_view_response.rows)
-        {
-            if(jvi.key!=null)
-            {
-                result.Add((jvi.value.jurisdiction_id,jvi.value.user_id, jvi.value.role_name));
-            }
-            
-        }
-
-        return result;
+            reader,
+            db_config);
     }
 
     private static mmria.common.getset.CouchDbHttpClient CreateCompatibilityCouchDbHttpClient()

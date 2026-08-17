@@ -7,6 +7,7 @@ using mmria.common.model;
 using System.Net.Http;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
+using mmria.common.SharedLibraries.Jurisdiction;
 
 using  mmria.server.extension;  
 
@@ -19,14 +20,17 @@ public sealed class pinned_casesController : ControllerBase
     mmria.common.couchdb.OverridableConfiguration configuration;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly IJurisdictionRepository _jurisdictionRepository;
     public pinned_casesController
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        IJurisdictionRepository jurisdictionRepository
     )
     {
         _couchDbHttpClient = couchDbHttpClient;
+        _jurisdictionRepository = jurisdictionRepository;
         host_prefix = tenantRuntime.EffectiveHostPrefix;
         configuration = tenantRuntime.RequireConfiguration();
 
@@ -42,7 +46,8 @@ public sealed class pinned_casesController : ControllerBase
             User,
             true,
             false,
-            _couchDbHttpClient
+            _couchDbHttpClient,
+            _jurisdictionRepository
         );
         mmria.common.model.couchdb.pinned_case_set result = await caseViewManager.GetOrCreatePinnedCaseSetAsync();
         return result;
@@ -74,7 +79,8 @@ public sealed class pinned_casesController : ControllerBase
                 User,
                 true,
                 false,
-                _couchDbHttpClient
+                _couchDbHttpClient,
+                _jurisdictionRepository
             );
             result = await caseViewManager.ApplyPinnedCaseMessageAsync(pin_case_message);
 
@@ -120,7 +126,8 @@ public sealed class pinned_casesController : ControllerBase
                     User,
                     true,
                     false,
-                    _couchDbHttpClient
+                    _couchDbHttpClient,
+                    _jurisdictionRepository
                 );
                 result = await caseViewManager.ApplyPinnedCaseMessageAsync(pin_case_message);
 

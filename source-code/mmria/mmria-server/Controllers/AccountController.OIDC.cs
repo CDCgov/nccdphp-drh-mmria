@@ -31,6 +31,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Akka.Actor;
 using mmria.common.SharedLibraries.Session.Model;
 using mmria.common.SharedLibraries.Session.Manager;
+using mmria.common.SharedLibraries.Session;
 
 using mmria.server.Controllers;
 
@@ -77,20 +78,26 @@ public sealed partial class AccountController : Controller
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.Account.IUserRepository _userRepository;
+    private readonly ISessionRepository _sessionRepository;
 
     public AccountController
     (
         IHttpContextAccessor httpContextAccessor,
         mmria.common.SharedLibraries.Session.Manager.SessionManager sessionManager,
+        ISessionRepository sessionRepository,
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.Account.IUserRepository userRepository
     )
     {
         _accessor = httpContextAccessor;
         _sessionManager = sessionManager;
+        _sessionRepository = sessionRepository;
         configuration = tenantRuntime.RequireConfiguration();
         db_config = tenantRuntime.RequireDbConfig();
         _couchDbHttpClient = couchDbHttpClient;
+        _userRepository = userRepository;
 
         host_prefix = tenantRuntime.EffectiveHostPrefix;
 
@@ -99,13 +106,39 @@ public sealed partial class AccountController : Controller
 
 
     [AllowAnonymous] 
-    public ActionResult SignIn()
+    public async Task<ActionResult> SignIn()
     {
-
-        //Response.Cookies.Delete("sid");
-        //Response.Cookies.Delete("expires_at");
-
-        
+        // Guard: redirect to app-offline page if the system is currently offline for this tenant.
+        // This prevents an unnecessary SAMS round-trip when the app is unavailable.
+        try
+        {
+            var vitalsUrl = configuration.GetString("vitals_url", host_prefix)
+                ?.Replace("/api/Message/IJESet", string.Empty);
+            if (!string.IsNullOrWhiteSpace(vitalsUrl))
+            {
+                var requestOptions = new mmria.common.getset.CouchDbRequestOptions
+                {
+                    VitalServiceKey = configuration.GetString("vital_service_key", host_prefix)
+                };
+                var json = await _couchDbHttpClient.ExecuteAsync(
+                    "GET", $"{vitalsUrl}/api/systemOffline/GetSystemOfflineConfig",
+                    null, "application/json", requestOptions);
+                var cfg = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.SystemOfflineConfig>(json);
+                if (cfg != null)
+                {
+                    bool affectsThisTenant = cfg.apply_to_all_jurisdictions ||
+                        (cfg.selected_jurisdictions ?? new List<string>())
+                            .Contains(host_prefix, StringComparer.OrdinalIgnoreCase);
+                    bool isOffline = !string.IsNullOrWhiteSpace(cfg.offline_date) &&
+                        DateTime.TryParse(cfg.offline_date, null,
+                            System.Globalization.DateTimeStyles.RoundtripKind, out var offlineDate) &&
+                        DateTime.UtcNow >= offlineDate.ToUniversalTime();
+                    if (affectsThisTenant && isOffline)
+                        return RedirectToAction("AppOffline");
+                }
+            }
+        }
+        catch { /* if the offline check fails, proceed with the normal SAMS redirect */ }
 
         var sams_endpoint_authorization = configuration.GetString("sams:endpoint_authorization",host_prefix);
         var sams_client_id = sams_config.client_id;
@@ -242,7 +275,7 @@ public sealed partial class AccountController : Controller
 
         //check if user exists
         var config_couchdb_url = db_config.url;
-        var config_timer_user_name =db_config.user_name;
+        var config_timer_user_name = db_config.user_name;
         var config_timer_value = db_config.user_value;
 
         var session_idle_timeout_minutes = mmria.server.util.SessionTimeoutHelper.GetSessionIdleTimeoutMinutes(
@@ -252,19 +285,10 @@ public sealed partial class AccountController : Controller
         mmria.common.model.couchdb.user user = null;
         try
         {
-            string request_string = $"{config_couchdb_url}/_users/{Uri.EscapeDataString("org.couchdb.user:" + email.ToLower())}";
-            var responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                "GET",
-                request_string,
-                null,
-                config_timer_user_name,
-                config_timer_value
-            );
+            user = await _userRepository.GetCouchDbUserAsync(email.ToLower(), db_config);
 
-            user = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.user>(responseFromServer);
-
-            // CouchDbHttpClient.ExecuteAsync does not throw on 404 - it returns the error JSON body.
-            // That deserializes into a non-null user object whose 'name' is null. Treat it as not-found.
+            // GetCouchDbUserAsync returns null on exception.
+            // A 404 body with no name deserializes to a non-null user with null name; treat as not-found.
             if (user != null && string.IsNullOrWhiteSpace(user.name))
             {
                 Console.WriteLine($"_users GET for {email?.ToLower()} returned a payload with no name field; treating as not-found.");
@@ -273,7 +297,7 @@ public sealed partial class AccountController : Controller
         }
         catch(Exception ex)
         {
-            Console.WriteLine (ex);
+            Console.WriteLine(ex);
 
         } 
 
@@ -298,17 +322,7 @@ public sealed partial class AccountController : Controller
                     is_app_prefix_ok = true;
                 }
 
-                string user_db_url = $"{config_couchdb_url}/_users/{Uri.EscapeDataString(user._id)}";
-                var responseFromServer = await _couchDbHttpClient.ExecuteJsonAsync(
-                    "PUT",
-                    user_db_url,
-                    user,
-                    SensitiveJsonPayloadOptions,
-                    config_timer_user_name,
-                    config_timer_value,
-                    "application/json"
-                );
-                user_save_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
+                user_save_result = await _userRepository.PutUserAsync(user, db_config);
 
             }
             catch(Exception ex) 
@@ -414,17 +428,9 @@ public sealed partial class AccountController : Controller
             settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
             var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(Session_Message, settings);
 
-            string request_string = config_couchdb_url + $"/{db_config.prefix}session/{Session_Message._id}";
             try
             {
-                string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                    "PUT",
-                    request_string,
-                    object_string,
-                    config_timer_user_name,
-                    config_timer_value
-                );
-                var result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
+                var result = await _sessionRepository.SaveSessionRawAsync(Session_Message._id, object_string, db_config);
 
                 if(result.ok)
                 {

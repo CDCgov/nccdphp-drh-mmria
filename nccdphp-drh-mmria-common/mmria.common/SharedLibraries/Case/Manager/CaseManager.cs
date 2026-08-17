@@ -4,7 +4,7 @@ using System.Dynamic;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
-using mmria.case_version.v260120;
+using mmria.case_version.v260615;
 using mmria.common.couchdb;
 using mmria.common.getset;
 using mmria.common.model.couchdb;
@@ -110,10 +110,14 @@ public sealed class UpdateMaidenNameResult
 public class CaseManager
 {
     private readonly CouchDbHttpClient _couchDbHttpClient;
+    private readonly ICaseRepository _caseRepository;
+    private readonly mmria.common.SharedLibraries.Audit.IAuditRepository _auditRepository;
 
-    public CaseManager(CouchDbHttpClient couchDbHttpClient)
+    public CaseManager(CouchDbHttpClient couchDbHttpClient, ICaseRepository caseRepository, mmria.common.SharedLibraries.Audit.IAuditRepository auditRepository)
     {
         _couchDbHttpClient = couchDbHttpClient;
+        _caseRepository = caseRepository;
+        _auditRepository = auditRepository;
     }
 
     public async Task<UpdateYearOfDeathResult> UpdateYearOfDeathAsync(
@@ -229,6 +233,8 @@ public class CaseManager
 
         var case_response = CaseJsonSerialization.DeserializeMmriaCase(responseFromServer);
 
+        var oldYear = case_response.home_record.date_of_death.year;
+
         if (yearOfDeathReplacement.HasValue)
             case_response.home_record.date_of_death.year = yearOfDeathReplacement.Value;
 
@@ -281,6 +287,35 @@ public class CaseManager
             result.StatusText = "(blank)";
             result.IsSuccessful = true;
             result.StatusCode = 200;
+
+            if (yearOfDeathReplacement.HasValue)
+            {
+                var auditDbConfig = role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase)
+                    ? dbConfigSet.detail_list[stateDatabase]
+                    : db_config;
+                var changeStack = new Change_Stack
+                {
+                    _id = Guid.NewGuid().ToString(),
+                    case_id = caseId,
+                    user_name = userName,
+                    note = "admin change, year of death updated",
+                    date_created = DateTime.UtcNow,
+                    doc_type = "Change_Stack",
+                    items = new List<Change_Stack_Item>
+                    {
+                        new Change_Stack_Item
+                        {
+                            user_name = userName,
+                            prompt = "Year of Death",
+                            object_path = "/home_record/date_of_death/year",
+                            old_value = oldYear.ToString(),
+                            new_value = yearOfDeathReplacement.Value.ToString(),
+                            doc_type = "Change_Stack_Item"
+                        }
+                    }
+                };
+                await _auditRepository.WriteAuditEntryAsync(changeStack, auditDbConfig);
+            }
         }
         else
         {
@@ -415,6 +450,7 @@ public class CaseManager
                     var certificate_identification = death_certificate["certificate_identification"] as IDictionary<string, object>;
                     if (certificate_identification != null)
                     {
+                        var oldMaidenName = certificate_identification.TryGetValue("dmaiden", out var dMaidenValue) ? dMaidenValue?.ToString() ?? "" : "";
                         dictionary["last_updated_by"] = userName;
                         dictionary["date_last_updated"] = DateTime.Now;
                         certificate_identification["dmaiden"] = maidenNameReplacement;
@@ -452,6 +488,36 @@ public class CaseManager
                             result.StatusText = "(blank)";
                             result.IsSuccessful = true;
                             result.StatusCode = 200;
+
+                            var auditDbConfig = role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase)
+                                ? dbConfigSet.detail_list[stateDatabase]
+                                : db_config;
+                            var changeStack = new Change_Stack
+                            {
+                                _id = Guid.NewGuid().ToString(),
+                                case_id = caseId,
+                                user_name = userName,
+                                note = "admin change, maiden name updated",
+                                date_created = DateTime.UtcNow,
+                                doc_type = "Change_Stack",
+                                items = new List<Change_Stack_Item>
+                                {
+                                    new Change_Stack_Item
+                                    {
+                                        user_name = userName,
+                                        date_created = DateTime.UtcNow,
+                                        prompt = "Maiden Name",
+                                        object_path = "g_data.death_certificate.certificate_identification.dmaiden",
+                                        metadata_path = "/death_certificate/certificate_identification/dmaiden",
+                                        dictionary_path = "/death_certificate/certificate_identification/dmaiden",
+                                        metadata_type = "string",
+                                        old_value = oldMaidenName,
+                                        new_value = maidenNameReplacement,
+                                        doc_type = "Change_Stack_Item"
+                                    }
+                                }
+                            };
+                            await _auditRepository.WriteAuditEntryAsync(changeStack, auditDbConfig);
                         }
                         else
                         {
@@ -589,56 +655,7 @@ public class CaseManager
             return false;
         }
 
-        try
-        {
-            // System.Text.Json escapes " inside the recordId via JsonEncodedText, so any
-            // weird input cannot break out of the selector.
-            var selectorPayload = new
-            {
-                selector = new
-                {
-                    record_id = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-                    {
-                        ["$eq"] = recordId
-                    }
-                },
-                fields = new[] { "_id" },
-                limit = 1
-            };
-
-            string payload = JsonConvert.SerializeObject(selectorPayload);
-            string findUrl = $"{dbInfo.url}/{dbInfo.prefix}mmrds/_find";
-
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                "POST",
-                findUrl,
-                payload,
-                dbInfo.user_name,
-                dbInfo.user_value,
-                "application/json");
-
-            if (string.IsNullOrEmpty(responseFromServer))
-            {
-                return false;
-            }
-
-            using var doc = System.Text.Json.JsonDocument.Parse(responseFromServer);
-            if (doc.RootElement.TryGetProperty("docs", out var docsElement) &&
-                docsElement.ValueKind == System.Text.Json.JsonValueKind.Array)
-            {
-                return docsElement.GetArrayLength() > 0;
-            }
-        }
-        catch (Exception ex)
-        {
-            // On error, fall back to "exists" so the caller picks a different candidate id.
-            // Worse case: one extra random suffix attempt — far cheaper than the original
-            // 25k-row fetch fallback.
-            Console.WriteLine($"RecordIdExistsAsync error for record_id={recordId}: {ex.Message}");
-            return true;
-        }
-
-        return false;
+        return await _caseRepository.RecordIdExistsAsync(recordId, dbInfo);
     }
 
     public async Task<string> GetRecordIdReplacementForYearOfDeathAsync(
@@ -650,16 +667,21 @@ public class CaseManager
     {
         DBConfigurationDetail db_info = null;
 
-        if (role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase))
+        if (dbConfigSet?.detail_list != null &&
+            !string.IsNullOrWhiteSpace(stateDatabase) &&
+            dbConfigSet.detail_list.TryGetValue(stateDatabase, out var resolved_db_info))
         {
-            db_info = dbConfigSet.detail_list[stateDatabase];
-        }
-        else if (role.Equals("jurisdiction_admin", StringComparison.OrdinalIgnoreCase))
-        {
-            db_info = dbConfigSet.detail_list[stateDatabase];
+            db_info = resolved_db_info;
         }
 
-        var array = recordId.Split('-');
+        var array = recordId?.Split('-') ?? Array.Empty<string>();
+        if (array.Length < 3)
+        {
+            // Record ID does not follow the expected STATE-YEAR-NUMBER pattern;
+            // return it unchanged rather than crashing.
+            return recordId ?? string.Empty;
+        }
+
         string new_record_id = $"{array[0]}-{yearOfDeathReplacement}-{array[2]}";
 
         // Per-candidate existence check rather than loading every record_id in the
@@ -798,16 +820,7 @@ public class CaseManager
     {
         if (!string.IsNullOrWhiteSpace(caseId))
             {
-                string request_string = dbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}");
-                string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                    "GET",
-                    request_string,
-                    null,
-                    dbConfig.user_name,
-                    dbConfig.user_value
-                );
-
-                var result = CaseJsonSerialization.DeserializeMmriaCase(responseFromServer);
+                var result = await _caseRepository.GetCaseAsync(caseId, dbConfig);
 
                 if (authorization_case.is_authorized_to_handle_jurisdiction_id(dbConfig, user, ResourceRightEnum.ReadCase, result, _couchDbHttpClient))
                 {
@@ -921,21 +934,14 @@ public class CaseManager
             string existing_offline_by_tab_id = null;
             try
             {
-                var check_document_response = await _couchDbHttpClient.ExecuteForResponseAsync(
-                    "GET",
-                    dbConfig.Get_Prefix_DB_Url($"mmrds/{id_val}"),
-                    null,
-                    dbConfig.user_name,
-                    dbConfig.user_value
-                );
+                var (checkStatusCode, check_document_json) = await _caseRepository.GetCaseDocumentWithStatusAsync(id_val, dbConfig);
 
-                if (check_document_response.StatusCode == 404)
+                if (checkStatusCode == 404)
                 {
                     // New case: CouchDB returns not_found for the existence probe.
                 }
-                else if (check_document_response.StatusCode == 200)
+                else if (checkStatusCode == 200)
                 {
-                    var check_document_json = check_document_response.Body;
                     var check_document_jobject = JObject.Parse(check_document_json);
                     var check_document_expando_object = JsonConvert.DeserializeObject<ExpandoObject>(check_document_json);
                     IDictionary<string, object> result_dictionary = check_document_expando_object as IDictionary<string, object>;
@@ -968,7 +974,7 @@ public class CaseManager
                 else
                 {
                     response.ok = false;
-                    response.error_description = $"Unable to verify existing case before save. CouchDB returned HTTP {check_document_response.StatusCode} for case {id_val}.";
+                    response.error_description = $"Unable to verify existing case before save. CouchDB returned HTTP {checkStatusCode} for case {id_val}.";
                     result.Response = response;
                     return result;
                 }
@@ -1036,6 +1042,18 @@ public class CaseManager
             caseData.last_updated_by = userName;
             caseData.date_last_updated = DateTime.Now;
 
+            // Detect rev conflict: reject the save when the client's revision is stale (Story 12.4).
+            // Both must be valid CouchDB revisions and they must differ for this to be a conflict.
+            if (CouchDbRevisionHelper.IsValidRevision(caseData._rev) &&
+                CouchDbRevisionHelper.IsValidRevision(existingRevision) &&
+                !string.Equals(caseData._rev.Trim(), existingRevision.Trim(), StringComparison.Ordinal))
+            {
+                response.ok = false;
+                response.error_description = "(409) Conflict - case has been updated since you last loaded it.";
+                result.Response = response;
+                return result;
+            }
+
             var caseRevisionHandling = DescribeRevisionHandling(caseData._rev, existingRevision);
             caseData._rev = CouchDbRevisionHelper.ResolveServerOwnedRevision(caseData._rev, existingRevision);
             var changeStackRevisionHandling = DescribeIncomingRevisionHandling(changeStack._rev);
@@ -1060,8 +1078,8 @@ public class CaseManager
 
             // Sliding edit lock: if the incoming payload still indicates the case is checked out,
             // refresh the checkout timestamp to extend the lock window.
-            // If the client is clearing the lock, strip the tab id before persisting so the
-            // saved document is fully unlocked after the owner-tab validation above succeeds.
+            // If the client is clearing the lock, strip all three checkout fields before persisting
+            // so the saved document is fully unlocked after the owner-tab validation above succeeds.
             if (caseData.date_last_checked_out.HasValue)
             {
                 caseData.date_last_checked_out = DateTime.UtcNow;
@@ -1069,6 +1087,20 @@ public class CaseManager
             else
             {
                 caseData.checked_out_by_tab_id = null;
+                caseData.last_checked_out_by = null;
+            }
+
+            // Normalize empty strings to null so NullValueHandling.Ignore removes the fields
+            // from the stored document. An empty string is not a valid tab id or user name and
+            // must not be persisted, otherwise the open-case Mango query produces false positives.
+            if (string.IsNullOrEmpty(caseData.checked_out_by_tab_id))
+            {
+                caseData.checked_out_by_tab_id = null;
+            }
+
+            if (string.IsNullOrEmpty(caseData.last_checked_out_by))
+            {
+                caseData.last_checked_out_by = null;
             }
 
             var object_string = CaseJsonSerialization.SerializeMmriaCase(caseData);
@@ -1077,14 +1109,7 @@ public class CaseManager
                 string save_response_from_server = null;
                 try
                 {
-                    string metadata_url = dbConfig.Get_Prefix_DB_Url($"mmrds/{id_val}");
-                    save_response_from_server = await _couchDbHttpClient.ExecuteAsync(
-                        "PUT",
-                        metadata_url,
-                        object_string,
-                        dbConfig.user_name,
-                        dbConfig.user_value
-                    );
+                    save_response_from_server = await _caseRepository.PutCaseDocumentJsonAsync(id_val, object_string, dbConfig);
                     response = JsonConvert.DeserializeObject<document_put_response>(save_response_from_server);
                     result.Response = response;
                 }
@@ -1118,32 +1143,7 @@ public class CaseManager
                 changeStack.record_id = mmria_record_id;
                 changeStack.metadata_version = configuration.GetString("metadata_version", hostPrefix);
 
-                JsonSerializerSettings auditSettings = new JsonSerializerSettings();
-                auditSettings.NullValueHandling = NullValueHandling.Ignore;
-                var audit_string = JsonConvert.SerializeObject(changeStack, auditSettings);
-
-                string audit_url = dbConfig.Get_Prefix_DB_Url($"audit/{changeStack._id}");
-                try
-                {
-                    string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                        "PUT",
-                        audit_url,
-                        audit_string,
-                        dbConfig.user_name,
-                        dbConfig.user_value
-                    );
-                    var audit_result = JsonConvert.DeserializeObject<document_put_response>(responseFromServer);
-                    if (audit_result == null || !audit_result.ok)
-                    {
-                        Console.WriteLine(
-                            $"Audit save failed for case {id_val}, audit {changeStack._id}: rev={changeStackRevisionHandling}; response={responseFromServer}");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine(
-                        $"Audit save threw for case {id_val}, audit {changeStack._id}: {ex.Message}");
-                }
+                await _auditRepository.WriteAuditEntryAsync(changeStack, dbConfig);
 
                 // Store the case ID and serialized case for the controller to dispatch sync message
                 result.CaseId = id_val;
@@ -1200,13 +1200,7 @@ public class CaseManager
         string documentJson;
         try
         {
-            documentJson = await _couchDbHttpClient.ExecuteAsync(
-                "GET",
-                dbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}"),
-                null,
-                dbConfig.user_name,
-                dbConfig.user_value
-            );
+            documentJson = await _caseRepository.GetCaseDocumentJsonAsync(caseId, dbConfig);
         }
         catch (Exception ex)
         {
@@ -1227,6 +1221,9 @@ public class CaseManager
             return result;
         }
 
+        // Capture the lock holder before clearing for the audit record.
+        var previousLockedBy = doc.Value<string>("last_checked_out_by") ?? "";
+
         // Admin operation: always clear lock fields regardless of current owner or tab.
         doc.Remove("date_last_checked_out");
         doc.Remove("last_checked_out_by");
@@ -1236,13 +1233,7 @@ public class CaseManager
 
         try
         {
-            var save_response_from_server = await _couchDbHttpClient.ExecuteAsync(
-                "PUT",
-                dbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}"),
-                updatedJson,
-                dbConfig.user_name,
-                dbConfig.user_value
-            );
+            var save_response_from_server = await _caseRepository.PutCaseDocumentJsonAsync(caseId, updatedJson, dbConfig);
 
             var putResponse = JsonConvert.DeserializeObject<document_put_response>(save_response_from_server);
             if (putResponse?.ok == true)
@@ -1252,6 +1243,34 @@ public class CaseManager
                 result.Message = "Lock force-released.";
                 result.CaseId = caseId;
                 result.SerializedCase = updatedJson;
+
+                var changeStack = new Change_Stack
+                {
+                    _id = Guid.NewGuid().ToString(),
+                    case_id = caseId,
+                    user_name = userName,
+                    note = "admin change, case lock force-released",
+                    date_created = DateTime.UtcNow,
+                    doc_type = "Change_Stack",
+                    items = new List<Change_Stack_Item>
+                    {
+                        new Change_Stack_Item
+                        {
+                            user_name = userName,
+                            date_created = DateTime.UtcNow,
+                            prompt = "Case Lock",
+                            object_path = "g_data.last_checked_out_by",
+                            metadata_path = "/last_checked_out_by",
+                            dictionary_path = "/last_checked_out_by",
+                            metadata_type = "string",
+                            old_value = previousLockedBy,
+                            new_value = "",
+                            doc_type = "Change_Stack_Item"
+                        }
+                    }
+                };
+                await _auditRepository.WriteAuditEntryAsync(changeStack, dbConfig);
+
                 return result;
             }
 
@@ -1328,7 +1347,7 @@ public class CaseManager
                     return result;
                 }
 
-                var conflictingSoftLockCaseId = await new CaseDAL(_couchDbHttpClient)
+                var conflictingSoftLockCaseId = await _caseRepository
                     .GetSoftLockedCaseIdForUserInAnotherTabAsync(userName, currentTabId, dbConfig);
 
                 if (!string.IsNullOrWhiteSpace(conflictingSoftLockCaseId) &&
@@ -1342,13 +1361,7 @@ public class CaseManager
             }
 
             // Get the current case document
-            var case_response = await _couchDbHttpClient.ExecuteAsync(
-                "GET",
-                dbConfig.url + $"/{dbConfig.prefix}mmrds/" + caseId,
-                null,
-                dbConfig.user_name,
-                dbConfig.user_value
-            );
+            var case_response = await _caseRepository.GetCaseDocumentJsonAsync(caseId, dbConfig);
             Console.WriteLine($"Case response length: {case_response?.Length ?? 0}");
 
             if (string.IsNullOrEmpty(case_response))
@@ -1546,13 +1559,7 @@ public class CaseManager
             var json_string = JsonConvert.SerializeObject(case_document);
             Console.WriteLine($"Serialized document length: {json_string.Length}");
 
-            var save_response = await _couchDbHttpClient.ExecuteAsync(
-                "PUT",
-                dbConfig.url + $"/{dbConfig.prefix}mmrds/" + caseId,
-                json_string,
-                dbConfig.user_name,
-                dbConfig.user_value
-            );
+            var save_response = await _caseRepository.PutCaseDocumentJsonAsync(caseId, json_string, dbConfig);
             Console.WriteLine($"Save response: {save_response}");
 
             if (string.IsNullOrEmpty(save_response))
@@ -1661,6 +1668,10 @@ public class CaseManager
             return result;
         }
 
+        // Capture the offline owner before clearing for the audit record.
+        var previousOfflineBy = caseDocument.GetValueOrDefault("offline_by")?.ToString() ?? "";
+        var previousLockedBy = caseDocument.GetValueOrDefault("last_checked_out_by")?.ToString() ?? "";
+
         caseDocument["is_offline"] = false;
         caseDocument.Remove("offline_date");
         caseDocument.Remove("offline_by");
@@ -1697,6 +1708,55 @@ public class CaseManager
         result.Message = "Offline and case locks removed.";
         result.CaseId = caseId;
         result.SerializedCase = jsonString;
+
+        var auditItems = new List<Change_Stack_Item>();
+        if (currentOfflineState)
+        {
+            auditItems.Add(new Change_Stack_Item
+            {
+                user_name = userName,
+                date_created = DateTime.UtcNow,
+                prompt = "Offline Lock",
+                object_path = "g_data.is_offline",
+                metadata_path = "/is_offline",
+                dictionary_path = "/is_offline",
+                metadata_type = "string",
+                old_value = previousOfflineBy,
+                new_value = "",
+                doc_type = "Change_Stack_Item"
+            });
+        }
+        if (!string.IsNullOrWhiteSpace(previousLockedBy))
+        {
+            auditItems.Add(new Change_Stack_Item
+            {
+                user_name = userName,
+                date_created = DateTime.UtcNow,
+                prompt = "Case Lock",
+                object_path = "g_data.last_checked_out_by",
+                metadata_path = "/last_checked_out_by",
+                dictionary_path = "/last_checked_out_by",
+                metadata_type = "string",
+                old_value = previousLockedBy,
+                new_value = "",
+                doc_type = "Change_Stack_Item"
+            });
+        }
+        if (auditItems.Count > 0)
+        {
+            var changeStack = new Change_Stack
+            {
+                _id = Guid.NewGuid().ToString(),
+                case_id = caseId,
+                user_name = userName,
+                note = "admin change, offline and case locks removed",
+                date_created = DateTime.UtcNow,
+                doc_type = "Change_Stack",
+                items = auditItems
+            };
+            await _auditRepository.WriteAuditEntryAsync(changeStack, dbConfig);
+        }
+
         return result;
     }
 
@@ -1854,18 +1914,11 @@ public class CaseManager
             return result;
         }
 
-        var requestUrl = dbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}");
-
         // Best-effort retry on CouchDB 409 conflicts.
         for (var attempt = 0; attempt < 3; attempt++)
         {
             string documentJson;
-            documentJson = await _couchDbHttpClient.ExecuteAsync(
-                "GET",
-                requestUrl,
-                null,
-                dbConfig.user_name,
-                dbConfig.user_value);
+            documentJson = await _caseRepository.GetCaseDocumentJsonAsync(caseId, dbConfig);
 
             if (string.IsNullOrWhiteSpace(documentJson) || documentJson.Contains("\"error\""))
             {
@@ -1960,12 +2013,7 @@ public class CaseManager
             doc["last_updated_by"] = userName;
 
             var updatedJson = doc.ToString(Formatting.None);
-            var putResponseJson = await _couchDbHttpClient.ExecuteAsync(
-                "PUT",
-                requestUrl,
-                updatedJson,
-                dbConfig.user_name,
-                dbConfig.user_value);
+            var putResponseJson = await _caseRepository.PutCaseDocumentJsonAsync(caseId, updatedJson, dbConfig);
 
             document_put_response putResponse = null;
             if (!string.IsNullOrWhiteSpace(putResponseJson) && putResponseJson.TrimStart().StartsWith("{"))
@@ -2032,13 +2080,7 @@ public class CaseManager
                     u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name)).FindFirst(System.Security.Claims.ClaimTypes.Name).Value;
             }
 
-            string request_string = null;
-
-            if (!string.IsNullOrWhiteSpace(caseId) && !string.IsNullOrWhiteSpace(rev))
-            {
-                request_string = dbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}?rev={rev}");
-            }
-            else
+            if (string.IsNullOrWhiteSpace(caseId) || string.IsNullOrWhiteSpace(rev))
             {
                 result.ErrorMessage = "Case ID and revision are required";
                 result.StatusCode = 400;
@@ -2048,13 +2090,7 @@ public class CaseManager
             string document_json = null;
             try
             {
-                document_json = await _couchDbHttpClient.ExecuteAsync(
-                    "GET",
-                    dbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}"),
-                    null,
-                    dbConfig.user_name,
-                    dbConfig.user_value
-                );
+                document_json = await _caseRepository.GetCaseDocumentJsonAsync(caseId, dbConfig);
                 var check_docuement_curl_result = JsonConvert.DeserializeObject<ExpandoObject>(document_json);
                 IDictionary<string, object> result_dictionary = check_docuement_curl_result as IDictionary<string, object>;
                 
@@ -2148,7 +2184,6 @@ public class CaseManager
                     var storedRev = result_dictionary["_rev"]?.ToString();
                     if (!string.IsNullOrWhiteSpace(storedRev))
                     {
-                        request_string = dbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}?rev={storedRev}");
                         rev = storedRev;
                     }
                 }
@@ -2177,13 +2212,7 @@ public class CaseManager
                 return result;
             }
 
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                "DELETE",
-                request_string,
-                null,
-                dbConfig.user_name,
-                dbConfig.user_value
-            );
+            string responseFromServer = await _caseRepository.DeleteCaseAsync(caseId, rev, dbConfig);
             var delete_result = JsonConvert.DeserializeObject<ExpandoObject>(responseFromServer);
 
             var audit_data = new Change_Stack()
@@ -2200,34 +2229,13 @@ public class CaseManager
                 first_name = first_name,
                 last_name = last_name,
 
-                note = "deleted case",
+                note = "case deleted",
 
                 metadata_version = "",
                 date_created = DateTime.UtcNow,
             };
 
-            JsonSerializerSettings settings = new JsonSerializerSettings();
-            settings.NullValueHandling = NullValueHandling.Ignore;
-
-            var audit_string = JsonConvert.SerializeObject(audit_data, settings);
-
-            string audit_url = dbConfig.Get_Prefix_DB_Url($"audit/{audit_data._id}");
-
-            try
-            {
-                string save_delete_audit_response = await _couchDbHttpClient.ExecuteAsync(
-                    "PUT",
-                    audit_url,
-                    audit_string,
-                    dbConfig.user_name,
-                    dbConfig.user_value
-                );
-                var audit_result = JsonConvert.DeserializeObject<document_put_response>(save_delete_audit_response);
-            }
-            catch(Exception ex)
-            {
-                Console.Write($"problem saving audit\n{ex}");
-            }
+            await _auditRepository.WriteAuditEntryAsync(audit_data, dbConfig);
 
             result.IsSuccessful = true;
             result.StatusCode = 200;

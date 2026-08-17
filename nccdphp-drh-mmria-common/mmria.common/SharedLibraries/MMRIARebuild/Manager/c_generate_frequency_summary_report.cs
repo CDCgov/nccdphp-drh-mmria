@@ -130,6 +130,9 @@ prenatal/routine_monitoring/date_and_time
     mmria.common.couchdb.DBConfigurationDetail db_config = null;
     private readonly System.Dynamic.ExpandoObject _source_object;
     private readonly mmria.common.metadata.app _metadata;
+    private readonly mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository _metadataRepository;
+    private readonly string _documentId;
+    private readonly string _hostPrefix;
 
     string data_type = "frequency_summary";
 
@@ -161,8 +164,11 @@ prenatal/routine_monitoring/date_and_time
         string p_metadata_version,
         mmria.common.couchdb.DBConfigurationDetail _db_config,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository metadataRepository,
         System.Dynamic.ExpandoObject p_source_object = null,
-        mmria.common.metadata.app p_metadata = null
+        mmria.common.metadata.app p_metadata = null,
+        string documentId = null,
+        string hostPrefix = null
     )
     {
 
@@ -173,6 +179,9 @@ prenatal/routine_monitoring/date_and_time
         _couchDbHttpClient = couchDbHttpClient;
         _source_object = p_source_object;
         _metadata = p_metadata;
+        _metadataRepository = metadataRepository;
+        _documentId = documentId;
+        _hostPrefix = hostPrefix;
     }
 
     public async System.Threading.Tasks.Task<string> executeAsync ()
@@ -181,13 +190,7 @@ prenatal/routine_monitoring/date_and_time
 
         var gs = new migrate.C_Get_Set_Value(new ());
         
-        var metadata = _metadata;
-        if(metadata == null)
-        {
-            string metadata_url = db_config.url + $"/metadata/version_specification-{metadata_version}/metadata";
-            string metadata_response = await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, db_config.user_name, db_config.user_value);
-            metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_response);
-        }
+        var metadata = _metadata ?? await _metadataRepository.GetAppDocumentAsync(metadata_version, db_config);
 
 		System.Dynamic.ExpandoObject source_object = _source_object ?? Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (source_json);
 
@@ -673,7 +676,7 @@ prenatal/routine_monitoring/date_and_time
                             }
                             catch(Exception ex)
                             {
-                                System.Console.WriteLine($"Calc_Date setting DateOnly error \n{ex}");
+                                System.Console.WriteLine($"[DbRebuildError] [tenant:{_hostPrefix}] [case:{_documentId}] [path:{path}] Calc_Date setting DateOnly error — {ex.GetType().Name}: {ex.Message}");
                             }
 
                         }
@@ -691,7 +694,7 @@ prenatal/routine_monitoring/date_and_time
                 }
                 catch(Exception ex)
                 {
-                    System.Console.WriteLine($"Calc_Date on Group Field error \n{ex}");
+                    System.Console.WriteLine($"[DbRebuildError] [tenant:{_hostPrefix}] [case:{_documentId}] [path:{path}] Calc_Date on Group Field error — {ex.GetType().Name}: {ex.Message}");
                 }
 
                 for(var i = 0; i < p_node.children.Count(); i++)

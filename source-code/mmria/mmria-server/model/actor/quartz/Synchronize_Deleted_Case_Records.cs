@@ -4,6 +4,9 @@ using System.Linq;
 using System.Threading.Tasks;
 using Akka.Actor;
 using mmria.server.model.actor;
+using mmria.common.SharedLibraries.Case;
+using mmria.common.SharedLibraries.DeIdentified;
+using mmria.common.SharedLibraries.Report;
 
 namespace mmria.server.model.actor.quartz;
 
@@ -14,15 +17,24 @@ public sealed class Synchronize_Deleted_Case_Records : ReceiveActor
 	mmria.common.couchdb.DBConfigurationDetail db_config = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly mmria.server.model.TenantChangeSequenceState _changeSequenceState;
+    private readonly ICaseRepository _caseRepository;
+    private readonly IDeIdentifiedRepository _deIdentifiedRepository;
+    private readonly IReportRepository _reportRepository;
 
     public Synchronize_Deleted_Case_Records
     (
         mmria.common.couchdb.DBConfigurationDetail _db_config,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        ICaseRepository caseRepository,
+        IDeIdentifiedRepository deIdentifiedRepository,
+        IReportRepository reportRepository
     )
     {
         db_config = _db_config;
         _couchDbHttpClient = couchDbHttpClient;
+        _caseRepository = caseRepository;
+        _deIdentifiedRepository = deIdentifiedRepository;
+        _reportRepository = reportRepository;
         _changeSequenceState = Program.GetTenantChangeSequenceState(
             mmria.server.model.TenantChangeSequenceState.KeyFor(db_config));
 
@@ -32,50 +44,28 @@ public sealed class Synchronize_Deleted_Case_Records : ReceiveActor
     {
         Console.WriteLine($"Synchronize_Deleted_Case_Records {System.DateTime.Now}");
 
-        mmria.server.model.couchdb.c_change_result latest_change_set = await GetJobInfo(_changeSequenceState.LastChangeSequence, scheduleInfo);
+        CaseChangeFeedResult latest_change_set = await _caseRepository.GetCaseChangesSinceAsync(_changeSequenceState.LastChangeSequence, db_config);
 
             Dictionary<string, KeyValuePair<string,bool>> response_results = new Dictionary<string, KeyValuePair<string,bool>> (StringComparer.OrdinalIgnoreCase);
             
-            if (_changeSequenceState.LastChangeSequence != latest_change_set.last_seq)
+            if (_changeSequenceState.LastChangeSequence != latest_change_set.LastSeq)
             {
-                foreach (mmria.server.model.couchdb.c_seq seq in latest_change_set.results)
+                foreach (CaseChangeEntry entry in latest_change_set.Changes)
                 {
-                    if (response_results.ContainsKey (seq.id)) 
+                    if (response_results.ContainsKey(entry.Id))
                     {
-                        if 
-                        (
-                            seq.changes.Count > 0 &&
-                            response_results [seq.id].Key != seq.changes [0].rev
-                        )
-                        {
-                            if (seq.deleted == null)
-                            {
-                                response_results [seq.id] = new KeyValuePair<string, bool> (seq.changes [0].rev, false);
-                            }
-                            else
-                            {
-                                response_results [seq.id] = new KeyValuePair<string, bool> (seq.changes [0].rev, true);
-                            }
-                            
-                        }
+                        response_results[entry.Id] = new KeyValuePair<string, bool>(entry.Seq, entry.Deleted);
                     }
-                    else 
+                    else
                     {
-                        if (seq.deleted == null)
-                        {
-                            response_results.Add (seq.id, new KeyValuePair<string, bool> (seq.changes [0].rev, false));
-                        }
-                        else
-                        {
-                            response_results.Add (seq.id, new KeyValuePair<string, bool> (seq.changes [0].rev, true));
-                        }
+                        response_results.Add(entry.Id, new KeyValuePair<string, bool>(entry.Seq, entry.Deleted));
                     }
                 }
             }
 
             
             _changeSequenceState.RecordCall();
-            _changeSequenceState.LastChangeSequence = latest_change_set.last_seq;
+            _changeSequenceState.LastChangeSequence = latest_change_set.LastSeq;
 
             // Bound the per-change-row fan-out. The previous code did Task.Run
             // per row with no await, no concurrency cap, and detached errors from
@@ -96,7 +86,7 @@ public sealed class Synchronize_Deleted_Case_Records : ReceiveActor
                         try
                         {
                             #if !IS_PMSS_ENHANCED
-                            mmria.server.utils.c_sync_document sync_document = new mmria.server.utils.c_sync_document(kvp.Key, null, "DELETE", scheduleInfo.version_number, db_config, _couchDbHttpClient);
+                            mmria.server.utils.c_sync_document sync_document = new mmria.server.utils.c_sync_document(kvp.Key, null, "DELETE", scheduleInfo.version_number, db_config, _couchDbHttpClient, deIdentifiedRepository: _deIdentifiedRepository, reportRepository: _reportRepository);
                             await sync_document.executeAsync();
                             #endif
                             #if IS_PMSS_ENHANCED
@@ -112,16 +102,15 @@ public sealed class Synchronize_Deleted_Case_Records : ReceiveActor
                     }
                     else
                     {
-                        string document_url = db_config.url + $"/{db_config.prefix}mmrds/" + kvp.Key;
                         string document_json = null;
 
                         try
                         {
-                            document_json = await _couchDbHttpClient.ExecuteAsync("GET", document_url, null, db_config.user_name, db_config.user_value);
-                            if (!string.IsNullOrEmpty(document_json) && document_json.IndexOf("\"_id\":\"_design/") < 0)
+                            document_json = await _caseRepository.GetCaseDocumentJsonAsync(kvp.Key, db_config);
+                            if (!string.IsNullOrEmpty(document_json) && document_json.IndexOf("\"_id\":\"_design/\"") < 0)
                             {
                                 #if !IS_PMSS_ENHANCED
-                                mmria.server.utils.c_sync_document sync_document = new mmria.server.utils.c_sync_document(kvp.Key, document_json, "PUT", scheduleInfo.version_number, db_config, _couchDbHttpClient);
+                                mmria.server.utils.c_sync_document sync_document = new mmria.server.utils.c_sync_document(kvp.Key, document_json, "PUT", scheduleInfo.version_number, db_config, _couchDbHttpClient, deIdentifiedRepository: _deIdentifiedRepository, reportRepository: _reportRepository);
                                 await sync_document.executeAsync();
                                 #endif
                                 #if IS_PMSS_ENHANCED
@@ -138,27 +127,5 @@ public sealed class Synchronize_Deleted_Case_Records : ReceiveActor
                     }
                 });
     }
-
-    public async Task<mmria.server.model.couchdb.c_change_result> GetJobInfo(string p_last_sequence, ScheduleInfoMessage p_scheduleInfo)
-    {
-
-        mmria.server.model.couchdb.c_change_result result = new mmria.server.model.couchdb.c_change_result();
-        string url = null;
-
-        if (string.IsNullOrWhiteSpace(p_last_sequence))
-        {
-            url = db_config.url + $"/{db_config.prefix}mmrds/_changes";
-        }
-        else
-        {
-            url = db_config.url + $"/{db_config.prefix}mmrds/_changes?since=" + p_last_sequence;
-        }
-        string res = await _couchDbHttpClient.ExecuteAsync("GET", url, null, p_scheduleInfo.user_name, p_scheduleInfo.user_value);
-        
-        result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.server.model.couchdb.c_change_result>(res);
-
-        return result;
-    }
-
 
 }

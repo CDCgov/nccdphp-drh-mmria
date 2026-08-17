@@ -5,6 +5,8 @@ using System.Net.Http.Headers;
 using System.Linq;
 using Microsoft.Extensions.Configuration;
 using mmria.common.getset;
+using mmria.common.SharedLibraries.MetadataVersion;
+using mmria.common.SharedLibraries.MetadataVersion.DAL;
 
 
 namespace mmria.services.Utilities.Exporter;
@@ -38,23 +40,19 @@ System.Collections.Generic.Dictionary<string, string> path_to_field_name_map = n
 
     private common.couchdb.DBConfigurationDetail db_config;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IMetadataRepository _metadataRepository;
 
     public export_all_generate_name_map(common.couchdb.DBConfigurationDetail _db_config, mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
         this.db_config = _db_config;
         _couchDbHttpClient = couchDbHttpClient;
+        _metadataRepository = new MetadataVersionDAL(couchDbHttpClient);
     }
     public Dictionary<string, Dictionary<string, string>> Execute(string p_version, string p_export_type = "all")
     {
-    
-        string metadata_url = $"{db_config.url}/metadata/{p_version}/metadata";
-        var curl_result = _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, db_config.user_name, db_config.user_value).GetAwaiter().GetResult();
-
-        
-        //System.Console.WriteLine("Execute(string p_version, string p_export_type = all)");
-        //System.Console.WriteLine(curl_result);
-        
-        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(curl_result);
+        const string versionSpecPrefix = "version_specification-";
+        string versionKey = p_version.StartsWith(versionSpecPrefix) ? p_version[versionSpecPrefix.Length..] : p_version;
+        mmria.common.metadata.app metadata = _metadataRepository.GetAppDocumentAsync(versionKey, db_config).GetAwaiter().GetResult();
 
 
 

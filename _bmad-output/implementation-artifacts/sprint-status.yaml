@@ -1,0 +1,305 @@
+# generated: 2026-07-14
+last_updated: 2026-08-03
+# project: mmria
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: _bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2026-07-14
+last_updated: 2026-08-03
+project: mmria
+project_key: NOKEY
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+
+development_status:
+  # ── Epic 1: Case Narrative Editor Fidelity ──────────────────────────────
+  epic-1: done
+  1-1-fix-save-path-html-stripping: done
+  1-2-fix-paste-handler-cursor-integrity: done
+  1-3-update-case-narrative-instruction-text: done
+  1-4-update-case-narrative-guidelines-panel: done
+  epic-1-retrospective: optional
+
+  # ── Epic 2: Vitals Field Validation ─────────────────────────────────────
+  epic-2: done
+  2-1-vitals-range-config-couchdb-and-server-loading: done
+  2-2-on-blur-vitals-validation-and-modal: done
+  2-3-display-time-exclusion-print-pdf-date-fix: done
+  2-4-display-time-exclusion-graph-and-table: done
+  2-5-historical-data-detection-and-indicators: done
+  2-6-vitals-validation-bug-fixes: done
+  epic-2-retrospective: optional
+
+  # ── Epic 3: System Configuration & Print Cleanup ─────────────────────────
+  epic-3: done
+  3-1-config-driven-omb-expiration-date: done
+  3-2-config-driven-mmria-version: done
+  3-3-remove-core-elements-print-option: done
+  epic-3-retrospective: optional
+
+  # ── Epic 4: Vitals Validation Refinements ────────────────────────────────
+  epic-4: done
+  4-0-validation-engine-foundation: done
+  4-1-print-view-pdf-validation-gate: done
+  4-2-print-pdf-comment-appending: done
+  4-3-omb-block-right-alignment: done
+  epic-4-retrospective: optional
+
+  # ── Epic 5: Validation Errors Panel ─────────────────────────────────────
+  epic-5: done
+  5-1-validation-errors-panel: done
+  epic-5-retrospective: optional
+
+  # ── Epic 6: Case Validation Rules Management ─────────────────────────────
+  epic-6: done
+  6-1-decouple-validation-rules-generation: done
+  6-2-port-case-validation-admin-ui: done
+  6-3-add-edit-rule-modal: done
+  epic-6-retrospective: optional
+
+  # ── Epic 7: Admin Action Audit Logging ───────────────────────────────────
+  epic-7: done
+  7-1-audit-logging-year-of-death-maiden-name: done
+  7-2-audit-logging-case-lifecycle-actions: done
+  epic-7-retrospective: optional
+
+  # ── Epic 8: System Going Offline ─────────────────────────────────────────
+  epic-8: done
+  8-1-system-offline-config-services-admin-page: done
+  8-2-login-page-offline-state: done
+  8-3-warning-and-offline-modals: done
+  8-4-periodic-status-check: done
+  8-5-sams-aware-app-offline-entry-points: done
+  8-6-offline-detection-precision-resilience: done
+  epic-8-retrospective: optional
+
+  # ── Epic 9: Standalone Bug Fixes ─────────────────────────────────────────
+  epic-9: done
+  9-1-fix-data-summary-checks-field-filter: done
+  9-2-fix-manage-users-export-respects-filter: done
+  9-3-fix-manage-users-role-filter-endswith: done
+  epic-9-retrospective: optional
+
+  # ── Epic 10: CVS PDF Export Tool Reliability ─────────────────────────────
+  epic-10: done
+  10-1-fix-cvs-batch-supervisor-busy-wait: done
+  10-2-server-side-cvs-error-hardening: done
+  10-3-client-side-cvs-retry-mechanism: done
+  10-4-cvs-parent-page-broadcast-channel-status: done
+  10-5-config-driven-cvs-retry-constants: done
+  epic-10-retrospective: optional
+
+  # ── Epic 11: Vitals Import Integer Type Fix ───────────────────────────────
+  epic-11: done
+  11-1-vitals-import-integer-type-fix: done
+  epic-11-retrospective: optional
+
+  # ── Epic 12: Data Migration Tool Modernization ────────────────────────────
+  epic-12: done
+  12-1-data-migration-environment-config: done
+  12-1-1-fix-data-migration-project-reference: done
+  12-2-vitals-type-correction-migration: done
+  12-2-migration-tool-hardening: done
+  12-3-case-rev-endpoint: done
+  12-4-stale-tab-ux: done
+  epic-12-retrospective: optional
+
+  # ── Epic 13: HTTP Client Modernization: data-migration ───────────────────
+  epic-13: done
+  13-1-data-migration-curl-to-couchdbhttpclient: done
+  epic-13-retrospective: optional
+
+  # ── Epic 14: HTTP Client Modernization: Replication ──────────────────────
+  epic-14: done
+  14-1-replication-curl-to-couchdbhttpclient: done
+  epic-14-retrospective: optional
+
+  # ── Epic 15: Admin Monitoring Enhancements ───────────────────────────────
+  epic-15: done
+  15-1-tenant-database-counts-open-cases: done
+  epic-15-retrospective: optional
+
+  # ── Epic 16: Controller Pattern Remediation ───────────────────────────────
+  epic-16: done
+  16-1-systemoffline-sharedlibraries-feature: done
+  16-2-caseworkflowadmin-wave9-refactor: done
+  epic-16-retrospective: optional
+
+  # ── Epic 17: mmrds CRUD Consolidation (SQL Migration Foundation) ──────────
+  epic-17: done
+  17-1-mmrds-operation-catalog: done
+  17-2-icase-repository-caseDAL-canonicalize: done
+  17-3-casemanager-direct-calls: done
+  17-4-caseworkflowadmindal-duplicates: done
+  17-5-auditrecovery-cvs-vitalimport-attachment: done
+  17-5b-mmria-services-case-reads: done
+  17-6-offlinecasemanager-direct-calls: done
+  17-7-mmriaservicesdal-sync-boundary-decision: done
+  epic-17-retrospective: optional
+
+  # ── Epic 18: _users and configuration Consolidation ───────────────────────
+  epic-18: done
+  18-1-users-operation-catalog: done
+  18-2-iuser-repository-accountdal: done
+  18-3-route-leaking-users-calls: done
+  18-4-iconfiguration-repository-systemconfigdal: done
+  18-5-iconfiguration-bootstrap-loader: done
+  epic-18-retrospective: optional
+
+  # ── Epic 19: jurisdiction Consolidation ───────────────────────────────────
+  epic-19: done
+  19-1-jurisdiction-operation-catalog: done
+  19-2-ijurisdiction-repository-jurisdictiondal: done
+  19-3-ijurisdiction-authorization-reader: done
+  19-4-route-out-of-dal-jurisdiction-crud: done
+  epic-19-retrospective: optional
+
+  # ── Epic 20: metadata Consolidation ───────────────────────────────────────
+  epic-20: done
+  20-1-metadata-operation-catalog: done
+  20-2-imetadata-repository-metadataversiondal: done
+  20-3-sharedlibraries-dal-metadata-calls: done
+  20-4-controller-metadata-calls: done
+  20-5-mmria-services-metadata-reads: done
+  20-6-metadata-boundary-decision: done
+  epic-20-retrospective: optional
+
+  # ── Epic 21: audit Consolidation ──────────────────────────────────────────
+  epic-21: done
+  21-1-audit-operation-catalog: done
+  21-2-iaudit-repository-auditdal: done
+  21-3-casemanager-audit-writes: done
+  21-4-caseworkflowadmindal-audit-calls: done
+  21-5-controller-audit-calls: done
+  21-6-manageusers-auditrecovery-audit-calls: done
+  epic-21-retrospective: optional
+
+  # ── Epic 22: .NET 10 Upgrade ─────────────────────────────────────────────
+  epic-22: done
+  22-1-net-10-compatibility-analysis-and-risk-assessment: done
+  22-2-net-10-upgrade-execution: done
+  epic-22-retrospective: optional
+
+  # ── Epic 23: Remaining Database Consolidation Gap Analysis (SQL Migration Foundation) ──
+  epic-23: done
+  23-1-remaining-database-gap-scan: done
+  23-2-isession-repository-sessiondal: done
+  23-3-iofflinecase-repository-offlinecasedal: done
+  23-4-iexportqueue-repository-exportqueuedal: done
+  23-5-ivitalimport-repository-vitalimportdal-canonicalize: done
+  23-6-ireport-repository-reportdal: done
+  23-7-route-report-read-calls: done
+  23-8-ilogging-repository-loggingdal: done
+  epic-23-retrospective: optional
+
+  # ── Epic 24: Infrastructure Sync and Database Lifecycle Consolidation ────
+  epic-24: done
+  24-1-infra-operations-catalog: done
+  24-2-ideidentified-repository-ireport-write-extension: done
+  24-3-icase-repository-sync-extensions: done
+  24-4-export-queue-rebuild-routing: done
+  24-5-idatabase-lifecycle-service: done
+  24-6-c-sync-document-pmss-routing: done
+  24-7-c-document-sync-all-routing: done
+  24-8-process-db-synchronization-set-routing: done
+  24-9-process-central-pull-list-cdc-routing: done
+  24-10-mmria-services-export-queue-routing: done
+  24-11-mmria-services-vital-import-routing: done
+  epic-24-retrospective: optional
+
+  # ── Epic 25: Async Safety + Metadata Reader Consolidation ─────────────────
+  epic-25: done
+  25-1-fix-result-blocking-calls: done
+  25-2-metadata-reader-imetadatarepository-pass: done
+  epic-25-retrospective: optional
+
+  # ── Epic 26: Controller API Direct-Call Remediation ───────────────────────
+  epic-26: done
+  26-1-case-api-controllers: done
+  26-2-auth-session-controllers: done
+  26-3-export-broadcast-controllers: done
+  26-4-jurisdiction-summary-utilities: done
+  epic-26-retrospective: optional
+
+  # ── Epic 27: Services Utility Repository Activation ───────────────────────
+  epic-27: done
+  27-1-activate-export-utility-wiring: done
+  27-2-batchprocessor-migration-actor-classification: done
+  epic-27-retrospective: optional
+
+  # ── Epic 28: mmria-server Non-DAL Remnants ────────────────────────────────
+  epic-28: done
+  28-1-vrosummary-case-reads: done
+  28-2-auth-middleware-session-jurisdiction-wiring: done
+  28-3-server-core-element-exporter-remaining-calls: done
+  epic-28-retrospective: optional
+
+  # ── Epic 29: Record ID Uniqueness Enforcement ─────────────────────────────
+  epic-29: backlog
+  29-1-server-side-format-validation-and-uniqueness-guard: backlog
+  29-2-client-side-per-candidate-api-check: backlog
+  29-3-add-record-id-list-view-remove-broken-bulk-list-call: backlog
+  epic-29-retrospective: optional
+
+  # ── Epic 31: Section 508 — Home Page General Section Focus Indicators ─────
+  epic-31: done
+  31-1-home-page-general-section-focus-indicator: done
+  epic-31-retrospective: optional
+
+  # ── Epic 32: Export Consistency — Date Format, De-id Parity, Hospital Code ─
+  epic-32: done
+  32-1-normalize-datetime-serialization: done
+  # 32-2-add-missing-pii-fields-to-global-de-id-list: closed (resolved manually — no story file)
+  32-3-hospital-paternity-field-investigation: done
+  epic-32-retrospective: optional
+
+  # Epic 33: Case Generator Date and Number Plausibility
+  epic-33: in-progress
+  33-1-metadata-aware-numeric-generation: in-progress
+  33-2-date-group-validity-timeline-plausibility: review
+  33-3-recursive-date-number-validation-gate: review
+  33-4-generator-regression-coverage: review
+  epic-33-retrospective: optional
+
+  # ── Epic 34: Case Narrative PDF Spacing Fidelity ──────────────────────────
+  epic-34: in-progress
+  34-1-normalize-case-narrative-pdf-whitespace-conversion: done
+  34-2-collapse-br-empty-paragraph-separators: ready-for-dev
+  epic-34-retrospective: optional
+
+  # ── Epic 35: Offline Exit/Go Online UX Cleanup (Rel 4.1 P-Immediate) ──────
+  epic-35: in-progress
+  35-1-hide-exit-offline-mode-widget: review
+  35-2-rename-go-online-to-go-online-and-sync-changes: review
+  35-3-align-go-online-confirmation-behavior: ready-for-dev
+  epic-35-retrospective: optional

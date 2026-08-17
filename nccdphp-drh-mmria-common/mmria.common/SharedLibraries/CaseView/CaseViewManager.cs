@@ -8,6 +8,7 @@ using System.Net;
 using System.Dynamic;
 using Newtonsoft.Json;
 using mmria.common.SharedLibraries.CaseView.DAL;
+using mmria.common.SharedLibraries.Jurisdiction;
 
 namespace mmria.common.SharedLibraries.CaseView;
 
@@ -22,6 +23,7 @@ public sealed class CaseViewManager
     mmria.common.SharedLibraries.Other.ResourceRightEnum ResourceRight;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly CaseViewDAL _dal;
+    private readonly IJurisdictionRepository _jurisdictionRepository;
 
     public CaseViewManager
     (
@@ -29,7 +31,8 @@ public sealed class CaseViewManager
         System.Security.Claims.ClaimsPrincipal p_user, 
         bool p_is_case_identified_data = false,
         bool p_include_pinned_cases = false,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient = null
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient = null,
+        IJurisdictionRepository jurisdictionRepository = null
     )
     {
         db_config = p_configuration;
@@ -39,6 +42,7 @@ public sealed class CaseViewManager
         is_include_pinned_cases = p_include_pinned_cases;
         _couchDbHttpClient = couchDbHttpClient;
         _dal = new CaseViewDAL(_couchDbHttpClient);
+        _jurisdictionRepository = jurisdictionRepository;
 
         if(is_case_identified_data)
         {
@@ -1250,8 +1254,9 @@ public sealed class CaseViewManager
 
         try
         {
-            string request_string = $"{db_config.url}/jurisdiction/pinned-case-set";
-            result = await _dal.GetPinnedCaseSetAsync(request_string, db_config);
+            result = _jurisdictionRepository != null
+                ? await _jurisdictionRepository.GetPinnedCaseSetAsync(db_config)
+                : await _dal.GetPinnedCaseSetAsync(db_config.Get_Prefix_DB_Url("jurisdiction/pinned-case-set"), db_config);
         }
         catch (Exception ex)
         {
@@ -1404,10 +1409,13 @@ public sealed class CaseViewManager
 
         try
         {
-            string request_string = use_prefix_route
-                ? db_config.Get_Prefix_DB_Url("jurisdiction/pinned-case-set")
-                : $"{db_config.url}/jurisdiction/pinned-case-set";
-            result = await _dal.GetPinnedCaseSetAsync(request_string, db_config);
+            result = _jurisdictionRepository != null
+                ? await _jurisdictionRepository.GetPinnedCaseSetAsync(db_config)
+                : await _dal.GetPinnedCaseSetAsync(
+                    use_prefix_route
+                        ? db_config.Get_Prefix_DB_Url("jurisdiction/pinned-case-set")
+                        : $"{db_config.url}/jurisdiction/pinned-case-set",
+                    db_config);
         }
         catch (WebException wex)
         {
@@ -1442,20 +1450,24 @@ public sealed class CaseViewManager
     {
         var result = new mmria.common.model.couchdb.document_put_response();
 
-        JsonSerializerSettings settings = new JsonSerializerSettings();
-        settings.NullValueHandling = NullValueHandling.Ignore;
-
-        var document_content = JsonConvert.SerializeObject(value, settings);
-
         if (value._id == "pinned-case-set")
         {
-            string request_string = use_prefix_route
-                ? db_config.Get_Prefix_DB_Url("jurisdiction/pinned-case-set")
-                : $"{db_config.url}/jurisdiction/pinned-case-set";
-
             try
             {
-                result = await _dal.SavePinnedCaseSetAsync(request_string, document_content, db_config);
+                if (_jurisdictionRepository != null)
+                {
+                    result = await _jurisdictionRepository.SavePinnedCaseSetAsync(value, db_config);
+                }
+                else
+                {
+                    JsonSerializerSettings settings = new JsonSerializerSettings();
+                    settings.NullValueHandling = NullValueHandling.Ignore;
+                    var document_content = JsonConvert.SerializeObject(value, settings);
+                    string request_string = use_prefix_route
+                        ? db_config.Get_Prefix_DB_Url("jurisdiction/pinned-case-set")
+                        : $"{db_config.url}/jurisdiction/pinned-case-set";
+                    result = await _dal.SavePinnedCaseSetAsync(request_string, document_content, db_config);
+                }
             }
             catch (Exception ex)
             {
