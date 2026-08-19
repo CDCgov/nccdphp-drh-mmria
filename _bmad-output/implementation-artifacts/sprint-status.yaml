@@ -1,5 +1,5 @@
 # generated: 2026-07-14
-last_updated: 2026-08-13
+last_updated: 2026-08-14
 # project: mmria
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@ last_updated: 2026-08-13
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-07-14
-last_updated: 2026-08-03
+last_updated: 2026-08-14
 project: mmria
 project_key: NOKEY
 tracking_system: file-system
@@ -266,9 +266,13 @@ development_status:
 
   # ── Epic 29: Record ID Uniqueness Enforcement ─────────────────────────────
   epic-29: in-progress
-  29-1-server-side-format-validation-and-uniqueness-guard: ready-for-dev
-  29-2-client-side-per-candidate-api-check: ready-for-dev
+  29-1-server-side-format-validation-and-uniqueness-guard: done
+  29-2-client-side-per-candidate-api-check: done
   29-3-add-record-id-list-view-remove-broken-bulk-list-call: backlog
+  29-4-generate-unique-record-id-manager-method: ready-for-dev
+  29-5-online-save-then-retry-on-collision: backlog
+  29-6-offline-placeholder-record-id: backlog
+  29-7-ije-batch-collision-retry: backlog
   epic-29-retrospective: optional
 
   # ── Epic 30: Unified Server-Side Geocoding (TAMU Refactor) ────────────────

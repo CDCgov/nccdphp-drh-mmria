@@ -159,6 +159,10 @@ FR-11.4: Epic 10 â€” BroadcastChannel CVS status and parent-page button sta
 FR-29.1: Epic 29 — Server-side record ID format validation and uniqueness guard in SaveCaseAsync
 FR-29.2: Epic 29 — Client-side per-candidate uniqueness check via /api/record_id before case save
 FR-29.3: Epic 29 — Add record_id_list CouchDB view and remove broken bulk-list dependency from case creation flow
+FR-29.4: Epic 29 — Extract `CaseManager.GenerateUniqueRecordIdAsync` primitive and expose `error_code` on collision/format rejections
+FR-29.5: Epic 29 — Online case creation collapses pre-flight loop into save-then-retry-on-collision (Path A)
+FR-29.6: Epic 29 — Offline placeholder record IDs (`STATE-OFFLINE-CASE-XX`) with server-generated real ID at sync (Path B)
+FR-29.7: Epic 29 — IJE batch import routes writes through `SaveCaseAsync` with collision-retry (Path C)
 
 FR-31.1: Epic 31 — CSS :focus-visible outline for Informant Interview Summary Template button (#view-informant-interview-summary-template-button)
 FR-31.2: Epic 31 — CSS :focus-visible outline for CDF Template PDF button (#view-cdf-template-button)
@@ -272,8 +276,11 @@ The null-fallback scaffolding placed in `exporter.cs`, `mmrds_exporter.cs`, and 
 ### Epic 29: Record ID Uniqueness Enforcement
 
 Abstractors creating new cases are protected against duplicate MMRIA Record IDs (`{jurisdiction}-{year-of-death}-{4-digit-number}`) by a defense-in-depth strategy. The server rejects any new-case save where the record ID already exists in the database. The client verifies uniqueness per-candidate against the server before saving, eliminating the TOCTOU race condition. The broken bulk-list CouchDB view dependency is removed from the case creation flow and a functioning design-document view is added in its place.
-**FRs covered:** FR-29.1, FR-29.2, FR-29.3
-**Stories:** 29.1 — Server-side format validation and uniqueness guard, 29.2 — Client-side per-candidate API check, 29.3 — Add record_id_list view and remove broken bulk-list call
+
+A 2026-08-19 audit uncovered three follow-on defects that Stories 29.1–29.3 did not address: (a) a bug in `CaseDAL.RecordIdExistsAsync` was causing every uniqueness check to falsely return "unique" — hot-fixed as part of Story 29.1 verification; (b) the online client's 20-call pre-flight loop leaves a residual race between the last check and the save; (c) offline case creation still writes a `STATE-YEAR-NNNN-OFFLINE` record ID that is stripped and blindly written at sync time, with no collision recovery; and (d) IJE batch imports bypass `SaveCaseAsync` entirely, relying on a stale 25 000-row HashSet fetched once per batch and silently allowing duplicates when the DB is larger than 25 k rows or another writer wins a race. Stories 29.4–29.7 remediate these by extracting the "generate a unique record ID" primitive onto `CaseManager` and routing all three creation paths (online UI, offline sync, IJE batch) through a save-then-retry-on-collision pattern.
+
+**FRs covered:** FR-29.1, FR-29.2, FR-29.3, FR-29.4, FR-29.5, FR-29.6, FR-29.7
+**Stories:** 29.1 — Server-side format validation and uniqueness guard, 29.2 — Client-side per-candidate API check, 29.3 — Add record_id_list view and remove broken bulk-list call, 29.4 — `GenerateUniqueRecordIdAsync` primitive + structured `error_code`, 29.5 — Path A save-then-retry-on-collision, 29.6 — Path B offline placeholder record IDs, 29.7 — Path C IJE batch collision-retry
 
 ### Epic 31: Section 508 — Home Page General Section Keyboard Focus Indicators
 
@@ -3936,6 +3943,19 @@ All three stories are independent and can proceed in parallel.
 | 29.2  | `source-code/mmria/mmria-server/wwwroot/scripts/case/index.pmss.js`                 | Same change for PMSS variant                                                           |
 | 29.3  | `source-code/mmria/mmria-server/database-scripts/case_design_sortable.json`         | Add `record_id_list` view                                                              |
 | 29.3  | `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js`                      | Remove `Get_Record_Id_List` function and `g_record_id_list` Set (dead code after 29.2) |
+| 29.4  | `nccdphp-drh-mmria-common/mmria.common/SharedLibraries/Case/Manager/CaseManager.cs` | Extract `GenerateUniqueRecordIdAsync` primitive; populate `error_code` on rejection    |
+| 29.4  | `nccdphp-drh-mmria-common/mmria.common/model/couchdb/document_put_response.cs`      | Add `error_code` string property (nullable, non-breaking)                              |
+| 29.5  | `source-code/mmria/mmria-server/wwwroot/scripts/case/index.mmria.js`                | Remove pre-flight loop; single POST + collision-retry using `error_code`               |
+| 29.5  | `source-code/mmria/mmria-server/wwwroot/scripts/case/index.pmss.js`                 | Same change for PMSS variant                                                           |
+| 29.6  | `source-code/mmria/mmria-server/wwwroot/scripts/case/index.mmria.js`                | Offline branch generates `STATE-OFFLINE-CASE-XX` placeholder                           |
+| 29.6  | `source-code/mmria/mmria-server/wwwroot/scripts/offline/offline-session-manager.js` | Per-session placeholder counter                                                        |
+| 29.6  | `source-code/mmria/mmria-server/wwwroot/scripts/offline/offline-case-manager.js`    | Remove `generateOfflineRecordId` (no more `-offline` suffix)                           |
+| 29.6  | `source-code/mmria/mmria-server/wwwroot/scripts/offline/offline-sync-manager.js`    | Update client sync-side pattern detection                                              |
+| 29.6  | `source-code/mmria/mmria-server/wwwroot/scripts/offline/offline-ui-renderer.js`     | Update offline-case detection to accept both patterns                                  |
+| 29.6  | `nccdphp-drh-mmria-common/mmria.common/SharedLibraries/OfflineCase/Manager/OfflineCaseManager.cs` | Server-side sync: detect placeholder, generate real record ID, then save            |
+| 29.7  | `nccdphp-drh-mmria-services/mmria.services/Services/BatchItemProcessingService.cs`  | Route write through `SaveCaseAsync`; retry on `record_id_conflict`                     |
+| 29.7  | `nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/Helper/MMRIAServicesHelper.cs` | Remove stale-HashSet uniqueness in `ConvertLineToBatchItem`                       |
+| 29.7  | `nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/Manager/MMRIAServicesManager.cs` | Deprecate or remove `GetExistingRecordIds` if unused                            |
 
 ---
 
@@ -4104,15 +4124,234 @@ Then zero build errors, and the case creation flow completes normally for both o
 
 ---
 
+### Story 29.4: Extract `GenerateUniqueRecordIdAsync` Primitive and Structured `error_code`
+
+**Story ID:** 29.4
+**Depends on:** 29.1 (the DAL fix landed with Story 29.1's smoke-test follow-up on 2026-08-19)
+
+As a developer,
+I want a single manager-level method that generates a jurisdiction-scoped unique MMRIA Record ID and a machine-readable `error_code` returned when `SaveCaseAsync` rejects one on format or collision grounds,
+So that every case-creation path (online UI, offline sync, IJE batch) can share one implementation and detect collisions without string-matching English error text.
+
+**Background:** `CaseManager.GetRecordIdReplacementForYearOfDeathAsync` (line ~685) already contains the exact "generate 4-digit random suffix, check via `RecordIdExistsAsync`, retry" loop that Paths A, B, and C all need. Extracting it lets the three creation paths call one primitive. Additionally, Story 29.1's `SaveCaseAsync` guard returns English-language rejection messages; downstream callers currently would have to string-match them to know whether to regenerate or surface a hard error. A structured `error_code` field solves that.
+
+**Acceptance Criteria:**
+
+**AC-1 — New public method exists on `CaseManager`**
+Given the primitive is extracted
+When `CaseManager.GenerateUniqueRecordIdAsync(string statePrefix, string year, DBConfigurationDetail dbInfo, int maxAttempts = 20)` is called
+Then it returns a `STATE-YEAR-NNNN` record ID whose 4-digit suffix does not currently exist in the database identified by `dbInfo`, or throws a `RecordIdGenerationExhaustedException` if `maxAttempts` random suffixes all collide
+
+**AC-2 — Existing `GetRecordIdReplacementForYearOfDeathAsync` delegates to the new method**
+Given the extraction preserves behavior for the Story 39.1 flow
+When `GetRecordIdReplacementForYearOfDeathAsync` runs
+Then it computes the state and target-year segments and calls `GenerateUniqueRecordIdAsync`; net behavior for that flow is unchanged (verified by existing test coverage plus at least one new unit test)
+
+**AC-3 — `document_put_response` gains a nullable `error_code` field**
+Given `document_put_response` is the canonical error carrier for case-save responses
+When a rejection carries a machine-readable reason
+Then `document_put_response.error_code` is populated with one of the string constants `record_id_format` or `record_id_conflict` (defined in one central location, e.g. `mmria.common.model.couchdb.SaveErrorCodes`); `error_code` is `null` on success and on rejections that predate this story (backward compatible)
+
+**AC-4 — `SaveCaseAsync` populates `error_code` on Story 29.1 guard rejections**
+Given the format guard rejects (bad suffix / bad year / missing prefix)
+When `SaveCaseAsync` returns
+Then `error_code = "record_id_format"` and the human-readable `error_description` is preserved
+And given the uniqueness guard rejects (`RecordIdExistsAsync` returned true)
+When `SaveCaseAsync` returns
+Then `error_code = "record_id_conflict"` and the human-readable `error_description` is preserved
+
+**AC-5 — Unit tests cover the new method**
+Given `CaseManager.GenerateUniqueRecordIdAsync` is added
+When the test suite runs
+Then unit tests cover: (a) happy path returns a valid `STATE-YEAR-NNNN` id, (b) collision retry advances the suffix, (c) exhaustion after `maxAttempts` throws `RecordIdGenerationExhaustedException`, (d) year and state segments are echoed unchanged
+
+**AC-6 — Build passes**
+Given the change is added
+When all projects build
+Then zero errors across `mmria.common`, `mmria-server`, `mmria.services`, and the utilities test project
+
+**Dev Notes:**
+
+- Put the constants class in `mmria.common.model.couchdb.SaveErrorCodes` (or similar single-source-of-truth location) so both server and JavaScript callers can reference a documented value.
+- `RecordIdGenerationExhaustedException` should carry `statePrefix`, `year`, and `attempts` for diagnostic use.
+- No changes to `record_idController` in this story — that endpoint is not deprecated until Story 29.5 removes its last caller.
+
+---
+
+### Story 29.5: Path A — Online Save-Then-Retry-on-Collision
+
+**Story ID:** 29.5
+**Depends on:** 29.4
+
+As an abstractor,
+I want the "Generate Record ID" flow to attempt the save with a single locally-generated candidate and, if the server reports a collision, automatically try again with a fresh suffix,
+So that the case-creation flow does not do 20 preflight round trips in the common case and does not surface a hard failure when a rare race condition occurs.
+
+**Background:** Story 29.2 shipped a 20-call pre-flight loop against `/api/record_id` before the POST to `/api/case`. The pre-flight consumes network round-trips even when there is no contention and leaves a residual race between the last "unique" reply and the save. Story 29.1's server-side guard is the authoritative check; the client only needs to detect a collision reply and regenerate.
+
+**Acceptance Criteria:**
+
+**AC-1 — Online path no longer pre-flights `/api/record_id`**
+Given the user is in online mode and clicks "Generate Record ID & Continue" and confirms
+When `add_new_case()` runs
+Then it generates one candidate `STATE-YEAR-NNNN` locally and issues a single POST to `/api/case` without calling `/api/record_id` first
+
+**AC-2 — Collision response triggers regeneration and retry**
+Given the server's response body contains `error_code === "record_id_conflict"`
+When the client processes the response
+Then `add_new_case()` regenerates the 4-digit suffix (same `generateCandidate` closure as Story 29.2), reassigns `home_record.record_id`, and re-POSTs to `/api/case`
+
+**AC-3 — Retry cap prevents infinite loop**
+Given the server returns `record_id_conflict` five consecutive times
+When the client's collision-retry loop reaches its cap
+Then the loop exits, the user sees `"Unable to generate a unique Record ID after multiple attempts. Please try again."`, and no case is created
+
+**AC-4 — Non-collision errors surface immediately**
+Given the server returns any `error_code` other than `record_id_conflict` (or `error_code` is absent)
+When the client processes the response
+Then the client does not retry; the response is surfaced as an ordinary save error via the existing `save_case_and_wait` failure path
+
+**AC-5 — PMSS variant kept consistent**
+Given the PMSS confirm handler at `index.pmss.js` line ~424 no longer wraps in `Get_Record_Id_List` (Story 29.2 removed it)
+When this story completes
+Then any residual pre-flight logic is removed and the PMSS unique-number flow uses its existing server-authoritative `/api/case_view/next-pmss-number` endpoint as the single source of truth — no additional client changes required, but confirm with a diff review that no pre-flight remains
+
+**AC-6 — Build and smoke test pass**
+Given the changes are applied
+When the server builds and an abstractor creates a case in the local multi-tenant environment
+Then zero build errors; a case creates successfully with one round trip in the common case; a forced-collision test (DevTools instrumentation returning `record_id_conflict` twice) confirms the retry loop advances and eventually succeeds
+
+**Dev Notes:**
+
+- Story 29.2's `alert("Unable to generate a unique Record ID…")` + `throw new Error(..., __handled=true)` pattern is preserved — only the trigger changes (server response vs. exhausted pre-flight loop).
+- Keep `g_record_id_list.add(new_record_id.toUpperCase())` after a successful save — still guards within-session duplicates for other case-list refresh code paths.
+- After this story, `record_idController` has no remaining callers in the shipped client. Do not delete in this story; add a `[Obsolete]` marker or a comment tagging Story 29.3's cleanup pass.
+
+---
+
+### Story 29.6: Path B — Offline Placeholder Record IDs (`STATE-OFFLINE-CASE-XX`)
+
+**Story ID:** 29.6
+**Depends on:** 29.4
+
+As an abstractor working offline,
+I want offline-created cases to hold a clearly-marked placeholder record ID until sync, at which point the server assigns a real jurisdiction-scoped unique ID,
+So that offline case creation cannot silently pick a record ID that another user or another tab already used, and the sync collision recovery is centralized on the server.
+
+**Background:** Today the offline branch of `add_new_case()` generates `STATE-YEAR-NNNN` against a local `g_ui` Set and appends `-OFFLINE`. At sync time the suffix is stripped and the case is written. If `STATE-YEAR-NNNN` collides with a case created by any other user (or by another offline tab of the same user) while the client was offline, the sync fails and the offline case is stuck. Story 29.4 provides the server-side primitive to generate a fresh unique record ID; this story replaces the client-side generation with a purely local placeholder.
+
+**Acceptance Criteria:**
+
+**AC-1 — Offline mode generates a placeholder record ID**
+Given `window.OfflineStatus.isOffline() === true`
+When `add_new_case()` reaches the record-ID assignment step
+Then it sets `home_record.record_id = ${STATE}-OFFLINE-CASE-${XX}` where `STATE` is the jurisdiction prefix derived from `window.location.host` (same source as today) and `XX` is a per-offline-session sequence number formatted `NN` (2 digits, `01`–`99`, zero-padded, small-value case as the team has confirmed few offline cases are permitted per session)
+
+**AC-2 — Sequence counter is scoped to the offline session and persists across tab reload**
+Given `OfflineSessionManager` maintains offline-session state (crypto key, offline case list, session id) in memory + service-worker storage
+When the offline case-creation flow needs a new `XX`
+Then `OfflineSessionManager.getNextOfflineCaseSequence()` returns the next integer for this offline session, persists it, and is stable across a tab reload within the same offline session
+
+**AC-3 — `generateOfflineRecordId` and the `-OFFLINE` suffix are removed from the offline creation path**
+Given Story 29.6 is complete
+When an abstractor creates an offline case
+Then `home_record.record_id` never carries `-OFFLINE`; the `generateOfflineRecordId` helper in `offline-case-manager.js` is deleted and its callers updated to use the placeholder pattern from AC-1
+
+**AC-4 — Sync-side detection converts placeholder to real ID before `SaveCaseAsync`**
+Given an offline case with `home_record.record_id` matching `/^([A-Z0-9]+)-OFFLINE-CASE-\d+$/i`
+When `OfflineCaseManager.ApplyOfflineDocumentAsync` processes it
+Then it extracts the state prefix from group 1, reads the year from `home_record.date_of_death.year` (fallback: current year if absent, logged as a warning), calls `CaseManager.GenerateUniqueRecordIdAsync(state, year, dbConfig)`, assigns the result to `home_record.record_id`, and then calls `SaveCaseAsync`
+
+**AC-5 — Legacy `-OFFLINE` suffix still accepted (transitional)**
+Given a client cache still holds offline cases with the pre-29.6 `STATE-YEAR-NNNN-OFFLINE` format
+When those cases sync
+Then the existing suffix-strip path (`offline-sync-manager.js` L205–208, `OfflineCaseManager.cs` L619) remains functional; a structured log entry records which format was seen so we can measure when the legacy path is safe to remove
+
+**AC-6 — UI displays placeholder as-is while offline**
+Given an offline case has `home_record.record_id = "TENANT1-OFFLINE-CASE-01"`
+When it is displayed in the case list or case header
+Then the placeholder text is rendered verbatim; no attempt is made to synthesize a fake `STATE-YEAR-NNNN` for display
+
+**AC-7 — Build and smoke test pass**
+Given the changes are applied
+When the server builds, an offline session is entered, a case is created offline, and the client goes back online
+Then zero build errors; the placeholder appears in the offline UI; on sync, `SaveCaseAsync` receives a real `STATE-YEAR-NNNN` (verified via the audit log), and the offline case is no longer stuck if a `record_id_conflict` occurs (since the server now regenerates before writing)
+
+**Dev Notes:**
+
+- `OfflineSessionManager` already persists offline session state in service-worker storage. Adding a `next_offline_case_sequence` field alongside is a small extension. Start at `01` on new offline session; do not reset until the session ends.
+- Detection regex must be case-insensitive (existing code paths uppercase the record ID at various points).
+- The `year` fallback (AC-4) — if `home_record.date_of_death.year` is missing, using `DateTime.UtcNow.Year.ToString()` is the pragmatic choice; log it so we can measure occurrence.
+- Two tabs offline at the same time in the same offline session are not a supported scenario per the team ("only a few cases created offline"). No cross-tab locking is required for `XX`.
+- After enough time in production to know no legacy `-OFFLINE` caches remain, the transitional suffix-strip path can be removed in a follow-up housekeeping story.
+
+---
+
+### Story 29.7: Path C — IJE Batch Collision-Retry via `SaveCaseAsync`
+
+**Story ID:** 29.7
+**Depends on:** 29.4
+
+As an operator running IJE batch imports,
+I want each new-case write in the batch to route through the same `SaveCaseAsync` guard that the online UI uses, and to auto-regenerate the record ID on collision,
+So that the batch cannot silently write duplicates when the tenant DB has more than 25 000 rows or when another writer wins a race against the batch's stale HashSet.
+
+**Background:** `BatchItemProcessingService.Process_Message` currently writes each imported case via `_caseRepository.PutCaseDocumentJsonAsync(mmria_id, object_string, db_info)` — a raw DAL PUT that bypasses `CaseManager.SaveCaseAsync` entirely. Uniqueness relies on the stale `ExistingRecordIds` HashSet fetched once at batch start by `MMRIAServicesDAL.GetExistingRecordIds` (up to 25 000 rows from `_view/by_date_created`). If the DB exceeds 25 k rows, or if another process creates a case during the batch, the HashSet is stale and CouchDB's `_id` fresh-GUID PUT succeeds silently even though `home_record.record_id` duplicates another case.
+
+**Acceptance Criteria:**
+
+**AC-1 — Batch write path routes through `CaseManager.SaveCaseAsync`**
+Given a batch item reaches the write step in `BatchItemProcessingService.Process_Message`
+When the case is persisted
+Then it is persisted via `CaseManager.SaveCaseAsync(caseData, changeStack, dbConfig, user, configuration, hostPrefix)` (with a synthetic `changeStack` note like `"vital_import"` and a service-account `ClaimsPrincipal`) rather than directly via `_caseRepository.PutCaseDocumentJsonAsync`
+
+**AC-2 — Collision response triggers regeneration and retry**
+Given the response's `error_code === "record_id_conflict"`
+When the batch item processor handles the rejection
+Then it calls `CaseManager.GenerateUniqueRecordIdAsync(state, year, dbConfig)`, updates `home_record.record_id` in the case document, and retries the save; cap at 5 attempts; on exhaustion, marks the batch item `ImportFailed` with `StatusDetail = "unable to generate unique record id after N attempts"`
+
+**AC-3 — Final batch item record_id reflects post-retry value**
+Given a batch item's record ID was regenerated during retry
+When the batch item's final status is recorded
+Then `BatchItem.mmria_record_id` carries the value that was actually persisted (not the pre-retry candidate) so users can trace the case in the UI
+
+**AC-4 — Stale `GetExistingRecordIds` path is retired**
+Given the DB-wide HashSet is no longer needed for uniqueness
+When Story 29.7 is complete
+Then `MMRIAServicesHelper.ConvertLineToBatchItem` no longer consumes `ExistingRecordIds` as a uniqueness guard; the parameter is either removed or documented as batch-local dedup only (within a single MOR file); `MMRIAServicesManager.GetExistingRecordIds` and `MMRIAServicesDAL.GetExistingRecordIds` are marked `[Obsolete]` if any other caller exists, or deleted if no other callers remain (grep the utilities repo test project first)
+
+**AC-5 — In-batch dedup preserved**
+Given two rows in the same MOR file happen to generate the same random suffix (rare but possible)
+When the batch initialization loop assigns record IDs
+Then a batch-local `HashSet<string>` (fresh, initialized empty each batch) prevents the collision within the file, so the AC-2 retry path only fires against cross-writer / cross-DB collisions, not intra-batch ones
+
+**AC-6 — Build and IJE smoke test pass**
+Given the changes are applied
+When `mmria.services` and `mmria.common` build and a small IJE batch is imported against the local multi-tenant environment
+Then zero build errors; every batch item that reports `NewCaseAdded` has a unique `home_record.record_id` in the DB; a forced-collision test (pre-seeding a duplicate case with a known suffix) confirms the retry path picks a fresh suffix and completes
+
+**Dev Notes:**
+
+- The `ClaimsPrincipal` for the batch service can be built from `mmria.services.vitalsimport.Program.timer_user_name` (already the identity used by other batch operations); confirm what `SaveCaseAsync` requires and mock the minimum claims needed.
+- `changeStack` for a new-case save through `SaveCaseAsync` cannot be empty — reuse the existing `Change_Stack` shape used by `OfflineCaseManager.ApplyOfflineDocumentAsync` (single item, `object_path = "vital_import"`).
+- `SaveCaseAsync` also writes `Change_Stack` audit entries via `IAuditRepository`. Confirm this is acceptable for IJE-imported cases (probably desired — audit trail attributed to the vitals import service account).
+- Do not remove `GetExistingRecordIds` in this story if the utilities repo test project references it; deletion is a small follow-up.
+
+---
+
 ## Epic 29 — Story Sequencing
 
-| Story                                      | Risk | Dependencies                                                              |
-| ------------------------------------------ | ---- | ------------------------------------------------------------------------- |
-| 29.1 — Server-side uniqueness guard        | Low  | None — uses existing `RecordIdExistsAsync`                                |
-| 29.2 — Client-side per-candidate API check | Low  | None — uses existing `record_idController`                                |
-| 29.3 — Add CouchDB view + remove dead code | Low  | 29.2 must complete first (ensures `Get_Record_Id_List` has no call sites) |
+| Story                                                | Risk   | Dependencies                                                                                                                       |
+| ---------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| 29.1 — Server-side uniqueness guard                  | Low    | None — uses existing `RecordIdExistsAsync`                                                                                         |
+| 29.2 — Client-side per-candidate API check           | Low    | None — uses existing `record_idController`                                                                                         |
+| 29.3 — Add CouchDB view + remove dead code           | Low    | 29.2 must complete first (ensures `Get_Record_Id_List` has no call sites)                                                          |
+| 29.4 — `GenerateUniqueRecordIdAsync` + `error_code`  | Low    | 29.1 (the guard populates the new field)                                                                                           |
+| 29.5 — Path A save-then-retry-on-collision           | Low    | 29.4                                                                                                                               |
+| 29.6 — Path B offline placeholder record IDs         | Medium | 29.4; touches offline session storage + sync path                                                                                  |
+| 29.7 — Path C IJE batch collision-retry              | Medium | 29.4; changes IJE write path from raw DAL to `SaveCaseAsync`                                                                       |
 
-29.1 and 29.2 can proceed in parallel. 29.3 depends on 29.2.
+29.1 and 29.2 can proceed in parallel. 29.3 depends on 29.2. 29.4 depends on 29.1 shipping. 29.5, 29.6, and 29.7 are independent of each other once 29.4 lands. 29.3 and 29.5 both touch `index.mmria.js`/`index.pmss.js` — sequence them or coordinate on the same file.
 
 ---
 

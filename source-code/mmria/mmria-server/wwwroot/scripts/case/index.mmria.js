@@ -100,10 +100,47 @@ var g_ui = {
       ) 
       {
           
-          let new_record_id = reporting_state.trim() + '-' + result.home_record.date_of_death.year.trim() + '-' + $mmria.getRandomCryptoValue().toString().substring(2, 6);
-          while(g_record_id_list.has(new_record_id))
+          const yearPart = result.home_record.date_of_death.year.trim();
+          const generateCandidate = () => reporting_state.trim() + '-' + yearPart + '-' + $mmria.getRandomCryptoValue().toString().substring(2, 6);
+          let new_record_id = generateCandidate();
+
+          // Story 29.2: per-candidate uniqueness check
+          // - Online: ask the server (GET /api/record_id) per candidate, retry up to 20 times.
+          // - Offline: use the in-memory Set built from cached offline case data.
+          const isOfflineForUniqueness = window.OfflineStatus && window.OfflineStatus.isOffline() === true;
+          const MAX_UNIQUE_RETRIES = 20;
+
+          if (isOfflineForUniqueness)
           {
-              new_record_id = reporting_state.trim() + '-' + result.home_record.date_of_death.year.trim() + '-' + $mmria.getRandomCryptoValue().toString().substring(2, 6);
+              const localSet = window.OfflineSessionManager.loadOfflineRecordIds(g_ui);
+              while (localSet.has(new_record_id.toUpperCase()))
+              {
+                  new_record_id = generateCandidate();
+              }
+          }
+          else
+          {
+              let attempts = 0;
+              while (true)
+              {
+                  const check_resp = await $.ajax({
+                      url: `${location.protocol}//${location.host}/api/record_id?record_id=${encodeURIComponent(new_record_id)}`
+                  });
+                  if (check_resp && check_resp.is_unique === true)
+                  {
+                      break;
+                  }
+                  attempts++;
+                  if (attempts >= MAX_UNIQUE_RETRIES)
+                  {
+                      const errMsg = "Unable to generate a unique Record ID after multiple attempts. Please try again.";
+                      alert(errMsg);
+                      const err = new Error(errMsg);
+                      err.__handled = true;
+                      throw err;
+                  }
+                  new_record_id = generateCandidate();
+              }
           }
   
           // Append "-offline" suffix if in offline mode
@@ -508,25 +545,26 @@ async function add_new_case_button_click(p_input)
             state.value = "init";
             new_validation_message_area.innerHTML = "generate confirmed";
 
-            await Get_Record_Id_List(
-
-            async function () {
-                try {
-                    console.log('🎯 Starting case creation...');
-                    await g_ui.add_new_case(
-                    new_first_name.value,
-                    new_middle_name.value,
-                    new_last_name.value,
-                    new_month_of_death.value,
-                    new_day_of_death.value,
-                    new_year_of_death.value,
-                    new_state_of_death.value);
-                    console.log('✅ Case creation completed successfully');
-                } catch (error) {
-                    console.error('❌ Error during case creation:', error);
+            // Story 29.2: Get_Record_Id_List no longer needed on the confirm path.
+            // add_new_case() now performs a per-candidate uniqueness check against
+            // GET /api/record_id (online) or a locally rebuilt Set (offline).
+            try {
+                console.log('🎯 Starting case creation...');
+                await g_ui.add_new_case(
+                new_first_name.value,
+                new_middle_name.value,
+                new_last_name.value,
+                new_month_of_death.value,
+                new_day_of_death.value,
+                new_year_of_death.value,
+                new_state_of_death.value);
+                console.log('✅ Case creation completed successfully');
+            } catch (error) {
+                console.error('❌ Error during case creation:', error);
+                if (!error || !error.__handled) {
                     alert('Error creating case. Please try again.');
                 }
-            });
+            }
 
         }
         else

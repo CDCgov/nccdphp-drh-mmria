@@ -277,13 +277,17 @@ public class CaseDAL : ICaseRepository
 
         try
         {
+            // Stored record_ids are uppercased by the client (index.mmria.js: new_record_id.toUpperCase()).
+            var normalizedRecordId = recordId.Trim().ToUpperInvariant();
+
+            // The field lives at doc.home_record.record_id, not doc.record_id.
             var selectorPayload = new
             {
-                selector = new
+                selector = new Dictionary<string, object>
                 {
-                    record_id = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    ["home_record.record_id"] = new Dictionary<string, string>
                     {
-                        ["$eq"] = recordId
+                        ["$eq"] = normalizedRecordId
                     }
                 },
                 fields = new[] { "_id" },

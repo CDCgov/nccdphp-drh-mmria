@@ -14,7 +14,11 @@
     "dotnet.defaultSolution": "disable",
     "dotnet-test-explorer.testProjectPath": "../nccdphp-drh-mmria-utilities/mmria-server.tests",
     "chat.tools.terminal.autoApprove": {
-        "dotnet build": true
+        "dotnet build": true,
+        "/^git -C c:\\\\repos\\\\nccdphp-drh-mmria rev-parse HEAD$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
     }
   }
 }

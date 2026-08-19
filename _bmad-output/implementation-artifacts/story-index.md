@@ -1214,13 +1214,17 @@ dev this story _bmad-output/implementation-artifacts/36-4-change-stack-snapshot-
 
 | Story | File | Status |
 |---|---|---|
-| 29.1 — Server-Side Record ID Format Validation and Uniqueness Guard | `29-1-server-side-format-validation-and-uniqueness-guard.md` | ready-for-dev |
-| 29.2 — Client-Side Per-Candidate Uniqueness Check via API | `29-2-client-side-per-candidate-api-check.md` | ready-for-dev |
+| 29.1 — Server-Side Record ID Format Validation and Uniqueness Guard | `29-1-server-side-format-validation-and-uniqueness-guard.md` | done |
+| 29.2 — Client-Side Per-Candidate Uniqueness Check via API | `29-2-client-side-per-candidate-api-check.md` | done |
 | 29.3 — Add `record_id_list` CouchDB View and Remove Dead Bulk-List Code | `29-3-add-record-id-list-view-remove-broken-bulk-list-call.md` | backlog |
+| 29.4 — Extract `GenerateUniqueRecordIdAsync` Manager Method and Structured `error_code` | `29-4-generate-unique-record-id-manager-method.md` | ready-for-dev |
+| 29.5 — Online Save-Then-Retry-on-Collision _(Path A)_ | `29-5-online-save-then-retry-on-collision.md` | backlog |
+| 29.6 — Offline Placeholder Record IDs _(Path B)_ | `29-6-offline-placeholder-record-id.md` | backlog |
+| 29.7 — IJE Batch Collision-Retry via `SaveCaseAsync` _(Path C)_ | `29-7-ije-batch-collision-retry.md` | backlog |
 
-**Sequencing:** 29.1 and 29.2 are independent and can proceed in parallel. 29.3 depends on 29.2 (confirms `Get_Record_Id_List` has no remaining call sites before deletion).
+**Sequencing:** 29.1 and 29.2 are independent and can proceed in parallel. 29.3 depends on 29.2. 29.4 depends on 29.1. 29.5, 29.6, and 29.7 are independent of each other once 29.4 lands; 29.3 and 29.5 both touch `index.mmria.js` / `index.pmss.js` — sequence them or coordinate on the same file.
 
-> ℹ️ Defense-in-depth: 29.1 is the server-side last-line guard; 29.2 eliminates the client-side race condition. Both must ship before 29.3 removes dead code.
+> ℹ️ Defense-in-depth: 29.1 is the server-side last-line guard; 29.2 eliminates the client-side race condition. 29.3 removes dead code. 29.4 extracts a shared record-id primitive and structured error code. 29.5 / 29.6 / 29.7 apply the primitive to the three case-creation paths (online UI, offline sync, IJE batch) so all three retry on collision instead of failing.
 
 **Story 29.1 prompt:**
 
@@ -1238,6 +1242,30 @@ dev this story _bmad-output/implementation-artifacts/29-2-client-side-per-candid
 
 ```
 dev this story _bmad-output/implementation-artifacts/29-3-add-record-id-list-view-remove-broken-bulk-list-call.md
+```
+
+**Story 29.4 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/29-4-generate-unique-record-id-manager-method.md
+```
+
+**Story 29.5 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/29-5-online-save-then-retry-on-collision.md
+```
+
+**Story 29.6 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/29-6-offline-placeholder-record-id.md
+```
+
+**Story 29.7 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/29-7-ije-batch-collision-retry.md
 ```
 
 ---

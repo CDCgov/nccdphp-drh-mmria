@@ -169,9 +169,21 @@ Urban-status derivation (Metropolitan Division / Metropolitan / Micropolitan / R
 
 ### FR-2 — Record ID Uniqueness Enforcement
 
-_(Carried from v4.1 backlog — Epic 29. Full FR definition: see `epics.md` FR-29.1–FR-29.3.)_
+_(Carried from v4.1 backlog — Epic 29. Full FR definition: see `epics.md` FR-29.1–FR-29.7.)_
 
 Abstractors creating new cases are protected against duplicate MMRIA Record IDs by a defense-in-depth strategy: server-side format validation and uniqueness guard, client-side per-candidate API check before save, and a functional `record_id_list` CouchDB view replacing the broken bulk-list dependency.
+
+**FR-2.4 — Shared `GenerateUniqueRecordIdAsync` primitive and structured collision error code.**
+`CaseManager` exposes a public `GenerateUniqueRecordIdAsync(state, year, dbConfig, maxAttempts)` method that produces a jurisdiction-scoped unique record ID by generating a `STATE-YEAR-NNNN` candidate and calling `RecordIdExistsAsync` until a free suffix is found or `maxAttempts` is exhausted (throws `RecordIdGenerationExhaustedException`). `document_put_response` gains a nullable `error_code` string field. `SaveCaseAsync` populates `error_code = "record_id_format"` on format-guard rejection and `error_code = "record_id_conflict"` on uniqueness-guard rejection. Downstream callers detect collisions via the code rather than matching English error text.
+
+**FR-2.5 — Online case creation uses save-then-retry-on-collision (Path A).**
+The Story 29.2 client pre-flight loop against `/api/record_id` is replaced by a single POST to `/api/case`. When the response's `error_code === "record_id_conflict"`, `add_new_case()` regenerates the 4-digit suffix and re-POSTs, up to 5 total attempts. On exhaustion, the same user-facing error message defined in FR-29.2 is surfaced and no case is created. Applies to both `index.mmria.js` and `index.pmss.js`. `record_idController` retains no shipped callers after this FR and is tagged for cleanup.
+
+**FR-2.6 — Offline case creation uses placeholder record IDs generated on server at sync (Path B).**
+Offline `add_new_case()` writes `home_record.record_id = "{STATE}-OFFLINE-CASE-{XX}"` where `XX` is a two-digit per-offline-session sequence maintained by `OfflineSessionManager`. The prior `-OFFLINE` suffix and `generateOfflineRecordId` helper are removed. At sync time, `OfflineCaseManager.ApplyOfflineDocumentAsync` detects the placeholder pattern (`/^([A-Z0-9]+)-OFFLINE-CASE-\d+$/i`), calls `CaseManager.GenerateUniqueRecordIdAsync(state, year, dbConfig)` where `state` is the captured prefix and `year` is `home_record.date_of_death.year`, assigns the result, and then invokes `SaveCaseAsync`. Legacy `STATE-YEAR-NNNN-OFFLINE` cases still in offline caches continue to be accepted transitionally with a structured log entry recording which format was seen.
+
+**FR-2.7 — IJE batch imports route through `SaveCaseAsync` with collision-retry (Path C).**
+`BatchItemProcessingService.Process_Message` persists each new case via `CaseManager.SaveCaseAsync` rather than directly via `_caseRepository.PutCaseDocumentJsonAsync`. On `error_code === "record_id_conflict"`, the batch item processor calls `GenerateUniqueRecordIdAsync` for a fresh record ID, updates `home_record.record_id`, and retries; cap at 5 attempts; on exhaustion, marks the item `ImportFailed`. `BatchItem.mmria_record_id` reports the final, post-retry value so users can trace the case. The stale 25 000-row `ExistingRecordIds` HashSet pattern in `MMRIAServicesHelper.ConvertLineToBatchItem` is retired for cross-writer uniqueness; a small batch-local dedup Set is preserved to guard intra-file suffix collisions.
 
 ---
 
@@ -304,7 +316,7 @@ NFR-4: The TAMU API key is resolved at server startup from the existing CouchDB 
 ## FR Coverage Map
 
 FR-1.1 – FR-1.9: Epic 30 — Unified Server-Side Geocoding (TAMU Refactor)  
-FR-2.1 – FR-2.3: Epic 29 — Record ID Uniqueness Enforcement  
+FR-2.1 – FR-2.7: Epic 29 — Record ID Uniqueness Enforcement  
 FR-3.1 – FR-3.11: Epic 37 — Form Designer Removal — Static HTML Form Rendering  
 FR-4.1 – FR-4.3: Epic TBD — IJE Upload Duplicate Prevention and Logging  
 FR-5.1 – FR-5.3: Epic TBD — Update Year of Death Record ID Regression Fix  

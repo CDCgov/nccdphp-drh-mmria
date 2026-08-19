@@ -939,6 +939,52 @@ public class CaseManager
                 if (checkStatusCode == 404)
                 {
                     // New case: CouchDB returns not_found for the existence probe.
+
+                    // Story 29.1: Server-side last-line guard for new cases.
+                    // Enforce record_id format (STATE-YEAR-NNNN) and jurisdiction-scoped uniqueness
+                    // before writing, so a duplicate/malformed record_id can never be persisted
+                    // regardless of client behavior. Skipped when record_id is absent — some
+                    // workflows legitimately omit it on first save.
+                    if (!string.IsNullOrWhiteSpace(mmria_record_id))
+                    {
+                        var recordIdSegments = mmria_record_id.Split('-');
+
+                        if (recordIdSegments.Length < 3 ||
+                            !System.Text.RegularExpressions.Regex.IsMatch(recordIdSegments[^1], @"^\d{4}$"))
+                        {
+                            response.ok = false;
+                            response.error_description = $"Record ID '{mmria_record_id}' does not match the required format (suffix must be exactly 4 digits).";
+                            result.Response = response;
+                            return result;
+                        }
+
+                        if (!System.Text.RegularExpressions.Regex.IsMatch(recordIdSegments[^2], @"^\d{4}$") ||
+                            !int.TryParse(recordIdSegments[^2], out var yearSegment) ||
+                            yearSegment < 1900 || yearSegment > 2100)
+                        {
+                            response.ok = false;
+                            response.error_description = $"Record ID '{mmria_record_id}' does not match the required format (year segment must be a 4-digit year between 1900 and 2100).";
+                            result.Response = response;
+                            return result;
+                        }
+
+                        var jurisdictionPrefix = string.Join('-', recordIdSegments[..^2]);
+                        if (string.IsNullOrWhiteSpace(jurisdictionPrefix))
+                        {
+                            response.ok = false;
+                            response.error_description = $"Record ID '{mmria_record_id}' does not match the required format (jurisdiction prefix is missing).";
+                            result.Response = response;
+                            return result;
+                        }
+
+                        if (await RecordIdExistsAsync(mmria_record_id, dbConfig))
+                        {
+                            response.ok = false;
+                            response.error_description = $"Record ID '{mmria_record_id}' is already in use. Please generate a new Record ID.";
+                            result.Response = response;
+                            return result;
+                        }
+                    }
                 }
                 else if (checkStatusCode == 200)
                 {
