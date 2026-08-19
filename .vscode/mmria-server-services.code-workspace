@@ -32,7 +32,11 @@
             "approve": true,
             "matchCommandLine": true
         },
-        "Add-Content": true
+        "Add-Content": true,
+        "/^python _bmad/scripts/resolve_customization\\.py --skill _bmad/bmm/agents/bmad-agent-architect --key agent 2>&1 \\| Select-Object -First 100$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
     }
   }
 }

@@ -1,6 +1,6 @@
 # Story 30.1: Create GeocodingManager in SharedLibraries
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -27,21 +27,21 @@ so that all geocoding paths in the codebase share one implementation and urban-s
 
 ## Tasks / Subtasks
 
-- [ ] Create `GeocodeResult` (AC: #2)
-  - [ ] Define as a record or class in `mmria.common/SharedLibraries/Geocoding/` (or a sibling file in `Manager/`)
-  - [ ] 15 properties matching the field names in AC-2
-- [ ] Create `GeocodingManager` (AC: #1, #3, #6)
-  - [ ] Method: `public GeocodeResult FetchGeocode(string geocodeApiKey, string street, string city, string state, string zip, string censusYear)`
-  - [ ] Split state on `-` before sending to TAMU (e.g. `"GA-Georgia".Split('-')[0]`)
-  - [ ] Call TAMU HTTP endpoint using existing model types from `mmria.common/texas_am/` — adapt from `TAMUGeoCode` in `mmria.services/Utilities/TAMUGeocode.cs` without creating an assembly dependency on services
-- [ ] Implement urban-status derivation (AC: #4, #5)
-  - [ ] After mapping TAMU response fields, compute `UrbanStatus` per the branching logic
-  - [ ] Compute `StateCountyFips = CensusStateFips + CensusCountyFips`
-- [ ] Handle error/unmatchable cases (AC: #7)
-  - [ ] `FeatureMatchingResultType == "Unmatchable"` → return empty result
-  - [ ] HTTP error or exception → catch, return empty result with `UrbanStatus = "Undetermined"`
-- [ ] Build (AC: #9)
-  - [ ] `dotnet build nccdphp-drh-mmria-common/mmria.common/mmria.common.csproj` — zero errors
+- [x] Create `GeocodeResult` (AC: #2)
+  - [x] Define as a record or class in `mmria.common/SharedLibraries/Geocoding/` (or a sibling file in `Manager/`)
+  - [x] 15 properties matching the field names in AC-2
+- [x] Create `GeocodingManager` (AC: #1, #3, #6)
+  - [x] Method: `public GeocodeResult FetchGeocode(string geocodeApiKey, string street, string city, string state, string zip, string censusYear)`
+  - [x] Split state on `-` before sending to TAMU (e.g. `"GA-Georgia".Split('-')[0]`)
+  - [x] Call TAMU HTTP endpoint using existing model types from `mmria.common/texas_am/` — adapt from `TAMUGeoCode` in `mmria.services/Utilities/TAMUGeocode.cs` without creating an assembly dependency on services
+- [x] Implement urban-status derivation (AC: #4, #5)
+  - [x] After mapping TAMU response fields, compute `UrbanStatus` per the branching logic
+  - [x] Compute `StateCountyFips = CensusStateFips + CensusCountyFips`
+- [x] Handle error/unmatchable cases (AC: #7)
+  - [x] `FeatureMatchingResultType == "Unmatchable"` → return empty result
+  - [x] HTTP error or exception → catch, return empty result with `UrbanStatus = "Undetermined"`
+- [x] Build (AC: #9)
+  - [x] `dotnet build nccdphp-drh-mmria-common/mmria.common/mmria.common.csproj` — zero errors
 
 ## Dev Notes
 
@@ -76,3 +76,45 @@ else if (inRange && result.CensusCbsaFips == "")
 else
     urbanStatus = "Undetermined";
 ```
+
+## Dev Agent Record
+
+**Agent:** Amelia (bmad-agent-dev)
+**Completion date:** 2026-08-19
+
+### Files created
+
+- `nccdphp-drh-mmria-common/mmria.common/SharedLibraries/Geocoding/GeocodeResult.cs`
+- `nccdphp-drh-mmria-common/mmria.common/SharedLibraries/Geocoding/Manager/GeocodingManager.cs`
+
+### Files modified
+
+None (other than this story file's Status, task checkboxes, and this Dev Agent Record).
+
+### Build result
+
+`dotnet build nccdphp-drh-mmria-common/mmria.common/mmria.common.csproj --nologo`
+→ **Build succeeded. 0 Warning(s). 0 Error(s).**
+
+### Deviations from ACs
+
+None. All 9 ACs satisfied as written. Notes on implementation choices:
+
+- **AC-5 wording** ("`StateCountyFips = CensusStateFips + CensusCountyFips` is computed here") is implemented as an unconditional string concatenation on the result object. The legacy code in `BatchItemProcessingService.Set_facility_of_delivery_Geocode` only concatenated when both parts were non-empty; the story wording is explicit ("computed here" without a conditional), so the manager always concatenates. When both parts are empty the result is `""`, which matches legacy behavior in that case.
+- **Census-year normalization** was preserved from `TAMUGeoCode` (`GetCensusYear` → `NormalizeCensusYear`) so arbitrary year strings still resolve to `1990|2000|2010|2020` for the TAMU URL. Not required by an AC but preserves parity with the legacy call site so downstream stories don't regress on caller inputs like `"2018"` or `""`.
+- **HttpClient reuse:** a single static `HttpClient` is held on `GeocodingManager` (legacy `TAMUGeoCode` created one per call). Prevents socket exhaustion under batch load; behavior otherwise identical.
+- **Method is synchronous** per AC-3 signature (`GeocodeResult FetchGeocode(...)`). Uses `.GetStringAsync(...).Result` — same pattern as the legacy `TAMUGeoCode.execute`. If a downstream story needs an async variant, it can be added without breaking this one.
+
+### Notes for downstream Epic 30 stories (30.2+)
+
+**Public surface locked in by 30.1** — 30.2 authors should target exactly this:
+
+- Namespace of manager: `mmria.common.SharedLibraries.Geocoding.Manager`
+- Namespace of result: `mmria.common.SharedLibraries.Geocoding`
+- Class: `GeocodingManager` (sealed, parameterless ctor; can be `new`-ed or DI-registered as a singleton — safe because state is limited to the static `HttpClient`)
+- Method: `GeocodeResult FetchGeocode(string geocodeApiKey, string street, string city, string state, string zip, string censusYear)` — synchronous
+- `GeocodeResult` is a class (not a record); all 15 properties are `string` and default to `""` except `UrbanStatus` which defaults to `"Undetermined"`. Consumers can safely read any property without null-checking.
+- On failure/unmatchable, all 15 fields on the returned `GeocodeResult` are empty strings **except** `UrbanStatus = "Undetermined"`. Callers should NOT treat "empty latitude" as an exception — it is the documented failure signal (AC-7).
+- The manager takes the raw state value (e.g. `"GA-Georgia"`) and splits internally. Downstream call sites should pass the raw case field value; they do **not** need to pre-split.
+- The legacy `mmria.services.vitalsimport.Utilities.TAMUGeoCode` class is intentionally still in place (AC-8) and still referenced by `BatchItemProcessingService`. Story 30.5 removes it. Do not delete it in 30.2-30.4.
+- No DI registration was added in 30.1 — the manager is stateless from the caller's perspective and can be either newed at the call site or registered as a singleton by the story that introduces the first DI-based consumer.

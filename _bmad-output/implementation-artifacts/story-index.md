@@ -1274,12 +1274,12 @@ dev this story _bmad-output/implementation-artifacts/29-7-ije-batch-collision-re
 
 | Story | File | Status |
 |---|---|---|
-| 30.1 — Create `GeocodingManager` in SharedLibraries | `30-1-create-geocoding-manager.md` | ready-for-dev |
-| 30.2 — Create `CaseGeocodingManager` with Per-Location Apply Methods | `30-2-create-case-geocoding-manager-apply-methods.md` | backlog |
-| 30.3 — New API Endpoint: `POST /api/case-geocode/{caseId}/{locationKey}` | `30-3-new-api-endpoint-case-geocode.md` | backlog |
-| 30.4 — Refactor `MMRIA_calculations.js` Geocode Button Handlers | `30-4-refactor-mmria-calculations-geocode-functions.md` | backlog |
-| 30.5 — Refactor `BatchItemProcessingService` to Use Shared `GeocodingManager` | `30-5-refactor-batch-item-processing-service.md` | backlog |
-| 30.6 — Fix Legacy Geocode Calls in `mmria-check-code.js` and `validator.js` | `30-6-fix-legacy-geocode-calls-check-code-validator.md` | backlog |
+| 30.1 — Create `GeocodingManager` in SharedLibraries | `30-1-create-geocoding-manager.md` | done |
+| 30.2 — Create `CaseGeocodingManager` with Per-Location Apply Methods | `30-2-create-case-geocoding-manager-apply-methods.md` | done |
+| 30.3 — New API Endpoint: `POST /api/case-geocode/{caseId}/{locationKey}` | `30-3-new-api-endpoint-case-geocode.md` | done |
+| 30.4 — Refactor `MMRIA_calculations.js` Geocode Button Handlers | `30-4-refactor-mmria-calculations-geocode-functions.md` | done |
+| 30.5 — Refactor `BatchItemProcessingService` to Use Shared `GeocodingManager` | `30-5-refactor-batch-item-processing-service.md` | done |
+| 30.6 — Fix Legacy Geocode Calls in `mmria-check-code.js` and `validator.js` | `30-6-fix-legacy-geocode-calls-check-code-validator.md` | in-progress |
 | 30.7 — Remove Dead TAMU Code from `mmria.committee_member.js` | `30-7-remove-dead-tamu-code-committee-member.md` | ready-for-dev |
 
 **Sequencing:** 30.1 → 30.2 → 30.3 is the critical path. 30.5 can run in parallel with 30.3 once 30.1 and 30.2 are done. 30.4 and 30.6 follow 30.3 and can run in parallel. 30.7 is fully independent — can be done at any time.

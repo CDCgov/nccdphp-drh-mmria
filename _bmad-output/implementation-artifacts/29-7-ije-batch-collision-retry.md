@@ -1,6 +1,6 @@
 # Story 29.7: IJE Batch Collision-Retry via `SaveCaseAsync` (Path C)
 
-Status: backlog
+Status: review
 
 ## Story
 
@@ -27,19 +27,19 @@ so that the batch cannot silently write duplicates when the tenant DB has more t
 
 ## Tasks / Subtasks
 
-- [ ] Locate the raw DAL PUT in `BatchItemProcessingService.Process_Message` (~line 2635) (AC: #1)
-- [ ] Build a service-account `ClaimsPrincipal` for the vitals-import identity (AC: #1)
-- [ ] Build a synthetic `Change_Stack` for the new-case save (`object_path = "vital_import"`) (AC: #1)
-- [ ] Replace the raw PUT with `CaseManager.SaveCaseAsync` (AC: #1)
-- [ ] Wrap the save in a collision-retry loop keyed on `error_code === "record_id_conflict"` (AC: #2)
-  - [ ] Cap at 5 attempts
-  - [ ] On exhaustion, populate `BatchItem` with `ImportFailed` status and the failure `StatusDetail`
-- [ ] Ensure the final `BatchItem.mmria_record_id` reflects the persisted value (AC: #3)
-- [ ] Retire the stale HashSet uniqueness path in `MMRIAServicesHelper.ConvertLineToBatchItem` (AC: #4)
-  - [ ] Grep both repos for callers of `GetExistingRecordIds`
-  - [ ] Delete or mark `[Obsolete]` accordingly
-- [ ] Add batch-local dedup HashSet in the loop that assigns initial candidates (AC: #5)
-- [ ] Build both projects (AC: #6)
+- [x] Locate the raw DAL PUT in `BatchItemProcessingService.Process_Message` (~line 2635) (AC: #1)
+- [x] Build a service-account `ClaimsPrincipal` for the vitals-import identity (AC: #1)
+- [x] Build a synthetic `Change_Stack` for the new-case save (`object_path = "vital_import"`) (AC: #1)
+- [x] Replace the raw PUT with `CaseManager.SaveCaseAsync` (AC: #1)
+- [x] Wrap the save in a collision-retry loop keyed on `error_code === "record_id_conflict"` (AC: #2)
+  - [x] Cap at 5 attempts
+  - [x] On exhaustion, populate `BatchItem` with `ImportFailed` status and the failure `StatusDetail`
+- [x] Ensure the final `BatchItem.mmria_record_id` reflects the persisted value (AC: #3)
+- [x] Retire the stale HashSet uniqueness path in `MMRIAServicesHelper.ConvertLineToBatchItem` (AC: #4)
+  - [x] Grep both repos for callers of `GetExistingRecordIds`
+  - [x] Delete or mark `[Obsolete]` accordingly
+- [x] Add batch-local dedup HashSet in the loop that assigns initial candidates (AC: #5)
+- [x] Build both projects (AC: #6)
 - [ ] IJE smoke test in local multi-tenant environment (AC: #6)
 
 ## Dev Notes

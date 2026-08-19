@@ -353,6 +353,10 @@ public sealed partial class Program
             builder.Services.AddScoped<mmria.common.SharedLibraries.CVS.DAL.CVSDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.CVS.Manager.CVSManager>();
 
+            // Story 30.3: Shared geocoding managers — parameterless, singleton-safe.
+            builder.Services.AddSingleton<mmria.common.SharedLibraries.Geocoding.Manager.GeocodingManager>();
+            builder.Services.AddSingleton<mmria.common.SharedLibraries.Case.Manager.CaseGeocodingManager>();
+
             // Register Session Manager (replaces actor-based Post_Session and Record_Session_Event)
             builder.Services.AddScoped<mmria.common.SharedLibraries.Session.Manager.SessionManager>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.CaseValidation.DAL.CaseValidationDAL>();

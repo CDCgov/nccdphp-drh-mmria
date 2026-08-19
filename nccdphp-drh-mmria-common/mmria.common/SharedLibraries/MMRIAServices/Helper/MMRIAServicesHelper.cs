@@ -409,7 +409,7 @@ public static class MMRIAServicesHelper
             DateTime ImportDate,
             string ImportFileName,
             string ReportingState,
-            HashSet<string> ExistingRecordIds
+            HashSet<string> BatchLocalRecordIds
     )
     {
         /*
@@ -426,6 +426,11 @@ public static class MMRIAServicesHelper
             StatusDetail
             */
 
+        // Story 29.7: BatchLocalRecordIds is a fresh per-batch HashSet used only to prevent
+        // two rows in the same MOR file from generating the same 4-digit suffix. Cross-writer
+        // and cross-DB uniqueness is now enforced at write time by CaseManager.SaveCaseAsync
+        // via the Story 29.1 guard and Story 29.7 collision-retry loop in BatchItemProcessingService.
+
         var x = mor_get_header(LineItem);
 
         string record_id = null;
@@ -434,8 +439,8 @@ public static class MMRIAServicesHelper
         {
             record_id = $"{ReportingState.ToUpper()}-{x["DOD_YR"]}-{GenerateRandomFourDigits().ToString()}";
         }
-        while (ExistingRecordIds.Contains(record_id));
-        ExistingRecordIds.Add(record_id);
+        while (BatchLocalRecordIds.Contains(record_id));
+        BatchLocalRecordIds.Add(record_id);
 
         var result = new mmria.common.ije.BatchItem()
         {
