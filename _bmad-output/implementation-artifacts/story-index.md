@@ -1216,7 +1216,7 @@ dev this story _bmad-output/implementation-artifacts/36-4-change-stack-snapshot-
 |---|---|---|
 | 29.1 — Server-Side Record ID Format Validation and Uniqueness Guard | `29-1-server-side-format-validation-and-uniqueness-guard.md` | done |
 | 29.2 — Client-Side Per-Candidate Uniqueness Check via API | `29-2-client-side-per-candidate-api-check.md` | done |
-| 29.3 — Add `record_id_list` CouchDB View and Remove Dead Bulk-List Code | `29-3-add-record-id-list-view-remove-broken-bulk-list-call.md` | backlog |
+| 29.3 — Add `record_id_list` CouchDB View and Remove Dead Bulk-List Code | `29-3-add-record-id-list-view-remove-broken-bulk-list-call.md` | done |
 | 29.4 — Extract `GenerateUniqueRecordIdAsync` Manager Method and Structured `error_code` | `29-4-generate-unique-record-id-manager-method.md` | ready-for-dev |
 | 29.5 — Online Save-Then-Retry-on-Collision _(Path A)_ | `29-5-online-save-then-retry-on-collision.md` | backlog |
 | 29.6 — Offline Placeholder Record IDs _(Path B)_ | `29-6-offline-placeholder-record-id.md` | backlog |
