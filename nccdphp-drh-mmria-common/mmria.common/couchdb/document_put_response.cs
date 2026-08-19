@@ -12,6 +12,10 @@ public sealed class document_put_response
 
     public string error_description { get; set; }
 
+    // Machine-readable rejection code — null on success and on legacy rejections
+    // that predate structured codes. See mmria.common.model.couchdb.SaveErrorCodes.
+    public string error_code { get; set; }
+
     public document_put_response ()
     {
         

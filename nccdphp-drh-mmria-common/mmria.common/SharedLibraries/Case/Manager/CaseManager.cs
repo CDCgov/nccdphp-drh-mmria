@@ -684,20 +684,48 @@ public class CaseManager
 
         string new_record_id = $"{array[0]}-{yearOfDeathReplacement}-{array[2]}";
 
-        // Per-candidate existence check rather than loading every record_id in the
-        // database into a HashSet. The original implementation fetched up to 25,000
-        // rows on every call; this loop now does one tiny Mango query per candidate.
-        int my_count = -1;
-        while (await RecordIdExistsAsync(new_record_id, db_info))
+        // Try the initial year-substituted candidate first (Story 39.1 preservation
+        // path). If it is already taken, fall through to the shared primitive for
+        // random collision-retry so all three creation paths share one loop.
+        if (await RecordIdExistsAsync(new_record_id, db_info))
         {
-            int _min = 1000;
-            int _max = 9999;
-            Random _rdm = new Random(System.DateTime.Now.Millisecond + my_count);
-            my_count++;
-            new_record_id = $"{array[0]}-{yearOfDeathReplacement}-{_rdm.Next(_min, _max)}";
+            new_record_id = await GenerateUniqueRecordIdAsync(
+                array[0],
+                yearOfDeathReplacement?.ToString() ?? string.Empty,
+                db_info);
         }
 
         return new_record_id;
+    }
+
+    /// <summary>
+    /// Generates a jurisdiction-scoped MMRIA record ID in the form
+    /// <c>{statePrefix}-{year}-{NNNN}</c> whose 4-digit suffix is not currently in
+    /// use in the database identified by <paramref name="dbInfo"/>. The suffix is a
+    /// uniform random integer in [1000, 9999]. On collision the suffix is regenerated
+    /// and re-checked up to <paramref name="maxAttempts"/> times.
+    /// </summary>
+    /// <exception cref="RecordIdGenerationExhaustedException">
+    /// Thrown when <paramref name="maxAttempts"/> random suffixes all collide.
+    /// </exception>
+    public async Task<string> GenerateUniqueRecordIdAsync(
+        string statePrefix,
+        string year,
+        DBConfigurationDetail dbInfo,
+        int maxAttempts = 20)
+    {
+        for (int attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            var suffix = Random.Shared.Next(1000, 10000);
+            var candidate = $"{statePrefix}-{year}-{suffix}";
+
+            if (!await RecordIdExistsAsync(candidate, dbInfo))
+            {
+                return candidate;
+            }
+        }
+
+        throw new RecordIdGenerationExhaustedException(statePrefix, year, maxAttempts);
     }
 
     private static int GetCaseLockMinutes(OverridableConfiguration configuration, string hostPrefix)
@@ -953,6 +981,7 @@ public class CaseManager
                             !System.Text.RegularExpressions.Regex.IsMatch(recordIdSegments[^1], @"^\d{4}$"))
                         {
                             response.ok = false;
+                            response.error_code = SaveErrorCodes.RecordIdFormat;
                             response.error_description = $"Record ID '{mmria_record_id}' does not match the required format (suffix must be exactly 4 digits).";
                             result.Response = response;
                             return result;
@@ -963,6 +992,7 @@ public class CaseManager
                             yearSegment < 1900 || yearSegment > 2100)
                         {
                             response.ok = false;
+                            response.error_code = SaveErrorCodes.RecordIdFormat;
                             response.error_description = $"Record ID '{mmria_record_id}' does not match the required format (year segment must be a 4-digit year between 1900 and 2100).";
                             result.Response = response;
                             return result;
@@ -972,6 +1002,7 @@ public class CaseManager
                         if (string.IsNullOrWhiteSpace(jurisdictionPrefix))
                         {
                             response.ok = false;
+                            response.error_code = SaveErrorCodes.RecordIdFormat;
                             response.error_description = $"Record ID '{mmria_record_id}' does not match the required format (jurisdiction prefix is missing).";
                             result.Response = response;
                             return result;
@@ -980,6 +1011,7 @@ public class CaseManager
                         if (await RecordIdExistsAsync(mmria_record_id, dbConfig))
                         {
                             response.ok = false;
+                            response.error_code = SaveErrorCodes.RecordIdConflict;
                             response.error_description = $"Record ID '{mmria_record_id}' is already in use. Please generate a new Record ID.";
                             result.Response = response;
                             return result;
