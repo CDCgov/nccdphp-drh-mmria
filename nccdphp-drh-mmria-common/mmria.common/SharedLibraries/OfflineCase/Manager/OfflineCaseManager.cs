@@ -613,10 +613,47 @@ public class OfflineCaseManager : IOfflineCaseManager
         modifiedDocument.last_updated_by = userName;
         modifiedDocument.date_last_updated = DateTime.UtcNow;
 
-        if (!string.IsNullOrWhiteSpace(modifiedDocument.home_record?.record_id) &&
-            modifiedDocument.home_record.record_id.EndsWith("-offline", StringComparison.OrdinalIgnoreCase))
+        var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient, _caseRepository, _auditRepository);
+
+        // Story 29.6: sync-side detection converts the offline placeholder
+        // record_id ({STATE}-OFFLINE-CASE-XX) into a real jurisdiction-scoped
+        // STATE-YEAR-NNNN via CaseManager.GenerateUniqueRecordIdAsync before
+        // SaveCaseAsync runs, so the Story 29.1 format guard never sees the
+        // placeholder. The legacy "-offline" suffix strip below (AC #5) remains
+        // functional for pre-29.6 offline caches.
+        var recordId = modifiedDocument.home_record?.record_id;
+        if (!string.IsNullOrWhiteSpace(recordId))
         {
-            modifiedDocument.home_record.record_id = modifiedDocument.home_record.record_id[..^"-offline".Length];
+            var placeholderMatch = System.Text.RegularExpressions.Regex.Match(
+                recordId,
+                @"^([A-Z0-9]+)-OFFLINE-CASE-\d+$",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            if (placeholderMatch.Success)
+            {
+                var statePrefix = placeholderMatch.Groups[1].Value.ToUpperInvariant();
+                string year;
+                var yearValue = modifiedDocument.home_record?.date_of_death?.year;
+                if (yearValue.HasValue && yearValue.Value >= 1900 && yearValue.Value <= 2100)
+                {
+                    year = ((int)yearValue.Value).ToString();
+                }
+                else
+                {
+                    year = DateTime.UtcNow.Year.ToString();
+                    Console.WriteLine($"OfflineCaseManager sync record_id_format=placeholder year_source=utc_fallback placeholder={recordId} case_id={modifiedDocument._id}");
+                }
+
+                var newRecordId = await caseManager.GenerateUniqueRecordIdAsync(statePrefix, year, dbConfig);
+                Console.WriteLine($"OfflineCaseManager sync record_id_format=placeholder placeholder={recordId} new_record_id={newRecordId} case_id={modifiedDocument._id}");
+                modifiedDocument.home_record.record_id = newRecordId;
+            }
+            else if (recordId.EndsWith("-offline", StringComparison.OrdinalIgnoreCase))
+            {
+                var stripped = recordId[..^"-offline".Length];
+                Console.WriteLine($"OfflineCaseManager sync record_id_format=legacy_offline_suffix original={recordId} new_record_id={stripped} case_id={modifiedDocument._id}");
+                modifiedDocument.home_record.record_id = stripped;
+            }
         }
 
         List<mmria.common.model.couchdb.Change_Stack_Item> changeStackItems;
@@ -656,7 +693,6 @@ public class OfflineCaseManager : IOfflineCaseManager
             note = $"Offline sync: Document modified offline and synced from session {request.OfflineSessionId}"
         };
 
-        var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient, _caseRepository, _auditRepository);
         var saveResult = await caseManager.SaveCaseAsync(
             modifiedDocument,
             changeStack,

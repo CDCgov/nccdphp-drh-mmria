@@ -1219,7 +1219,7 @@ dev this story _bmad-output/implementation-artifacts/36-4-change-stack-snapshot-
 | 29.3 — Add `record_id_list` CouchDB View and Remove Dead Bulk-List Code | `29-3-add-record-id-list-view-remove-broken-bulk-list-call.md` | done |
 | 29.4 — Extract `GenerateUniqueRecordIdAsync` Manager Method and Structured `error_code` | `29-4-generate-unique-record-id-manager-method.md` | done |
 | 29.5 — Online Save-Then-Retry-on-Collision _(Path A)_ | `29-5-online-save-then-retry-on-collision.md` | done |
-| 29.6 — Offline Placeholder Record IDs _(Path B)_ | `29-6-offline-placeholder-record-id.md` | backlog |
+| 29.6 — Offline Placeholder Record IDs _(Path B)_ | `29-6-offline-placeholder-record-id.md` | done |
 | 29.7 — IJE Batch Collision-Retry via `SaveCaseAsync` _(Path C)_ | `29-7-ije-batch-collision-retry.md` | backlog |
 
 **Sequencing:** 29.1 and 29.2 are independent and can proceed in parallel. 29.3 depends on 29.2. 29.4 depends on 29.1. 29.5, 29.6, and 29.7 are independent of each other once 29.4 lands; 29.3 and 29.5 both touch `index.mmria.js` / `index.pmss.js` — sequence them or coordinate on the same file.

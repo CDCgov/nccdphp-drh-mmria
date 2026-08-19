@@ -109,6 +109,28 @@ window.OfflineSessionManager = {
   },
 
   /**
+   * Story 29.6: returns the next per-offline-session case sequence as a
+   * 2-digit zero-padded string. Counter is scoped to the current offline
+   * session and persisted to localStorage so it survives tab reload but
+   * resets when a new offline session starts.
+   * @returns {string} Zero-padded 2-digit sequence (e.g. "01").
+   */
+  getNextOfflineCaseSequence: function() {
+    const sessionId = (window.OfflineStatus && typeof window.OfflineStatus.getOfflineSessionId === 'function'
+      ? window.OfflineStatus.getOfflineSessionId()
+      : null) || localStorage.getItem('offline_session_id') || 'no-session';
+
+    const storageKey = 'offline_case_sequence:' + sessionId;
+    let current = parseInt(localStorage.getItem(storageKey) || '0', 10);
+    if (isNaN(current) || current < 0) {
+      current = 0;
+    }
+    const next = current + 1;
+    localStorage.setItem(storageKey, next.toString());
+    return next.toString().padStart(2, '0');
+  },
+
+  /**
    * Load offline record IDs from cached case data
    * @param {Object} g_ui - Global UI object with offline case lists
    * @returns {Set<string>} Set of record IDs

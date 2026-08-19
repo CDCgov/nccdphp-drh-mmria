@@ -37,7 +37,12 @@ function render_offline_processing_item(caseDoc, i) {
     const currentCaseStatus = caseStatus == null ? '(blank)' : caseStatuses[caseStatus.toString()];
     const dateCreated = modifiedDocument.date_created ? new Date(modifiedDocument.date_created).toLocaleDateString('en-US') : '';
     const lastUpdatedDate = modifiedDocument.date_last_updated ? new Date(modifiedDocument.date_last_updated).toLocaleDateString('en-US') : '';
-    const isOfflineCreated = recordID && recordID.toLowerCase().indexOf('-offline') !== -1;
+    // Story 29.6: recognize both the new placeholder pattern
+    // ({STATE}-OFFLINE-CASE-XX) and the legacy "-offline" suffix.
+    const isOfflineCreated = !!(recordID && (
+        /-OFFLINE-CASE-\d+$/i.test(recordID) ||
+        /-offline$/i.test(recordID)
+    ));
 
     let projectedReviewDate = modifiedDocument.home_record?.case_status?.projected_review_date ? new Date(modifiedDocument.home_record.case_status.projected_review_date).toLocaleDateString('en-US') : '';
     let actualReviewDate = modifiedDocument.home_record?.case_status?.committee_review_date ? new Date(modifiedDocument.home_record.case_status.committee_review_date).toLocaleDateString('en-US') : '';

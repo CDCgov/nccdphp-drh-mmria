@@ -107,27 +107,26 @@ var g_ui = {
           
           const yearPart = result.home_record.date_of_death.year.trim();
           generateRecordIdCandidate = () => reporting_state.trim() + '-' + yearPart + '-' + $mmria.getRandomCryptoValue().toString().substring(2, 6);
-          let new_record_id = generateRecordIdCandidate();
+          let new_record_id;
 
           // Story 29.5: online path is server-authoritative — no /api/record_id
           // pre-flight. The single POST to /api/case below retries on
-          // record_id_conflict. The offline branch keeps the local Set check
-          // untouched (Story 29.6 will replace that with a placeholder pattern).
+          // record_id_conflict. Story 29.6: offline path writes a placeholder
+          // record ID; OfflineCaseManager.SyncOfflineCaseAsync replaces it with
+          // a real STATE-YEAR-NNNN via GenerateUniqueRecordIdAsync at sync time.
           const isOfflineForUniqueness = window.OfflineStatus && window.OfflineStatus.isOffline() === true;
 
           if (isOfflineForUniqueness)
           {
-              const localSet = window.OfflineSessionManager.loadOfflineRecordIds(g_ui);
-              while (localSet.has(new_record_id.toUpperCase()))
-              {
-                  new_record_id = generateRecordIdCandidate();
-              }
+              const state = reporting_state.trim();
+              const seq = window.OfflineSessionManager.getNextOfflineCaseSequence();
+              new_record_id = state + '-OFFLINE-CASE-' + seq;
           }
-  
-          // Append "-offline" suffix if in offline mode
-          if(isOfflineMode === 'true') {
-            new_record_id = window.OfflineCaseManager.generateOfflineRecordId(new_record_id);
-            }
+          else
+          {
+              new_record_id = generateRecordIdCandidate();
+          }
+
           result.home_record.record_id = new_record_id.toUpperCase();
           hasGeneratedRecordId = true;
   

@@ -166,10 +166,13 @@ async function sync_offline_changes(caseID) {
         modifiedDocument.offline_date = null; // Clear offline date
         modifiedDocument.offline_by = null;
         modifiedDocument.offline_lock_type = null;
-        // Check if this is a new case created offline by looking for "-offline" suffix in record_id
-        const isNewOfflineCase = modifiedDocument.home_record && 
-                                 modifiedDocument.home_record.record_id && 
-                                 modifiedDocument.home_record.record_id.toLowerCase().indexOf('-offline') >= 0;
+        // Story 29.6: detect offline-created cases via either the new placeholder
+        // pattern ({STATE}-OFFLINE-CASE-XX) or the legacy "-offline" suffix.
+        const recordIdForDetection = modifiedDocument.home_record && modifiedDocument.home_record.record_id;
+        const isNewOfflineCase = !!recordIdForDetection && (
+            /-OFFLINE-CASE-\d+$/i.test(recordIdForDetection) ||
+            /-offline$/i.test(recordIdForDetection)
+        );
 
         // Only validate revision for existing cases (not new cases created offline)
         if (!isNewOfflineCase) {
@@ -202,10 +205,13 @@ async function sync_offline_changes(caseID) {
             }
         }
 
-        // Remove "-offline" suffix from record_id if present (for both new and existing cases)
-        if (modifiedDocument.home_record && modifiedDocument.home_record.record_id && modifiedDocument.home_record.record_id.toLowerCase().indexOf('-offline') >= 0) {
+        // Story 29.6: legacy transitional path — strip the "-offline" suffix
+        // for pre-29.6 offline caches. New offline cases use the placeholder
+        // pattern ({STATE}-OFFLINE-CASE-XX) and the real record_id is assigned
+        // by the server in OfflineCaseManager.SyncOfflineCaseAsync before save.
+        if (modifiedDocument.home_record && modifiedDocument.home_record.record_id && /-offline$/i.test(modifiedDocument.home_record.record_id)) {
             modifiedDocument.home_record.record_id = modifiedDocument.home_record.record_id.replace(/-offline$/i, '');
-            offlineLog.log('OfflineSyncManager', 'new record_id after removing -offline suffix:', modifiedDocument.home_record.record_id);
+            offlineLog.log('OfflineSyncManager', 'record_id_format=legacy_offline_suffix new record_id after removing -offline suffix:', modifiedDocument.home_record.record_id);
         }
 
         // Make API call using the offline-session workflow.
