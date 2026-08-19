@@ -269,8 +269,8 @@ development_status:
   29-1-server-side-format-validation-and-uniqueness-guard: done
   29-2-client-side-per-candidate-api-check: done
   29-3-add-record-id-list-view-remove-broken-bulk-list-call: done
-  29-4-generate-unique-record-id-manager-method: ready-for-dev
-  29-5-online-save-then-retry-on-collision: backlog
+  29-4-generate-unique-record-id-manager-method: done
+  29-5-online-save-then-retry-on-collision: done
   29-6-offline-placeholder-record-id: backlog
   29-7-ije-batch-collision-retry: backlog
   epic-29-retrospective: optional
