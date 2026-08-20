@@ -280,10 +280,10 @@ development_status:
   30-1-create-geocoding-manager: done
   30-2-create-case-geocoding-manager-apply-methods: done
   30-3-new-api-endpoint-case-geocode: done
-  30-4-refactor-mmria-calculations-geocode-functions: done
+  30-4-refactor-mmria-calculations-geocode-functions: review
   30-5-refactor-batch-item-processing-service: done
-  30-6-fix-legacy-geocode-calls-check-code-validator: in-progress
-  30-7-remove-dead-tamu-code-committee-member: ready-for-dev
+  30-6-fix-legacy-geocode-calls-check-code-validator: review
+  30-7-remove-dead-tamu-code-committee-member: review
   epic-30-retrospective: optional
 
   # ── Epic 31: Section 508 — Home Page General Section Focus Indicators ─────
@@ -357,3 +357,8 @@ development_status:
   41-1-per-tenant-auth-investigation: ready-for-dev
   41-2-per-tenant-auth-implementation: backlog
   epic-41-retrospective: optional
+
+  # ── Epic 42: Geocoding Location Registry (Declarative Refactor) ──────────
+  epic-42: in-progress
+  42-1-geocoding-location-registry-refactor: review
+  epic-42-retrospective: optional

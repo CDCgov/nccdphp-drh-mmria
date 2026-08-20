@@ -5,39 +5,52 @@ using mmria.common.SharedLibraries.Geocoding;
 
 namespace mmria.common.SharedLibraries.Case.Manager;
 
+// Declarative case-document target for a geocode location key.
+// Static → mutations under BasePath. List → mutations under ListPath[listIndex]/SubPath.
+public readonly record struct GeocodeTarget(bool IsList, string BasePath, string ListPath, string SubPath)
+{
+    public static GeocodeTarget Static(string basePath) => new(false, basePath, string.Empty, string.Empty);
+    public static GeocodeTarget List(string listPath, string subPath) => new(true, string.Empty, listPath, subPath);
+}
+
 // Applies a GeocodeResult to a specific location inside a case document.
 // Pure document mutation — no CouchDB access. Safe as a DI singleton.
 public sealed class CaseGeocodingManager
 {
-    public void Apply_DC_PlaceOfLastResidence_Geocode(ExpandoObject caseDoc, GeocodeResult result)
-        => ApplyStatic(caseDoc, result, "death_certificate/place_of_last_residence");
+    // Single source of truth for location key → case-document target mapping.
+    // Adding a new geocode-enabled location is a single-entry addition here — no other file changes required.
+    public static readonly IReadOnlyDictionary<string, GeocodeTarget> LocationRegistry =
+        new Dictionary<string, GeocodeTarget>(System.StringComparer.Ordinal)
+        {
+            ["dc_place_of_last_residence"] = GeocodeTarget.Static("death_certificate/place_of_last_residence"),
+            ["dc_address_of_injury"]       = GeocodeTarget.Static("death_certificate/address_of_injury"),
+            ["dc_address_of_death"]        = GeocodeTarget.Static("death_certificate/address_of_death"),
+            ["bc_facility_of_delivery"]    = GeocodeTarget.Static("birth_fetal_death_certificate_parent/facility_of_delivery_location"),
+            ["bc_location_of_residence"]   = GeocodeTarget.Static("birth_fetal_death_certificate_parent/location_of_residence"),
+            ["pc_primary_care_facility"]   = GeocodeTarget.Static("prenatal/location_of_primary_prenatal_care_facility"),
+            ["erh_location"]               = GeocodeTarget.List("er_visit_and_hospital_medical_records", "name_and_location_facility"),
+            ["omv_location_of_care"]       = GeocodeTarget.List("other_medical_office_visits", "location_of_medical_care_facility"),
+            ["mt_origin_address"]          = GeocodeTarget.List("medical_transport", "origin_information/address"),
+            ["mt_destination_address"]     = GeocodeTarget.List("medical_transport", "destination_information/address"),
+        };
 
-    public void Apply_DC_AddressOfInjury_Geocode(ExpandoObject caseDoc, GeocodeResult result)
-        => ApplyStatic(caseDoc, result, "death_certificate/address_of_injury");
+    // Unknown keys are ignored so batch callers can invoke without pre-validation.
+    public void Apply(ExpandoObject caseDoc, string locationKey, GeocodeResult result, int listIndex = 0)
+    {
+        if (locationKey == null || !LocationRegistry.TryGetValue(locationKey, out var target))
+        {
+            return;
+        }
 
-    public void Apply_DC_AddressOfDeath_Geocode(ExpandoObject caseDoc, GeocodeResult result)
-        => ApplyStatic(caseDoc, result, "death_certificate/address_of_death");
-
-    public void Apply_BC_FacilityOfDelivery_Geocode(ExpandoObject caseDoc, GeocodeResult result)
-        => ApplyStatic(caseDoc, result, "birth_fetal_death_certificate_parent/facility_of_delivery_location");
-
-    public void Apply_BC_LocationOfResidence_Geocode(ExpandoObject caseDoc, GeocodeResult result)
-        => ApplyStatic(caseDoc, result, "birth_fetal_death_certificate_parent/location_of_residence");
-
-    public void Apply_PC_PrimaryCareFacility_Geocode(ExpandoObject caseDoc, GeocodeResult result)
-        => ApplyStatic(caseDoc, result, "prenatal_care_record/location_of_primary_prenatal_care_facility");
-
-    public void Apply_ERH_Location_Geocode(ExpandoObject caseDoc, GeocodeResult result, int listIndex)
-        => ApplyList(caseDoc, result, "er_visit_and_hospital_medical_records", listIndex, "location");
-
-    public void Apply_OMV_LocationOfCare_Geocode(ExpandoObject caseDoc, GeocodeResult result, int listIndex)
-        => ApplyList(caseDoc, result, "other_medical_office_visits", listIndex, "location_of_medical_care_facility");
-
-    public void Apply_MT_OriginAddress_Geocode(ExpandoObject caseDoc, GeocodeResult result, int listIndex)
-        => ApplyList(caseDoc, result, "medical_transport", listIndex, "origin_information/address");
-
-    public void Apply_MT_DestinationAddress_Geocode(ExpandoObject caseDoc, GeocodeResult result, int listIndex)
-        => ApplyList(caseDoc, result, "medical_transport", listIndex, "destination_information/address");
+        if (target.IsList)
+        {
+            ApplyList(caseDoc, result, target.ListPath, listIndex, target.SubPath);
+        }
+        else
+        {
+            ApplyStatic(caseDoc, result, target.BasePath);
+        }
+    }
 
     private static void ApplyStatic(ExpandoObject caseDoc, GeocodeResult result, string basePath)
     {

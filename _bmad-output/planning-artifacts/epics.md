@@ -5915,3 +5915,66 @@ So that the dynamic JS rendering engine is completely eliminated and the codebas
 | 37.3 — Wire case editor view | High | 37.1, 37.2 complete |
 | 37.4 — Wire read-only views | Medium | 37.3 pattern established |
 | 37.6 — Remove rendering engine | High | 37.3, 37.4 complete; verify all views before deleting |
+
+---
+
+## Epic 42: Geocoding Location Registry (Declarative Refactor) _(v4.2, follow-up to Epic 30)_
+
+**Goal:** Deliver the declarative location→field mapping intent that was discussed during Epic 30 planning but was not captured in the Epic 30 story specs. Convert `CaseGeocodingManager` from ten hand-written per-location apply methods into a single `LocationRegistry` (10 entries) + one `Apply(caseDoc, locationKey, result, listIndex?)` method. Update both callers (`CaseGeocodeController` and `BatchItemProcessingService`) to consume the registry. After this epic, adding a new geocode-enabled location is a **single-entry addition to `LocationRegistry`** — no controller switch update, no new manager method, no separate valid-key list.
+
+**Background — the gap being closed**
+
+Epic 30 delivered end-to-end unification of the geocode/apply/save path across the browser button click and the vital-import batch service. Both callers hit the same `GeocodingManager` and `CaseGeocodingManager`. However the *shape* of `CaseGeocodingManager` shipped as imperative code rather than the declarative registry that was the original design intent:
+
+- 10 hand-written `Apply_DC_PlaceOfLastResidence_Geocode` / `Apply_DC_AddressOfInjury_Geocode` / etc. methods, each with the target path (e.g., `"death_certificate/place_of_last_residence"`) hard-coded as a string literal in the method body.
+- `CaseGeocodeController` maintains a separate hand-maintained `_validKeys` HashSet (10 entries) and `_listKeys` HashSet (4 entries), and dispatches to the right method via a switch/if-chain in a private `ApplyGeocode` helper.
+- `BatchItemProcessingService` has 5 call sites, each hard-coding the specific method name (e.g., `_caseGeocodingManager.Apply_DC_AddressOfDeath_Geocode(new_case, geo_result)`). The batch service therefore must know method identifiers, not just location keys, and cannot iterate a data-driven list of forms.
+
+Adding a new form today requires: (1) new method in `CaseGeocodingManager`, (2) new entry in controller `_validKeys` (and `_listKeys` if it's a list-shaped location), (3) new branch in controller `ApplyGeocode` switch, (4) new client `locationKey`. Four coordinated edits across three files for what should be a single-line registry addition.
+
+**Requirement covered:** FR-1.10 (added to v4.2 PRD as part of this epic).
+
+---
+
+### Story 42.1 — Convert `CaseGeocodingManager` to Declarative `LocationRegistry`
+
+**User Story:** As a developer maintaining or extending case-geocoding, I need the location→field mapping to be a single declarative registry and one `Apply(caseDoc, locationKey, result, listIndex?)` method, so that adding a new geocode-enabled location is a single-entry change and every caller (controller, batch service, future callers) is data-driven off the same source of truth.
+
+**Scope:**
+
+- Introduce a `GeocodeTarget` value type (or `readonly record struct`) in `mmria.common/SharedLibraries/Case/Manager/` with fields `IsList`, `BasePath` (used when `IsList` is false), `ListPath` and `SubPath` (used when `IsList` is true), plus factory helpers `GeocodeTarget.Static(basePath)` and `GeocodeTarget.List(listPath, subPath)`.
+- Add `public static readonly IReadOnlyDictionary<string, GeocodeTarget> LocationRegistry` on `CaseGeocodingManager` with all 10 current entries, ordinal-comparer, values matching the current per-method target paths verbatim.
+- Add `public void Apply(ExpandoObject caseDoc, string locationKey, GeocodeResult result, int listIndex = 0)` that looks up the target and dispatches to the existing `ApplyStatic` / `ApplyList` private helpers.
+- Delete the 10 `Apply_DC_*_Geocode` / `Apply_BC_*_Geocode` / `Apply_PC_*_Geocode` / `Apply_ERH_*_Geocode` / `Apply_OMV_*_Geocode` / `Apply_MT_*_Geocode` public methods after all call sites are migrated. (Do NOT keep them as thin wrappers — the callers within this epic are exhaustive; leaving wrappers would preserve the exact anti-pattern this epic removes.)
+- Update `CaseGeocodeController`: derive `_validKeys` from `CaseGeocodingManager.LocationRegistry.Keys`; derive `_listKeys` from `LocationRegistry.Where(kv => kv.Value.IsList).Select(kv => kv.Key)`; replace the `ApplyGeocode` switch/if-chain with a single `_caseGeocodingManager.Apply(caseDoc, locationKey, geocodeResult, listIndex)` call.
+- Update `BatchItemProcessingService`: each of the 5 call sites currently naming `Apply_DC_AddressOfDeath_Geocode`, `Apply_DC_PlaceOfLastResidence_Geocode`, `Apply_BC_LocationOfResidence_Geocode` (x2), and `Apply_BC_FacilityOfDelivery_Geocode` becomes `_caseGeocodingManager.Apply(new_case, "<locationKey>", geo_result)` using the corresponding registry key.
+
+**Acceptance Criteria:**
+
+1. `CaseGeocodingManager.LocationRegistry` exists with exactly 10 entries, and their keys match the 10 keys previously listed in `CaseGeocodeController._validKeys`.
+2. `CaseGeocodingManager.Apply(caseDoc, locationKey, result, listIndex)` exists and produces byte-identical case-document mutations to the pre-refactor per-location methods for every entry in the registry.
+3. The 10 `Apply_*_Geocode` public methods on `CaseGeocodingManager` are deleted.
+4. `CaseGeocodeController` no longer holds hand-maintained `_validKeys` or `_listKeys` HashSet literals; both are derived from `LocationRegistry`.
+5. `CaseGeocodeController._ApplyGeocode` (or equivalent switch/if-chain) is deleted; the single-line `Apply(...)` call replaces it.
+6. `BatchItemProcessingService` has zero references to any `Apply_*_Geocode` method name; every geocode-apply call is `Apply(new_case, "<key>", geo_result)` with the location key as a string literal.
+7. `dotnet build` on `mmria-server.csproj` and `mmria.services.csproj` succeeds with zero errors.
+8. Adding a new geocode-enabled location to the codebase is verified to require exactly one change: a new key/value pair in `LocationRegistry`. (Verified via a written note in the story's Dev Agent Record, not a code change — this is a design property, not a runtime behavior.)
+
+**Callers to update — enumeration for the story author:**
+
+- `nccdphp-drh-mmria-common/mmria.common/SharedLibraries/Case/Manager/CaseGeocodingManager.cs` — full rewrite.
+- `source-code/mmria/mmria-server/Controllers/api/CaseGeocodeController.cs` — `_validKeys`, `_listKeys`, and `ApplyGeocode` helper.
+- `nccdphp-drh-mmria-services/mmria.services/Services/BatchItemProcessingService.cs` — lines ~1162, ~1203, ~1588, ~1904, ~1919 (each named `_caseGeocodingManager.Apply_*_Geocode(...)`).
+
+**Out of scope:** Client JS. The client contract remains `POST /api/case-geocode/{caseId}/{locationKey}` with the same body shape — the registry lives entirely server-side and is invisible to the browser. The `$case_geocode_dispatch` helper introduced in Story 30.4 is unchanged.
+
+---
+
+## Epic 42 — Story Sequencing
+
+| Story | Risk | Dependencies |
+|---|---|---|
+| 42.1 — Registry refactor | Low | Epic 30 must be `done` (all Epic 30 stories in `review` or `done` is sufficient to start; commit the review-status stories before starting 42.1 to avoid the uncommitted-work class of failure Epic 30 hit) |
+
+Single-story epic. The refactor is small (three files touched, ~150 lines net), fully in-process, and carries no user-facing behavior change.
+

@@ -1277,10 +1277,10 @@ dev this story _bmad-output/implementation-artifacts/29-7-ije-batch-collision-re
 | 30.1 — Create `GeocodingManager` in SharedLibraries | `30-1-create-geocoding-manager.md` | done |
 | 30.2 — Create `CaseGeocodingManager` with Per-Location Apply Methods | `30-2-create-case-geocoding-manager-apply-methods.md` | done |
 | 30.3 — New API Endpoint: `POST /api/case-geocode/{caseId}/{locationKey}` | `30-3-new-api-endpoint-case-geocode.md` | done |
-| 30.4 — Refactor `MMRIA_calculations.js` Geocode Button Handlers | `30-4-refactor-mmria-calculations-geocode-functions.md` | done |
+| 30.4 — Refactor `MMRIA_calculations.js` Geocode Button Handlers | `30-4-refactor-mmria-calculations-geocode-functions.md` | review |
 | 30.5 — Refactor `BatchItemProcessingService` to Use Shared `GeocodingManager` | `30-5-refactor-batch-item-processing-service.md` | done |
-| 30.6 — Fix Legacy Geocode Calls in `mmria-check-code.js` and `validator.js` | `30-6-fix-legacy-geocode-calls-check-code-validator.md` | in-progress |
-| 30.7 — Remove Dead TAMU Code from `mmria.committee_member.js` | `30-7-remove-dead-tamu-code-committee-member.md` | ready-for-dev |
+| 30.6 — Fix Legacy Geocode Calls in `mmria-check-code.js` and `validator.js` | `30-6-fix-legacy-geocode-calls-check-code-validator.md` | review |
+| 30.7 — Remove Dead TAMU Code from `mmria.committee_member.js` | `30-7-remove-dead-tamu-code-committee-member.md` | review |
 
 **Sequencing:** 30.1 → 30.2 → 30.3 is the critical path. 30.5 can run in parallel with 30.3 once 30.1 and 30.2 are done. 30.4 and 30.6 follow 30.3 and can run in parallel. 30.7 is fully independent — can be done at any time.
 
@@ -1440,6 +1440,25 @@ dev this story _bmad-output/implementation-artifacts/41-2-per-tenant-auth-implem
 
 ---
 
+## Epic 42: Geocoding Location Registry — Declarative Refactor _(v4.2, follow-up to Epic 30)_
+
+| Story | File | Status |
+|---|---|---|
+| 42.1 — Convert `CaseGeocodingManager` to Declarative `LocationRegistry` | [42-1-geocoding-location-registry-refactor.md](42-1-geocoding-location-registry-refactor.md) | review |
+
+**Sequencing:** Single story. Depends on Epic 30 being fully committed (all Epic 30 stories in `review` or `done`, all files in `git log`).
+
+> ℹ️ Delivers the declarative location→field mapping intent that was discussed during Epic 30 planning but not captured in the Epic 30 story specs. Epic 30 shipped end-to-end unification of the geocode/apply/save path across the browser and vital-import batch — both callers hit the same `GeocodingManager` and `CaseGeocodingManager`. However, `CaseGeocodingManager` shipped as 10 hand-written `Apply_*_Geocode` methods with target paths hard-coded as string literals in method bodies, and `CaseGeocodeController` maintains a separate hand-maintained `_validKeys` HashSet + switch/if-chain. This epic converts that to a single `LocationRegistry` (`IReadOnlyDictionary<string, GeocodeTarget>`) and one `Apply(caseDoc, locationKey, result, listIndex?)` method. After it lands, adding a new geocode-enabled location is a single-entry addition to the registry — no controller switch update, no new manager method, no separate valid-key list.
+>
+> ℹ️ **Covers PRD requirement:** FR-1.10 (v4.2 PRD).
+
+**Story 42.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/42-1-geocoding-location-registry-refactor.md
+```
+
+---
 
 
 | OI       | Affects               | What to resolve                                                                                                                                                                                                                                                                                                                                                                                        |

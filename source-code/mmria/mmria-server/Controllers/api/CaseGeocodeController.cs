@@ -25,17 +25,13 @@ namespace mmria.server;
 [Route("api/case-geocode")]
 public sealed class CaseGeocodeController : ControllerBase
 {
-    private static readonly HashSet<string> _validKeys = new(StringComparer.Ordinal)
-    {
-        "dc_place_of_last_residence", "dc_address_of_injury", "dc_address_of_death",
-        "bc_facility_of_delivery", "bc_location_of_residence", "pc_primary_care_facility",
-        "erh_location", "omv_location_of_care", "mt_origin_address", "mt_destination_address"
-    };
+    // Derived from CaseGeocodingManager.LocationRegistry — single source of truth for supported location keys.
+    private static readonly HashSet<string> _validKeys =
+        new(CaseGeocodingManager.LocationRegistry.Keys, StringComparer.Ordinal);
 
-    private static readonly HashSet<string> _listKeys = new(StringComparer.Ordinal)
-    {
-        "erh_location", "omv_location_of_care", "mt_origin_address", "mt_destination_address"
-    };
+    private static readonly HashSet<string> _listKeys = new(
+        CaseGeocodingManager.LocationRegistry.Where(kv => kv.Value.IsList).Select(kv => kv.Key),
+        StringComparer.Ordinal);
 
     private readonly mmria.common.couchdb.OverridableConfiguration _configuration;
     private readonly mmria.common.couchdb.DBConfigurationDetail _dbConfig;
@@ -176,7 +172,7 @@ public sealed class CaseGeocodeController : ControllerBase
             geocodeResult = new GeocodeResult();
         }
 
-        ApplyGeocode(caseDoc, safeLocationKey, geocodeResult, request.listIndex ?? 0);
+        _caseGeocodingManager.Apply(caseDoc, safeLocationKey, geocodeResult, request.listIndex ?? 0);
 
         // Server-side CVS lookup — only for dc_place_of_last_residence when the geocode matched.
         if (string.Equals(safeLocationKey, "dc_place_of_last_residence", StringComparison.Ordinal) &&
@@ -211,43 +207,6 @@ public sealed class CaseGeocodeController : ControllerBase
         }
 
         return Ok(new { ok = true });
-    }
-
-    private void ApplyGeocode(ExpandoObject caseDoc, string locationKey, GeocodeResult result, int listIndex)
-    {
-        switch (locationKey)
-        {
-            case "dc_place_of_last_residence":
-                _caseGeocodingManager.Apply_DC_PlaceOfLastResidence_Geocode(caseDoc, result);
-                break;
-            case "dc_address_of_injury":
-                _caseGeocodingManager.Apply_DC_AddressOfInjury_Geocode(caseDoc, result);
-                break;
-            case "dc_address_of_death":
-                _caseGeocodingManager.Apply_DC_AddressOfDeath_Geocode(caseDoc, result);
-                break;
-            case "bc_facility_of_delivery":
-                _caseGeocodingManager.Apply_BC_FacilityOfDelivery_Geocode(caseDoc, result);
-                break;
-            case "bc_location_of_residence":
-                _caseGeocodingManager.Apply_BC_LocationOfResidence_Geocode(caseDoc, result);
-                break;
-            case "pc_primary_care_facility":
-                _caseGeocodingManager.Apply_PC_PrimaryCareFacility_Geocode(caseDoc, result);
-                break;
-            case "erh_location":
-                _caseGeocodingManager.Apply_ERH_Location_Geocode(caseDoc, result, listIndex);
-                break;
-            case "omv_location_of_care":
-                _caseGeocodingManager.Apply_OMV_LocationOfCare_Geocode(caseDoc, result, listIndex);
-                break;
-            case "mt_origin_address":
-                _caseGeocodingManager.Apply_MT_OriginAddress_Geocode(caseDoc, result, listIndex);
-                break;
-            case "mt_destination_address":
-                _caseGeocodingManager.Apply_MT_DestinationAddress_Geocode(caseDoc, result, listIndex);
-                break;
-        }
     }
 
     // Server-side replacement for the client's CVS "data" round-trip.

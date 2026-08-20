@@ -1,6 +1,6 @@
 # Story 30.7: Remove Dead TAMU Code from mmria.committee_member.js
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -14,22 +14,22 @@ so that the API key is not present in any file served to the browser.
 2. No `geoservices.tamu.edu` URL appears in any client-served JS file. PowerShell grep confirms zero.
 3. No `geocode_api_key` or `apikey=` value appears in any client-served JS file. PowerShell grep confirms zero.
 4. The committee member view continues to function correctly — the validate-address button is always disabled in this view (read-only), so no geocode functionality is lost.
-5. `dotnet build mmria-server.csproj` — zero errors.
+5. `node --check` on `mmria.committee_member.js` — zero syntax errors. (The `.csproj` build is not a valid verification for JS-only changes; it does not lint or bundle files under `wwwroot/scripts/`.)
 
 ## Tasks / Subtasks
 
-- [ ] Locate and remove dead geocode code (AC: #1)
-  - [ ] Open `source-code/mmria/mmria-server/wwwroot/scripts/mmria.committee_member.js`
-  - [ ] Find the `get_geocode_info` function that constructs a `geoservices.tamu.edu` URL with an embedded API key
-  - [ ] Remove the entire function body and declaration — this is dead code (the button is always disabled in committee member view)
-- [ ] Verify no TAMU URL remains in client JS (AC: #2)
-  - [ ] `Select-String -Recurse -Path "source-code\mmria\mmria-server\wwwroot\scripts" -Pattern "geoservices.tamu.edu"` → zero results
-- [ ] Verify no API key in client JS (AC: #3)
-  - [ ] `Select-String -Recurse -Path "source-code\mmria\mmria-server\wwwroot\scripts" -Pattern "geocode_api_key|apikey="` → zero results in browser-served files
-- [ ] Verify committee member view still works (AC: #4)
+- [x] Locate and remove dead geocode code (AC: #1)
+  - [x] Open `source-code/mmria/mmria-server/wwwroot/scripts/mmria.committee_member.js`
+  - [x] Find the `get_geocode_info` function that constructs a `geoservices.tamu.edu` URL with an embedded API key
+  - [x] Remove the entire function body and declaration — this is dead code (the button is always disabled in committee member view)
+- [x] Verify no TAMU URL remains in client JS (AC: #2)
+  - [x] `Get-ChildItem -Path "source-code\mmria\mmria-server\wwwroot\scripts" -Recurse -File | Select-String -Pattern "geoservices.tamu.edu"` → zero results
+- [x] Verify no API key in client JS (AC: #3)
+  - [x] `Get-ChildItem -Path "source-code\mmria\mmria-server\wwwroot\scripts" -Recurse -File | Select-String -Pattern "geocode_api_key|apikey="` → zero results
+- [ ] Verify committee member view still works (AC: #4) — Human-TODO: smoke test in dev env
   - [ ] Open a case in committee member view in the local environment — confirm the form loads correctly and the validate-address button is disabled as expected
-- [ ] Build (AC: #5)
-  - [ ] `dotnet build` on mmria-server — zero errors
+- [x] Node syntax check (AC: #5)
+  - [x] `node --check source-code/mmria/mmria-server/wwwroot/scripts/mmria.committee_member.js` — zero output (parse OK).
 
 ## Dev Notes
 

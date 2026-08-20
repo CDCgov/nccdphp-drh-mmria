@@ -1159,7 +1159,7 @@ public sealed class BatchItemProcessingService
                 );
                 death_certificate_address_of_death_latitude = geo_result.Latitude;
                 death_certificate_address_of_death_longitude = geo_result.Longitude;
-                _caseGeocodingManager.Apply_DC_AddressOfDeath_Geocode(new_case, geo_result);
+                _caseGeocodingManager.Apply(new_case, "dc_address_of_death", geo_result);
             }
 
             gs.set_value
@@ -1200,7 +1200,7 @@ public sealed class BatchItemProcessingService
                 );
                 death_certificate_place_of_last_residence_latitude = geo_result.Latitude;
                 death_certificate_place_of_last_residence_longitude = geo_result.Longitude;
-                _caseGeocodingManager.Apply_DC_PlaceOfLastResidence_Geocode(new_case, geo_result);
+                _caseGeocodingManager.Apply(new_case, "dc_place_of_last_residence", geo_result);
             }
 
             var new_case_dictionary = new_case as IDictionary<string, object>;
@@ -1585,7 +1585,7 @@ public sealed class BatchItemProcessingService
                         );
                         location_of_residence_latitude = geo_result.Latitude;
                         location_of_residence_longitude = geo_result.Longitude;
-                        _caseGeocodingManager.Apply_BC_LocationOfResidence_Geocode(new_case, geo_result);
+                        _caseGeocodingManager.Apply(new_case, "bc_location_of_residence", geo_result);
                     }
 
 
@@ -1901,7 +1901,7 @@ public sealed class BatchItemProcessingService
                         );
                         location_of_residence_latitude = geo_result.Latitude;
                         location_of_residence_longitude = geo_result.Longitude;
-                        _caseGeocodingManager.Apply_BC_LocationOfResidence_Geocode(new_case, geo_result);
+                        _caseGeocodingManager.Apply(new_case, "bc_location_of_residence", geo_result);
                     }
 
                     {
@@ -1916,7 +1916,7 @@ public sealed class BatchItemProcessingService
                         );
                         facility_of_delivery_location_latitude = geo_result.Latitude;
                         facility_of_delivery_location_longitude = geo_result.Longitude;
-                        _caseGeocodingManager.Apply_BC_FacilityOfDelivery_Geocode(new_case, geo_result);
+                        _caseGeocodingManager.Apply(new_case, "bc_facility_of_delivery", geo_result);
                     }
 
                     birth_2_death

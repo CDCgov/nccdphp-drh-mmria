@@ -165,6 +165,15 @@ The vital import batch service (`BatchItemProcessingService`) geocodes cases dur
 **FR-1.9 — Shared geocoding logic in SharedLibraries**
 Urban-status derivation (Metropolitan Division / Metropolitan / Micropolitan / Rural / Undetermined) and `state_county_fips` calculation are implemented once in `mmria.common/SharedLibraries/Geocoding/GeocodingManager`. No client-side JS calculates urban status.
 
+**FR-1.10 — Declarative location-to-field registry (Epic 42, post-Epic-30 refactor)**
+The mapping from location key to case-document target path is expressed as a single **declarative registry** (`LocationRegistry`) inside `mmria.common/SharedLibraries/Case/Manager/CaseGeocodingManager`. Each entry captures the location key, the base path (for static locations) or list path + subpath (for list-shaped locations), and the list flag. There is one public `Apply(caseDoc, locationKey, result, listIndex)` method on `CaseGeocodingManager` that looks up the target in the registry and applies the geocode result — not ten per-location `Apply_*_Geocode` methods.
+
+Both callers are data-driven off the same registry:
+- `CaseGeocodeController` derives `_validKeys` (all registry keys) and `_listKeys` (registry keys where `IsList` is true) from `LocationRegistry` directly; no separate hand-maintained key lists.
+- `BatchItemProcessingService` calls `Apply(caseDoc, "dc_address_of_death", result)` and similar by-key invocations at every geocode call site; the batch service never references a per-location method name.
+
+Adding a new geocode-enabled location requires exactly **one code change**: a new entry in `LocationRegistry`. No controller switch update, no new manager method, no separate valid-key list update. This FR was implicit in the original Epic 30 planning discussion but was not captured in the shipped Epic 30 stories; Epic 42 delivers it as a follow-up.
+
 ---
 
 ### FR-2 — Record ID Uniqueness Enforcement
@@ -316,6 +325,7 @@ NFR-4: The TAMU API key is resolved at server startup from the existing CouchDB 
 ## FR Coverage Map
 
 FR-1.1 – FR-1.9: Epic 30 — Unified Server-Side Geocoding (TAMU Refactor)  
+FR-1.10: Epic 42 — Geocoding Location Registry (Declarative Refactor)  
 FR-2.1 – FR-2.7: Epic 29 — Record ID Uniqueness Enforcement  
 FR-3.1 – FR-3.11: Epic 37 — Form Designer Removal — Static HTML Form Rendering  
 FR-4.1 – FR-4.3: Epic TBD — IJE Upload Duplicate Prevention and Logging  
