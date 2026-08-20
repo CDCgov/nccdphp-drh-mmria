@@ -1,6 +1,6 @@
 # Story 30.7: Remove Dead TAMU Code from mmria.committee_member.js
 
-Status: review
+Status: done
 
 ## Story
 

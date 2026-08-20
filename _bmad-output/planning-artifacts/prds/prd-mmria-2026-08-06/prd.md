@@ -96,20 +96,6 @@ When a user navigates to the login page, the form rendered matches the configure
 
 ---
 
-### FR-9 — Case Narrative Editor: Post-v4.1 Follow-up Tweaks
-
-QA feedback on the v4.1 case narrative paste and save-path changes identified two items requiring follow-up. The v4.1 changes are working well overall; these are targeted adjustments.
-
-**FR-9.1 — Strip emoji characters from case narrative on save**
-Emoji characters (Unicode range U+1F300 and above, and related symbol ranges) entered or pasted into the case narrative editor are removed from the stored value on save. Emojis are not part of the approved narrative format and can cause encoding issues in IJE exports, CSV de-identified exports, and downstream data consumers. The save-path sanitizer already strips XSS vectors; emoji stripping is added to the same path. Characters within the standard ASCII and supported extended Latin ranges are not affected.
-
-**FR-9.2 — Explicitly strip strikethrough from case narrative on save**
-Strikethrough markup (`<s>`, `<strike>`, `<del>`) is stripped from the case narrative on the save path, consistent with the v4.1 decision to preserve only the explicitly approved formatting tags (`<br>`, `<u>`, `<hr>`, `<font>`). Strikethrough is not an approved narrative format and was retained as an unintentional side effect of the v4.1 save-path fix broadening the tag preservation. This is a narrowing correction — no other currently preserved tags are affected.
-
-> **Accepted behavior (not a bug):** Background colors/highlights are not retained on paste into the narrative editor. This is intentional — background color cannot be rendered consistently across print view, PDF export, and IJE/CSV data output. No action required.
-
----
-
 Ten "Validate Address and Get Geography Context" buttons are distributed across case forms. Currently each button calls the TAMU geocoding API client-side, applies results to `g_data`, then saves — non-atomically, with duplicated urban-status logic in every callback, and with the TAMU API key exposed in `mmria.committee_member.js`. Additionally, the vital import batch service contains a separate isolated geocoding implementation with duplicated field-mapping logic.
 
 **FR-1.1 — Single server endpoint, all 10 locations**
@@ -231,9 +217,16 @@ The `/form-designer` WYSIWYG tool, its JS/CSS assets, its API write endpoints, a
 
 ---
 
-### FR-4 — IJE Upload Duplicate Prevention and Logging
+### FR-4 — IJE Batch Re-Upload Rejection & Import Observability
 
-When an IJE/vitals file is uploaded, the upload controller currently prevents duplicate cases from being created in the `mmrds` case database. However, the same batch data is still written to the `vital_import` CouchDB database a second time, creating duplicate import records. Additionally, no meaningful log output is produced to help a developer or operator understand what was skipped and why.
+When an IJE/vitals file is uploaded, the individual case-level duplicate guard in `BatchItemProcessingService` already prevents the same vital record (`CDCUniqueID`) from being added to the `mmrds` case database twice, and Epic 29 (Record ID Uniqueness) prevents `mmria_record_id` collisions on the write path. However, re-uploading the **same file** still (a) calls the external vitals service a second time, (b) writes a new batch document to the `vital_import` CouchDB database, and (c) produces no meaningful log output describing what was skipped and why.
+
+This FR is scoped to two things Epic 29 does not cover:
+
+1. Rejecting a **file-level** re-upload at the controller before any downstream work runs (keyed on `nat_file_name` / `fet_file_name` / `mor_file_name` — not on `mmria_record_id` or `CDCUniqueID`).
+2. Adding structured logging around batch-level rejection and around the pre-existing per-case `ExistingCaseSkipped` decision.
+
+Neither of these behaviors is delivered by Epic 29. See the *Relationship to Epic 29* note in Story 38.1 for the identifier-by-identifier breakdown.
 
 **FR-4.1 — Prevent duplicate entries in vital_import database**
 When an IJE file is submitted for upload, the server checks the `vital_import` database before writing the batch. If the batch (or the individual case records within it) already exists in `vital_import`, the duplicate entries are not written. The existing case-level duplicate guard for `mmrds` is not affected.
@@ -424,11 +417,10 @@ FR-1.1 – FR-1.9: Epic 30 — Unified Server-Side Geocoding (TAMU Refactor)
 FR-1.10 – FR-1.11: Epic 42 — Geocoding Location Registry (Declarative Refactor) + Certainty Code Modal Restoration  
 FR-2.1 – FR-2.9: Epic 29 — Record ID Uniqueness Enforcement  
 FR-3.1 – FR-3.11: Epic 37 — Form Designer Removal — Static HTML Form Rendering  
-FR-4.1 – FR-4.3: Epic TBD — IJE Upload Duplicate Prevention and Logging  
+FR-4.1 – FR-4.3: Epic 38 — IJE Batch Re-Upload Rejection & Import Observability  
 FR-5.1 – FR-5.3: Epic TBD — Update Year of Death Record ID Regression Fix  
 FR-7.1 – FR-7.6: Epic TBD — Session Expiry Automatic Logout Redirect on 401  
 FR-8.1 – FR-8.5: Epic TBD — Per-Tenant Authentication Mode (SAMS + Password Co-existence)  
-FR-9.1 – FR-9.2: Epic TBD — Case Narrative Post-v4.1 Tweaks (Emoji Strip, Strikethrough Strip)  
 FR-10.1 – FR-10.5: Epic TBD — STEVE Download Structured Logging  
 FR-11.1 – FR-11.5: Epic TBD — STEVE PRAMS Download Structured Logging  
 FR-12.1 – FR-12.5: Epic TBD — Case Excel Export Column Width Auto-Fit (ClosedXML)  

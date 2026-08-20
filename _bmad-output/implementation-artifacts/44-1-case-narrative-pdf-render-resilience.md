@@ -174,7 +174,6 @@ Suggested manual steps:
 
 ### Related Prior Art
 
-- FR-9.1 / FR-9.2 (case narrative editor save-path tweaks) — related but separate concern (input sanitization vs. render resilience).
 - Project-context §2.4 — the guardrail that keeps this fix render-side.
 - Discussion trail on BUG 118794 (Vilma Jun 3 → Nicholas Jun 3/Jun 10 → Vilma Jun 10/Jul 13) — Vilma's Jun 10 draft message wording is captured in OI-v42-5 as a comparison candidate.
 

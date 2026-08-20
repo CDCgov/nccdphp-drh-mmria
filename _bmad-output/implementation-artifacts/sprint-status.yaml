@@ -1,5 +1,5 @@
 # generated: 2026-07-14
-last_updated: 2026-08-20
+last_updated: 2026-08-20  # epic-29, epic-30, epic-42 closed
 # project: mmria
 # project_key: NOKEY
 # tracking_system: file-system
@@ -265,27 +265,28 @@ development_status:
   epic-28-retrospective: optional
 
   # ── Epic 29: Record ID Uniqueness Enforcement ─────────────────────────────
-  epic-29: in-progress
+  epic-29: done
   29-1-server-side-format-validation-and-uniqueness-guard: done
   29-2-client-side-per-candidate-api-check: done
   29-3-add-record-id-list-view-remove-broken-bulk-list-call: done
   29-4-generate-unique-record-id-manager-method: done
   29-5-online-save-then-retry-on-collision: done
-  29-6-offline-placeholder-record-id: backlog
-  29-7-ije-batch-collision-retry: backlog
-  # 29-7 superseded by 29-8 (2026-08-20) — story file marked "superseded"; no defined sprint status maps
-  29-8-vital-import-dedicated-case-writer: review
+  29-6-offline-placeholder-record-id: done
+  # 29-7 superseded by 29-8 (2026-08-20) — work delivered via VitalImportCaseWriter
+  29-7-ije-batch-collision-retry: done
+  29-8-vital-import-dedicated-case-writer: done
+  29-9-batchitemprocessor-exception-hardening: done
   epic-29-retrospective: optional
 
   # ── Epic 30: Unified Server-Side Geocoding (TAMU Refactor) ────────────────
-  epic-30: in-progress
+  epic-30: done
   30-1-create-geocoding-manager: done
   30-2-create-case-geocoding-manager-apply-methods: done
   30-3-new-api-endpoint-case-geocode: done
-  30-4-refactor-mmria-calculations-geocode-functions: review
+  30-4-refactor-mmria-calculations-geocode-functions: done
   30-5-refactor-batch-item-processing-service: done
-  30-6-fix-legacy-geocode-calls-check-code-validator: review
-  30-7-remove-dead-tamu-code-committee-member: review
+  30-6-fix-legacy-geocode-calls-check-code-validator: done
+  30-7-remove-dead-tamu-code-committee-member: done
   epic-30-retrospective: optional
 
   # ── Epic 31: Section 508 — Home Page General Section Focus Indicators ─────
@@ -339,7 +340,7 @@ development_status:
   37-6-remove-js-rendering-engine: backlog
   epic-37-retrospective: optional
 
-  # ── Epic 38: IJE Upload Duplicate Prevention and Logging ──────────────────
+  # ── Epic 38: IJE Batch Re-Upload Rejection & Import Observability ───────────
   epic-38: in-progress
   38-1-ije-upload-duplicate-prevention-and-logging: ready-for-dev
   epic-38-retrospective: optional
@@ -361,6 +362,7 @@ development_status:
   epic-41-retrospective: optional
 
   # ── Epic 42: Geocoding Location Registry (Declarative Refactor) ──────────
-  epic-42: in-progress
-  42-1-geocoding-location-registry-refactor: review
+  epic-42: done
+  42-1-geocoding-location-registry-refactor: done
+  42-2-restore-certainty-code-modal: done
   epic-42-retrospective: optional

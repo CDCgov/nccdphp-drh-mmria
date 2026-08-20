@@ -1,6 +1,6 @@
 # Story 30.6: Fix Legacy Geocode Calls in mmria-check-code.js and validator.js
 
-Status: review
+Status: done
 
 ## Story
 

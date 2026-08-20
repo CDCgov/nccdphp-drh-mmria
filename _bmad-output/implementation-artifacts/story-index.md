@@ -1379,13 +1379,13 @@ dev this story _bmad-output/implementation-artifacts/35-3-align-go-online-confir
 
 ---
 
-## Epic 38: IJE Upload Duplicate Prevention and Logging _(v4.2)_
+## Epic 38: IJE Batch Re-Upload Rejection & Import Observability _(v4.2)_
 
 | Story | File | Status |
 |---|---|---|
-| 38.1 — IJE Upload Duplicate Prevention and Logging | `38-1-ije-upload-duplicate-prevention-and-logging.md` | ready-for-dev |
+| 38.1 — IJE Batch Re-Upload Rejection & Import Observability | `38-1-ije-upload-duplicate-prevention-and-logging.md` | ready-for-dev |
 
-**Sequencing:** Single story. Independent.
+**Sequencing:** Single story. Independent. Does **not** overlap Epic 29 (Record ID Uniqueness) — Epic 38 keys on IJE **file name** at the upload boundary; Epic 29 keys on `mmria_record_id` at the case-write boundary. See the *Relationship to Epic 29* note in Story 38.1.
 
 > ⚠️ **OI-3 must be resolved before starting:** Confirm with Nick whether partial-batch uploads (some new, some duplicate cases) should (a) process new cases and skip duplicates, or (b) reject the entire batch. Story 38.1 implements option (b) as the conservative default — update if option (a) is chosen.
 

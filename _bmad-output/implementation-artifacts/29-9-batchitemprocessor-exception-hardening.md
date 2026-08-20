@@ -1,6 +1,6 @@
 # Story 29.9: `BatchItemProcessor` Exception Hardening
 
-Status: review
+Status: done
 
 ## Story
 

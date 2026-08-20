@@ -4,7 +4,7 @@ baseline_commit: f3f039a48687d1adecd3c928019c893c5b03cb4e
 
 # Story 42.2: Restore Census Tract Certainty Code ≠ 1 Warning Modal
 
-Status: review
+Status: done
 
 ## Story
 

@@ -4,7 +4,7 @@ baseline_commit: 330d0773ce058eeff17b6115a964eadf04be9090
 
 # Story 42.1: Convert CaseGeocodingManager to Declarative LocationRegistry
 
-Status: review
+Status: done
 
 ## Story
 

@@ -1,4 +1,4 @@
-# Story 38.1: IJE Upload Duplicate Prevention and Logging
+# Story 38.1: IJE Batch Re-Upload Rejection & Import Observability
 
 Status: ready-for-dev
 
@@ -6,8 +6,20 @@ Status: ready-for-dev
 
 As a vital importer,
 when I re-upload an IJE file that has already been processed,
-I want the system to detect the duplicate and not create redundant entries in the `vital_import` database,
+I want the system to detect the duplicate at the upload boundary and not create redundant entries in the `vital_import` database,
 so that the import history stays clean and I receive clear feedback about what was skipped.
+
+## Relationship to Epic 29 (Record ID Uniqueness)
+
+This story does **not** duplicate Epic 29. The two epics guard three different identifiers at three different points in the pipeline:
+
+| Identifier | What it identifies | Guarded by |
+|---|---|---|
+| `nat_file_name` / `fet_file_name` / `mor_file_name` | The uploaded IJE file | **This story (new, batch-level, at the upload controller)** |
+| `CDCUniqueID` | The individual vital record inside the file | Pre-existing `BatchItemProcessingService` case-skip logic (unchanged) |
+| `mmria_record_id` (`STATE-YEAR-NNNN`) | The MMRIA case document | Epic 29 (format + uniqueness at case write) |
+
+Concretely: Epic 29 already prevents a re-upload from creating duplicate cases, but the batch still hits the external vitals service, still writes a fresh `Batch` document to `vital_import`, and still churns per-case decisions with no structured log output. This story short-circuits the re-upload before that downstream work runs and adds observability around the pre-existing per-case skip.
 
 ## Acceptance Criteria
 

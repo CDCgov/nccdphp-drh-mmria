@@ -1,6 +1,6 @@
 # Story 30.4: Refactor MMRIA_calculations.js Geocode Button Handlers
 
-Status: review
+Status: done
 
 ## History (2026-08-19) — prior work lost, redo required
 

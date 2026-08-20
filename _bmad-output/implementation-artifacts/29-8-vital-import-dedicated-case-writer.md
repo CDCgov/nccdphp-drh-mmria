@@ -4,7 +4,7 @@ baseline_commit: c608db41b41b4060cbb343164e240aaed212ea47
 
 # Story 29.8: Vital-Import Dedicated Case Writer
 
-Status: review
+Status: done
 
 ## Story
 
