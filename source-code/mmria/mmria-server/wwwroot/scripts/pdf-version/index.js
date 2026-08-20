@@ -1233,6 +1233,34 @@ function convert_html_to_pdf(p_value) {
 
 }
 
+// Story 44.1: pre-flight shape check on narrative-derived pdfmake {table} items.
+// Returns true when any table row is shorter than the widest row / declared widths,
+// or when any cell slot is undefined/null. Genuine {text:''} placeholders are fine.
+function has_malformed_narrative_table(p_narrative) {
+	if (!Array.isArray(p_narrative)) return false;
+	for (let i = 0; i < p_narrative.length; i++) {
+		const item = p_narrative[i];
+		if (item == null || !item.hasOwnProperty('table')) continue;
+		const t = item.table;
+		if (t == null || !Array.isArray(t.body)) return true;
+		let expected = Array.isArray(t.widths) ? t.widths.length : 0;
+		for (let r = 0; r < t.body.length; r++) {
+			const row = t.body[r];
+			if (Array.isArray(row) && row.length > expected) expected = row.length;
+		}
+		if (expected === 0) continue;
+		for (let r = 0; r < t.body.length; r++) {
+			const row = t.body[r];
+			if (!Array.isArray(row)) return true;
+			if (row.length < expected) return true;
+			for (let c = 0; c < row.length; c++) {
+				if (row[c] === undefined || row[c] === null) return true;
+			}
+		}
+	}
+	return false;
+}
+
 function convert_attribute_to_pdf(p_node, p_result) 
 {
 	//{ text: d.case_opening_overview, style: ['tableDetail'], },
@@ -2625,72 +2653,105 @@ function print_pdf_render_content(ctx) {
 		case "textarea":
 			// console.log('*************** type: ', ctx.metadata.type);
 			if (ctx.metadata.name == 'case_opening_overview') {
-				let narrative = convert_html_to_pdf(pdf_version_index_to_string(ctx));
-				// Loop thru and handle the ul (bullet list) & ol (ordered list) differently
-				for (let i = 0; i < narrative.length; i++) {
-					if (narrative[i].hasOwnProperty('ul') == true) {
-						// Found a record with the ul: key
-						narrative[i].ul.forEach((u) => {
-							let ulRet = '' + u.text;
+				// Story 44.1: snapshot ctx.content so we can roll back any partial narrative
+				// content if the pre-flight validator or a node visitor throws.
+				const narrativeSnapshotLen = ctx.content.length;
+				let narrativeFallback = false;
+				try {
+					let narrative = convert_html_to_pdf(pdf_version_index_to_string(ctx));
 
-                            if(Array.isArray(u.text))
-                            {
-                                ulRet = '' + u.text.join("");
-                            }
-							// bullet list removed -  removed style: ['narrativeDetail'], 
-							ctx.content.push([
-								{ ul: [ulRet,], colSpan: '2', },
-								{},
-							]);
-						});
-					} else if (narrative[i].hasOwnProperty('ol') == true) {
-						// Found a record with the ol: key
-						narrative[i].ol.forEach((o) => {
-							let olRet = '' + o.text;
-
-                            if(Array.isArray(o.text))
-                            {
-                                ulRet = '' + o.text.join("");
-                            }
-							// ordered list -  removed style: ['narrativeDetail'], 
-							ctx.content.push([
-								{ ol: [olRet,], colSpan: '2', },
-								{},
-							]);
-						});
-					} else if (narrative[i].hasOwnProperty('table') == true) {
-						// Found a table record
-						let myHeaderRows = narrative[i].table.headerRows;
-						let myBody = [];
-						narrative[i].table.body.forEach((b) => {
-							myBody.push(b);
-						});
-						let myWidths = narrative[i].table.widths;
-
-						// table removed -  - removed style: ['narrativeDetail'], 
-						ctx.content.push([
-							{
-								layout: 'lightHorizontalLines',
-								table: {
-									headerRows: myHeaderRows,
-									widths: myWidths,
-									body: myBody,
-								}, colSpan: '2',
-							}, {},
-						]);
-					} else if (narrative[i].hasOwnProperty('canvas') == true) {
-						// Canvas element (e.g. from <hr>) — cannot be wrapped in {text:}
-						ctx.content.push([
-							Object.assign({}, narrative[i], { colSpan: '2' }),
-							{},
-						]);
+					if (has_malformed_narrative_table(narrative)) {
+						narrativeFallback = true;
 					} else {
-						// Regular default - removed style: ['narrativeDetail'], 
-						ctx.content.push([
-							{ text: narrative[i], colSpan: '2' },
-							{},
-						]);
+						// Loop thru and handle the ul (bullet list) & ol (ordered list) differently
+						for (let i = 0; i < narrative.length; i++) {
+							if (narrative[i].hasOwnProperty('ul') == true) {
+								// Found a record with the ul: key
+								narrative[i].ul.forEach((u) => {
+									let ulRet = '' + u.text;
+
+									if(Array.isArray(u.text))
+									{
+										ulRet = '' + u.text.join("");
+									}
+									// bullet list removed -  removed style: ['narrativeDetail'], 
+									ctx.content.push([
+										{ ul: [ulRet,], colSpan: '2', },
+										{},
+									]);
+								});
+							} else if (narrative[i].hasOwnProperty('ol') == true) {
+								// Found a record with the ol: key
+								narrative[i].ol.forEach((o) => {
+									let olRet = '' + o.text;
+
+									if(Array.isArray(o.text))
+									{
+										ulRet = '' + o.text.join("");
+									}
+									// ordered list -  removed style: ['narrativeDetail'], 
+									ctx.content.push([
+										{ ol: [olRet,], colSpan: '2', },
+										{},
+									]);
+								});
+							} else if (narrative[i].hasOwnProperty('table') == true) {
+								// Found a table record
+								let myHeaderRows = narrative[i].table.headerRows;
+								let myBody = [];
+								narrative[i].table.body.forEach((b) => {
+									myBody.push(b);
+								});
+								let myWidths = narrative[i].table.widths;
+
+								// table removed -  - removed style: ['narrativeDetail'], 
+								ctx.content.push([
+									{
+										layout: 'lightHorizontalLines',
+										table: {
+											headerRows: myHeaderRows,
+											widths: myWidths,
+											body: myBody,
+										}, colSpan: '2',
+									}, {},
+								]);
+							} else if (narrative[i].hasOwnProperty('canvas') == true) {
+								// Canvas element (e.g. from <hr>) — cannot be wrapped in {text:}
+								ctx.content.push([
+									Object.assign({}, narrative[i], { colSpan: '2' }),
+									{},
+								]);
+							} else {
+								// Regular default - removed style: ['narrativeDetail'], 
+								ctx.content.push([
+									{ text: narrative[i], colSpan: '2' },
+									{},
+								]);
+							}
+						}
 					}
+				} catch (err) {
+					narrativeFallback = true;
+				}
+
+				if (narrativeFallback) {
+					// Roll back any partial narrative content pushed before the failure.
+					if (ctx.content.length > narrativeSnapshotLen) {
+						ctx.content.splice(narrativeSnapshotLen, ctx.content.length - narrativeSnapshotLen);
+					}
+					const fallback_record_id =
+						(g_d && g_d.home_record && g_d.home_record.record_id) ||
+						(g_d && g_d._id) ||
+						'(unknown)';
+					console.warn('[pdf] case_narrative fallback', { record_id: fallback_record_id });
+					ctx.content.push([
+						{
+							text: 'Case Narrative could not be included in this report. Please review the Case Narrative in the case and try again.',
+							style: ['tableDetail'],
+							colSpan: '2',
+						},
+						{},
+					]);
 				}
 			} else {
 				ctx.content.push([

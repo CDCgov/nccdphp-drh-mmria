@@ -1766,6 +1766,11 @@ async function $case_geocode_dispatch(p_location_key, p_address, p_list_index)
             throw new Error(msg);
         }
 
+        // FR-1.11: parse the success body so we can surface any server-emitted warning after the reload (code: certainty_code_not_1).
+        let ok_body = null;
+        try { ok_body = await resp.json(); }
+        catch (_ok_parse_ex) { /* body was not JSON — proceed without a warning */ }
+
         // Reload the case in edit mode via the existing reload path (case/index.js).
         if (typeof window.mmria_reload_case_data === 'function')
         {
@@ -1774,6 +1779,16 @@ async function $case_geocode_dispatch(p_location_key, p_address, p_list_index)
         else if (typeof get_specific_case === 'function' && g_data && g_data._id)
         {
             await get_specific_case(g_data._id);
+        }
+
+        // FR-1.11: server-emitted address-geocode warning (e.g., Census Tract Certainty ≠ 1).
+        if (ok_body && ok_body.warning && ok_body.warning.title)
+        {
+            try
+            {
+                $mmria.info_dialog_show(ok_body.warning.title, ok_body.warning.heading, ok_body.warning.message);
+            }
+            catch (_warn_dialog_ex) { /* ignore secondary failure */ }
         }
     }
     catch (err)

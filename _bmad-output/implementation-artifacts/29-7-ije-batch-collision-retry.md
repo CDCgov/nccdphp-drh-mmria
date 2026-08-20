@@ -1,6 +1,8 @@
 # Story 29.7: IJE Batch Collision-Retry via `SaveCaseAsync` (Path C)
 
-Status: review
+Status: superseded
+
+> **⚠️ Superseded by Story 29.8 (2026-08-20).** This story's implementation strategy — route batch writes through `CaseManager.SaveCaseAsync` — caused an authorization regression: `SaveCaseAsync` runs the user-request authorization check against the synthetic `vital-import` `ClaimsPrincipal`, which has no role/jurisdiction entries, so every batch save fails with `unauthorized PUT`. Story 29.8 fixes this by routing batch writes through a dedicated `VitalImportCaseWriter` instead. The Story 29.1 record-id format/uniqueness guards and Story 29.4 collision-retry loop are preserved via a shared private helper on `CaseManager`. See FR-2.8 in [`prd-mmria-2026-08-06/prd.md`](../planning-artifacts/prds/prd-mmria-2026-08-06/prd.md) and the `2026-08-20 — FR-2.8 and FR-2.9 added` decision-log entry for the design rationale. This story file is retained for audit purposes; no further work will be performed against it.
 
 ## Story
 

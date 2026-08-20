@@ -1,5 +1,5 @@
 # generated: 2026-07-14
-last_updated: 2026-08-19
+last_updated: 2026-08-20
 # project: mmria
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@ last_updated: 2026-08-19
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-07-14
-last_updated: 2026-08-19
+last_updated: 2026-08-20
 project: mmria
 project_key: NOKEY
 tracking_system: file-system
@@ -273,6 +273,8 @@ development_status:
   29-5-online-save-then-retry-on-collision: done
   29-6-offline-placeholder-record-id: backlog
   29-7-ije-batch-collision-retry: backlog
+  # 29-7 superseded by 29-8 (2026-08-20) — story file marked "superseded"; no defined sprint status maps
+  29-8-vital-import-dedicated-case-writer: review
   epic-29-retrospective: optional
 
   # ── Epic 30: Unified Server-Side Geocoding (TAMU Refactor) ────────────────

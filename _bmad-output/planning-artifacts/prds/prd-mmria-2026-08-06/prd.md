@@ -204,6 +204,23 @@ Offline `add_new_case()` writes `home_record.record_id = "{STATE}-OFFLINE-CASE-{
 **FR-2.7 — IJE batch imports route through `SaveCaseAsync` with collision-retry (Path C).**
 `BatchItemProcessingService.Process_Message` persists each new case via `CaseManager.SaveCaseAsync` rather than directly via `_caseRepository.PutCaseDocumentJsonAsync`. On `error_code === "record_id_conflict"`, the batch item processor calls `GenerateUniqueRecordIdAsync` for a fresh record ID, updates `home_record.record_id`, and retries; cap at 5 attempts; on exhaustion, marks the item `ImportFailed`. `BatchItem.mmria_record_id` reports the final, post-retry value so users can trace the case. The stale 25 000-row `ExistingRecordIds` HashSet pattern in `MMRIAServicesHelper.ConvertLineToBatchItem` is retired for cross-writer uniqueness; a small batch-local dedup Set is preserved to guard intra-file suffix collisions.
 
+> **Implementation amendment (2026-08-20):** FR-2.7's "route batch writes through `SaveCaseAsync`" strategy caused an authorization regression — `SaveCaseAsync` runs the application-layer authorization check against the caller's `ClaimsPrincipal`, but the batch runs as a server-side integration with a synthetic `vital-import` principal that has no role/jurisdiction assignments. Every batch save returned `unauthorized PUT`. FR-2.8 supersedes the "call `SaveCaseAsync` directly" portion of FR-2.7 with a dedicated `VitalImportCaseWriter`. The Story 29.1 record-id format/uniqueness guards and Story 29.4 collision-retry loop remain in force via a shared private helper on `CaseManager`. See decision-log entry `2026-08-20 — FR-2.8 added` for design rationale.
+
+**FR-2.8 — Vital-import batch writes use a dedicated `VitalImportCaseWriter`.**
+`nccdphp-drh-mmria-services/mmria.services/SharedLibraries/VitalImport/Manager/VitalImportCaseWriter.cs` exposes a single method, `SaveNewVitalImportCaseAsync(caseData, changeStack, dbConfig, configuration, hostPrefix)`, that writes a new case using the CouchDB service credentials without invoking the user-request authorization check. The method:
+- Takes no `ClaimsPrincipal` parameter — controllers have no legitimate reason to use it, and the missing parameter is a visible signal in code review that this is not a user-request path.
+- Runs the Story 29.1 record-id format guard (STATE-YEAR-NNNN, four-digit year 1900-2100, four-digit suffix, non-empty jurisdiction prefix) and the Story 29.1 uniqueness check via `ICaseRepository.RecordIdExistsAsync`.
+- Runs the Story 29.4 collision-retry loop keyed on `error_code === "record_id_conflict"`, up to 5 attempts, calling `CaseManager.GenerateUniqueRecordIdAsync` on each collision. On exhaustion, returns a `SaveCaseResult` whose `document_put_response.error_description` reports the exhaustion reason.
+- Writes an `IAuditRepository` change-stack entry stamped with `created_by = "vital-import"` and `last_updated_by = "vital-import"` so imports are attributable in the audit log.
+
+The shared record-id validation + retry logic is extracted into a private helper on `CaseManager` (called from both `SaveCaseAsync` and `SaveNewVitalImportCaseAsync`) so the guards and retry semantics cannot drift between the two paths. The writer is registered in the vital-import service DI graph only — not in the main mmria-server DI graph — so it is unreachable from user-facing controllers. `BatchItemProcessingService.Process_Message` calls `SaveNewVitalImportCaseAsync` instead of `SaveCaseAsync`, and the synthetic-`ClaimsPrincipal` scaffolding (`BuildVitalImportPrincipal`, `BuildVitalImportConfiguration`'s user-facing bits) is removed.
+
+**FR-2.9 — `BatchItemProcessor` cannot strand items under "In Process" on exception.**
+When `BatchItemProcessingService.Process_Message(StartBatchItemMessage)` throws, `BatchItemProcessor.ReceiveAsync` must `Tell` a synthetic `ImportFailed` `BatchItem` back to the parent `BatchProcessor` — not silently log the exception and drop the message. Concretely:
+- The `catch (Exception ex)` block in `BatchItemProcessor.cs` constructs a `BatchItem` with `Status = ImportFailed`, `CDCUniqueID = message.cdc_unique_id`, `mmria_record_id = message.record_id`, `mmria_id` populated (either from the message or a fresh `Guid`), and `StatusDetail = "Processing exception: {ex.Message}"` (full stack trace goes to the console log, not `StatusDetail`).
+- The synthetic completion is sent via `Context.ActorSelection(message.BatchProcessorPath).Tell(batchItem)` so `BatchProcessor.pending_items` decrements and `Finalize_Batch()` runs.
+- No batch item can remain visible under "In Process" indefinitely; every dispatched item resolves to `NewCaseAdded`, `ExistingCaseSkipped`, or `ImportFailed` before the batch closes.
+
 ---
 
 ### FR-3 — Form Designer Removal — Static HTML Form Rendering
@@ -313,6 +330,73 @@ ClosedXML creates the workbook directly in memory — no template file is needed
 **FR-12.5 — No behavioral changes to CSV or other export formats**
 The change is scoped to `WriteCSV.WriteToExcel()`. The CSV write path, the data content, the column set, the export queue flow, and the UI are unchanged.
 
+---
+
+### FR-13 — Vitals Import: Father's Race Principal Tribe Mapping Correction
+
+_(Source: BUG 119513 — Rel 4.2, P-High, reported by Susana. Iteration: MMRIA\ITDM 25-26 - Option Yr 4.)_
+
+When an IJE vitals file (NAT or FET) is imported, the father's race "Specify Principal Tribe" field (`bfdcpdofr_p_tribe`, MMRIA path `birth_fetal_death_certificate_parent/demographic_of_father/race/principle_tribe`) is not correctly populated from the IJE fields `FRACE16` and `FRACE17`. The documented mapping rule is: *combine `FRACE16` and `FRACE17` into one field, separated by a pipe delimiter, transferring the strings verbatim; leave the MMRIA field empty when both source fields are blank.*
+
+Root cause: at both call sites in `BatchItemProcessingService` (NAT path around line 1682 and FET path around line 2024), `field_set["FRACE16"]` is passed twice to the `FRACE16_17_NAT_Rule` / `FRACE16_17_FET_Rule` helpers instead of passing `field_set["FRACE17"]` as the second argument. The helper methods themselves in `MMRIAServicesHelper` implement the pipe-join contract correctly — they simply never receive the `FRACE17` value. The adjacent `FRACE18_19`, `FRACE20_21`, and `FRACE22_23` calls follow the correct `(N, N+1)` pattern, so this is a localized copy/paste defect, not a design gap.
+
+**FR-13.1 — NAT import populates `bfdcpdofr_p_tribe` from both FRACE16 and FRACE17**
+When a NAT file is imported and either `FRACE16` or `FRACE17` (or both) contain non-blank values, the resulting MMRIA case document has `birth_fetal_death_certificate_parent/demographic_of_father/race/principle_tribe` populated according to the pipe-join rule:
+- Both non-blank: `"{FRACE16}|{FRACE17}"`
+- Only `FRACE16` non-blank: `"{FRACE16}"`
+- Only `FRACE17` non-blank: `"{FRACE17}"`
+- Both blank: field left empty
+
+**FR-13.2 — FET import applies the same rule**
+The identical behavior described in FR-13.1 applies to the FET (fetal death) import path.
+
+**FR-13.3 — Verbatim string transfer**
+Source values from `FRACE16` and `FRACE17` are transferred verbatim (subject only to the existing input-trim performed during IJE line parsing). No case normalization, character mapping, or dictionary lookup is applied. The MMRIA field type remains a JSON string.
+
+**FR-13.4 — No collateral changes to other FRACE fields**
+The `FRACE18_19`, `FRACE20_21`, and `FRACE22_23` call sites and their helper rules are already correct and are not modified. No changes to the mother's race `MRACE*` fields or to any other IJE-to-MMRIA mapping.
+
+**FR-13.5 — Regression coverage**
+Unit test coverage is added for the four `FRACE16` / `FRACE17` combinations (both non-blank, FRACE16-only, FRACE17-only, both blank) on both the NAT and FET rule helpers to prevent future recurrence. If integration-level coverage for `BatchItemProcessingService` NAT/FET routing exists, the four-case matrix is exercised there as well.
+
+> **OI-v42-4 (open):** Determine whether existing MMRIA cases previously created via vitals import require a retrospective data-correction migration for `principle_tribe` (analogous to the Epic 12 Story 12.2 vitals type-correction migration). Two considerations: (a) the correct source IJE values may no longer be available if the original files are not retained; (b) the impact scope is limited to cases where both `FRACE16` and `FRACE17` were populated or where only `FRACE17` was populated. Confirm with Nick after FR-13.1/FR-13.2 ship. A follow-on story (43.2) will be added to Epic 43 if remediation is approved.
+
+---
+
+### FR-14 — Case Narrative PDF Render Resilience
+
+_(Source: BUG 118794 — Rel 4.1, P-Low, TA: Unable to create PDF on Case Narrative Case NJ-2024-7102, reported by NJ. Iteration: MMRIA\ITDM 25-26 - Option Yr 4.)_
+
+When a case PDF is generated (`/pdf-version`), rendering must not fail because of malformed HTML content in the case narrative (`g_data.case_narrative.case_opening_overview`). The client-side PDF pipeline in `source-code/mmria/mmria-server/wwwroot/scripts/pdf-version/index.js` walks the narrative HTML into a pdfmake doc-def; when the narrative contains structurally broken markup (observed case: a `<table>` with a `<tr>` shorter than the header row), pdfmake throws `"Malformed table row, a cell is undefined"` at layout time and the entire case PDF fails to render — the user sees the "Please wait — Your request is being processed" spinner indefinitely and never receives a document.
+
+The fix is a section-scoped fallback: when narrative rendering cannot succeed, the narrative is omitted from the PDF, a short neutral placeholder is emitted in its place, and every other section of the case renders normally. The stored narrative HTML is not modified.
+
+**FR-14.1 — Narrative section renders inside an isolated fallback boundary**
+The case narrative HTML→pdfmake conversion for `case_opening_overview` is guarded so that any failure — from either the DOM walker (`convert_html_to_pdf` / `ConvertHTMLDOMWalker`) or a downstream pdfmake layout error caused by narrative-derived content — is caught. On failure, the narrative content is dropped from the doc-def and PDF generation for every other section proceeds to completion. A malformed narrative on one case never blocks the entire report.
+
+**FR-14.2 — Neutral placeholder replaces narrative on fallback**
+When the narrative cannot be rendered, its position in the PDF is filled with a single short, neutral placeholder line. Recommended wording (exact text confirmed at implementation time):
+
+> _"Case Narrative could not be included in this report. Please review the Case Narrative in the case and try again."_
+
+The placeholder must not disclose the underlying cause (no mention of tables, HTML, parse errors, etc.), must not include a stack trace or error code, and must not include an excerpt of the narrative content. It is styled consistently with the surrounding section body — no red-alert framing, no console-error affordance in the PDF.
+
+**FR-14.3 — Save and Open output paths share the fallback**
+Both output modes in `pdfMake.createPdf(doc).download(...)` (`g_type_output == 'save'`) and `pdfMake.createPdf(doc).open(window)` produce the same behavior: a complete PDF is delivered, with the placeholder standing in for the narrative body. The user experience is identical regardless of which path was invoked.
+
+**FR-14.4 — No changes to stored narrative HTML**
+The stored value at `g_data.case_narrative.case_opening_overview` is not modified. This is a render-side resilience change only, in accordance with the project-context §2.4 rule that the narrative HTML structure must not be altered. Any editor or save-path sanitization work remains out of scope for FR-14 (see FR-9 for narrative save-path items).
+
+**FR-14.5 — Client-side notice on fallback**
+When the fallback fires, the browser emits a single `console.warn` entry naming the affected `record_id` (or case `_id` when the record ID is absent), so that a developer inspecting the browser console during support triage can identify the fallback event. The console entry must not include an excerpt of the narrative content (PII avoidance). No new server-side log is required for FR-14.
+
+**FR-14.6 — Non-narrative sections are unaffected**
+No behavior change is introduced for any section other than `case_opening_overview`. The doc-def rows produced for demographic, death certificate, birth/fetal death, prenatal care, ER visit, medical transport, social/environmental profile, mental health, informant interview, committee review, or any other section are identical to today's output on cases whose narrative renders normally.
+
+> **OI-v42-5 (open):** Confirm final placeholder wording with Vilma (Draft candidate: _"Case Narrative could not be included in this report. Please review the Case Narrative in the case and try again."_ — compare with her Jun 10 draft: _"Please check the format of Case Narrative content. The content has one or more unexpected formats. Please fix the issue before generating the PDF."_ Per Nick's direction the wording should be brief and must not describe the underlying cause.) Confirm at story kickoff.
+
+---
+
 --- All changes must function correctly in Microsoft Edge and Google Chrome.
 
 NFR-2: The geocoding refactor introduces no new client-side dependencies, no bundler changes, and no metadata schema changes.
@@ -329,6 +413,8 @@ NFR-4: The TAMU API key is resolved at server startup from the existing CouchDB 
 - OI-2: Confirm Epic 30 story amendments needed for server-side CVS and case-reload behavior vs. the field-update-in-place design in existing Epic 30 stories.
 - OI-6 (FR-10): Determine how `ILogger` is injected into `SteveAPI_Instance`. The actor currently uses a parameterless constructor and is spawned via `Context.ActorOf<SteveAPI_Instance>()` with no DI wiring. Options: (a) pass the logger through `Props.Create(() => new SteveAPI_Instance(logger))` from the supervisor, or (b) wire Akka.NET's `ServiceProvider` integration if already available in the actor system setup. Confirm at implementation time. Either approach is acceptable; the story author decides.
 - OI-7 (FR-10): The FR-10.3 log entry for "STEVE auth token received" must confirm receipt only — the token value itself must not appear in any log output.
+- OI-v42-4 (FR-13): Retrospective data-correction migration decision for cases previously imported with mis-mapped `principle_tribe`. See FR-13 OI callout.
+- OI-v42-5 (FR-14): Final placeholder wording for the Case Narrative PDF fallback. See FR-14.2 OI callout.
 
 ---
 
@@ -336,7 +422,7 @@ NFR-4: The TAMU API key is resolved at server startup from the existing CouchDB 
 
 FR-1.1 – FR-1.9: Epic 30 — Unified Server-Side Geocoding (TAMU Refactor)  
 FR-1.10 – FR-1.11: Epic 42 — Geocoding Location Registry (Declarative Refactor) + Certainty Code Modal Restoration  
-FR-2.1 – FR-2.7: Epic 29 — Record ID Uniqueness Enforcement  
+FR-2.1 – FR-2.9: Epic 29 — Record ID Uniqueness Enforcement  
 FR-3.1 – FR-3.11: Epic 37 — Form Designer Removal — Static HTML Form Rendering  
 FR-4.1 – FR-4.3: Epic TBD — IJE Upload Duplicate Prevention and Logging  
 FR-5.1 – FR-5.3: Epic TBD — Update Year of Death Record ID Regression Fix  
@@ -345,4 +431,6 @@ FR-8.1 – FR-8.5: Epic TBD — Per-Tenant Authentication Mode (SAMS + Password 
 FR-9.1 – FR-9.2: Epic TBD — Case Narrative Post-v4.1 Tweaks (Emoji Strip, Strikethrough Strip)  
 FR-10.1 – FR-10.5: Epic TBD — STEVE Download Structured Logging  
 FR-11.1 – FR-11.5: Epic TBD — STEVE PRAMS Download Structured Logging  
-FR-12.1 – FR-12.5: Epic TBD — Case Excel Export Column Width Auto-Fit (ClosedXML)
+FR-12.1 – FR-12.5: Epic TBD — Case Excel Export Column Width Auto-Fit (ClosedXML)  
+FR-13.1 – FR-13.5: Epic 43 — Vitals Import Father's Race Principal Tribe Mapping Correction (BUG 119513)  
+FR-14.1 – FR-14.6: Epic 44 — Case Narrative PDF Render Resilience (BUG 118794)

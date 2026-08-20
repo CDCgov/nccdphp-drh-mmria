@@ -206,7 +206,24 @@ public sealed class CaseGeocodeController : ControllerBase
             return StatusCode(500, new { error = "Failed to save case document." });
         }
 
-        return Ok(new { ok = true });
+        // FR-1.11: surface a "Certainty Code != 1" warning to the client so it can raise the info dialog after reload.
+        // Only when the geocode matched (FeatureMatchingGeographyType != "Unmatchable") AND the certainty code is not "1".
+        object warning = null;
+        if (!string.IsNullOrWhiteSpace(geocodeResult.FeatureMatchingGeographyType) &&
+            !string.Equals(geocodeResult.FeatureMatchingGeographyType, "Unmatchable", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(geocodeResult.NAACCRCensusTractCertaintyCode, "1", StringComparison.Ordinal))
+        {
+            warning = new
+            {
+                code = "certainty_code_not_1",
+                title = "Address Geocode",
+                heading = "Validation: Census Tract Certainty Code is Not 1 (Census tract based on complete and valid street address.)",
+                message = "There might be a potential error in the address. Please verify address.",
+                certaintyCode = geocodeResult.NAACCRCensusTractCertaintyCode
+            };
+        }
+
+        return Ok(new { ok = true, warning });
     }
 
     // Server-side replacement for the client's CVS "data" round-trip.

@@ -765,6 +765,7 @@ public sealed class BatchItemProcessingService
     private readonly mmria.common.SharedLibraries.Case.Manager.CaseManager _caseManager;
     private readonly mmria.common.SharedLibraries.Geocoding.Manager.GeocodingManager _geocodingManager;
     private readonly mmria.common.SharedLibraries.Case.Manager.CaseGeocodingManager _caseGeocodingManager;
+    private readonly mmria.services.SharedLibraries.VitalImport.Manager.VitalImportCaseWriter _vitalImportCaseWriter;
     public BatchItemProcessingService(mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
         _couchDbHttpClient = couchDbHttpClient;
@@ -773,6 +774,7 @@ public sealed class BatchItemProcessingService
         _metadataRepository = new MetadataVersionDAL(_couchDbHttpClient);
         _auditRepository = new mmria.common.SharedLibraries.Audit.DAL.AuditDAL(_couchDbHttpClient);
         _caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient, _caseRepository, _auditRepository);
+        _vitalImportCaseWriter = new mmria.services.SharedLibraries.VitalImport.Manager.VitalImportCaseWriter(_caseRepository, _caseManager, _auditRepository);
         _geocodingManager = new mmria.common.SharedLibraries.Geocoding.Manager.GeocodingManager();
         _caseGeocodingManager = new mmria.common.SharedLibraries.Case.Manager.CaseGeocodingManager();
         var httpClientFactory = new mmria.common.SimpleHttpClientFactory();
@@ -2616,7 +2618,7 @@ if
 
             var case_dictionary = new_case as IDictionary<string, object>;
 
-            // Story 29.7: finished is populated after the save loop below with the
+            // Story 29.8: finished is populated after the save call below with the
             // post-retry record_id and the appropriate NewCaseAdded / ImportFailed status.
             mmria.common.ije.BatchItem finished;
 
@@ -2628,69 +2630,36 @@ if
             settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
             var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(new_case, settings);
 
-            // Story 29.7: route batch writes through CaseManager.SaveCaseAsync so the
-            // Story 29.1 record_id format and uniqueness guards run at write time. On a
-            // record_id_conflict response, regenerate the STATE-YEAR-NNNN suffix via
-            // GenerateUniqueRecordIdAsync (Story 29.4) and retry up to 5 attempts total.
-            const int MAX_RECORD_ID_RETRIES = 5;
-            var vital_import_principal = BuildVitalImportPrincipal();
-            var save_configuration = BuildVitalImportConfiguration(_dbConfigSet, message.host_state);
+            // Story 29.8: batch writes go through VitalImportCaseWriter instead of
+            // CaseManager.SaveCaseAsync so the user-request authorization check does
+            // not fire against the synthetic vital-import identity. The writer
+            // preserves the Story 29.1 record_id format/uniqueness guards and owns
+            // the Story 29.4 collision-retry loop internally (5-attempt cap).
             var final_record_id = message.record_id;
             var save_ok = false;
             string save_failure_detail = null;
-            mmria.common.model.couchdb.document_put_response document_put_response = null;
 
             try
             {
                 var case_data = mmria.common.utils.CaseJsonSerialization.DeserializeMmriaCase(object_string);
+                var change_stack = BuildVitalImportChangeStack(case_data);
+                var save_configuration = BuildVitalImportConfiguration(_dbConfigSet, message.host_state);
 
-                for (int attempt = 1; attempt <= MAX_RECORD_ID_RETRIES; attempt++)
+                var save_result = await _vitalImportCaseWriter.SaveNewVitalImportCaseAsync(
+                    case_data,
+                    change_stack,
+                    db_info,
+                    save_configuration,
+                    message.host_state);
+
+                if (save_result?.Response != null && save_result.Response.ok)
                 {
-                    var change_stack = BuildVitalImportChangeStack(case_data, "vital-import");
-
-                    var save_result = await _caseManager.SaveCaseAsync(
-                        case_data,
-                        change_stack,
-                        db_info,
-                        vital_import_principal,
-                        save_configuration,
-                        message.host_state);
-
-                    document_put_response = save_result.Response;
-
-                    if (document_put_response != null && document_put_response.ok)
-                    {
-                        save_ok = true;
-                        final_record_id = case_data.home_record?.record_id ?? final_record_id;
-                        break;
-                    }
-
-                    if (document_put_response != null &&
-                        string.Equals(document_put_response.error_code, mmria.common.model.couchdb.SaveErrorCodes.RecordIdConflict, StringComparison.Ordinal) &&
-                        attempt < MAX_RECORD_ID_RETRIES)
-                    {
-                        var (state_prefix, year_segment) = ExtractStatePrefixAndYear(case_data.home_record?.record_id, message.host_state, mor_field_set);
-                        try
-                        {
-                            var new_record_id = await _caseManager.GenerateUniqueRecordIdAsync(state_prefix, year_segment, db_info);
-                            case_data.home_record.record_id = new_record_id;
-                            Console.WriteLine($"BatchItemProcessingService record_id collision retry attempt={attempt} case_id={mmria_id} new_record_id={new_record_id}");
-                            continue;
-                        }
-                        catch (Exception genEx)
-                        {
-                            save_failure_detail = $"unable to generate unique record id after {attempt} attempts: {genEx.Message}";
-                            break;
-                        }
-                    }
-
-                    save_failure_detail = document_put_response?.error_description ?? "unknown save failure";
-                    break;
+                    save_ok = true;
+                    final_record_id = case_data.home_record?.record_id ?? final_record_id;
                 }
-
-                if (!save_ok && string.IsNullOrWhiteSpace(save_failure_detail))
+                else
                 {
-                    save_failure_detail = "unable to generate unique record id after 5 attempts";
+                    save_failure_detail = save_result?.Response?.error_description ?? "unknown save failure";
                 }
             }
             catch (Exception ex)
@@ -2777,27 +2746,8 @@ if
 
     
 
-    // Story 29.7 — service-account principal for vitals-import writes routed through
-    // CaseManager.SaveCaseAsync. Issuer "https://contoso.com" is required by
-    // mmria.common.SharedLibraries.Other.authorization.get_current_jurisdiction_id_set_for.
-    private static System.Security.Claims.ClaimsPrincipal BuildVitalImportPrincipal()
-    {
-        var name_claim = new System.Security.Claims.Claim(
-            System.Security.Claims.ClaimTypes.Name,
-            "vital-import",
-            System.Security.Claims.ClaimValueTypes.String,
-            "https://contoso.com");
-
-        var identity = new System.Security.Claims.ClaimsIdentity(
-            new[] { name_claim },
-            "vital-import-auth");
-
-        return new System.Security.Claims.ClaimsPrincipal(identity);
-    }
-
-    // Story 29.7 — minimal OverridableConfiguration for SaveCaseAsync. Only
-    // metadata_version is semantically consumed (written to the audit Change_Stack);
-    // case_lock_minutes falls back to its 120-minute default for the new-case path.
+    // Story 29.8 — minimal OverridableConfiguration for VitalImportCaseWriter. Only
+    // metadata_version is semantically consumed (written to the audit Change_Stack).
     private static mmria.common.couchdb.OverridableConfiguration BuildVitalImportConfiguration(
         mmria.common.couchdb.ConfigurationSet dbConfigSet,
         string hostPrefix)
@@ -2813,11 +2763,10 @@ if
         return configuration;
     }
 
-    // Story 29.7 — synthetic Change_Stack for the new-case audit entry.
-    // object_path/metadata_path/prompt shape mirrors OfflineCaseManager.ApplyOfflineDocumentAsync.
+    // Story 29.8 — Change_Stack scaffold for the new-case audit entry. The writer
+    // stamps user_name = "vital-import" on the stack and its items.
     private static mmria.common.model.couchdb.Change_Stack BuildVitalImportChangeStack(
-        mmria.case_version.v260615.mmria_case case_data,
-        string user_name)
+        mmria.case_version.v260615.mmria_case case_data)
     {
         var now = DateTime.UtcNow;
         return new mmria.common.model.couchdb.Change_Stack
@@ -2826,7 +2775,6 @@ if
             case_id = case_data._id,
             case_rev = case_data._rev,
             date_created = now,
-            user_name = user_name,
             note = "Vital Import: new case added by batch importer",
             items = new List<mmria.common.model.couchdb.Change_Stack_Item>
             {
@@ -2841,40 +2789,10 @@ if
                     dictionary_path = "/vital_import",
                     metadata_type = "vital_import",
                     prompt = "Vital Import",
-                    date_created = now,
-                    user_name = user_name
+                    date_created = now
                 }
             }
         };
-    }
-
-    // Story 29.7 — pull state prefix and 4-digit year for record-id regeneration.
-    // Prefers the segments parsed from the existing record_id; falls back to
-    // host_state / DOD_YR when the record_id shape is unusable.
-    private static (string statePrefix, string year) ExtractStatePrefixAndYear(
-        string current_record_id,
-        string host_state,
-        Dictionary<string, string> mor_field_set)
-    {
-        if (!string.IsNullOrWhiteSpace(current_record_id))
-        {
-            var segments = current_record_id.Split('-');
-            if (segments.Length >= 3 &&
-                System.Text.RegularExpressions.Regex.IsMatch(segments[^2], @"^\d{4}$"))
-            {
-                var prefix = string.Join('-', segments[..^2]);
-                if (!string.IsNullOrWhiteSpace(prefix))
-                {
-                    return (prefix.ToUpperInvariant(), segments[^2]);
-                }
-            }
-        }
-
-        var fallback_state = string.IsNullOrWhiteSpace(host_state) ? "XX" : host_state.ToUpperInvariant();
-        var fallback_year = mor_field_set != null && mor_field_set.TryGetValue("DOD_YR", out var yr) && !string.IsNullOrWhiteSpace(yr)
-            ? yr
-            : DateTime.UtcNow.Year.ToString();
-        return (fallback_state, fallback_year);
     }
 
     private void omb_mrace_recode(migrate.C_Get_Set_Value gs, System.Dynamic.ExpandoObject new_case, string[] race)
