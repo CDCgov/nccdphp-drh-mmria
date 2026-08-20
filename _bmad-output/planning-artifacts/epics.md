@@ -5970,11 +5970,58 @@ Adding a new form today requires: (1) new method in `CaseGeocodingManager`, (2) 
 
 ---
 
+### Story 42.2 — Restore Census Tract Certainty Code ≠ 1 Warning Modal (regression fix)
+
+**User Story:** As an abstractor validating an address on any of the 10 "Validate Address and Get Geography Context" buttons, I want the "Address Geocode / Validation: Census Tract Certainty Code is Not 1 ..." info dialog to appear whenever a successful geocode returns a certainty code other than `"1"`, so that I know to re-check a partially valid address before continuing — the same UX that shipped before the Epic 30 server-side migration.
+
+**Background — the regression being closed**
+
+Epic 30 (Stories 30.3 + 30.4) moved geocoding server-side. Story 30.4 removed the 10 in-line client `$mmria.info_dialog_show("Address Geocode", "Validation: Census Tract Certainty Code is Not 1 ...", "...")` calls on the stated assumption that the server would surface the warning through the response. `CaseGeocodeController.Post(...)` however only returns `Ok(new { ok = true })` and never inspects `geocodeResult.NAACCRCensusTractCertaintyCode`. Story 30.6 propagated the same trimmed `$case_geocode_dispatch` helper into the 3 sibling copies (`mmria-check-code.js`, `database-scripts/validator.js`, `wwwroot/scripts/validator.js`) without noticing the missing warning field. Story 42.1 (registry refactor) was explicitly server-side-only and did not touch the client dispatcher either. Result: the modal never fires anywhere — a regression against **FR-1.5** at every one of the 10 registry keys. The verbatim old-code check was `if (parseInt(geo_data.NAACCRCensusTractCertaintyCode) != 1) { $mmria.info_dialog_show("Address Geocode", "Validation: Census Tract Certainty Code is Not 1 (Census tract based on complete and valid street address.)", "There might be a potential error in the address. Please verify address."); }` — repeated in all 10 geocode handlers at commit `f3f039a48^` (`ba4e36147` for the != 1 form).
+
+**Requirement covered:** FR-1.11 (added to v4.2 PRD alongside this story).
+
+**Scope:**
+
+- **Server (`CaseGeocodeController`).** After the `_caseGeocodingManager.Apply(...)` call and before the save, compute an optional warning: when `geocodeResult.FeatureMatchingGeographyType` is present and not equal (ordinal-ignore-case) to `"Unmatchable"` **and** `geocodeResult.NAACCRCensusTractCertaintyCode` (ordinal-compared to `"1"`) is not `"1"`, produce a small object with `code = "certainty_code_not_1"`, `title = "Address Geocode"`, `heading = "Validation: Census Tract Certainty Code is Not 1 (Census tract based on complete and valid street address.)"`, `message = "There might be a potential error in the address. Please verify address."`, and `certaintyCode = geocodeResult.NAACCRCensusTractCertaintyCode`. Otherwise the warning is `null`. Return `Ok(new { ok = true, warning })` — `null` warnings must be serialized as an explicit `null` (or omitted — either shape is acceptable so long as the client's `if (body.warning)` check remains truthy only for real warnings). Do not put this logic in `CaseGeocodingManager` or `GeocodingManager` — this is a UX concern; the manager stays pure so the batch service is unaffected.
+- **Client (`$case_geocode_dispatch`) — 4 files, identical patch.**
+  - `source-code/mmria/mmria-server/database-scripts/MMRIA_calculations.js` (helper at line ~889)
+  - `source-code/mmria/mmria-server/database-scripts/mmria-check-code.js` (helper at line ~1575)
+  - `source-code/mmria/mmria-server/database-scripts/validator.js` (helper at line ~1575)
+  - `source-code/mmria/mmria-server/wwwroot/scripts/validator.js` (helper at line ~1711)
+
+  On the success branch of the dispatcher, parse `resp.json()` into a local (guarded try/catch — an unexpected non-JSON body must not crash the reload). Run the existing case-reload path first. **After** the reload completes, if the parsed body has a truthy `warning.title`, call `$mmria.info_dialog_show(warning.title, warning.heading, warning.message)` inside a try/catch (matches the error-branch guarding already in place). Order matters: fire after the reload so the just-populated certainty-code field is visible behind the modal (mirrors the pre-Epic-30 UX).
+
+- **Batch path — explicitly excluded.** `BatchItemProcessingService` has no UI to render a modal. The batch service already writes `_logger` entries at geocode failures; adding a low-certainty summary to the batch report is a separate future story and not part of FR-1.11.
+- **No changes to `CaseGeocodingManager`, `LocationRegistry`, `GeocodingManager`, or `GeocodeResult`.** The certainty code is already carried on `GeocodeResult` — only the controller and the 4 client copies change.
+
+**Acceptance Criteria:**
+
+1. `CaseGeocodeController.Post(...)` returns a 200 OK body with a `warning` field. When the geocode matched (`FeatureMatchingGeographyType` non-empty and not `"Unmatchable"`) and `NAACCRCensusTractCertaintyCode` (ordinal-compared) is not `"1"`, `warning` is an object with `code = "certainty_code_not_1"`, `title = "Address Geocode"`, `heading = "Validation: Census Tract Certainty Code is Not 1 (Census tract based on complete and valid street address.)"`, `message = "There might be a potential error in the address. Please verify address."`, and `certaintyCode` equal to the raw code. Otherwise `warning` is `null` (or omitted). The `ok = true` field is preserved.
+2. Each of the 4 `$case_geocode_dispatch` copies parses the success-branch response body, and — after the case reload completes — if the parsed body contains a truthy `warning.title`, invokes `$mmria.info_dialog_show(warning.title, warning.heading, warning.message)` inside a try/catch guard. The 4 patches are byte-identical to each other after formatting.
+3. `CaseGeocodingManager`, `LocationRegistry`, `GeocodingManager`, `GeocodeResult`, `BatchItemProcessingService`, and every other server-side file except `CaseGeocodeController.cs` are unchanged. Verified via `git diff --name-only` in the Dev Agent Record.
+4. Manual smoke against a running server: at three representative buttons — DC place of last residence (static base path), BC facility of delivery (static base path, different form), MT origin address (list-shaped path with `listIndex`) — a TAMU response with certainty code `4` triggers the modal with the FR-1.11 wording verbatim, and a TAMU response with certainty code `1` does not trigger it. The 7 remaining registry keys share the same controller code path and are therefore covered by the three probes plus AC #1's response-shape guarantee.
+5. Unmatchable geocode: the response has `warning = null` (matching the current pre-Epic-30 UX of silently clearing the fields). No modal fires.
+6. `dotnet build source-code/mmria/mmria-server/mmria-server.csproj` succeeds with zero errors. `dotnet build nccdphp-drh-mmria-services/mmria.services/mmria.services.csproj` succeeds with zero errors (unchanged, but confirms no accidental cross-project impact).
+7. Grep guardrail: `Select-String -Pattern "certainty_code_not_1"` returns exactly 5 matches — one in `CaseGeocodeController.cs` and one in each of the 4 dispatcher copies. Any other count indicates missing files or accidental duplication.
+
+**Callers to update — enumeration for the story author:**
+
+- `source-code/mmria/mmria-server/Controllers/api/CaseGeocodeController.cs` — extend the success-path response body only.
+- `source-code/mmria/mmria-server/database-scripts/MMRIA_calculations.js` — inside `$case_geocode_dispatch` on the success branch.
+- `source-code/mmria/mmria-server/database-scripts/mmria-check-code.js` — same edit.
+- `source-code/mmria/mmria-server/database-scripts/validator.js` — same edit.
+- `source-code/mmria/mmria-server/wwwroot/scripts/validator.js` — same edit.
+
+**Out of scope:** `BatchItemProcessingService`; `CaseGeocodingManager` and its `LocationRegistry`; `GeocodingManager` and `GeocodeResult`; the shape of the request payload; any new modal component or new client helper — the existing `$mmria.info_dialog_show` covers the requirement.
+
+---
+
 ## Epic 42 — Story Sequencing
 
 | Story | Risk | Dependencies |
 |---|---|---|
 | 42.1 — Registry refactor | Low | Epic 30 must be `done` (all Epic 30 stories in `review` or `done` is sufficient to start; commit the review-status stories before starting 42.1 to avoid the uncommitted-work class of failure Epic 30 hit) |
+| 42.2 — Certainty code modal restoration | Low | Story 42.1 `done`. (Not strictly required — the controller is edited either way — but running after 42.1 avoids a rebase against the registry refactor's controller changes.) |
 
-Single-story epic. The refactor is small (three files touched, ~150 lines net), fully in-process, and carries no user-facing behavior change.
+Two-story epic. Both are small, in-process changes with no user-facing behavior change beyond restoring FR-1.5 at all 10 buttons.
 

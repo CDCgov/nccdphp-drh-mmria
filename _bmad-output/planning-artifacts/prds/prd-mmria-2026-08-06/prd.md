@@ -174,6 +174,16 @@ Both callers are data-driven off the same registry:
 
 Adding a new geocode-enabled location requires exactly **one code change**: a new entry in `LocationRegistry`. No controller switch update, no new manager method, no separate valid-key list update. This FR was implicit in the original Epic 30 planning discussion but was not captured in the shipped Epic 30 stories; Epic 42 delivers it as a follow-up.
 
+**FR-1.11 — Restore the Census Tract Certainty Code warning modal (regression fix, Epic 42)**
+FR-1.5 requires that when `NAACCRCensusTractCertaintyCode != 1` on a successful geocode, a non-blocking info dialog is shown with the exact text: _"Validation: Census Tract Certainty Code is Not 1 (Census tract based on complete and valid street address.) There might be a potential error in the address. Please verify address."_ Epic 30 (Stories 30.3 and 30.4) moved the geocode flow server-side but did not wire the warning through the new response, and Story 30.4 explicitly removed the client-side dialog on the assumption that the server would surface it. The server currently only returns `{ ok: true }` on success, so the modal never fires — a regression against FR-1.5 at all 10 "Validate Address and Get Geography Context" buttons.
+
+To close the gap:
+
+- **Server response.** `POST /api/case-geocode/{caseId}/{locationKey}` returns a structured `warning` field on the 200 OK response when the geocode matched (i.e., `FeatureMatchingGeographyType` is present and not `"Unmatchable"`) and `NAACCRCensusTractCertaintyCode != "1"`. The warning object carries `code = "certainty_code_not_1"`, `title = "Address Geocode"`, `heading` and `message` matching the FR-1.5 wording verbatim, and the raw `certaintyCode` for diagnostic use. When there is no warning (matched with certainty `"1"`, or unmatchable), the `warning` field is `null` or omitted.
+- **Client dispatcher.** The `$case_geocode_dispatch` helper (defined in `MMRIA_calculations.js`, `mmria-check-code.js`, `database-scripts/validator.js`, and `wwwroot/scripts/validator.js` — 4 copies) parses the response body on the success path and, if `warning` is present, invokes `$mmria.info_dialog_show(warning.title, warning.heading, warning.message)` **after** the case-reload completes so the just-saved certainty-code field is visible behind the modal.
+- **Coverage.** Behavior is identical across all 10 registry keys — no per-location branching in either the server or client dispatcher.
+- **Batch scope explicitly excluded.** `BatchItemProcessingService` does not surface UI warnings; its 5 geocode call sites already log at the server. A batch-report summary of low-certainty imports is a separate feature, not part of this FR.
+
 ---
 
 ### FR-2 — Record ID Uniqueness Enforcement
@@ -325,7 +335,7 @@ NFR-4: The TAMU API key is resolved at server startup from the existing CouchDB 
 ## FR Coverage Map
 
 FR-1.1 – FR-1.9: Epic 30 — Unified Server-Side Geocoding (TAMU Refactor)  
-FR-1.10: Epic 42 — Geocoding Location Registry (Declarative Refactor)  
+FR-1.10 – FR-1.11: Epic 42 — Geocoding Location Registry (Declarative Refactor) + Certainty Code Modal Restoration  
 FR-2.1 – FR-2.7: Epic 29 — Record ID Uniqueness Enforcement  
 FR-3.1 – FR-3.11: Epic 37 — Form Designer Removal — Static HTML Form Rendering  
 FR-4.1 – FR-4.3: Epic TBD — IJE Upload Duplicate Prevention and Logging  
