@@ -84,7 +84,7 @@ public sealed class CVSManager
                 catch (Exception ex)
                 {
                     // Year query failed — proceed with the original year value.
-                    _logger.LogWarning(ex, "CVS year-list query failed for url={Url}; proceeding with original year={Year}", cvs.cvs_api_url, get_all_data_body.payload.year);
+                    _logger.LogWarning(ex, "CVS year-list query failed; proceeding with original year value.");
                 }
             }
         }
@@ -96,7 +96,7 @@ public sealed class CVSManager
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "CVS GetAllData failed for c_geoid={CGeoid} t_geoid={TGeoid} year={Year}", post_payload.c_geoid, post_payload.t_geoid, post_payload.year);
+            _logger.LogError(ex, "CVS GetAllData failed.");
             return null;
         }
     }
