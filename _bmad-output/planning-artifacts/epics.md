@@ -70,6 +70,17 @@ NFR-33.1: Generator improvements must remain a low-impact utilities change: no m
 NFR-34.1: The case narrative PDF spacing fix remains surgical, with no new client-side dependencies, no bundler changes, no storage migration, and no broad rewrite of `pdf-version/index.js`.
 NFR-34.2: The plain-text paste fix (FR-34.5) is scoped to the `else if (pastedText)` branch in `attach_narrative_paste_handler` in `textarea.js`. The `text/html` paste path, `textarea_control_strip_html_attributes`, the save path, and `pdf-version/index.js` are not changed.
 NFR-35.1: The Epic 35 change is UI/copy-scoped only — no server-side changes, no CouchDB schema changes, and no removal of `OfflineExitManager`, `offline-modals.js` exit-modal markup, or their cleanup/audit behavior. All hidden code remains fully intact and reachable via a future toggle.
+FR-37.1: A C# console application (`mmria-form-html-generator`) in `nccdphp-drh-mmria-utilities` reads `metadata.json` and `ui_specification.json` from configurable file paths and generates one HTML fragment file per top-level form section (14 sections). Output is written to a configurable output directory, committed to `mmria-server/wwwroot/generated-forms/`.
+FR-37.2: Each generated HTML fragment renders all fields with inline `position:absolute` styles sourced from `ui_specification.form_design[path].control.style`. Every input, select, and textarea carries `data-path` (slash-separated metadata path), `data-field-type` (metadata type string), and `data-prompt` attributes. Conditionally visible fields carry `data-show-when="path=value"`. Label elements carry positioning from `ui_specification.form_design[path].prompt.style`.
+FR-37.3: Grid controls (`metadata.type == "grid"`) are generated with a `<tbody data-grid-body="path">` container and a `<template data-grid-template="path">` row template. Multi-cardinality forms (`cardinality == "+"` or `"*"`) are generated with a `<template data-form-template="path">` instance template and a `[data-form-instances="path"]` container. `{{index}}` is used as the array-index placeholder in data-path values inside templates. List fields carry `data-list-id` matching the metadata list name so the binder can resolve option values at runtime.
+FR-37.4: The generator logs any metadata path that has no entry in `ui_specification.form_design` to stderr. Chart fields (`metadata.type == "chart"`) are emitted as `<div data-field-type="chart" data-path="...">` placeholder elements. The existing `chart.js` is retained as a specialized component invoked by the data binder for those elements only.
+FR-37.5: A new `wwwroot/scripts/form-binder.js` exposes `formBinder.bind(sectionEl, gData, options)` and `formBinder.collect(sectionEl, gData)`. `bind()` walks all `[data-path]` elements in the section, populates values from gData, evaluates `[data-show-when]` rules, clones grid and multi-form templates for array data, and delegates `[data-field-type="chart"]` elements to the existing chart rendering code. `collect()` reads all `[data-path]` element current values and writes them back to gData with type coercion appropriate to `data-field-type`. `options.readOnly = true` disables all inputs after binding and suppresses change listener wiring.
+FR-37.6: When `options.readOnly` is not set, `formBinder.bind()` attaches a single delegated `change`/`input` listener on the section container that writes changed values back to `g_data` at the correct path immediately. This replaces per-field onChange wiring done by the type renderers. Dependent list filtering (parent-child dropdowns) and `[data-show-when]` re-evaluation are triggered by the same listener.
+FR-37.7: All three case rendering contexts — Case editor (`Case/Index.cshtml`), analyst read-only (`AnalystCase/Index.cshtml`), and committee member (`CaseVRO/Index.cshtml`) — embed all 14 generated section HTML fragments in the initial page load. Section navigation shows/hides the target section div and calls `formBinder.bind(sectionEl, g_data)` (edit) or `formBinder.bind(sectionEl, g_data, {readOnly: true})` (read-only). No call to `page_render()` or any type renderer remains in any case view JS.
+FR-37.8: `de-identified/index.js` uses the same static HTML sections with `formBinder.bind(..., {readOnly: true})`. `case/search_view.js` rendering that uses `g_default_ui_specification` for field display is replaced with position-independent rendering (field prompt + value text) that does not depend on layout coordinates.
+FR-37.9: The `/form-designer` route, `form_designerController.cs`, `Views/form_designer/Index.cshtml`, all JS in `wwwroot/scripts/form-designer/`, and all assets in `wwwroot/form-designer/` are deleted. The single nav link `<li><a href="/form-designer">Open form designer</a></li>` in `Views/Home/Index.cshtml` is removed. The `form_designer` role and its authorization policy in `Program.cs` are **not removed** — the role gates access to the entire Form Designer admin section (Metadata Management, De-Identified List, Data Migration, Substance Lists, Session Logs, and more).
+FR-37.10: The POST `/api/ui_specification/{id}` action is removed from `ui_specificationController.cs`. The POST `/api/metadata` action is removed from `metadataController.cs`. GET actions on both controllers are retained until Story 37.6 confirms no consumers remain, then `ui_specificationController.cs` is deleted entirely.
+FR-37.11: `page_renderer.js`, `page_renderer.committee_member.js`, and all 30 files in `wwwroot/scripts/editor/page_renderer/` are deleted. `g_default_ui_specification`, the `/api/version/{ver}/ui_specification` fetch, and all calls to `page_render()`, `app_render()`, `form_render()`, `group_render()`, `grid_render()`, and individual type renderer functions are removed from `case/index.js`, `de-identified/index.js`, and `case/search_view.js`. `ui_specificationController.cs` is deleted.
 
 ### Additional Requirements
 
@@ -148,6 +159,10 @@ FR-11.4: Epic 10 â€” BroadcastChannel CVS status and parent-page button sta
 FR-29.1: Epic 29 — Server-side record ID format validation and uniqueness guard in SaveCaseAsync
 FR-29.2: Epic 29 — Client-side per-candidate uniqueness check via /api/record_id before case save
 FR-29.3: Epic 29 — Add record_id_list CouchDB view and remove broken bulk-list dependency from case creation flow
+FR-29.4: Epic 29 — Extract `CaseManager.GenerateUniqueRecordIdAsync` primitive and expose `error_code` on collision/format rejections
+FR-29.5: Epic 29 — Online case creation collapses pre-flight loop into save-then-retry-on-collision (Path A)
+FR-29.6: Epic 29 — Offline placeholder record IDs (`STATE-OFFLINE-CASE-XX`) with server-generated real ID at sync (Path B)
+FR-29.7: Epic 29 — IJE batch import routes writes through `SaveCaseAsync` with collision-retry (Path C)
 
 FR-31.1: Epic 31 — CSS :focus-visible outline for Informant Interview Summary Template button (#view-informant-interview-summary-template-button)
 FR-31.2: Epic 31 — CSS :focus-visible outline for CDF Template PDF button (#view-cdf-template-button)
@@ -171,6 +186,18 @@ FR-36.1: Epic 36 — Reconcile false-positive suppression: distinguish already-c
 FR-36.2: Epic 36 — Change stack snapshot deduplication on enqueue (optional optimization)
 FR-36.3: Epic 36 — Rev poll generation guard verification and regression test during transient network outage
 FR-36.4: Epic 36 — Autosave-drop awaited-save data carry-through verification
+
+FR-37.1: Epic 37 — HTML generator tool: reads metadata + ui_specification, outputs 14 static HTML section fragments
+FR-37.2: Epic 37 — Generated HTML attribute contract: data-path, data-field-type, data-show-when, inline position styles
+FR-37.3: Epic 37 — Grid and multi-cardinality form template patterns in generated HTML
+FR-37.4: Epic 37 — Generator diagnostic: unmapped path logging; chart field placeholder delegation
+FR-37.5: Epic 37 — form-binder.js: bind(), collect(), readOnly mode
+FR-37.6: Epic 37 — form-binder.js: delegated change listener, dependent list re-evaluation, show-when re-evaluation
+FR-37.7: Epic 37 — Wire Case editor view: static HTML sections + formBinder, remove page_render() calls
+FR-37.8: Epic 37 — Wire read-only views (AnalystCase, CaseVRO, de-identified, search_view)
+FR-37.9: Epic 37 — Remove /form-designer route, controller, views, JS assets, CSS assets, auth policy
+FR-37.10: Epic 37 — Remove form designer write endpoints (POST ui_specification, POST metadata)
+FR-37.11: Epic 37 — Remove page_renderer.js + 30 type renderers, g_default_ui_specification, ui_specificationController
 
 ## Epic List
 
@@ -249,8 +276,11 @@ The null-fallback scaffolding placed in `exporter.cs`, `mmrds_exporter.cs`, and 
 ### Epic 29: Record ID Uniqueness Enforcement
 
 Abstractors creating new cases are protected against duplicate MMRIA Record IDs (`{jurisdiction}-{year-of-death}-{4-digit-number}`) by a defense-in-depth strategy. The server rejects any new-case save where the record ID already exists in the database. The client verifies uniqueness per-candidate against the server before saving, eliminating the TOCTOU race condition. The broken bulk-list CouchDB view dependency is removed from the case creation flow and a functioning design-document view is added in its place.
-**FRs covered:** FR-29.1, FR-29.2, FR-29.3
-**Stories:** 29.1 — Server-side format validation and uniqueness guard, 29.2 — Client-side per-candidate API check, 29.3 — Add record_id_list view and remove broken bulk-list call
+
+A 2026-08-19 audit uncovered three follow-on defects that Stories 29.1–29.3 did not address: (a) a bug in `CaseDAL.RecordIdExistsAsync` was causing every uniqueness check to falsely return "unique" — hot-fixed as part of Story 29.1 verification; (b) the online client's 20-call pre-flight loop leaves a residual race between the last check and the save; (c) offline case creation still writes a `STATE-YEAR-NNNN-OFFLINE` record ID that is stripped and blindly written at sync time, with no collision recovery; and (d) IJE batch imports bypass `SaveCaseAsync` entirely, relying on a stale 25 000-row HashSet fetched once per batch and silently allowing duplicates when the DB is larger than 25 k rows or another writer wins a race. Stories 29.4–29.7 remediate these by extracting the "generate a unique record ID" primitive onto `CaseManager` and routing all three creation paths (online UI, offline sync, IJE batch) through a save-then-retry-on-collision pattern.
+
+**FRs covered:** FR-29.1, FR-29.2, FR-29.3, FR-29.4, FR-29.5, FR-29.6, FR-29.7
+**Stories:** 29.1 — Server-side format validation and uniqueness guard, 29.2 — Client-side per-candidate API check, 29.3 — Add record_id_list view and remove broken bulk-list call, 29.4 — `GenerateUniqueRecordIdAsync` primitive + structured `error_code`, 29.5 — Path A save-then-retry-on-collision, 29.6 — Path B offline placeholder record IDs, 29.7 — Path C IJE batch collision-retry
 
 ### Epic 31: Section 508 — Home Page General Section Keyboard Focus Indicators
 
@@ -3913,6 +3943,19 @@ All three stories are independent and can proceed in parallel.
 | 29.2  | `source-code/mmria/mmria-server/wwwroot/scripts/case/index.pmss.js`                 | Same change for PMSS variant                                                           |
 | 29.3  | `source-code/mmria/mmria-server/database-scripts/case_design_sortable.json`         | Add `record_id_list` view                                                              |
 | 29.3  | `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js`                      | Remove `Get_Record_Id_List` function and `g_record_id_list` Set (dead code after 29.2) |
+| 29.4  | `nccdphp-drh-mmria-common/mmria.common/SharedLibraries/Case/Manager/CaseManager.cs` | Extract `GenerateUniqueRecordIdAsync` primitive; populate `error_code` on rejection    |
+| 29.4  | `nccdphp-drh-mmria-common/mmria.common/model/couchdb/document_put_response.cs`      | Add `error_code` string property (nullable, non-breaking)                              |
+| 29.5  | `source-code/mmria/mmria-server/wwwroot/scripts/case/index.mmria.js`                | Remove pre-flight loop; single POST + collision-retry using `error_code`               |
+| 29.5  | `source-code/mmria/mmria-server/wwwroot/scripts/case/index.pmss.js`                 | Same change for PMSS variant                                                           |
+| 29.6  | `source-code/mmria/mmria-server/wwwroot/scripts/case/index.mmria.js`                | Offline branch generates `STATE-OFFLINE-CASE-XX` placeholder                           |
+| 29.6  | `source-code/mmria/mmria-server/wwwroot/scripts/offline/offline-session-manager.js` | Per-session placeholder counter                                                        |
+| 29.6  | `source-code/mmria/mmria-server/wwwroot/scripts/offline/offline-case-manager.js`    | Remove `generateOfflineRecordId` (no more `-offline` suffix)                           |
+| 29.6  | `source-code/mmria/mmria-server/wwwroot/scripts/offline/offline-sync-manager.js`    | Update client sync-side pattern detection                                              |
+| 29.6  | `source-code/mmria/mmria-server/wwwroot/scripts/offline/offline-ui-renderer.js`     | Update offline-case detection to accept both patterns                                  |
+| 29.6  | `nccdphp-drh-mmria-common/mmria.common/SharedLibraries/OfflineCase/Manager/OfflineCaseManager.cs` | Server-side sync: detect placeholder, generate real record ID, then save            |
+| 29.7  | `nccdphp-drh-mmria-services/mmria.services/Services/BatchItemProcessingService.cs`  | Route write through `SaveCaseAsync`; retry on `record_id_conflict`                     |
+| 29.7  | `nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/Helper/MMRIAServicesHelper.cs` | Remove stale-HashSet uniqueness in `ConvertLineToBatchItem`                       |
+| 29.7  | `nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/Manager/MMRIAServicesManager.cs` | Deprecate or remove `GetExistingRecordIds` if unused                            |
 
 ---
 
@@ -4081,15 +4124,234 @@ Then zero build errors, and the case creation flow completes normally for both o
 
 ---
 
+### Story 29.4: Extract `GenerateUniqueRecordIdAsync` Primitive and Structured `error_code`
+
+**Story ID:** 29.4
+**Depends on:** 29.1 (the DAL fix landed with Story 29.1's smoke-test follow-up on 2026-08-19)
+
+As a developer,
+I want a single manager-level method that generates a jurisdiction-scoped unique MMRIA Record ID and a machine-readable `error_code` returned when `SaveCaseAsync` rejects one on format or collision grounds,
+So that every case-creation path (online UI, offline sync, IJE batch) can share one implementation and detect collisions without string-matching English error text.
+
+**Background:** `CaseManager.GetRecordIdReplacementForYearOfDeathAsync` (line ~685) already contains the exact "generate 4-digit random suffix, check via `RecordIdExistsAsync`, retry" loop that Paths A, B, and C all need. Extracting it lets the three creation paths call one primitive. Additionally, Story 29.1's `SaveCaseAsync` guard returns English-language rejection messages; downstream callers currently would have to string-match them to know whether to regenerate or surface a hard error. A structured `error_code` field solves that.
+
+**Acceptance Criteria:**
+
+**AC-1 — New public method exists on `CaseManager`**
+Given the primitive is extracted
+When `CaseManager.GenerateUniqueRecordIdAsync(string statePrefix, string year, DBConfigurationDetail dbInfo, int maxAttempts = 20)` is called
+Then it returns a `STATE-YEAR-NNNN` record ID whose 4-digit suffix does not currently exist in the database identified by `dbInfo`, or throws a `RecordIdGenerationExhaustedException` if `maxAttempts` random suffixes all collide
+
+**AC-2 — Existing `GetRecordIdReplacementForYearOfDeathAsync` delegates to the new method**
+Given the extraction preserves behavior for the Story 39.1 flow
+When `GetRecordIdReplacementForYearOfDeathAsync` runs
+Then it computes the state and target-year segments and calls `GenerateUniqueRecordIdAsync`; net behavior for that flow is unchanged (verified by existing test coverage plus at least one new unit test)
+
+**AC-3 — `document_put_response` gains a nullable `error_code` field**
+Given `document_put_response` is the canonical error carrier for case-save responses
+When a rejection carries a machine-readable reason
+Then `document_put_response.error_code` is populated with one of the string constants `record_id_format` or `record_id_conflict` (defined in one central location, e.g. `mmria.common.model.couchdb.SaveErrorCodes`); `error_code` is `null` on success and on rejections that predate this story (backward compatible)
+
+**AC-4 — `SaveCaseAsync` populates `error_code` on Story 29.1 guard rejections**
+Given the format guard rejects (bad suffix / bad year / missing prefix)
+When `SaveCaseAsync` returns
+Then `error_code = "record_id_format"` and the human-readable `error_description` is preserved
+And given the uniqueness guard rejects (`RecordIdExistsAsync` returned true)
+When `SaveCaseAsync` returns
+Then `error_code = "record_id_conflict"` and the human-readable `error_description` is preserved
+
+**AC-5 — Unit tests cover the new method**
+Given `CaseManager.GenerateUniqueRecordIdAsync` is added
+When the test suite runs
+Then unit tests cover: (a) happy path returns a valid `STATE-YEAR-NNNN` id, (b) collision retry advances the suffix, (c) exhaustion after `maxAttempts` throws `RecordIdGenerationExhaustedException`, (d) year and state segments are echoed unchanged
+
+**AC-6 — Build passes**
+Given the change is added
+When all projects build
+Then zero errors across `mmria.common`, `mmria-server`, `mmria.services`, and the utilities test project
+
+**Dev Notes:**
+
+- Put the constants class in `mmria.common.model.couchdb.SaveErrorCodes` (or similar single-source-of-truth location) so both server and JavaScript callers can reference a documented value.
+- `RecordIdGenerationExhaustedException` should carry `statePrefix`, `year`, and `attempts` for diagnostic use.
+- No changes to `record_idController` in this story — that endpoint is not deprecated until Story 29.5 removes its last caller.
+
+---
+
+### Story 29.5: Path A — Online Save-Then-Retry-on-Collision
+
+**Story ID:** 29.5
+**Depends on:** 29.4
+
+As an abstractor,
+I want the "Generate Record ID" flow to attempt the save with a single locally-generated candidate and, if the server reports a collision, automatically try again with a fresh suffix,
+So that the case-creation flow does not do 20 preflight round trips in the common case and does not surface a hard failure when a rare race condition occurs.
+
+**Background:** Story 29.2 shipped a 20-call pre-flight loop against `/api/record_id` before the POST to `/api/case`. The pre-flight consumes network round-trips even when there is no contention and leaves a residual race between the last "unique" reply and the save. Story 29.1's server-side guard is the authoritative check; the client only needs to detect a collision reply and regenerate.
+
+**Acceptance Criteria:**
+
+**AC-1 — Online path no longer pre-flights `/api/record_id`**
+Given the user is in online mode and clicks "Generate Record ID & Continue" and confirms
+When `add_new_case()` runs
+Then it generates one candidate `STATE-YEAR-NNNN` locally and issues a single POST to `/api/case` without calling `/api/record_id` first
+
+**AC-2 — Collision response triggers regeneration and retry**
+Given the server's response body contains `error_code === "record_id_conflict"`
+When the client processes the response
+Then `add_new_case()` regenerates the 4-digit suffix (same `generateCandidate` closure as Story 29.2), reassigns `home_record.record_id`, and re-POSTs to `/api/case`
+
+**AC-3 — Retry cap prevents infinite loop**
+Given the server returns `record_id_conflict` five consecutive times
+When the client's collision-retry loop reaches its cap
+Then the loop exits, the user sees `"Unable to generate a unique Record ID after multiple attempts. Please try again."`, and no case is created
+
+**AC-4 — Non-collision errors surface immediately**
+Given the server returns any `error_code` other than `record_id_conflict` (or `error_code` is absent)
+When the client processes the response
+Then the client does not retry; the response is surfaced as an ordinary save error via the existing `save_case_and_wait` failure path
+
+**AC-5 — PMSS variant kept consistent**
+Given the PMSS confirm handler at `index.pmss.js` line ~424 no longer wraps in `Get_Record_Id_List` (Story 29.2 removed it)
+When this story completes
+Then any residual pre-flight logic is removed and the PMSS unique-number flow uses its existing server-authoritative `/api/case_view/next-pmss-number` endpoint as the single source of truth — no additional client changes required, but confirm with a diff review that no pre-flight remains
+
+**AC-6 — Build and smoke test pass**
+Given the changes are applied
+When the server builds and an abstractor creates a case in the local multi-tenant environment
+Then zero build errors; a case creates successfully with one round trip in the common case; a forced-collision test (DevTools instrumentation returning `record_id_conflict` twice) confirms the retry loop advances and eventually succeeds
+
+**Dev Notes:**
+
+- Story 29.2's `alert("Unable to generate a unique Record ID…")` + `throw new Error(..., __handled=true)` pattern is preserved — only the trigger changes (server response vs. exhausted pre-flight loop).
+- Keep `g_record_id_list.add(new_record_id.toUpperCase())` after a successful save — still guards within-session duplicates for other case-list refresh code paths.
+- After this story, `record_idController` has no remaining callers in the shipped client. Do not delete in this story; add a `[Obsolete]` marker or a comment tagging Story 29.3's cleanup pass.
+
+---
+
+### Story 29.6: Path B — Offline Placeholder Record IDs (`STATE-OFFLINE-CASE-XX`)
+
+**Story ID:** 29.6
+**Depends on:** 29.4
+
+As an abstractor working offline,
+I want offline-created cases to hold a clearly-marked placeholder record ID until sync, at which point the server assigns a real jurisdiction-scoped unique ID,
+So that offline case creation cannot silently pick a record ID that another user or another tab already used, and the sync collision recovery is centralized on the server.
+
+**Background:** Today the offline branch of `add_new_case()` generates `STATE-YEAR-NNNN` against a local `g_ui` Set and appends `-OFFLINE`. At sync time the suffix is stripped and the case is written. If `STATE-YEAR-NNNN` collides with a case created by any other user (or by another offline tab of the same user) while the client was offline, the sync fails and the offline case is stuck. Story 29.4 provides the server-side primitive to generate a fresh unique record ID; this story replaces the client-side generation with a purely local placeholder.
+
+**Acceptance Criteria:**
+
+**AC-1 — Offline mode generates a placeholder record ID**
+Given `window.OfflineStatus.isOffline() === true`
+When `add_new_case()` reaches the record-ID assignment step
+Then it sets `home_record.record_id = ${STATE}-OFFLINE-CASE-${XX}` where `STATE` is the jurisdiction prefix derived from `window.location.host` (same source as today) and `XX` is a per-offline-session sequence number formatted `NN` (2 digits, `01`–`99`, zero-padded, small-value case as the team has confirmed few offline cases are permitted per session)
+
+**AC-2 — Sequence counter is scoped to the offline session and persists across tab reload**
+Given `OfflineSessionManager` maintains offline-session state (crypto key, offline case list, session id) in memory + service-worker storage
+When the offline case-creation flow needs a new `XX`
+Then `OfflineSessionManager.getNextOfflineCaseSequence()` returns the next integer for this offline session, persists it, and is stable across a tab reload within the same offline session
+
+**AC-3 — `generateOfflineRecordId` and the `-OFFLINE` suffix are removed from the offline creation path**
+Given Story 29.6 is complete
+When an abstractor creates an offline case
+Then `home_record.record_id` never carries `-OFFLINE`; the `generateOfflineRecordId` helper in `offline-case-manager.js` is deleted and its callers updated to use the placeholder pattern from AC-1
+
+**AC-4 — Sync-side detection converts placeholder to real ID before `SaveCaseAsync`**
+Given an offline case with `home_record.record_id` matching `/^([A-Z0-9]+)-OFFLINE-CASE-\d+$/i`
+When `OfflineCaseManager.ApplyOfflineDocumentAsync` processes it
+Then it extracts the state prefix from group 1, reads the year from `home_record.date_of_death.year` (fallback: current year if absent, logged as a warning), calls `CaseManager.GenerateUniqueRecordIdAsync(state, year, dbConfig)`, assigns the result to `home_record.record_id`, and then calls `SaveCaseAsync`
+
+**AC-5 — Legacy `-OFFLINE` suffix still accepted (transitional)**
+Given a client cache still holds offline cases with the pre-29.6 `STATE-YEAR-NNNN-OFFLINE` format
+When those cases sync
+Then the existing suffix-strip path (`offline-sync-manager.js` L205–208, `OfflineCaseManager.cs` L619) remains functional; a structured log entry records which format was seen so we can measure when the legacy path is safe to remove
+
+**AC-6 — UI displays placeholder as-is while offline**
+Given an offline case has `home_record.record_id = "TENANT1-OFFLINE-CASE-01"`
+When it is displayed in the case list or case header
+Then the placeholder text is rendered verbatim; no attempt is made to synthesize a fake `STATE-YEAR-NNNN` for display
+
+**AC-7 — Build and smoke test pass**
+Given the changes are applied
+When the server builds, an offline session is entered, a case is created offline, and the client goes back online
+Then zero build errors; the placeholder appears in the offline UI; on sync, `SaveCaseAsync` receives a real `STATE-YEAR-NNNN` (verified via the audit log), and the offline case is no longer stuck if a `record_id_conflict` occurs (since the server now regenerates before writing)
+
+**Dev Notes:**
+
+- `OfflineSessionManager` already persists offline session state in service-worker storage. Adding a `next_offline_case_sequence` field alongside is a small extension. Start at `01` on new offline session; do not reset until the session ends.
+- Detection regex must be case-insensitive (existing code paths uppercase the record ID at various points).
+- The `year` fallback (AC-4) — if `home_record.date_of_death.year` is missing, using `DateTime.UtcNow.Year.ToString()` is the pragmatic choice; log it so we can measure occurrence.
+- Two tabs offline at the same time in the same offline session are not a supported scenario per the team ("only a few cases created offline"). No cross-tab locking is required for `XX`.
+- After enough time in production to know no legacy `-OFFLINE` caches remain, the transitional suffix-strip path can be removed in a follow-up housekeeping story.
+
+---
+
+### Story 29.7: Path C — IJE Batch Collision-Retry via `SaveCaseAsync`
+
+**Story ID:** 29.7
+**Depends on:** 29.4
+
+As an operator running IJE batch imports,
+I want each new-case write in the batch to route through the same `SaveCaseAsync` guard that the online UI uses, and to auto-regenerate the record ID on collision,
+So that the batch cannot silently write duplicates when the tenant DB has more than 25 000 rows or when another writer wins a race against the batch's stale HashSet.
+
+**Background:** `BatchItemProcessingService.Process_Message` currently writes each imported case via `_caseRepository.PutCaseDocumentJsonAsync(mmria_id, object_string, db_info)` — a raw DAL PUT that bypasses `CaseManager.SaveCaseAsync` entirely. Uniqueness relies on the stale `ExistingRecordIds` HashSet fetched once at batch start by `MMRIAServicesDAL.GetExistingRecordIds` (up to 25 000 rows from `_view/by_date_created`). If the DB exceeds 25 k rows, or if another process creates a case during the batch, the HashSet is stale and CouchDB's `_id` fresh-GUID PUT succeeds silently even though `home_record.record_id` duplicates another case.
+
+**Acceptance Criteria:**
+
+**AC-1 — Batch write path routes through `CaseManager.SaveCaseAsync`**
+Given a batch item reaches the write step in `BatchItemProcessingService.Process_Message`
+When the case is persisted
+Then it is persisted via `CaseManager.SaveCaseAsync(caseData, changeStack, dbConfig, user, configuration, hostPrefix)` (with a synthetic `changeStack` note like `"vital_import"` and a service-account `ClaimsPrincipal`) rather than directly via `_caseRepository.PutCaseDocumentJsonAsync`
+
+**AC-2 — Collision response triggers regeneration and retry**
+Given the response's `error_code === "record_id_conflict"`
+When the batch item processor handles the rejection
+Then it calls `CaseManager.GenerateUniqueRecordIdAsync(state, year, dbConfig)`, updates `home_record.record_id` in the case document, and retries the save; cap at 5 attempts; on exhaustion, marks the batch item `ImportFailed` with `StatusDetail = "unable to generate unique record id after N attempts"`
+
+**AC-3 — Final batch item record_id reflects post-retry value**
+Given a batch item's record ID was regenerated during retry
+When the batch item's final status is recorded
+Then `BatchItem.mmria_record_id` carries the value that was actually persisted (not the pre-retry candidate) so users can trace the case in the UI
+
+**AC-4 — Stale `GetExistingRecordIds` path is retired**
+Given the DB-wide HashSet is no longer needed for uniqueness
+When Story 29.7 is complete
+Then `MMRIAServicesHelper.ConvertLineToBatchItem` no longer consumes `ExistingRecordIds` as a uniqueness guard; the parameter is either removed or documented as batch-local dedup only (within a single MOR file); `MMRIAServicesManager.GetExistingRecordIds` and `MMRIAServicesDAL.GetExistingRecordIds` are marked `[Obsolete]` if any other caller exists, or deleted if no other callers remain (grep the utilities repo test project first)
+
+**AC-5 — In-batch dedup preserved**
+Given two rows in the same MOR file happen to generate the same random suffix (rare but possible)
+When the batch initialization loop assigns record IDs
+Then a batch-local `HashSet<string>` (fresh, initialized empty each batch) prevents the collision within the file, so the AC-2 retry path only fires against cross-writer / cross-DB collisions, not intra-batch ones
+
+**AC-6 — Build and IJE smoke test pass**
+Given the changes are applied
+When `mmria.services` and `mmria.common` build and a small IJE batch is imported against the local multi-tenant environment
+Then zero build errors; every batch item that reports `NewCaseAdded` has a unique `home_record.record_id` in the DB; a forced-collision test (pre-seeding a duplicate case with a known suffix) confirms the retry path picks a fresh suffix and completes
+
+**Dev Notes:**
+
+- The `ClaimsPrincipal` for the batch service can be built from `mmria.services.vitalsimport.Program.timer_user_name` (already the identity used by other batch operations); confirm what `SaveCaseAsync` requires and mock the minimum claims needed.
+- `changeStack` for a new-case save through `SaveCaseAsync` cannot be empty — reuse the existing `Change_Stack` shape used by `OfflineCaseManager.ApplyOfflineDocumentAsync` (single item, `object_path = "vital_import"`).
+- `SaveCaseAsync` also writes `Change_Stack` audit entries via `IAuditRepository`. Confirm this is acceptable for IJE-imported cases (probably desired — audit trail attributed to the vitals import service account).
+- Do not remove `GetExistingRecordIds` in this story if the utilities repo test project references it; deletion is a small follow-up.
+
+---
+
 ## Epic 29 — Story Sequencing
 
-| Story                                      | Risk | Dependencies                                                              |
-| ------------------------------------------ | ---- | ------------------------------------------------------------------------- |
-| 29.1 — Server-side uniqueness guard        | Low  | None — uses existing `RecordIdExistsAsync`                                |
-| 29.2 — Client-side per-candidate API check | Low  | None — uses existing `record_idController`                                |
-| 29.3 — Add CouchDB view + remove dead code | Low  | 29.2 must complete first (ensures `Get_Record_Id_List` has no call sites) |
+| Story                                                | Risk   | Dependencies                                                                                                                       |
+| ---------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| 29.1 — Server-side uniqueness guard                  | Low    | None — uses existing `RecordIdExistsAsync`                                                                                         |
+| 29.2 — Client-side per-candidate API check           | Low    | None — uses existing `record_idController`                                                                                         |
+| 29.3 — Add CouchDB view + remove dead code           | Low    | 29.2 must complete first (ensures `Get_Record_Id_List` has no call sites)                                                          |
+| 29.4 — `GenerateUniqueRecordIdAsync` + `error_code`  | Low    | 29.1 (the guard populates the new field)                                                                                           |
+| 29.5 — Path A save-then-retry-on-collision           | Low    | 29.4                                                                                                                               |
+| 29.6 — Path B offline placeholder record IDs         | Medium | 29.4; touches offline session storage + sync path                                                                                  |
+| 29.7 — Path C IJE batch collision-retry              | Medium | 29.4; changes IJE write path from raw DAL to `SaveCaseAsync`                                                                       |
 
-29.1 and 29.2 can proceed in parallel. 29.3 depends on 29.2.
+29.1 and 29.2 can proceed in parallel. 29.3 depends on 29.2. 29.4 depends on 29.1 shipping. 29.5, 29.6, and 29.7 are independent of each other once 29.4 lands. 29.3 and 29.5 both touch `index.mmria.js`/`index.pmss.js` — sequence them or coordinate on the same file.
 
 ---
 
@@ -5330,3 +5592,436 @@ So that the reconcile false-positive cannot occur even if Story 36.1's reconcile
 | 36.4 — Snapshot deduplication on enqueue (optional) | Medium | 36.1 complete |
 
 Stories 36.1 and 36.2 are independent and can be implemented in parallel. Story 36.3 should follow 36.1 since both touch `index.js`. Story 36.4 is optional and should only be scheduled if the team decides the defence-in-depth layer is warranted.
+
+---
+
+### Epic 37: Form Designer Removal — Static HTML Form Rendering
+
+The `/form-designer` WYSIWYG tool, its supporting JavaScript and CSS assets, its API write endpoints, and the case form's runtime dependency on `g_default_ui_specification` are permanently removed. A standalone build-time generator replaces the dynamic JS rendering engine by producing static HTML fragments from the metadata and UI specification. A lightweight `form-binder.js` handles data population, conditional visibility, grid row cloning, and change tracking for all case form views. The rendered form is pixel-identical to the current output. The OMB-certified layout is preserved exactly.
+
+**FRs covered:** FR-37.1 through FR-37.11
+**Stories:** 37.1 — HTML generator, 37.2 — form-binder.js, 37.3 — Wire case editor view, 37.4 — Wire read-only views, 37.5 — Remove form designer, 37.6 — Remove rendering engine
+
+**Architecture constraints:**
+- Generated HTML files are committed as permanent source artifacts in `wwwroot/generated-forms/`. Generation is a **one-time operation** run during Story 37.1. After that, the committed HTML files are the source of truth for form layout. Any future label or layout change is made by editing the HTML files directly.
+- Field labels in the generated HTML come from the `prompt` property in the versioned metadata (`metadata_26.06.15.json`). The versioning concept will be simplified in a future effort; for this epic the versioned metadata document is the authoritative label source.
+- `chart.js` is the only type-renderer file retained; it is called as a specialized component by form-binder.js.
+- `page_renderer.js` and all 30 files in `editor/page_renderer/` are deleted on completion of Story 37.4.
+- Metadata API endpoints (`/api/metadata`, `/api/version/{ver}/metadata`) are not touched — they remain for validation and other consumers.
+
+---
+
+### Story 37.1: HTML Generator — Build Tool
+
+As a developer,
+I want a build-time code generator in the utilities repo that produces static HTML form sections from the metadata and UI specification,
+So that case form rendering no longer depends on a runtime JavaScript rendering engine and the OMB-certified layout is captured as a versioned source artifact.
+
+**Acceptance Criteria:**
+
+**Given** metadata.json and ui_specification.json file paths are provided as command-line arguments
+**When** `mmria-form-html-generator` runs
+**Then** one HTML fragment file per top-level form section is written to the output directory — 14 files named `{section-name}.html`
+
+**Given** a metadata field with an entry in `ui_specification.form_design`
+**When** the generator emits that field
+**Then** the HTML element carries the exact inline CSS from `ui_specification.form_design[path].control.style` (position:absolute, top, left, width, height)
+**And** the element carries `data-path="{slash/separated/path}"`, `data-field-type="{metadata.type}"`, and `data-prompt="{metadata.prompt}"`
+**And** the corresponding label element carries inline CSS from `ui_specification.form_design[path].prompt.style`
+
+**Given** a list field (`metadata.type == "list"`)
+**When** the generator emits it
+**Then** a `<select data-path="..." data-list-id="{metadata.name}">` is emitted
+**And** `<option>` elements are populated from `metadata.values` with their display text and stored value
+**And** if `metadata.is_multiselect == true` or `control_style` contains `"checkbox"`, the control is emitted as a checkbox group with `data-multiselect="true"`
+
+**Given** a grid control (`metadata.type == "grid"`)
+**When** the generator emits it
+**Then** the output contains a `<fieldset class="grid-control" data-path="{path}">` with a `<tbody data-grid-body="{path}">` container
+**And** a `<template data-grid-template="{path}">` element containing one row, with `{{index}}` as the array index placeholder in all data-path values within the template row
+
+**Given** a form section with `metadata.cardinality == "+"` or `"*"` (multi-cardinality)
+**When** the generator emits it
+**Then** a `<div data-form-instances="{path}">` container and a `<template data-form-template="{path}">` containing one complete form instance are emitted
+**And** the template contains all child field HTML for that form instance, with `{{formIndex}}` as the instance index placeholder in data-path values
+
+**Given** a metadata path with no entry in `ui_specification.form_design`
+**When** the generator encounters it
+**Then** the field is still emitted (positioned at 0,0) and the unmapped path is written to stderr with format: `UNMAPPED: {path}`
+
+**Given** a field with `metadata.type == "chart"`
+**When** the generator emits it
+**Then** a `<div data-field-type="chart" data-path="{path}" class="chart-placeholder">` is emitted instead of an input control
+
+**Implementation note:** Generator is a new project at `nccdphp-drh-mmria-utilities/mmria-form-html-generator/`. This is a **one-time-use tool**. It runs once, the output is reviewed and committed, and the tool is then archived — it will not be run again as a build step or pipeline.
+
+The generator accepts `--base-url` (e.g. `https://tenant1-mmria.local:12345`) and `--output` directory as arguments. At startup it calls `GET {base-url}/api/version/release-version` to resolve the current version string dynamically — the version is never hardcoded. It then fetches `GET {base-url}/api/version/{version}/metadata` and `GET {base-url}/api/version/{version}/ui_specification` using that resolved version. The locally saved `artifacts/metadata_26.06.15.json` and `artifacts/ui_specification_26.06.15.json` are reference snapshots only. Output: `{output}/generated-forms/{section-name}.html` (14 files); default output targets `wwwroot/generated-forms/` in `mmria-server`.
+
+The metadata tree is the primary structural input. The generator recursively walks `metadata.children` at each node level. Each node carries: `name` (used to build the slash-separated path, e.g. `home_record/date_of_death/month`), `type` (determines HTML element), `prompt` (label text), `children` (sub-nodes for group/form/grid types), `values` (option list for list-type fields), `max_length`, `is_read_only`, `cardinality`, `is_multiselect`, `control_style`, and `other_specify_list`. The ui_specification is consulted as a secondary lookup: for each path the generator builds from the metadata tree, it reads `ui_specification.form_design["{path}"]` to get `.control.style` (input position/size) and `.prompt.style` (label position/size). Handles all types dispatched by `page_renderer.js`: string, textarea/address, date, datetime, time, number, boolean, list, grid, group, form, label, button, always_enabled_button, html_area, hidden, jurisdiction, chart. Developer reviews stderr output at the end to confirm no critical fields are unmapped.
+
+**Files (new):** `nccdphp-drh-mmria-utilities/mmria-form-html-generator/mmria-form-html-generator.csproj`, `Program.cs`, `HtmlGenerator.cs`, `FieldRenderer.cs`
+
+| Dependency | Risk |
+|---|---|
+| None — standalone utility | Low |
+
+---
+
+### Story 37.2: form-binder.js — Data Binding Layer
+
+As a developer,
+I want a lightweight JavaScript data binding module that replaces page_renderer.js's data binding responsibility,
+So that the static HTML form sections can display, edit, and collect case data without the rendering engine infrastructure.
+
+**Acceptance Criteria:**
+
+**Given** a section HTML element and a `g_data` object
+**When** `formBinder.bind(sectionEl, g_data)` is called
+**Then** every `[data-path]` `<input>`, `<select>`, and `<textarea>` in the section is populated with the value at the corresponding path in `g_data`
+**And** list `<select>` elements have the correct `option` selected
+**And** multi-select checkbox groups reflect the stored array values
+**And** datetime, date, and time inputs are formatted using the same display format as the current renderers
+
+**Given** an element with `data-show-when="path=value"` or `data-show-when="path!=value"`
+**When** `formBinder.bind()` is called
+**Then** the element's visibility matches the condition evaluated against `g_data`
+**And** when any field matching a `data-show-when` condition path changes, all dependent elements in the section are re-evaluated immediately
+
+**Given** a `<tbody data-grid-body="path">` and a `<template data-grid-template="path">` in the section
+**When** `formBinder.bind()` is called and `g_data` contains an array at `path`
+**Then** one `<tr>` row is cloned from the template for each array item
+**And** each row's `[data-path]` values have `{{index}}` replaced with the actual array index
+**And** each row's fields are bound to the corresponding array item values
+**And** add/remove row buttons on the grid operate correctly, updating the `g_data` array and re-rendering the body
+
+**Given** a `[data-form-instances="path"]` container and a `[data-form-template="path"]`
+**When** `formBinder.bind()` is called and `g_data` contains an array at `path`
+**Then** one form instance div is cloned from the template for each array item
+**And** `{{formIndex}}` placeholders in cloned data-path values are replaced with the instance index
+**And** add/remove instance buttons operate correctly
+
+**Given** `options.readOnly == true` is passed to `formBinder.bind()`
+**When** binding completes
+**Then** all `<input>`, `<select>`, and `<textarea>` elements in the section have the `disabled` attribute applied
+**And** no change event listeners are wired
+
+**Given** an input or select with a `data-path` attribute and `options.readOnly` is not set
+**When** the user changes the value
+**Then** a single delegated listener on the section container writes the new value back to `g_data` at the correct path immediately
+**And** dependent-list child dropdowns are re-filtered if the changed field is a `data-parent-list` parent
+
+**Given** `formBinder.collect(sectionEl, g_data)` is called before a save
+**When** the function runs
+**Then** all current input values are written back to `g_data` with type coercion appropriate to `data-field-type` (string stays string, number fields are parsed as float/int, boolean fields are parsed as bool)
+
+**Given** a `[data-field-type="chart"]` placeholder element
+**When** `formBinder.bind()` encounters it
+**Then** the existing `chart.js` rendering function is called with the element and the data at `data-path`, producing the chart in-place (no change to chart.js internals)
+
+**Implementation note:** `form-binder.js` is a plain JS module (no build step, consistent with the existing no-bundler convention). Path navigation into `g_data` uses a `getByPath(obj, 'section/group/field')` helper that splits on `/` and walks the object tree. `data-show-when` evaluation uses the same helper. Dependent parent-child list re-filtering replaces the logic currently in `list.js` that reads `g_dependent_parent_to_child` and `g_dependent_child_to_parent` — those maps are retained and consulted by the binder's change listener. Developer audits all existing per-field onChange patterns in `case/index.js` and the type renderers to ensure full coverage before Story 37.3 begins.
+
+**Files (new):** `source-code/mmria/mmria-server/wwwroot/scripts/form-binder.js`
+
+| Dependency | Risk |
+|---|---|
+| Story 37.1 must be complete (binder tested against real generated HTML) | Low |
+
+---
+
+### Story 37.3: Wire Case Editor View
+
+As an abstractor,
+I want the case data entry form to render from static HTML sections using form-binder.js,
+So that the form displays and behaves identically to today without the JS rendering engine.
+
+**Acceptance Criteria:**
+
+**Given** an abstractor opens a case in edit mode
+**When** a form section is selected from the navigation sidebar
+**Then** the corresponding pre-loaded static HTML section div is shown
+**And** `formBinder.bind(sectionEl, g_data)` is called to populate all field values
+**And** the form is visually pixel-identical to the current JS-rendered output
+
+**Given** the case page has loaded
+**When** the developer inspects the Network tab in DevTools
+**Then** no request to `/api/version/{ver}/ui_specification` is made
+**And** `g_default_ui_specification` is not declared or referenced in `case/index.js`
+
+**Given** the abstractor changes a field value
+**When** the change event fires via form-binder's delegated listener
+**Then** `g_data` is updated at the correct path
+**And** the change is queued via the existing `g_change_stack` mechanism (unchanged)
+
+**Given** the developer audits all calls to `page_render()`, `app_render()`, `form_render()`, `group_render()`, `grid_render()` in `case/index.js` and all scripts loaded by `Case/Index.cshtml`
+**When** the audit is complete
+**Then** zero calls to those functions remain — all are replaced by `formBinder.bind()` invocations
+
+**Given** all 14 generated section HTML files
+**When** `Case/Index.cshtml` renders
+**Then** all 14 section fragments are embedded in the initial page HTML (via Razor `@Html.Partial` or static `<div>` includes), initially hidden, with their section-name as the `id`
+
+**Implementation note:** Developer loads all 14 `wwwroot/generated-forms/{section}.html` files as Razor partials in `Case/Index.cshtml`. The existing section-navigation logic in `case/index.js` that shows/hides section containers is adapted to target the static divs by section name. Per-field `onChange` wiring from type renderers is replaced entirely by the form-binder delegated listener. Existing validation integration, `g_change_stack`, save/load, checkout/checkin, and inactivity management in `case/index.js` are not changed. Developer runs Playwright E2E tests after wiring each section before proceeding to the next.
+
+**Files:** `source-code/mmria/mmria-server/Views/Case/Index.cshtml`, `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js`
+
+| Dependency | Risk |
+|---|---|
+| Story 37.1 (generated HTML must exist) | — |
+| Story 37.2 (form-binder.js must exist) | — |
+
+---
+
+### Story 37.4: Wire Read-Only Views (AnalystCase, CaseVRO, De-identified, Search View)
+
+As an analyst, committee member, or de-identification reviewer,
+I want the read-only case views to render from static HTML sections using form-binder.js,
+So that they display correct case data without the JS rendering engine.
+
+**Acceptance Criteria:**
+
+**Given** an analyst opens a case in the AnalystCase view
+**When** a form section is selected
+**Then** `formBinder.bind(sectionEl, g_data, {readOnly: true})` populates all fields
+**And** all inputs are disabled
+**And** the display is visually identical to the current rendered output
+
+**Given** a committee member opens a case in the CaseVRO view
+**Then** the same static HTML sections and read-only binding apply
+**And** no reference to `page_renderer.committee_member.js` or its type renderer variants (`datetime.committee_member.js`, `grid.committee_member.js`, `form.committee_member.mmria.js`, `form.committee_member.pmss.js`) remains in the CaseVRO JS
+
+**Given** the de-identified view is rendered
+**Then** the same static HTML sections and `formBinder.bind(..., {readOnly: true})` apply
+**And** `de-identified/index.js` no longer fetches or references `g_default_ui_specification`
+
+**Given** the case search view (`case/search_view.js`) currently uses `g_default_ui_specification` for field display in search results
+**When** this story is implemented
+**Then** search result rendering is replaced with position-independent display (field prompt + value, without absolute-positioned layout)
+**And** `case/search_view.js` contains no reference to `g_default_ui_specification` or `form_design`
+
+**Given** each of these four view contexts has been migrated
+**When** the developer greps those view files for `g_default_ui_specification`, `page_render`, `form_render`, `group_render`, `grid_render`
+**Then** zero matches are found
+
+**Files:** `source-code/mmria/mmria-server/Views/AnalystCase/Index.cshtml`, `source-code/mmria/mmria-server/Views/CaseVRO/Index.cshtml`, `source-code/mmria/mmria-server/wwwroot/scripts/de-identified/index.js`, `source-code/mmria/mmria-server/wwwroot/scripts/case/search_view.js`, and their corresponding JS index files
+
+| Dependency | Risk |
+|---|---|
+| Story 37.3 complete (pattern established) | Low |
+
+---
+
+### Story 37.5: Remove Form Designer
+
+As a developer,
+I want the /form-designer admin tool and all its supporting code deleted from the codebase,
+So that there is no dead code, no unused admin role, and no API write surface for form layout.
+
+**Acceptance Criteria:**
+
+**Given** the form designer has been removed
+**When** a browser navigates to `/form-designer` (even as a `form_designer`-role user)
+**Then** a 404 response is returned
+
+**Given** all form designer assets have been deleted
+**When** the developer greps the repository for `form_designerController` or `href="/form-designer"`
+**Then** zero matches remain in any C# file or Razor view
+
+**Given** the `form_designer` role and policy are deliberately preserved
+**When** the developer opens the application as a form_designer-role user
+**Then** the Form Designer admin section is still visible in the navigation
+**And** the "Open form designer" link no longer appears in that section
+**And** all other links (Metadata Management, De-Identified List, etc.) continue to work
+
+**Given** the POST endpoints have been removed
+**When** `dotnet build` runs
+**Then** the build succeeds with zero errors
+
+**Delete list:**
+- `Controllers/form_designerController.cs`
+- `Views/form_designer/Index.cshtml` (entire directory)
+- `wwwroot/scripts/form-designer/` (entire directory — all JS files including `app.js`, `index.js`, `dataService.js`, `spec.js`, `canvas/`, `interact-*.js`)
+- `wwwroot/form-designer/` (entire directory — `app.html`, `style-formDesigner.css`, `style-interact.css`, `style-multiselection.css`)
+- The single `<li><a href="/form-designer">Open form designer</a></li>` line from `Views/Home/Index.cshtml` (line 461)
+- POST action on `ui_specificationController.cs` (`[HttpPost("{id}")]`)
+- POST action on `metadataController.cs`
+
+**Do NOT remove:**
+- The `form_designer` role or its authorization policy in `Program.cs` — it gates the entire Form Designer admin panel section, which includes Metadata Management, De-Identified List, Data Migration, Substance Lists, Export List Manager, Session Activity Report, and Offline Session Logs. These features remain.
+- Any `[Authorize(Roles = "form_designer")]` attribute on other controllers
+
+**Files:** `source-code/mmria/mmria-server/Controllers/form_designerController.cs`, `source-code/mmria/mmria-server/Controllers/api/ui_specificationController.cs`, `source-code/mmria/mmria-server/Controllers/api/metadataController.cs`, `source-code/mmria/mmria-server/Views/Home/Index.cshtml`
+
+| Dependency | Risk |
+|---|---|
+| None — independent deletion pass | Low |
+
+---
+
+### Story 37.6: Remove JS Rendering Engine
+
+As a developer,
+I want `page_renderer.js`, all 30 type renderer files, `g_default_ui_specification`, and `ui_specificationController` deleted from the codebase,
+So that the dynamic JS rendering engine is completely eliminated and the codebase carries no orphaned rendering infrastructure.
+
+**Acceptance Criteria:**
+
+**Given** Stories 37.3 and 37.4 are complete
+**When** the developer greps the entire `wwwroot/scripts/` tree for `g_default_ui_specification`
+**Then** zero matches are found
+
+**Given** all rendering engine files have been deleted
+**When** the developer greps for `page_render(`, `group_render(`, `grid_render(`, `form_render(`, `list_render(`, `string_render(`, `date_render(`, `boolean_render(`, `label_render(`, `chart_render(`
+**Then** zero matches are found in any file outside the generator utility
+
+**Given** `ui_specificationController.cs` has been deleted
+**When** `dotnet build` runs on `mmria-server.csproj`
+**Then** the build succeeds with zero errors
+
+**Given** the case form is exercised in a browser after all changes
+**When** the developer inspects the Network tab
+**Then** no request to `/api/version/{ver}/ui_specification` is made
+**And** no request to `/api/ui_specification` is made
+
+**Delete list:**
+- `wwwroot/scripts/editor/page_renderer.js`
+- `wwwroot/scripts/editor/page_renderer.committee_member.js`
+- All 30 files in `wwwroot/scripts/editor/page_renderer/` (confirm count before deleting)
+- `Controllers/api/ui_specificationController.cs` (entire file)
+
+**Remove from `case/index.js`:**
+- `var g_default_ui_specification = null;` declaration
+- The `/api/version/{ver}/ui_specification` fetch and `g_default_ui_specification` assignment
+- All `<script>` tags referencing `page_renderer.js` or any `page_renderer/` file (remove from `Case/Index.cshtml`, `AnalystCase/Index.cshtml`, `CaseVRO/Index.cshtml`, and any Shared layout that loads them)
+
+**Remove from `de-identified/index.js` and `case/search_view.js`:**
+- Any remaining `g_default_ui_specification` declarations and fetches (should be zero if Story 37.4 was complete, but verify)
+
+**Implementation note:** Run `dotnet build` and then exercise each case view context (edit, analyst, committee, de-identified) with a real case before marking done. Playwright E2E suite should pass before this story is closed.
+
+**Files:** All files in `wwwroot/scripts/editor/page_renderer/`, `wwwroot/scripts/editor/page_renderer.js`, `wwwroot/scripts/editor/page_renderer.committee_member.js`, `Controllers/api/ui_specificationController.cs`, `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js`, `Views/Case/Index.cshtml`, `Views/AnalystCase/Index.cshtml`, `Views/CaseVRO/Index.cshtml`
+
+| Dependency | Risk |
+|---|---|
+| Stories 37.3 and 37.4 must be complete | High — deleting before views are wired breaks the app |
+| Story 37.5 (form designer deleted) | Low — independent, but cleaner to complete first |
+
+## Epic 37 — Story Sequencing
+
+| Story | Risk | Dependencies |
+|---|---|---|
+| 37.1 — HTML generator build tool | Medium | None — standalone utility |
+| 37.2 — form-binder.js | Medium | 37.1 (test against real generated HTML) |
+| 37.5 — Remove form designer | Low | None — independent deletion |
+| 37.3 — Wire case editor view | High | 37.1, 37.2 complete |
+| 37.4 — Wire read-only views | Medium | 37.3 pattern established |
+| 37.6 — Remove rendering engine | High | 37.3, 37.4 complete; verify all views before deleting |
+
+---
+
+## Epic 42: Geocoding Location Registry (Declarative Refactor) _(v4.2, follow-up to Epic 30)_
+
+**Goal:** Deliver the declarative location→field mapping intent that was discussed during Epic 30 planning but was not captured in the Epic 30 story specs. Convert `CaseGeocodingManager` from ten hand-written per-location apply methods into a single `LocationRegistry` (10 entries) + one `Apply(caseDoc, locationKey, result, listIndex?)` method. Update both callers (`CaseGeocodeController` and `BatchItemProcessingService`) to consume the registry. After this epic, adding a new geocode-enabled location is a **single-entry addition to `LocationRegistry`** — no controller switch update, no new manager method, no separate valid-key list.
+
+**Background — the gap being closed**
+
+Epic 30 delivered end-to-end unification of the geocode/apply/save path across the browser button click and the vital-import batch service. Both callers hit the same `GeocodingManager` and `CaseGeocodingManager`. However the *shape* of `CaseGeocodingManager` shipped as imperative code rather than the declarative registry that was the original design intent:
+
+- 10 hand-written `Apply_DC_PlaceOfLastResidence_Geocode` / `Apply_DC_AddressOfInjury_Geocode` / etc. methods, each with the target path (e.g., `"death_certificate/place_of_last_residence"`) hard-coded as a string literal in the method body.
+- `CaseGeocodeController` maintains a separate hand-maintained `_validKeys` HashSet (10 entries) and `_listKeys` HashSet (4 entries), and dispatches to the right method via a switch/if-chain in a private `ApplyGeocode` helper.
+- `BatchItemProcessingService` has 5 call sites, each hard-coding the specific method name (e.g., `_caseGeocodingManager.Apply_DC_AddressOfDeath_Geocode(new_case, geo_result)`). The batch service therefore must know method identifiers, not just location keys, and cannot iterate a data-driven list of forms.
+
+Adding a new form today requires: (1) new method in `CaseGeocodingManager`, (2) new entry in controller `_validKeys` (and `_listKeys` if it's a list-shaped location), (3) new branch in controller `ApplyGeocode` switch, (4) new client `locationKey`. Four coordinated edits across three files for what should be a single-line registry addition.
+
+**Requirement covered:** FR-1.10 (added to v4.2 PRD as part of this epic).
+
+---
+
+### Story 42.1 — Convert `CaseGeocodingManager` to Declarative `LocationRegistry`
+
+**User Story:** As a developer maintaining or extending case-geocoding, I need the location→field mapping to be a single declarative registry and one `Apply(caseDoc, locationKey, result, listIndex?)` method, so that adding a new geocode-enabled location is a single-entry change and every caller (controller, batch service, future callers) is data-driven off the same source of truth.
+
+**Scope:**
+
+- Introduce a `GeocodeTarget` value type (or `readonly record struct`) in `mmria.common/SharedLibraries/Case/Manager/` with fields `IsList`, `BasePath` (used when `IsList` is false), `ListPath` and `SubPath` (used when `IsList` is true), plus factory helpers `GeocodeTarget.Static(basePath)` and `GeocodeTarget.List(listPath, subPath)`.
+- Add `public static readonly IReadOnlyDictionary<string, GeocodeTarget> LocationRegistry` on `CaseGeocodingManager` with all 10 current entries, ordinal-comparer, values matching the current per-method target paths verbatim.
+- Add `public void Apply(ExpandoObject caseDoc, string locationKey, GeocodeResult result, int listIndex = 0)` that looks up the target and dispatches to the existing `ApplyStatic` / `ApplyList` private helpers.
+- Delete the 10 `Apply_DC_*_Geocode` / `Apply_BC_*_Geocode` / `Apply_PC_*_Geocode` / `Apply_ERH_*_Geocode` / `Apply_OMV_*_Geocode` / `Apply_MT_*_Geocode` public methods after all call sites are migrated. (Do NOT keep them as thin wrappers — the callers within this epic are exhaustive; leaving wrappers would preserve the exact anti-pattern this epic removes.)
+- Update `CaseGeocodeController`: derive `_validKeys` from `CaseGeocodingManager.LocationRegistry.Keys`; derive `_listKeys` from `LocationRegistry.Where(kv => kv.Value.IsList).Select(kv => kv.Key)`; replace the `ApplyGeocode` switch/if-chain with a single `_caseGeocodingManager.Apply(caseDoc, locationKey, geocodeResult, listIndex)` call.
+- Update `BatchItemProcessingService`: each of the 5 call sites currently naming `Apply_DC_AddressOfDeath_Geocode`, `Apply_DC_PlaceOfLastResidence_Geocode`, `Apply_BC_LocationOfResidence_Geocode` (x2), and `Apply_BC_FacilityOfDelivery_Geocode` becomes `_caseGeocodingManager.Apply(new_case, "<locationKey>", geo_result)` using the corresponding registry key.
+
+**Acceptance Criteria:**
+
+1. `CaseGeocodingManager.LocationRegistry` exists with exactly 10 entries, and their keys match the 10 keys previously listed in `CaseGeocodeController._validKeys`.
+2. `CaseGeocodingManager.Apply(caseDoc, locationKey, result, listIndex)` exists and produces byte-identical case-document mutations to the pre-refactor per-location methods for every entry in the registry.
+3. The 10 `Apply_*_Geocode` public methods on `CaseGeocodingManager` are deleted.
+4. `CaseGeocodeController` no longer holds hand-maintained `_validKeys` or `_listKeys` HashSet literals; both are derived from `LocationRegistry`.
+5. `CaseGeocodeController._ApplyGeocode` (or equivalent switch/if-chain) is deleted; the single-line `Apply(...)` call replaces it.
+6. `BatchItemProcessingService` has zero references to any `Apply_*_Geocode` method name; every geocode-apply call is `Apply(new_case, "<key>", geo_result)` with the location key as a string literal.
+7. `dotnet build` on `mmria-server.csproj` and `mmria.services.csproj` succeeds with zero errors.
+8. Adding a new geocode-enabled location to the codebase is verified to require exactly one change: a new key/value pair in `LocationRegistry`. (Verified via a written note in the story's Dev Agent Record, not a code change — this is a design property, not a runtime behavior.)
+
+**Callers to update — enumeration for the story author:**
+
+- `nccdphp-drh-mmria-common/mmria.common/SharedLibraries/Case/Manager/CaseGeocodingManager.cs` — full rewrite.
+- `source-code/mmria/mmria-server/Controllers/api/CaseGeocodeController.cs` — `_validKeys`, `_listKeys`, and `ApplyGeocode` helper.
+- `nccdphp-drh-mmria-services/mmria.services/Services/BatchItemProcessingService.cs` — lines ~1162, ~1203, ~1588, ~1904, ~1919 (each named `_caseGeocodingManager.Apply_*_Geocode(...)`).
+
+**Out of scope:** Client JS. The client contract remains `POST /api/case-geocode/{caseId}/{locationKey}` with the same body shape — the registry lives entirely server-side and is invisible to the browser. The `$case_geocode_dispatch` helper introduced in Story 30.4 is unchanged.
+
+---
+
+### Story 42.2 — Restore Census Tract Certainty Code ≠ 1 Warning Modal (regression fix)
+
+**User Story:** As an abstractor validating an address on any of the 10 "Validate Address and Get Geography Context" buttons, I want the "Address Geocode / Validation: Census Tract Certainty Code is Not 1 ..." info dialog to appear whenever a successful geocode returns a certainty code other than `"1"`, so that I know to re-check a partially valid address before continuing — the same UX that shipped before the Epic 30 server-side migration.
+
+**Background — the regression being closed**
+
+Epic 30 (Stories 30.3 + 30.4) moved geocoding server-side. Story 30.4 removed the 10 in-line client `$mmria.info_dialog_show("Address Geocode", "Validation: Census Tract Certainty Code is Not 1 ...", "...")` calls on the stated assumption that the server would surface the warning through the response. `CaseGeocodeController.Post(...)` however only returns `Ok(new { ok = true })` and never inspects `geocodeResult.NAACCRCensusTractCertaintyCode`. Story 30.6 propagated the same trimmed `$case_geocode_dispatch` helper into the 3 sibling copies (`mmria-check-code.js`, `database-scripts/validator.js`, `wwwroot/scripts/validator.js`) without noticing the missing warning field. Story 42.1 (registry refactor) was explicitly server-side-only and did not touch the client dispatcher either. Result: the modal never fires anywhere — a regression against **FR-1.5** at every one of the 10 registry keys. The verbatim old-code check was `if (parseInt(geo_data.NAACCRCensusTractCertaintyCode) != 1) { $mmria.info_dialog_show("Address Geocode", "Validation: Census Tract Certainty Code is Not 1 (Census tract based on complete and valid street address.)", "There might be a potential error in the address. Please verify address."); }` — repeated in all 10 geocode handlers at commit `f3f039a48^` (`ba4e36147` for the != 1 form).
+
+**Requirement covered:** FR-1.11 (added to v4.2 PRD alongside this story).
+
+**Scope:**
+
+- **Server (`CaseGeocodeController`).** After the `_caseGeocodingManager.Apply(...)` call and before the save, compute an optional warning: when `geocodeResult.FeatureMatchingGeographyType` is present and not equal (ordinal-ignore-case) to `"Unmatchable"` **and** `geocodeResult.NAACCRCensusTractCertaintyCode` (ordinal-compared to `"1"`) is not `"1"`, produce a small object with `code = "certainty_code_not_1"`, `title = "Address Geocode"`, `heading = "Validation: Census Tract Certainty Code is Not 1 (Census tract based on complete and valid street address.)"`, `message = "There might be a potential error in the address. Please verify address."`, and `certaintyCode = geocodeResult.NAACCRCensusTractCertaintyCode`. Otherwise the warning is `null`. Return `Ok(new { ok = true, warning })` — `null` warnings must be serialized as an explicit `null` (or omitted — either shape is acceptable so long as the client's `if (body.warning)` check remains truthy only for real warnings). Do not put this logic in `CaseGeocodingManager` or `GeocodingManager` — this is a UX concern; the manager stays pure so the batch service is unaffected.
+- **Client (`$case_geocode_dispatch`) — 4 files, identical patch.**
+  - `source-code/mmria/mmria-server/database-scripts/MMRIA_calculations.js` (helper at line ~889)
+  - `source-code/mmria/mmria-server/database-scripts/mmria-check-code.js` (helper at line ~1575)
+  - `source-code/mmria/mmria-server/database-scripts/validator.js` (helper at line ~1575)
+  - `source-code/mmria/mmria-server/wwwroot/scripts/validator.js` (helper at line ~1711)
+
+  On the success branch of the dispatcher, parse `resp.json()` into a local (guarded try/catch — an unexpected non-JSON body must not crash the reload). Run the existing case-reload path first. **After** the reload completes, if the parsed body has a truthy `warning.title`, call `$mmria.info_dialog_show(warning.title, warning.heading, warning.message)` inside a try/catch (matches the error-branch guarding already in place). Order matters: fire after the reload so the just-populated certainty-code field is visible behind the modal (mirrors the pre-Epic-30 UX).
+
+- **Batch path — explicitly excluded.** `BatchItemProcessingService` has no UI to render a modal. The batch service already writes `_logger` entries at geocode failures; adding a low-certainty summary to the batch report is a separate future story and not part of FR-1.11.
+- **No changes to `CaseGeocodingManager`, `LocationRegistry`, `GeocodingManager`, or `GeocodeResult`.** The certainty code is already carried on `GeocodeResult` — only the controller and the 4 client copies change.
+
+**Acceptance Criteria:**
+
+1. `CaseGeocodeController.Post(...)` returns a 200 OK body with a `warning` field. When the geocode matched (`FeatureMatchingGeographyType` non-empty and not `"Unmatchable"`) and `NAACCRCensusTractCertaintyCode` (ordinal-compared) is not `"1"`, `warning` is an object with `code = "certainty_code_not_1"`, `title = "Address Geocode"`, `heading = "Validation: Census Tract Certainty Code is Not 1 (Census tract based on complete and valid street address.)"`, `message = "There might be a potential error in the address. Please verify address."`, and `certaintyCode` equal to the raw code. Otherwise `warning` is `null` (or omitted). The `ok = true` field is preserved.
+2. Each of the 4 `$case_geocode_dispatch` copies parses the success-branch response body, and — after the case reload completes — if the parsed body contains a truthy `warning.title`, invokes `$mmria.info_dialog_show(warning.title, warning.heading, warning.message)` inside a try/catch guard. The 4 patches are byte-identical to each other after formatting.
+3. `CaseGeocodingManager`, `LocationRegistry`, `GeocodingManager`, `GeocodeResult`, `BatchItemProcessingService`, and every other server-side file except `CaseGeocodeController.cs` are unchanged. Verified via `git diff --name-only` in the Dev Agent Record.
+4. Manual smoke against a running server: at three representative buttons — DC place of last residence (static base path), BC facility of delivery (static base path, different form), MT origin address (list-shaped path with `listIndex`) — a TAMU response with certainty code `4` triggers the modal with the FR-1.11 wording verbatim, and a TAMU response with certainty code `1` does not trigger it. The 7 remaining registry keys share the same controller code path and are therefore covered by the three probes plus AC #1's response-shape guarantee.
+5. Unmatchable geocode: the response has `warning = null` (matching the current pre-Epic-30 UX of silently clearing the fields). No modal fires.
+6. `dotnet build source-code/mmria/mmria-server/mmria-server.csproj` succeeds with zero errors. `dotnet build nccdphp-drh-mmria-services/mmria.services/mmria.services.csproj` succeeds with zero errors (unchanged, but confirms no accidental cross-project impact).
+7. Grep guardrail: `Select-String -Pattern "certainty_code_not_1"` returns exactly 5 matches — one in `CaseGeocodeController.cs` and one in each of the 4 dispatcher copies. Any other count indicates missing files or accidental duplication.
+
+**Callers to update — enumeration for the story author:**
+
+- `source-code/mmria/mmria-server/Controllers/api/CaseGeocodeController.cs` — extend the success-path response body only.
+- `source-code/mmria/mmria-server/database-scripts/MMRIA_calculations.js` — inside `$case_geocode_dispatch` on the success branch.
+- `source-code/mmria/mmria-server/database-scripts/mmria-check-code.js` — same edit.
+- `source-code/mmria/mmria-server/database-scripts/validator.js` — same edit.
+- `source-code/mmria/mmria-server/wwwroot/scripts/validator.js` — same edit.
+
+**Out of scope:** `BatchItemProcessingService`; `CaseGeocodingManager` and its `LocationRegistry`; `GeocodingManager` and `GeocodeResult`; the shape of the request payload; any new modal component or new client helper — the existing `$mmria.info_dialog_show` covers the requirement.
+
+---
+
+## Epic 42 — Story Sequencing
+
+| Story | Risk | Dependencies |
+|---|---|---|
+| 42.1 — Registry refactor | Low | Epic 30 must be `done` (all Epic 30 stories in `review` or `done` is sufficient to start; commit the review-status stories before starting 42.1 to avoid the uncommitted-work class of failure Epic 30 hit) |
+| 42.2 — Certainty code modal restoration | Low | Story 42.1 `done`. (Not strictly required — the controller is edited either way — but running after 42.1 avoids a rebase against the registry refactor's controller changes.) |
+
+Two-story epic. Both are small, in-process changes with no user-facing behavior change beyond restoring FR-1.5 at all 10 buttons.
+

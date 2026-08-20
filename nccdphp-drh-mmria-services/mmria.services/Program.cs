@@ -98,6 +98,35 @@ public sealed class Program
         builder.Services.AddScoped<mmria.common.SharedLibraries.VitalImport.DAL.VitalImportDAL>();
         builder.Services.AddScoped<mmria.common.SharedLibraries.VitalImport.IVitalImportRepository>(
             sp => sp.GetRequiredService<mmria.common.SharedLibraries.VitalImport.DAL.VitalImportDAL>());
+        // Story 29.8: dedicated vital-import writer. Registered only here so
+        // mmria-server controllers cannot resolve it via DI.
+        builder.Services.AddScoped<mmria.common.SharedLibraries.Audit.DAL.AuditDAL>();
+        builder.Services.AddScoped<mmria.common.SharedLibraries.Audit.IAuditRepository>(
+            sp => sp.GetRequiredService<mmria.common.SharedLibraries.Audit.DAL.AuditDAL>());
+        builder.Services.AddScoped<mmria.common.SharedLibraries.Case.Manager.CaseManager>(
+            sp => new mmria.common.SharedLibraries.Case.Manager.CaseManager(
+                sp.GetRequiredService<mmria.common.getset.CouchDbHttpClient>(),
+                sp.GetRequiredService<mmria.common.SharedLibraries.Case.ICaseRepository>(),
+                sp.GetRequiredService<mmria.common.SharedLibraries.Audit.IAuditRepository>()));
+        builder.Services.AddScoped<mmria.services.SharedLibraries.VitalImport.Manager.VitalImportCaseWriter>(
+            sp => new mmria.services.SharedLibraries.VitalImport.Manager.VitalImportCaseWriter(
+                sp.GetRequiredService<mmria.common.SharedLibraries.Case.ICaseRepository>(),
+                sp.GetRequiredService<mmria.common.SharedLibraries.Case.Manager.CaseManager>(),
+                sp.GetRequiredService<mmria.common.SharedLibraries.Audit.IAuditRepository>()));
+        // Story 29.8: dedicated case writer for the batch vital-import path.
+        // Registered only in the vital-import service DI graph - controllers in
+        // mmria-server cannot resolve it. VitalImportCaseWriter is internal to
+        // mmria.services, so even referencing the type from mmria-server is a
+        // compile error.
+        builder.Services.AddScoped<mmria.common.SharedLibraries.Case.Manager.CaseManager>(sp =>
+            new mmria.common.SharedLibraries.Case.Manager.CaseManager(
+                sp.GetRequiredService<mmria.common.getset.CouchDbHttpClient>(),
+                sp.GetRequiredService<mmria.common.SharedLibraries.Case.ICaseRepository>(),
+                sp.GetRequiredService<mmria.common.SharedLibraries.Audit.IAuditRepository>()));
+        builder.Services.AddScoped<mmria.common.SharedLibraries.Audit.DAL.AuditDAL>();
+        builder.Services.AddScoped<mmria.common.SharedLibraries.Audit.IAuditRepository>(
+            sp => sp.GetRequiredService<mmria.common.SharedLibraries.Audit.DAL.AuditDAL>());
+        builder.Services.AddScoped<mmria.services.SharedLibraries.VitalImport.Manager.VitalImportCaseWriter>();
         builder.Services.AddScoped<MMRIAServicesDAL>();
         builder.Services.AddScoped<MMRIAServicesManager>();
         builder.Services.AddScoped<MMRIARebuildDAL>();

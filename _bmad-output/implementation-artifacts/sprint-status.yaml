@@ -1,5 +1,5 @@
 # generated: 2026-07-14
-last_updated: 2026-08-03
+last_updated: 2026-08-20
 # project: mmria
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@ last_updated: 2026-08-03
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-07-14
-last_updated: 2026-08-03
+last_updated: 2026-08-20
 project: mmria
 project_key: NOKEY
 tracking_system: file-system
@@ -265,11 +265,28 @@ development_status:
   epic-28-retrospective: optional
 
   # ── Epic 29: Record ID Uniqueness Enforcement ─────────────────────────────
-  epic-29: backlog
-  29-1-server-side-format-validation-and-uniqueness-guard: backlog
-  29-2-client-side-per-candidate-api-check: backlog
-  29-3-add-record-id-list-view-remove-broken-bulk-list-call: backlog
+  epic-29: in-progress
+  29-1-server-side-format-validation-and-uniqueness-guard: done
+  29-2-client-side-per-candidate-api-check: done
+  29-3-add-record-id-list-view-remove-broken-bulk-list-call: done
+  29-4-generate-unique-record-id-manager-method: done
+  29-5-online-save-then-retry-on-collision: done
+  29-6-offline-placeholder-record-id: backlog
+  29-7-ije-batch-collision-retry: backlog
+  # 29-7 superseded by 29-8 (2026-08-20) — story file marked "superseded"; no defined sprint status maps
+  29-8-vital-import-dedicated-case-writer: review
   epic-29-retrospective: optional
+
+  # ── Epic 30: Unified Server-Side Geocoding (TAMU Refactor) ────────────────
+  epic-30: in-progress
+  30-1-create-geocoding-manager: done
+  30-2-create-case-geocoding-manager-apply-methods: done
+  30-3-new-api-endpoint-case-geocode: done
+  30-4-refactor-mmria-calculations-geocode-functions: review
+  30-5-refactor-batch-item-processing-service: done
+  30-6-fix-legacy-geocode-calls-check-code-validator: review
+  30-7-remove-dead-tamu-code-committee-member: review
+  epic-30-retrospective: optional
 
   # ── Epic 31: Section 508 — Home Page General Section Focus Indicators ─────
   epic-31: done
@@ -292,14 +309,58 @@ development_status:
   epic-33-retrospective: optional
 
   # ── Epic 34: Case Narrative PDF Spacing Fidelity ──────────────────────────
-  epic-34: in-progress
+  epic-34: done
   34-1-normalize-case-narrative-pdf-whitespace-conversion: done
-  34-2-collapse-br-empty-paragraph-separators: ready-for-dev
+  34-2-collapse-br-empty-paragraph-separators: done
   epic-34-retrospective: optional
 
   # ── Epic 35: Offline Exit/Go Online UX Cleanup (Rel 4.1 P-Immediate) ──────
-  epic-35: in-progress
-  35-1-hide-exit-offline-mode-widget: review
-  35-2-rename-go-online-to-go-online-and-sync-changes: review
-  35-3-align-go-online-confirmation-behavior: ready-for-dev
+  epic-35: done
+  35-1-hide-exit-offline-mode-widget: done
+  35-2-rename-go-online-to-go-online-and-sync-changes: done
+  35-3-align-go-online-confirmation-behavior: done
   epic-35-retrospective: optional
+
+  # ── Epic 36: Case Save Queue Reconcile — Idle Network Recovery Fix ────────
+  epic-36: done
+  36-1-fix-false-positive-reconcile-warning: done
+  36-2-verify-rev-poll-generation-guard: done
+  36-3-verify-autosave-drop-data-carry-through: done
+  36-4-change-stack-snapshot-deduplication-on-enqueue: done
+  epic-36-retrospective: optional
+
+  # ── Epic 37: Form Designer Removal — Static HTML Form Rendering ───────────
+  epic-37: backlog
+  37-1-html-generator-build-tool: backlog
+  37-2-form-binder-js-data-binding-layer: backlog
+  37-3-wire-case-editor-view: backlog
+  37-4-wire-read-only-views: backlog
+  37-5-remove-form-designer: backlog
+  37-6-remove-js-rendering-engine: backlog
+  epic-37-retrospective: optional
+
+  # ── Epic 38: IJE Upload Duplicate Prevention and Logging ──────────────────
+  epic-38: in-progress
+  38-1-ije-upload-duplicate-prevention-and-logging: ready-for-dev
+  epic-38-retrospective: optional
+
+  # ── Epic 39: Update Year of Death Record ID Regression Fix ────────────────
+  epic-39: in-progress
+  39-1-year-of-death-record-id-regression-fix: ready-for-dev
+  epic-39-retrospective: optional
+
+  # ── Epic 40: Session Expiry Automatic Logout Redirect on 401 ─────────────
+  epic-40: in-progress
+  40-1-session-expiry-401-redirect: ready-for-dev
+  epic-40-retrospective: optional
+
+  # ── Epic 41: Per-Tenant Authentication Mode (SAMS + Password) ────────────
+  epic-41: in-progress
+  41-1-per-tenant-auth-investigation: ready-for-dev
+  41-2-per-tenant-auth-implementation: backlog
+  epic-41-retrospective: optional
+
+  # ── Epic 42: Geocoding Location Registry (Declarative Refactor) ──────────
+  epic-42: in-progress
+  42-1-geocoding-location-registry-refactor: review
+  epic-42-retrospective: optional

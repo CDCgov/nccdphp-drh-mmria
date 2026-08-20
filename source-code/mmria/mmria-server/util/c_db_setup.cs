@@ -633,8 +633,8 @@ public sealed class c_db_setup : mmria.server.IDatabaseLifecycleService
     {
         try
         {
-            await _couchDbHttpClient.ExecuteAsync(p_method, p_target_server, null, p_user_name, p_value);
-            return true;
+            var response = await _couchDbHttpClient.ExecuteForResponseAsync(p_method, p_target_server, null, p_user_name, p_value);
+            return response.StatusCode >= 200 && response.StatusCode < 300;
         }
         catch (Exception) 
         {
@@ -646,8 +646,8 @@ public sealed class c_db_setup : mmria.server.IDatabaseLifecycleService
     {
         try
         {
-            await couchDbHttpClient.ExecuteAsync(p_method, p_target_server, null, p_user_name, p_value);
-            return true;
+            var response = await couchDbHttpClient.ExecuteForResponseAsync(p_method, p_target_server, null, p_user_name, p_value);
+            return response.StatusCode >= 200 && response.StatusCode < 300;
         }
         catch (Exception) 
         {

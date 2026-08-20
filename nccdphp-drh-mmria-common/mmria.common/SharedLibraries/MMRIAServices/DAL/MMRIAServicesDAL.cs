@@ -175,6 +175,7 @@ public sealed class MMRIAServicesDAL
         return true;
     }
 
+    [Obsolete("Retired for cross-writer uniqueness by Story 29.7; SaveCaseAsync now enforces record_id uniqueness at write time. Delete after any utility callers migrate.")]
     public async Task<HashSet<string>> GetExistingRecordIds(mmria.common.couchdb.DBConfigurationDetail item_db_info)
     {
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

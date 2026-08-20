@@ -1210,7 +1210,329 @@ dev this story _bmad-output/implementation-artifacts/36-4-change-stack-snapshot-
 
 ---
 
-## Open Items — Resolve Before Affected Story
+## Epic 29: Record ID Uniqueness Enforcement _(v4.2)_
+
+| Story | File | Status |
+|---|---|---|
+| 29.1 — Server-Side Record ID Format Validation and Uniqueness Guard | `29-1-server-side-format-validation-and-uniqueness-guard.md` | done |
+| 29.2 — Client-Side Per-Candidate Uniqueness Check via API | `29-2-client-side-per-candidate-api-check.md` | done |
+| 29.3 — Add `record_id_list` CouchDB View and Remove Dead Bulk-List Code | `29-3-add-record-id-list-view-remove-broken-bulk-list-call.md` | done |
+| 29.4 — Extract `GenerateUniqueRecordIdAsync` Manager Method and Structured `error_code` | `29-4-generate-unique-record-id-manager-method.md` | done |
+| 29.5 — Online Save-Then-Retry-on-Collision _(Path A)_ | `29-5-online-save-then-retry-on-collision.md` | done |
+| 29.6 — Offline Placeholder Record IDs _(Path B)_ | `29-6-offline-placeholder-record-id.md` | done |
+| 29.7 — IJE Batch Collision-Retry via `SaveCaseAsync` _(Path C)_ | `29-7-ije-batch-collision-retry.md` | superseded |
+| 29.8 — Vital-Import Dedicated Case Writer _(supersedes 29.7)_ | `29-8-vital-import-dedicated-case-writer.md` | review |
+| 29.9 — `BatchItemProcessor` Exception Hardening | `29-9-batchitemprocessor-exception-hardening.md` | ready-for-dev |
+
+**Sequencing:** 29.1 and 29.2 are independent and can proceed in parallel. 29.3 depends on 29.2. 29.4 depends on 29.1. 29.5, 29.6, and 29.7 are independent of each other once 29.4 lands; 29.3 and 29.5 both touch `index.mmria.js` / `index.pmss.js` — sequence them or coordinate on the same file. 29.8 supersedes 29.7's implementation strategy — depends on 29.1 and 29.4 (both `done`). 29.9 is independent and can be worked in parallel with 29.8.
+
+> ℹ️ Defense-in-depth: 29.1 is the server-side last-line guard; 29.2 eliminates the client-side race condition. 29.3 removes dead code. 29.4 extracts a shared record-id primitive and structured error code. 29.5 / 29.6 / 29.7 apply the primitive to the three case-creation paths (online UI, offline sync, IJE batch) so all three retry on collision instead of failing.
+>
+> ⚠️ **Story 29.7 is `superseded`** — its implementation strategy (route batch writes through `SaveCaseAsync`) caused an authorization regression: `SaveCaseAsync` runs the user-request authorization check against a synthetic `vital-import` `ClaimsPrincipal` that has no role/jurisdiction entries, so every batch save fails with `unauthorized PUT`. Story 29.8 fixes this by introducing a dedicated `VitalImportCaseWriter` that preserves the Story 29.1 guards and Story 29.4 retry loop via a shared private helper on `CaseManager`, without invoking the authorization check. See FR-2.8 and the `2026-08-20 — FR-2.8 and FR-2.9 added` entry in [.decision-log.md](../planning-artifacts/prds/prd-mmria-2026-08-06/.decision-log.md) for the design options considered.
+>
+> ⚠️ **Story 29.9** hardens a separate defect discovered during the 29.7 regression investigation: `BatchItemProcessor.ReceiveAsync` silently swallows exceptions from `Process_Message` without notifying the parent `BatchProcessor`, leaving affected items stranded under "In Process" indefinitely. Independent of 29.8.
+
+**Story 29.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/29-1-server-side-format-validation-and-uniqueness-guard.md
+```
+
+**Story 29.2 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/29-2-client-side-per-candidate-api-check.md
+```
+
+**Story 29.3 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/29-3-add-record-id-list-view-remove-broken-bulk-list-call.md
+```
+
+**Story 29.4 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/29-4-generate-unique-record-id-manager-method.md
+```
+
+**Story 29.5 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/29-5-online-save-then-retry-on-collision.md
+```
+
+**Story 29.6 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/29-6-offline-placeholder-record-id.md
+```
+
+**Story 29.7 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/29-7-ije-batch-collision-retry.md
+```
+
+**Story 29.8 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/29-8-vital-import-dedicated-case-writer.md
+```
+
+**Story 29.9 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/29-9-batchitemprocessor-exception-hardening.md
+```
+
+---
+
+## Epic 30: Unified Server-Side Geocoding — TAMU Refactor _(v4.2)_
+
+| Story | File | Status |
+|---|---|---|
+| 30.1 — Create `GeocodingManager` in SharedLibraries | `30-1-create-geocoding-manager.md` | done |
+| 30.2 — Create `CaseGeocodingManager` with Per-Location Apply Methods | `30-2-create-case-geocoding-manager-apply-methods.md` | done |
+| 30.3 — New API Endpoint: `POST /api/case-geocode/{caseId}/{locationKey}` | `30-3-new-api-endpoint-case-geocode.md` | done |
+| 30.4 — Refactor `MMRIA_calculations.js` Geocode Button Handlers | `30-4-refactor-mmria-calculations-geocode-functions.md` | review |
+| 30.5 — Refactor `BatchItemProcessingService` to Use Shared `GeocodingManager` | `30-5-refactor-batch-item-processing-service.md` | done |
+| 30.6 — Fix Legacy Geocode Calls in `mmria-check-code.js` and `validator.js` | `30-6-fix-legacy-geocode-calls-check-code-validator.md` | review |
+| 30.7 — Remove Dead TAMU Code from `mmria.committee_member.js` | `30-7-remove-dead-tamu-code-committee-member.md` | review |
+
+**Sequencing:** 30.1 → 30.2 → 30.3 is the critical path. 30.5 can run in parallel with 30.3 once 30.1 and 30.2 are done. 30.4 and 30.6 follow 30.3 and can run in parallel. 30.7 is fully independent — can be done at any time.
+
+> ⚠️ **v4.2 amendments** applied in these story files (differ from the original Epic 30 design in `epics.md`):
+> - **30.3**: Endpoint returns `{ ok: true }` — client reloads the case rather than applying fields from the response. CVS lookup runs server-side inside the endpoint (dc_place_of_last_residence only).
+> - **30.4**: Client shows busy modal, POSTs to endpoint, then reloads in edit mode. CVS call removed from client.
+> - **30.7**: Dead code removal only — committee member view is read-only, button always disabled.
+
+**Story 30.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/30-1-create-geocoding-manager.md
+```
+
+**Story 30.2 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/30-2-create-case-geocoding-manager-apply-methods.md
+```
+
+**Story 30.3 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/30-3-new-api-endpoint-case-geocode.md
+```
+
+**Story 30.4 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/30-4-refactor-mmria-calculations-geocode-functions.md
+```
+
+**Story 30.5 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/30-5-refactor-batch-item-processing-service.md
+```
+
+**Story 30.6 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/30-6-fix-legacy-geocode-calls-check-code-validator.md
+```
+
+**Story 30.7 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/30-7-remove-dead-tamu-code-committee-member.md
+```
+
+---
+
+## Epic 35: Offline Exit/Go Online UX Cleanup _(v4.1 P-Immediate)_
+
+| Story | File | Status |
+|---|---|---|
+| 35.1 — Hide Exit Offline Mode Widget | `35-1-hide-exit-offline-mode-widget.md` | done |
+| 35.2 — Rename "Go Online" to "Go Online & Sync Changes" | `35-2-rename-go-online-to-go-online-and-sync-changes.md` | done |
+| 35.3 — Align Go Online Confirmation Behavior | `35-3-align-go-online-confirmation-behavior.md` | done |
+
+**Story 35.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/35-1-hide-exit-offline-mode-widget.md
+```
+
+**Story 35.2 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/35-2-rename-go-online-to-go-online-and-sync-changes.md
+```
+
+**Story 35.3 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/35-3-align-go-online-confirmation-behavior.md
+```
+
+---
+
+## Epic 38: IJE Upload Duplicate Prevention and Logging _(v4.2)_
+
+| Story | File | Status |
+|---|---|---|
+| 38.1 — IJE Upload Duplicate Prevention and Logging | `38-1-ije-upload-duplicate-prevention-and-logging.md` | ready-for-dev |
+
+**Sequencing:** Single story. Independent.
+
+> ⚠️ **OI-3 must be resolved before starting:** Confirm with Nick whether partial-batch uploads (some new, some duplicate cases) should (a) process new cases and skip duplicates, or (b) reject the entire batch. Story 38.1 implements option (b) as the conservative default — update if option (a) is chosen.
+
+**Story 38.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/38-1-ije-upload-duplicate-prevention-and-logging.md
+```
+
+---
+
+## Epic 39: Update Year of Death — Record ID Regression Fix _(v4.2)_
+
+| Story | File | Status |
+|---|---|---|
+| 39.1 — Year of Death Record ID Regression Fix | `39-1-year-of-death-record-id-regression-fix.md` | ready-for-dev |
+
+**Sequencing:** Single story. Independent.
+
+> ℹ️ Fixes two bugs introduced by v4.1 refactoring of `GetRecordIdReplacementForYearOfDeathAsync` in `CaseManager.cs`. Applies to both `cdc_admin` and `jurisdiction_admin` role variants.
+
+**Story 39.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/39-1-year-of-death-record-id-regression-fix.md
+```
+
+---
+
+## Epic 40: Session Expiry Automatic Logout Redirect on 401 _(v4.2)_
+
+| Story | File | Status |
+|---|---|---|
+| 40.1 — Session Expiry 401 Redirect | `40-1-session-expiry-401-redirect.md` | ready-for-dev |
+
+**Sequencing:** Single story. Independent.
+
+> ℹ️ Client-side only. Adds a `window.fetch` interceptor and `$(document).ajaxError()` handler to `_LayoutBase.cshtml` — covers all ~85 fetch and ~149 jQuery AJAX call sites on every page. Redirects to `/Account/Logout` (not login) to ensure the expired CouchDB session is cleaned up.
+
+**Story 40.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/40-1-session-expiry-401-redirect.md
+```
+
+---
+
+## Epic 41: Per-Tenant Authentication Mode — SAMS + Password Co-existence _(v4.2)_
+
+| Story | File | Status |
+|---|---|---|
+| 41.1 — Per-Tenant Auth Investigation | `41-1-per-tenant-auth-investigation.md` | ready-for-dev |
+| 41.2 — Per-Tenant Auth Implementation | `41-2-per-tenant-auth-implementation.md` | backlog |
+
+**Sequencing:** 41.1 must complete first. 41.2 cannot begin until `docs/ai/per-tenant-auth-findings.md` is written.
+
+> ℹ️ `use_sams` in `AccountController` is already resolved per-tenant via `OverridableConfiguration.GetBoolean("sams:is_enabled", host_prefix)`. Story 41.1 confirms whether setting this key in the per-tenant CouchDB config doc is sufficient, or whether additional code changes are needed. Story 41.2 scope is defined by the findings.
+
+**Story 41.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/41-1-per-tenant-auth-investigation.md
+```
+
+**Story 41.2 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/41-2-per-tenant-auth-implementation.md
+```
+
+---
+
+## Epic 42: Geocoding Location Registry — Declarative Refactor _(v4.2, follow-up to Epic 30)_
+
+| Story | File | Status |
+|---|---|---|
+| 42.1 — Convert `CaseGeocodingManager` to Declarative `LocationRegistry` | [42-1-geocoding-location-registry-refactor.md](42-1-geocoding-location-registry-refactor.md) | review |
+| 42.2 — Restore Census Tract Certainty Code ≠ 1 Warning Modal _(regression fix)_ | [42-2-restore-certainty-code-modal.md](42-2-restore-certainty-code-modal.md) | review |
+
+**Sequencing:** 42.1 depends on Epic 30 being fully committed (all Epic 30 stories in `review` or `done`, all files in `git log`). 42.2 depends on 42.1 being in `review` or `done` — not strictly required (the controller is edited either way), but running after 42.1 avoids a rebase against the registry refactor's controller changes.
+
+> ℹ️ **42.1** delivers the declarative location→field mapping intent that was discussed during Epic 30 planning but not captured in the Epic 30 story specs. Epic 30 shipped end-to-end unification of the geocode/apply/save path across the browser and vital-import batch — both callers hit the same `GeocodingManager` and `CaseGeocodingManager`. However, `CaseGeocodingManager` shipped as 10 hand-written `Apply_*_Geocode` methods with target paths hard-coded as string literals in method bodies, and `CaseGeocodeController` maintains a separate hand-maintained `_validKeys` HashSet + switch/if-chain. This epic converts that to a single `LocationRegistry` (`IReadOnlyDictionary<string, GeocodeTarget>`) and one `Apply(caseDoc, locationKey, result, listIndex?)` method. After it lands, adding a new geocode-enabled location is a single-entry addition to the registry — no controller switch update, no new manager method, no separate valid-key list.
+>
+> ℹ️ **42.2** restores the "Address Geocode / Validation: Census Tract Certainty Code is Not 1 ..." info dialog that was silently dropped by Story 30.4. Story 30.4 removed the 10 in-line client checks on the assumption that Story 30.3's server would surface the warning, but the shipped `CaseGeocodeController.Post(...)` only returns `{ ok: true }` on success — the modal never fires at any of the 10 "Validate Address and Get Geography Context" buttons. Server extends the success response with a `warning` field; the 4-copy `$case_geocode_dispatch` helper (in `MMRIA_calculations.js`, `mmria-check-code.js`, `database-scripts/validator.js`, `wwwroot/scripts/validator.js`) surfaces it via `$mmria.info_dialog_show` after the case reload.
+>
+> ℹ️ **Covers PRD requirements:** FR-1.10 (42.1), FR-1.11 (42.2).
+
+**Story 42.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/42-1-geocoding-location-registry-refactor.md
+```
+
+**Story 42.2 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/42-2-restore-certainty-code-modal.md
+```
+
+---
+
+## Epic 43: Vitals Import Father's Race Principal Tribe Fix _(v4.2, BUG 119513)_
+
+| Story | File | Status |
+|---|---|---|
+| 43.1 — Fix Father's Race `principle_tribe` Mapping (FRACE16 + FRACE17) | [43-1-ije-import-father-race-principal-tribe-mapping-fix.md](43-1-ije-import-father-race-principal-tribe-mapping-fix.md) | ready-for-dev |
+
+> ℹ️ **Source:** BUG 119513 — Rel 4.2, P-High, reported by Susana (MMRIA\ITDM 25-26 - Option Yr 4). Covers PRD requirements FR-13.1 – FR-13.5.
+>
+> ℹ️ **Root cause:** Copy/paste defect at two call sites in `BatchItemProcessingService.cs` (NAT ~1682, FET ~2024) where `field_set["FRACE16"]` is passed twice to the pipe-join helper instead of passing `field_set["FRACE17"]` as the second argument. The `FRACE16_17_NAT_Rule` / `FRACE16_17_FET_Rule` helpers in `MMRIAServicesHelper.cs` are correct and require no change. Adjacent `FRACE18_19` / `FRACE20_21` / `FRACE22_23` calls already use the correct pattern.
+>
+> ℹ️ **Independent** of all other v4.2 epics. Can be worked immediately.
+>
+> ⚠️ **Retrospective data correction is out of scope for 43.1.** Cases previously imported with the wrong mapping remain wrong until a separate remediation story is authorized. Tracked as OI-v42-4 in the PRD; potential Story 43.2 if approved.
+
+**Story 43.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/43-1-ije-import-father-race-principal-tribe-mapping-fix.md
+```
+
+---
+
+## Epic 44: Case Narrative PDF Render Resilience _(v4.2, BUG 118794)_
+
+| Story | File | Status |
+|---|---|---|
+| 44.1 — Section-Scoped Fallback for Case Narrative PDF Rendering | [44-1-case-narrative-pdf-render-resilience.md](44-1-case-narrative-pdf-render-resilience.md) | ready-for-dev |
+
+> ℹ️ **Source:** BUG 118794 — Rel 4.1, P-Low, TA: "Unable to create PDF on Case Narrative Case: NJ-2024-7102", reported by NJ (MMRIA\ITDM 25-26 - Option Yr 4). Reproduced against tenant1 record `TENENAT1-2010-7462`. Covers PRD requirements FR-14.1 – FR-14.6.
+>
+> ℹ️ **Root cause:** The client-side PDF pipeline in [source-code/mmria/mmria-server/wwwroot/scripts/pdf-version/index.js](../../source-code/mmria/mmria-server/wwwroot/scripts/pdf-version/index.js#L1379-L1478) converts the narrative HTML (`case_opening_overview`) into a pdfmake doc-def. In the `TABLE` branch of `ConvertHTMLDOMWalker`, `body.widths` is derived from the first body row only — no per-row shape check. When the narrative contains a `<table>` whose final `<tr>` has fewer `<td>`s than the header (observed defect), the doc-def contains an undefined cell, and pdfmake throws `"Malformed table row, a cell is undefined"` at layout time inside `createPdf(doc)`. The entire case PDF fails to render — the user sees the "Please wait" spinner indefinitely.
+>
+> ℹ️ **Design (per Nick, 2026-08-20):** Section-scoped fallback — wrap the narrative content build (and add a pre-flight shape validator on any narrative-derived pdfmake tables) with a try-and-fallback path. On any failure, drop the narrative content from the doc-def and substitute a single neutral placeholder line. All other case sections render normally. The placeholder must not describe the underlying cause. Stored narrative HTML is not modified (project-context §2.4).
+>
+> ℹ️ **Independent** of all other v4.2 epics. Can be worked immediately.
+>
+> ⚠️ **Constraint:** pdfmake's malformed-table exception fires during `pdfMake.createPdf(doc)` (async, window-based) — a try/catch around the narrative content-build call alone does not catch it. The pre-flight shape validator on narrative-derived `{table}` items is the primary guard; the try/catch around the content-build is the belt-and-suspenders secondary guard.
+
+**Story 44.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/44-1-case-narrative-pdf-render-resilience.md
+```
+
+---
+
 
 | OI       | Affects               | What to resolve                                                                                                                                                                                                                                                                                                                                                                                        |
 | -------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -1221,3 +1543,6 @@ dev this story _bmad-output/implementation-artifacts/36-4-change-stack-snapshot-
 | OI-dev-B | Story 2.5             | **Resolved** — Edit-mode hook confirmed during Story 2.5 implementation.                                                                                                                                                                                                                                                                                                                               |
 | OI-dev-C | Story 2.5             | **Resolved** — Chart.js DOM target confirmed during Story 2.5 implementation.                                                                                                                                                                                                                                                                                                                          |
 | OI-PRD-4 | Stories 4.0, 4.1, 5.1 | **Resolved** — Dedicated version-scoped `case-validation-rules` CouchDB document; `severity: hard` for active-input blur; `severity: warning` for historical load-time scan; soft-acknowledgment print gate (UI-only, no persist); POC `CaseValidationManager` field_rules path ported in Story 4.0 (vitals-scoped). FR-2.1, FR-2.3, FR-2.6, FR-6 updated in PRD. Stories 4.0, 4.1, and 5.1 unblocked. |
+| OI-v42-3 | Story 38.1 | **Open** — Confirm partial-batch behavior for IJE re-uploads: (a) skip duplicate cases and process new ones, or (b) reject the entire batch. Story 38.1 implements option (b) as the conservative default. Confirm with Nick before starting. |
+| OI-v42-4 | Story 43.1 (potential Story 43.2) | **Open** — Determine whether to author a retrospective data-correction migration for cases previously imported with the wrong `principle_tribe` mapping (BUG 119513). Depends on whether original IJE files are still available and on impact assessment. Follows the Epic 12 Story 12.2 pattern if approved. |
+| OI-v42-5 | Story 44.1 | **Open** — Confirm final placeholder wording for the Case Narrative PDF fallback with Vilma. Draft candidate: _"Case Narrative could not be included in this report. Please review the Case Narrative in the case and try again."_ Per Nick's direction (2026-08-20) the wording must be brief and must not describe the underlying cause (no mention of tables / HTML / parse errors). Confirm at story kickoff. |

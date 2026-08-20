@@ -374,6 +374,7 @@ public sealed class MMRIAServicesManager
         return null;
     }
 
+    [Obsolete("Retired for cross-writer uniqueness by Story 29.7; SaveCaseAsync now enforces record_id uniqueness at write time. Delete after any utility callers migrate.")]
     public async Task<HashSet<string>> GetExistingRecordIds(mmria.common.couchdb.DBConfigurationDetail item_db_info)
     {
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -391,7 +392,7 @@ public sealed class MMRIAServicesManager
         return result;
     }
 
-    public async Task<(bool duplicate_is_found, Dictionary<string, int> duplicate_count)> CheckForVitalImportBatchDuplicates(
+    public Task<(bool duplicate_is_found, Dictionary<string, int> duplicate_count)> CheckForVitalImportBatchDuplicates(
         string[] mor_set,
         int mor_max_length,
         DateTime ImportDate,
@@ -404,20 +405,19 @@ public sealed class MMRIAServicesManager
         var duplicate_count = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var duplicate_is_found = false;
 
-        HashSet<string> ExistingRecordIds = null;
-        if (ExistingRecordIds == null)
-        {
-            Console.WriteLine("Getting existing record IDs");
-            ExistingRecordIds = await GetExistingRecordIds(item_db_info);
-            Console.WriteLine($"Found {ExistingRecordIds?.Count ?? 0} existing records");
-        }
+        // Story 29.7: a fresh, empty, per-batch HashSet is used only for intra-file dedup
+        // (prevents two rows in the same MOR from generating the same 4-digit random suffix).
+        // Cross-writer / cross-DB uniqueness is enforced at write time by
+        // CaseManager.SaveCaseAsync (Story 29.1 guard) and the Story 29.7 collision-retry
+        // loop in BatchItemProcessingService.
+        var batch_local_record_ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         Console.WriteLine("Processing MOR records");
         foreach (var row in mor_set)
         {
             if (row.Length == mor_max_length)
             {
-                var batch_item = Helper.MMRIAServicesHelper.ConvertLineToBatchItem(row, ImportDate, mor_file_name, ReportingState, ExistingRecordIds);
+                var batch_item = Helper.MMRIAServicesHelper.ConvertLineToBatchItem(row, ImportDate, mor_file_name, ReportingState, batch_local_record_ids);
 
                 if (batch_item_set.ContainsKey(batch_item.CDCUniqueID))
                 {
@@ -433,7 +433,7 @@ public sealed class MMRIAServicesManager
             }
         }
 
-        return (duplicate_is_found, duplicate_count);
+        return Task.FromResult((duplicate_is_found, duplicate_count));
     }
 
     public async Task<(bool is_case_already_present, string mmria_id, string record_id)> IsCaseAlreadyPresent(

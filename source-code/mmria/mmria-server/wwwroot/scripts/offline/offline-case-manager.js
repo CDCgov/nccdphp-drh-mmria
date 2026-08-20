@@ -1327,19 +1327,6 @@ async function process_offline_save(p_data, save_case_request, p_note, p_call_ba
 }
 
 /**
- * Generate offline record ID by appending "-offline" suffix if in offline mode
- * @param {string} baseRecordId - The base record ID
- * @returns {string} Record ID with "-offline" suffix if in offline mode
- */
-function generateOfflineRecordId(baseRecordId) {
-    const isOffline = window.OfflineStatus.isOffline();
-    if (isOffline) {
-        return baseRecordId + '-offline';
-    }
-    return baseRecordId;
-}
-
-/**
  * Handle offline setup for newly created case
  * @param {Object} result - The newly created case data
  * @param {Object} g_ui - Global UI object
@@ -1428,7 +1415,6 @@ window.OfflineCaseManager = {
     ensureOfflineInitialization: ensure_offline_initialization,
     getOfflineCase: get_offline_case,
     processOfflineSave: process_offline_save,
-    generateOfflineRecordId: generateOfflineRecordId,
     handleNewCaseOfflineSetup: handleNewCaseOfflineSetup,
     get_case_for_processing: get_case_for_processing
 };

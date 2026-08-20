@@ -40,6 +40,9 @@ public sealed class record_idController: ControllerBase
     }
 
     [HttpGet]
+    // Story 29.5: no shipped callers after the online save-then-retry-on-collision
+    // refactor. Retain for the Story 29.3 cleanup pass, then remove.
+    [Obsolete("no shipped callers after Story 29.5; retain for Story 29.3 cleanup pass")]
     public async Task<Record_Id_Response> Get(string record_id)
     {
         var result = new Record_Id_Response(){ ok = true, is_unique = false };

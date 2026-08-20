@@ -421,13 +421,12 @@ async function add_new_case_button_click(p_input)
             state.value = "init";
             new_validation_message_area.innerHTML = "generate confirmed";
 
-            await Get_Record_Id_List(
-
-            function () {
-                g_ui.add_new_case(
+            // Story 29.2: Get_Record_Id_List no longer needed on the confirm path.
+            // PMSS uses the server-authoritative /api/case_view/next-pmss-number endpoint
+            // to obtain a unique number directly inside add_new_case().
+            g_ui.add_new_case(
                 new_year_of_death.value,
                 new_state_of_death.value);
-            });
 
         }
         else

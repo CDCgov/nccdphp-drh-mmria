@@ -14,7 +14,29 @@
     "dotnet.defaultSolution": "disable",
     "dotnet-test-explorer.testProjectPath": "../nccdphp-drh-mmria-utilities/mmria-server.tests",
     "chat.tools.terminal.autoApprove": {
-        "dotnet build": true
+        "dotnet build": true,
+        "/^git -C c:\\\\repos\\\\nccdphp-drh-mmria rev-parse HEAD$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^Get-Process -Name mmria-server -ErrorAction SilentlyContinue \\| Select-Object Id, ProcessName$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^Get-Process \\| Where-Object \\{ \\$_\\.ProcessName -match 'mmria\\|dotnet' \\} \\| Select-Object Id, ProcessName, MainWindowTitle$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "Get-CimInstance": true,
+        "/^node --check source-code/mmria/mmria-server/wwwroot/scripts/case/index\\.js 2>&1; if \\(\\$LASTEXITCODE -eq 0\\) \\{ \"JS OK\" \\}$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "Add-Content": true,
+        "/^python _bmad/scripts/resolve_customization\\.py --skill _bmad/bmm/agents/bmad-agent-architect --key agent 2>&1 \\| Select-Object -First 100$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
     }
   }
 }

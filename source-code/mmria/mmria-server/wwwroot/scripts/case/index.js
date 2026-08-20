@@ -72,6 +72,7 @@ var g_is_confirm_for_case_lock = false;
 var g_target_case_status = null;
 var g_previous_case_status = null;
 var g_other_specify_lookup = {};
+// Used in offline mode only — online mode uses per-candidate /api/record_id checks (Story 29.2)
 var g_record_id_list = new Set();
 var g_form_access_list = new Map();
 var role_set = new Set();
@@ -2421,62 +2422,6 @@ $(function ()
 });
 
 
-async function Get_Record_Id_List(p_call_back) 
-{
-    // Check if we're in offline mode
-    const isOfflineMode = window.OfflineStatus.isOffline();
-    
-    if (isOfflineMode) {
-        // In offline mode, use cached offline case data
-        try {
-            const recordIdSet = window.OfflineSessionManager.loadOfflineRecordIds(g_ui);
-            recordIdSet.forEach(id => g_record_id_list.add(id));
-            
-            if (p_call_back != null) {
-                p_call_back();
-            }
-        } catch (error) {
-            offlineLog.error('CaseIndex', 'Error loading offline record IDs:', error);
-            // Still call callback even if there's an error
-            if (p_call_back != null) {
-                p_call_back();
-            }
-        }
-        return;
-    }
-    
-    // Online mode - make API call as usual
-    try {
-        const url = `${location.protocol}//${location.host}/api/case_view/record-id-list`;
-
-        const response = await $.ajax
-        ({
-            url: url,
-        });
-
-        if(response!= null)
-        {
-            for(var i = 0; i < response.length; i++)
-            {
-                let item = response[i];
-                g_record_id_list.add(item.toUpperCase());
-            }
-
-            if(p_call_back!= null)
-            {
-                p_call_back();
-            }
-        }
-    } catch (error) {
-        console.error('Error fetching record ID list:', error);
-        // Still call callback even if API call fails
-        if (p_call_back != null) {
-            p_call_back();
-        }
-    }
-
-}
-
 async function load_and_set_data() 
 {
     if (
@@ -3883,7 +3828,14 @@ async function process_save_case()
     {
       if(case_response != null && case_response.error_description != null)
       {
-        const err_object = { status: 500, responseText: case_response.error_description };
+        // Story 29.5: surface the server's structured error_code on the rejection
+        // object so callers (add_new_case) can distinguish record_id_conflict from
+        // generic save failures without parsing the English error_description.
+        const err_object = {
+          status: 500,
+          responseText: case_response.error_description,
+          error_code: case_response.error_code
+        };
 
         if
         (
@@ -3948,6 +3900,14 @@ async function process_save_case()
           return;
         }
 
+        // Story 29.5: record_id_conflict is expected during add_new_case retries.
+        // Skip the generic 500 dialog and let the caller handle the collision.
+        if (err_object.error_code === "record_id_conflict")
+        {
+          fail_item(err_object);
+          return;
+        }
+
         $mmria.save_error_500_dialog_show(err_object, item.note);
         fail_item(err_object);
         return;
@@ -3955,7 +3915,8 @@ async function process_save_case()
 
       fail_item({
         status: 500,
-        responseText: case_response != null ? case_response.error_description : 'Unknown save failure'
+        responseText: case_response != null ? case_response.error_description : 'Unknown save failure',
+        error_code: case_response != null ? case_response.error_code : undefined
       });
       return;
     }

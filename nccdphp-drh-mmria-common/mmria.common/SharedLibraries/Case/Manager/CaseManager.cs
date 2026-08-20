@@ -684,20 +684,48 @@ public class CaseManager
 
         string new_record_id = $"{array[0]}-{yearOfDeathReplacement}-{array[2]}";
 
-        // Per-candidate existence check rather than loading every record_id in the
-        // database into a HashSet. The original implementation fetched up to 25,000
-        // rows on every call; this loop now does one tiny Mango query per candidate.
-        int my_count = -1;
-        while (await RecordIdExistsAsync(new_record_id, db_info))
+        // Try the initial year-substituted candidate first (Story 39.1 preservation
+        // path). If it is already taken, fall through to the shared primitive for
+        // random collision-retry so all three creation paths share one loop.
+        if (await RecordIdExistsAsync(new_record_id, db_info))
         {
-            int _min = 1000;
-            int _max = 9999;
-            Random _rdm = new Random(System.DateTime.Now.Millisecond + my_count);
-            my_count++;
-            new_record_id = $"{array[0]}-{yearOfDeathReplacement}-{_rdm.Next(_min, _max)}";
+            new_record_id = await GenerateUniqueRecordIdAsync(
+                array[0],
+                yearOfDeathReplacement?.ToString() ?? string.Empty,
+                db_info);
         }
 
         return new_record_id;
+    }
+
+    /// <summary>
+    /// Generates a jurisdiction-scoped MMRIA record ID in the form
+    /// <c>{statePrefix}-{year}-{NNNN}</c> whose 4-digit suffix is not currently in
+    /// use in the database identified by <paramref name="dbInfo"/>. The suffix is a
+    /// uniform random integer in [1000, 9999]. On collision the suffix is regenerated
+    /// and re-checked up to <paramref name="maxAttempts"/> times.
+    /// </summary>
+    /// <exception cref="RecordIdGenerationExhaustedException">
+    /// Thrown when <paramref name="maxAttempts"/> random suffixes all collide.
+    /// </exception>
+    public async Task<string> GenerateUniqueRecordIdAsync(
+        string statePrefix,
+        string year,
+        DBConfigurationDetail dbInfo,
+        int maxAttempts = 20)
+    {
+        for (int attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            var suffix = Random.Shared.Next(1000, 10000);
+            var candidate = $"{statePrefix}-{year}-{suffix}";
+
+            if (!await RecordIdExistsAsync(candidate, dbInfo))
+            {
+                return candidate;
+            }
+        }
+
+        throw new RecordIdGenerationExhaustedException(statePrefix, year, maxAttempts);
     }
 
     private static int GetCaseLockMinutes(OverridableConfiguration configuration, string hostPrefix)
@@ -932,6 +960,7 @@ public class CaseManager
             bool existing_is_offline = false;
             string existing_offline_by = null;
             string existing_offline_by_tab_id = null;
+            bool is_new_case = false;
             try
             {
                 var (checkStatusCode, check_document_json) = await _caseRepository.GetCaseDocumentWithStatusAsync(id_val, dbConfig);
@@ -939,6 +968,10 @@ public class CaseManager
                 if (checkStatusCode == 404)
                 {
                     // New case: CouchDB returns not_found for the existence probe.
+                    // Story 29.8: record_id format/uniqueness guards moved into
+                    // ValidateRecordIdAndPersistAsync so VitalImportCaseWriter can
+                    // share them without going through this authorization path.
+                    is_new_case = true;
                 }
                 else if (checkStatusCode == 200)
                 {
@@ -1106,11 +1139,12 @@ public class CaseManager
             var object_string = CaseJsonSerialization.SerializeMmriaCase(caseData);
             var casePayloadContainsRevision = object_string.Contains("\"_rev\"", StringComparison.Ordinal);
 
-                string save_response_from_server = null;
                 try
                 {
-                    save_response_from_server = await _caseRepository.PutCaseDocumentJsonAsync(id_val, object_string, dbConfig);
-                    response = JsonConvert.DeserializeObject<document_put_response>(save_response_from_server);
+                    // Story 29.8: shared helper enforces Story 29.1 record_id format/uniqueness
+                    // guards for new cases and performs the PUT for both new and existing cases.
+                    response = await ValidateRecordIdAndPersistAsync(
+                        id_val, object_string, mmria_record_id, is_new_case, dbConfig);
                     result.Response = response;
                 }
                 catch (Exception ex)
@@ -1124,14 +1158,6 @@ public class CaseManager
                 if (!response.ok)
                 {
                     Console.Write($"save failed for: {id_val}");
-                    if (string.IsNullOrWhiteSpace(response.error_description))
-                    {
-                        response.error_description = save_response_from_server;
-                    }
-                    else
-                    {
-                        response.error_description = response.error_description;
-                    }
 
                     Console.WriteLine(
                         $"Case save failed for {id_val}: rev={caseRevisionHandling}; contains_rev={casePayloadContainsRevision}; response={response.error_description}");
@@ -1151,6 +1177,92 @@ public class CaseManager
                 result.Response = response;
 
         return result;
+    }
+
+    // Story 29.8: shared helper used by SaveCaseAsync (user-request path) and by
+    // VitalImportCaseWriter (batch-import path). Enforces the Story 29.1 record_id
+    // format and uniqueness guards for new cases, then performs the PUT. The
+    // Story 29.4 collision-retry loop is owned by the caller. Kept internal so
+    // controllers cannot bind to it directly - only assemblies listed under
+    // InternalsVisibleTo (mmria.services, mmria-server.tests) can invoke it.
+    internal async Task<document_put_response> ValidateRecordIdAndPersistAsync(
+        string caseId,
+        string serializedCase,
+        string mmriaRecordId,
+        bool enforceRecordIdGuards,
+        DBConfigurationDetail dbConfig)
+    {
+        if (enforceRecordIdGuards && !string.IsNullOrWhiteSpace(mmriaRecordId))
+        {
+            var formatFailure = ValidateNewCaseRecordIdFormat(mmriaRecordId);
+            if (formatFailure != null)
+            {
+                return formatFailure;
+            }
+
+            if (await RecordIdExistsAsync(mmriaRecordId, dbConfig))
+            {
+                return new document_put_response
+                {
+                    ok = false,
+                    error_code = SaveErrorCodes.RecordIdConflict,
+                    error_description = $"Record ID '{mmriaRecordId}' is already in use. Please generate a new Record ID."
+                };
+            }
+        }
+
+        var raw = await _caseRepository.PutCaseDocumentJsonAsync(caseId, serializedCase, dbConfig);
+        var response = JsonConvert.DeserializeObject<document_put_response>(raw);
+        if (response == null)
+        {
+            return new document_put_response { ok = false, error_description = raw };
+        }
+        if (!response.ok && string.IsNullOrWhiteSpace(response.error_description))
+        {
+            response.error_description = raw;
+        }
+        return response;
+    }
+
+    private static document_put_response ValidateNewCaseRecordIdFormat(string mmriaRecordId)
+    {
+        var recordIdSegments = mmriaRecordId.Split('-');
+
+        if (recordIdSegments.Length < 3 ||
+            !System.Text.RegularExpressions.Regex.IsMatch(recordIdSegments[^1], @"^\d{4}$"))
+        {
+            return new document_put_response
+            {
+                ok = false,
+                error_code = SaveErrorCodes.RecordIdFormat,
+                error_description = $"Record ID '{mmriaRecordId}' does not match the required format (suffix must be exactly 4 digits)."
+            };
+        }
+
+        if (!System.Text.RegularExpressions.Regex.IsMatch(recordIdSegments[^2], @"^\d{4}$") ||
+            !int.TryParse(recordIdSegments[^2], out var yearSegment) ||
+            yearSegment < 1900 || yearSegment > 2100)
+        {
+            return new document_put_response
+            {
+                ok = false,
+                error_code = SaveErrorCodes.RecordIdFormat,
+                error_description = $"Record ID '{mmriaRecordId}' does not match the required format (year segment must be a 4-digit year between 1900 and 2100)."
+            };
+        }
+
+        var jurisdictionPrefix = string.Join('-', recordIdSegments[..^2]);
+        if (string.IsNullOrWhiteSpace(jurisdictionPrefix))
+        {
+            return new document_put_response
+            {
+                ok = false,
+                error_code = SaveErrorCodes.RecordIdFormat,
+                error_description = $"Record ID '{mmriaRecordId}' does not match the required format (jurisdiction prefix is missing)."
+            };
+        }
+
+        return null;
     }
 
     public async Task<ReleaseCaseLockResult> ForceReleaseCaseLockAsync(

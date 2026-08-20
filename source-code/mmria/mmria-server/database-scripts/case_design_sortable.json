@@ -52,6 +52,9 @@
     },
     "conflicts": {
       "map": "function(doc) { \n   if(doc._conflicts) { emit(doc._conflicts, null); } \n }"
+    },
+    "record_id_list": {
+      "map": "function(doc) {\n  if (doc.home_record && doc.home_record.record_id) {\n    emit(doc.home_record.record_id, { record_id: doc.home_record.record_id });\n  }\n}"
     }
   }
 }
