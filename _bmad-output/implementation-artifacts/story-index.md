@@ -40,12 +40,6 @@ dev this story _bmad-output/implementation-artifacts/41-4-account-controller-par
 
 ## Epic 45 — mmria-server.tests Reliability Uplift & Live-DB Retirement
 
-**45.2**
-
-```
-dev this story _bmad-output/implementation-artifacts/45-2-tier-enforcement-categorize-reorganize-quarantine.md
-```
-
 **45.3**
 
 ```

@@ -1,5 +1,5 @@
 # generated: 2026-07-14
-last_updated: 2026-08-21  # 41-2 done (Winston gate, AC #9 deploy-gated); 41-3 & 41-4 backlog
+last_updated: 2026-08-21  # 45-2 review (tier enforcement complete; 130 pass / 0 fail)
 # project: mmria
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@ last_updated: 2026-08-21  # 41-2 done (Winston gate, AC #9 deploy-gated); 41-3 &
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-07-14
-last_updated: 2026-08-21  # 41-2 done (Winston gate, AC #9 deploy-gated); 41-3 & 41-4 backlog
+last_updated: 2026-08-21  # 45-2 review (tier enforcement complete; 130 pass / 0 fail)
 project: mmria
 project_key: NOKEY
 tracking_system: file-system
@@ -382,7 +382,7 @@ development_status:
   # ── Epic 45: mmria-server.tests Reliability Uplift & Live-DB Retirement ───
   epic-45: in-progress
   45-1-test-inventory-classification-catalog: done
-  45-2-tier-enforcement-categorize-reorganize-quarantine: ready-for-dev
+  45-2-tier-enforcement-categorize-reorganize-quarantine: review
   45-3-convert-live-db-tests-to-mocked-wave-1: ready-for-dev
   45-4-retire-live-db-tests-e2e-coverage-plan: ready-for-dev
   45-5-casetests-fixture-shed: ready-for-dev  # optional
