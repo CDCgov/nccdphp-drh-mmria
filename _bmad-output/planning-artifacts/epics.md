@@ -6025,3 +6025,120 @@ Epic 30 (Stories 30.3 + 30.4) moved geocoding server-side. Story 30.4 removed th
 
 Two-story epic. Both are small, in-process changes with no user-facing behavior change beyond restoring FR-1.5 at all 10 buttons.
 
+---
+
+## Epic 46: Case Route Migration — Numeric Index to Case `_id`
+
+**Goal:** Replace the numeric-index first segment of the case-page hash route (`/Case#/0/home_record`) with the CouchDB case `_id` (GUID) so the URL identifies the case as a stable resource. Route shape is preserved verbatim except for that one segment. Legacy numeric URLs and unauthorized/unknown case ids redirect to the case list; no silent index → id translation and no landing page in this epic.
+
+**Requirement covered:** FR-15.1 through FR-15.8.
+
+**Background — the flaw being closed**
+
+The case editor's hash route today treats `path_array[0]` as a **numeric index into `g_ui.case_view_list`**, resolved at hashchange time via `case_view_list[caseIndex].id`. The list mutates constantly — sort order changes, filter changes, offline sync inserts cases, another user adds a case — so the same URL can silently resolve to a different case. Refresh must load the list before it can resolve the URL, which forces `OfflineNavigationManager.getTargetCaseIdForHashChange` and sibling code to reconcile index → id under offline and mid-transition conditions. Bookmarks and share links are effectively unreliable.
+
+Winston's architectural review (2026-08-21) evaluated five alternatives — Option A (id-in-URL, preserve hash shape), Option B (id + position query), Option C (id in sessionStorage), Option D (History API path routing), Option E (in-memory only) — and Nick selected Option A. History API migration is deferred as a separate future epic.
+
+**Identifier choice — CouchDB `_id`, not `record_id`**
+
+Cases are identified by their CouchDB document `_id` (GUID/UUID). The human-readable `STATE-YEAR-NNNN` record id is **not** used because it can be null or malformed on cases mid-creation (see project-context §3.3), while `_id` is always present and immutable. The offline store already keys by `_id`, so no storage schema change is required.
+
+**Scope boundary — case-adjacent only**
+
+*In scope:* `wwwroot/scripts/case/`, `wwwroot/scripts/de-identified/`, `wwwroot/scripts/committee-member/`, case-facing navigation renderers under `wwwroot/scripts/editor/` (`navigation_renderer.js`, `navigation_renderer.abstractor.committee.js`, `navigation_renderer.committee_member.js`, `preview.js`), `wwwroot/scripts/offline/` navigation reconciliation, `wwwroot/scripts/url_monitor.js`, and verification-only sweep of `wwwroot/scripts/print-version/`.
+
+*Out of scope:* aggregate reports, overdose data summary, data dictionary, export-list-manager, admin pages, `editor/page_renderer/app.mmria.js` (metadata form-designer tool, not the case editor), server-side C# `core_element_export`/`exporter` (their `record_index` mentions are data-model column names, not routing), and the offline store's `case_index` localStorage key (a storage-schema constant unrelated to URL positional indexing).
+
+**Non-goal:** Migrating from hash routing (`#/…`) to History API path routing (`/case/{id}/{form}`). That is a separate future epic.
+
+---
+
+### Story 46.1 — Migrate Case Routing from Numeric Index to Case `_id`
+
+**User Story:** As a case abstractor or reviewer, I need the URL for a case page to identify the case by its stable CouchDB `_id` (GUID) instead of its position in the current case list, so that refresh, back/forward navigation, and shared links always resolve to the same case regardless of list mutations.
+
+**Scope:**
+
+- Update `url_monitor.get_url_state` to return a `selected_case_id` field alongside `selected_form_name`. Discriminator: if `path_array[0]` is one of the known form keywords (`summary`, `field_search`, `notifications`, `pinned`, and any others enumerated at implementation time via a full grep of `path_array[0] ==` comparisons), populate `selected_form_name` as today. If `path_array[0]` is purely numeric (`/^\d+$/`), leave both null and set a `legacy_numeric_index` flag. Otherwise treat it as `selected_case_id`. `path_array`, `selected_id`, `selected_child_id` are preserved exactly.
+- Rewrite the two hashchange branches in `case/index.js` (the `isTrusted` branch around line 3060 and the fallback branch around line 3251) to consume `url_state.selected_case_id` directly. Delete the `parseInt(path_array[0]) >= 0` index probes and the `case_view_list[caseIndex].id` lookup. When `url_state.legacy_numeric_index` is set, call a shared redirect helper and return.
+- Update every `window.location.hash = '#/{index}/…'` writer in `case/index.js`, `case/index.mmria.js`, `case/index.pmss.js`, `case/search_view.js`, `de-identified/index.js`, `committee-member/index.js`, and case-facing `editor/` navigation renderers to emit `#/${caseId}/…`. `case/case-validation.js` L1798 already re-emits whatever is at `path_array[0]` and inherits the id automatically after upstream writers are fixed; verify only.
+- Simplify `OfflineNavigationManager.getTargetCaseIdForHashChange` to accept a case id (or null) rather than an index. `g_offline_case_index_map` continues to exist as an offline id-list for UI affordances but is not read to resolve URL → case. `offline-case-storage.js` `case_index` localStorage key is not renamed.
+- Add a shared redirect helper (in or alongside `url_monitor`) that issues `history.replaceState(null, '', '#/summary')` plus a single `console.info` tagged with the redirect reason (`legacy-numeric-url`, `unauthorized-case`, `case-not-found`). At the unauthorized-case call site, leave a `// TODO(46.x): show landing page / modal for unauthorized case access` stub.
+- Verify `print-version/index.js` and `print-version/print_version_renderer.js` have no active index-based URL construction (their `path_array` references are commented out; server-side rendering supplies the case). No code changes expected; if active coupling is found, apply the same treatment.
+
+**Acceptance Criteria:**
+
+**AC-1 — Route shape preserved except for the numeric segment**
+Given a user opens a case in the editor
+When the URL is inspected
+Then it matches `/Case#/{caseId}/{form}/{child}` where `{caseId}` is the CouchDB `_id` GUID; non-case routes (`#/summary`, `#/field_search/…`, `#/notifications`, `#/pinned`) are unchanged.
+
+**AC-2 — Hashchange resolves case by id, not by list position**
+Given the case list is re-sorted or re-filtered after the user opens a case
+When the browser re-navigates via back/forward or the user refreshes
+Then the same case loads regardless of the current list ordering — no `case_view_list[index].id` lookup happens on the URL-resolution path.
+
+**AC-3 — Discriminator is deterministic**
+Given `url_monitor.get_url_state` is called with a URL whose `path_array[0]` is a form keyword
+When the state is inspected
+Then `selected_form_name` is populated and `selected_case_id` is null; given a URL whose `path_array[0]` is a GUID-shaped case id, `selected_case_id` is populated and `selected_form_name` is null; given a URL whose `path_array[0]` is purely numeric, both are null and `legacy_numeric_index` is true.
+
+**AC-4 — Legacy numeric URLs redirect to the case list**
+Given a legacy URL like `/Case#/0/home_record`
+When the page loads
+Then the redirect helper calls `history.replaceState` to `#/summary`, a single `console.info` is logged with `reason: 'legacy-numeric-url'`, no case document is fetched, and the back-stack does not contain the legacy URL.
+
+**AC-5 — Unauthorized / unknown case id redirects to the case list**
+Given the URL carries a case id the current user cannot open (unauthorized, wrong tenant, or not found)
+When the hashchange handler runs
+Then the redirect helper is called with `reason: 'unauthorized-case'` (or `'case-not-found'`), the URL becomes `#/summary` via `history.replaceState`, and a `// TODO(46.x): show landing page / modal for unauthorized case access` comment is present at the redirect call site.
+
+**AC-6 — Offline navigation reconciliation simplified**
+Given the user is in offline mode
+When the hashchange handler runs
+Then `OfflineNavigationManager.getTargetCaseIdForHashChange` receives the case id directly from `url_state.selected_case_id` (not an index) and returns without consulting `g_offline_case_index_map` as a URL-resolution source. `g_offline_case_index_map` and the `case_index` localStorage key are unmodified in shape.
+
+**AC-7 — Next/prev navigation derives position at click time**
+Given a case is open and the UI offers next/prev navigation
+When the button is clicked
+Then the target case id is computed via `case_view_list.findIndex(c => c.id === currentCaseId) ± 1` and emitted as `#/${nextCaseId}/${currentForm}`; list position is not persisted in the URL.
+
+**AC-8 — Case-adjacent scope only; admin/reports untouched**
+Given the full grep list for the in-scope directories is exercised
+When `dotnet build source-code/mmria/mmria-server/mmria-server.csproj` runs
+Then the build succeeds with zero errors and no C# controller, Razor view, or route attribute is modified. `aggregate-report/`, `overdose-data-summary/`, `data-dictionary/`, `export-list-manager/`, and admin pages are byte-unchanged.
+
+**AC-9 — Playwright smoke regression**
+Given the case-editor Playwright smoke suite is updated to expect `_id`-shaped URLs
+When the suite runs
+Then the existing scenarios pass, plus new coverage: open case → refresh → same case loads; sort/filter list → previously-open case's URL still resolves; legacy `#/0/home_record` → lands on `#/summary`; bogus `#/does-not-exist-guid/home_record` → lands on `#/summary`.
+
+**Callers to update — enumeration for the story author:**
+
+- `source-code/mmria/mmria-server/wwwroot/scripts/url_monitor.js` — discriminator, `selected_case_id` field, redirect helper.
+- `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js` — two hashchange branches (L3060, L3251), the writer at L3107 already emits `#/summary` (unchanged); verify each `window.location.hash =` writer.
+- `source-code/mmria/mmria-server/wwwroot/scripts/case/index.mmria.js` — L262 (`'#/' + g_ui.selected_record_index + '/home_record'`).
+- `source-code/mmria/mmria-server/wwwroot/scripts/case/index.pmss.js` — equivalent write site.
+- `source-code/mmria/mmria-server/wwwroot/scripts/case/search_view.js` — L28 (`record_index = path_array[0]`).
+- `source-code/mmria/mmria-server/wwwroot/scripts/case/case-validation.js` — L1798, verify only.
+- `source-code/mmria/mmria-server/wwwroot/scripts/de-identified/index.js` — L124 and its hash writers.
+- `source-code/mmria/mmria-server/wwwroot/scripts/committee-member/index.js` — L71 and navigation renderer.
+- `source-code/mmria/mmria-server/wwwroot/scripts/committee-member/navigation_renderer.js` — L43.
+- `source-code/mmria/mmria-server/wwwroot/scripts/editor/navigation_renderer.js`, `navigation_renderer.abstractor.committee.js`, `navigation_renderer.committee_member.js`, `preview.js` — case-list navigation only, not the metadata form designer.
+- `source-code/mmria/mmria-server/wwwroot/scripts/offline/offline-navigation-manager.js` — `getTargetCaseIdForHashChange` signature.
+- `source-code/mmria/mmria-server/wwwroot/scripts/offline/offline-case-manager.js` — L483, keep id-list, stop using for URL resolution.
+- `source-code/mmria/mmria-server/wwwroot/scripts/offline/offline-modals.js` — L960, same treatment.
+- `source-code/mmria/mmria-server/wwwroot/scripts/print-version/index.js`, `print_version_renderer.js` — verify only, no changes expected.
+
+**Out of scope:** aggregate/overdose reports, data-dictionary, export-list-manager, admin pages, server-side C# `core_element_export`/`exporter` code (their `record_index` mentions are export column names, not routing), the `case_index` localStorage key in `offline-case-storage.js`, and any migration to History API path routing.
+
+---
+
+## Epic 46 — Story Sequencing
+
+| Story | Risk | Dependencies |
+|---|---|---|
+| 46.1 — Migrate case routing from numeric index to case `_id` | Medium | None — self-contained client-side change. Optional but recommended to land after Epic 45's Playwright suite is stable so smoke coverage is trustworthy. |
+
+Single-story epic. The change is concentrated but touches ~10 files; risk is medium because the hashchange handlers coordinate with autosave, offline reconciliation, and next/prev navigation. Playwright smoke coverage on `_id`-shaped URLs is the primary safety net.
+

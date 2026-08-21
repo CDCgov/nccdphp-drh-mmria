@@ -40,20 +40,18 @@ dev this story _bmad-output/implementation-artifacts/41-4-account-controller-par
 
 ## Epic 45 — mmria-server.tests Reliability Uplift & Live-DB Retirement
 
-**45.3**
-
-```
-dev this story _bmad-output/implementation-artifacts/45-3-convert-live-db-tests-to-mocked-wave-1.md
-```
-
-**45.4**
-
-```
-dev this story _bmad-output/implementation-artifacts/45-4-retire-live-db-tests-e2e-coverage-plan.md
-```
-
 **45.5**
 
 ```
 dev this story _bmad-output/implementation-artifacts/45-5-casetests-fixture-shed.md
+```
+
+---
+
+## Epic 46 — Case Route Migration — Numeric Index to Case `_id`
+
+**46.1**
+
+```
+dev this story _bmad-output/implementation-artifacts/46-1-case-route-index-to-case-id.md
 ```

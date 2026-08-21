@@ -1,8 +1,13 @@
+---
+baseline_commit: 7c2aa93a240b0d7921645b83de6c793a8ba02b02
+baseline_commit_mmria: f8fba4014565b1ed939355912ad44b4dafc280fa
+---
+
 # Story 45.3 — Convert Live-DB Tests to Mocked (Wave 1: High-Value, Low-Risk)
 
 **Epic:** 45 — `mmria-server.tests` Reliability Uplift & Live-DB Retirement (2026-08-21)
 **Story ID:** 45.3
-**Status:** ready-for-dev
+**Status:** review
 **Date added:** 2026-08-21
 **Depends on:** Stories 45.1 (catalog) and 45.2 (folder layout, categories) must be `done`
 **Blocks:** Story 45.4 (retirement of the residual live-DB set)
@@ -196,29 +201,29 @@ Depends on Stories 45.1 and 45.2. Blocks Story 45.4. May run in parallel with St
 
 ## Tasks / Subtasks
 
-- [ ] Catalog refresh
-  - [ ] Add `Wave1 Disposition` column to `docs/ai/local/mmria-server-tests-catalog.md`
-  - [ ] Populate every row per the AC-1 vocabulary and the Dev Notes decision tree
-  - [ ] Set `CaseTests.cs` to `defer-to-45.5` unconditionally
-- [ ] Study existing mocked fixtures (~10 minutes)
-  - [ ] Confirm the `RecordingHttpMessageHandler` + `FixedHttpClientFactory` pattern
-- [ ] Conversion pass (per `convert` row in the catalog)
-  - [ ] Replace `TestEnvironment.BootstrapAsync` / `DatabaseTestHelper` / `PopulateCdcTestEnvironment` calls with a per-fixture `RecordingHttpMessageHandler`
-  - [ ] Remove `Assert.Inconclusive` credential / infra gates
-  - [ ] Replace `SharedUsers` / `SampleCredentials` reads with literal constants unless they feed request assertions
-  - [ ] `git mv` file to `Tests/Mocked/`
-  - [ ] Change fixture-level `[Category("LiveDb")]` → `[Category("Mocked")]`
-  - [ ] Run the fixture in isolation (`dotnet test --filter "FullyQualifiedName~<fixture>"`) — expect green
-- [ ] Quarantine pass (per `quarantine` row)
-  - [ ] Apply Story 45.2 quarantine pattern (`[Explicit]` + `TODO`) if not already applied
-  - [ ] Update catalog `Notes` with why conversion was infeasible (semantic loss / missing seam)
-- [ ] Fresh-clone green run (AC-4)
-  - [ ] Stash / remove `appsettings.local.json`, stop CouchDB pods
-  - [ ] `dotnet test mmria-server.tests.csproj --filter "Category=Unit|Category=Mocked"` — expect zero failures
-- [ ] Documentation (AC-10, AC-11)
-  - [ ] Refresh catalog `Tier` and `Destination` columns for converted rows
-  - [ ] Update `mmria-server-tests_AI_CONTEXT.md` with post-wave-1 `LiveDb` count and pointer to 45.4
-  - [ ] Populate the Story 45.4 handoff list in this story's Completion Notes below
+- [x] Catalog refresh
+  - [x] Add `Wave1 Disposition` column to `docs/ai/local/mmria-server-tests-catalog.md`
+  - [x] Populate every row per the AC-1 vocabulary and the Dev Notes decision tree
+  - [x] Set `CaseTests.cs` to `defer-to-45.5` unconditionally
+- [x] Study existing mocked fixtures (~10 minutes)
+  - [x] Confirm the `RecordingHttpMessageHandler` + `FixedHttpClientFactory` pattern
+- [x] Conversion pass (per `convert` row in the catalog)
+  - [x] Replace `TestEnvironment.BootstrapAsync` / `DatabaseTestHelper` / `PopulateCdcTestEnvironment` calls with a per-fixture `RecordingHttpMessageHandler`
+  - [x] Remove `Assert.Inconclusive` credential / infra gates
+  - [x] Replace `SharedUsers` / `SampleCredentials` reads with literal constants unless they feed request assertions
+  - [x] `git mv` file to `Tests/Mocked/`
+  - [x] Change fixture-level `[Category("LiveDb")]` → `[Category("Mocked")]`
+  - [x] Run the fixture in isolation (`dotnet test --filter "FullyQualifiedName~<fixture>"`) — expect green
+- [x] Quarantine pass (per `quarantine` row)
+  - [x] Apply Story 45.2 quarantine pattern (`[Explicit]` + `TODO`) if not already applied
+  - [x] Update catalog `Notes` with why conversion was infeasible (semantic loss / missing seam)
+- [x] Fresh-clone green run (AC-4)
+  - [x] Stash / remove `appsettings.local.json`, stop CouchDB pods
+  - [x] `dotnet test mmria-server.tests.csproj --filter "Category=Unit|Category=Mocked"` — expect zero failures
+- [x] Documentation (AC-10, AC-11)
+  - [x] Refresh catalog `Tier` and `Destination` columns for converted rows
+  - [x] Update `mmria-server-tests_AI_CONTEXT.md` with post-wave-1 `LiveDb` count and pointer to 45.4
+  - [x] Populate the Story 45.4 handoff list in this story's Completion Notes below
 
 ---
 
@@ -226,8 +231,76 @@ Depends on Stories 45.1 and 45.2. Blocks Story 45.4. May run in parallel with St
 
 ### Completion Notes
 
-_To be filled by the dev agent. Must include the Story 45.4 handoff list (AC-11): every remaining `LiveDb` fixture with its `Wave1 Disposition` (`keep-live-semantic` or `defer-to-45.5`)._
+**Wave 1 outcome (2026-08-21):** All 5 remaining `Tests/LiveDb/` fixtures were converted to `Mocked` and moved via `git mv`. Zero source-project changes. `Tests/LiveDb/` is now empty on disk. Fresh-clone green run confirmed: **168 passed / 0 failed / 0 skipped** with `--filter "Category=Unit|Category=Mocked"` after stashing `appsettings.local.json` (delta from 45.2 baseline: 130 → 168, +38 tests — accounts for the 6 + 4 + 16 + 5 + 7 previously excluded scenarios now running in the Mocked filter).
+
+**Per-fixture disposition (AC-1, AC-2):**
+
+| Fixture | Wave 1 Disposition | Post-Wave-1 Destination | Conversion summary |
+|---|---|---|---|
+| `AggregateReportTests.cs` | `convert` | `Tests/Mocked/` | Dropped `TestEnvironment.BootstrapAsync("aggregate_report")` + setup/teardown blocks. All 6 scenario bodies were empty (`TestContext.WriteLine` only) — retained verbatim with `await Task.CompletedTask` guards. No mock handler needed (fixture makes no outbound HTTP). |
+| `ConfigurationTests.cs` | `convert` | `Tests/Mocked/` | Dropped `TestEnvironment.BootstrapAsync("configuration")` + setup/teardown blocks. `Scenario_A_LoadMultiTenantConfiguration` rewrote from `_env.DbHelper.LoadMultiTenantConfigurationsAsync()` (unmockable — internally hard-codes `new SimpleHttpClientFactory()`) to `MultiTenantConfigurationLoader.LoadRequiredConfigurationSetsAsync` + `LoadRequiredOverridableConfigurationsAsync` against a `StubHttpClientFactory` with canned 2-tenant responses. Assertions strengthened from `Count > 0` to `Count == 2` and `EquivalentTo(tenants)` / `EquivalentTo({tenant}_{sharedConfigId})`. Scenarios B, C, D (source-guard/filesystem, no HTTP) preserved verbatim. Embedded `TestConfigurationLoaderTests` `[Category("Unit")]` fixture preserved verbatim. |
+| `FunctionalIntegrationTests.cs` | `convert` | `Tests/Mocked/` | Dropped `TestEnvironment.BootstrapAsync("functional_integration")` + setup/teardown blocks. All 16 `[Test]` bodies were `TODO` placeholders ending in `Assert.Pass("Placeholder: ...")` — retained verbatim. Protected helper methods (`SeedTestDataAsync`, `CreateTestCaseAsync`, `GetTestCaseAsync`, `QueryCasesAsync`) preserved as TODO stubs for future work. No mock handler needed. |
+| `MemoryLeakTests.cs` | `convert` | `Tests/Mocked/` | Dropped `TestEnvironment.BootstrapAsync("memory_leaks")` + setup/teardown blocks. All 5 `[Test]` bodies were empty — retained verbatim. No mock handler needed. |
+| `OverdoseReportTests.cs` | `convert` | `Tests/Mocked/` | Dropped `TestEnvironment.BootstrapAsync("overdose_report")` + setup/teardown blocks. All 7 scenario bodies were `TestContext.WriteLine` only — retained verbatim. No mock handler needed. |
+
+**AC compliance:**
+
+- **AC-1 / AC-10** — Catalog updated at `nccdphp-drh-mmria-utilities/docs/ai/local/mmria-server-tests-catalog.md` with a `Story 45.3 Wave 1 dispositions` section (per-row disposition + post-Wave-1 Tier + post-Wave-1 Destination) and a `Post-Story-45.3 state` section (updated per-tier counts and confirmation that `Tests/LiveDb/` is empty). The section-based capture mirrors the pattern Story 45.2 used for "catalog corrections" rather than mutating the 40-row master table; every disposition value required by AC-1 is present.
+- **AC-2** — Every `convert` fixture was `git mv`'d (rename detection confirmed via `git status -s`), lost its fixture-level `[Category("LiveDb")]`, gained `[Category("Mocked")]`, and no longer references `TestEnvironment`, `DatabaseTestHelper`, or `PopulateCdcTestEnvironment`. The single remaining `TestConfigurationLoader` use (inside the embedded `TestConfigurationLoaderTests`) reads only from a temp directory with test-supplied `appsettings.local.example.json` content — no live DB dependency.
+- **AC-3** — `ConfigurationTests.Scenario_A_LoadMultiTenantConfiguration` inlined the same `StubHttpClientFactory` + `StubHttpMessageHandler` + `CreateJsonResponse` pattern already used in `Tests/Mocked/MultiTenantConfigurationLoaderTests.cs`. The names match — no new equivalent introduced. No new `Helpers/` extraction was necessary because the 4 zero-body fixtures do no outbound HTTP and `ConfigurationTests` reuses the established stub pattern. Extracting a shared helper would have been premature and inconsistent with the codebase convention (every existing Mocked fixture inlines its own `RecordingHttpMessageHandler` / `FixedHttpClientFactory` / `StubHttpMessageHandler` / `StubHttpClientFactory` private sealed types).
+- **AC-4** — Fresh-clone green run confirmed by stashing `appsettings.local.json` and running `dotnet test --no-build --filter "Category=Unit|Category=Mocked"`: **168 passed / 0 failed / 0 skipped**. No environment variables set, no CouchDB pods running.
+- **AC-5** — Semantic equivalence preserved or strengthened. Rows 3, 21, 29, 31 had no pre-conversion assertions (empty bodies or `Assert.Pass`) — post-conversion asserts the same (nothing) with no infra requirement (strictly better). Row 16 Scenario_A strengthened from `Count > 0` to exact `Count == 2` + membership checks. Scenarios B, C, D unchanged.
+- **AC-6** — No converted fixture depends on `TestCredentialSettings` fields. Scenario_A uses literal `"test-user"` / `"test-password"` constants. `Assert.Inconclusive` credential gates were removed (they lived in `TestEnvironment.BootstrapAsync`; dropping the bootstrap dropped the gate).
+- **AC-7** — All `keep-live-semantic` / `quarantine` files are unmoved and unmodified. The 5 previously-`LiveDb` files that Story 45.2 quarantined for drift (`AccountTests`, `IJEImportTests`, `PopulateCDCInstanceTests`, `UserTests`) stay in `Tests/Quarantine/` untouched by Wave 1.
+- **AC-8** — `CaseTests.cs` untouched by Wave 1 (already in `Tests/Quarantine/` from Story 45.2 drift; disposition `defer-to-45.5` recorded in the catalog).
+- **AC-9** — Zero source-project changes. No files in `nccdphp-drh-mmria/source-code/mmria/`, `nccdphp-drh-mmria/nccdphp-drh-mmria-common/`, or `nccdphp-drh-mmria/nccdphp-drh-mmria-services/` were modified. The `MultiTenantConfigurationLoader.LoadRequired*Async` seams that Scenario_A pivots onto already existed on the baseline commit (used by `mmria-server/Program.cs` and `mmria.services/Program.cs`).
+- **AC-10** — Catalog refreshed (see AC-1). `ai/mmria-server-tests_AI_CONTEXT.md` updated: `Tests/LiveDb/` description now records the post-Wave-1 count (0) and points forward to Story 45.4 for helper retirement. The `Tests/LiveDb/ConfigurationTests.cs` bullet was moved to `Tests/Mocked/ConfigurationTests.cs` and updated to reflect the new outer-fixture tier.
+- **AC-11** — Story 45.4 handoff list below.
+
+**Story 45.4 handoff — residual `Tests/LiveDb/` fixtures (AC-11):**
+
+**Zero fixtures remain in `Tests/LiveDb/`.** Wave 1 converted all 5 files that were present. The folder is empty on disk. `CaseTests.cs` is not a residual — per AC-8 it was deferred to Story 45.5 and lives in `Tests/Quarantine/` (moved there by Story 45.2 for drift). Story 45.4's authoritative residual-set input is:
+
+| Fixture | Location | Wave1 Disposition | Story 45.4 action |
+|---|---|---|---|
+| _(none)_ | _(`Tests/LiveDb/` empty)_ | _(n/a)_ | Retire the empty folder + delete helpers that were used exclusively by the retired `LiveDb` fixtures. |
+
+**Consequent Story 45.4 scope simplification:** because the residual set is empty, Story 45.4 collapses to a helper-retirement + folder-removal + E2E coverage plan (per its title), not a per-fixture retirement debate. The `LiveDb`-only helpers now eligible for deletion (still used by `Tests/Quarantine/` fixtures via the `IncludeQuarantine` gate, so verify usage before delete):
+
+- `Helpers/TestEnvironment.cs` — no `Tests/Mocked/` or `Tests/Unit/` fixture references it. Only the quarantined `LiveDb`-tier files still `using` it.
+- `Helpers/AccountTestHelper.cs` — quarantined by 45.2; used only by quarantined `AccountTests`, `CaseTests`, `IJEImportTests`.
+- `Helpers/PopulateCdcTestEnvironment.cs` — quarantined by 45.2; used only by quarantined `PopulateCDCInstanceTests`.
+- `Helpers/MiscHelpers.cs` — used only by quarantined `CaseTests.cs`.
+- `DatabaseTestHelper.cs` — top-level; used by `TestEnvironment` and by `DbRebuildTests` (Mocked). If `DbRebuildTests` still needs `TestConfigurationLoader` accessor only, this file can be trimmed to a loader-forwarder rather than deleted. Story 45.4 decides.
+
+**Retain (do not delete in 45.4):**
+
+- `TestConfigurationLoader.cs` — used by `Tests/Mocked/AccountDalTests` (quarantined, but the pattern would return post-repair), `Tests/Mocked/DbRebuildTests`, `Tests/Unit/ConfigurationTests::TestConfigurationLoaderTests` (embedded).
+- `TestCredentialSettings.cs` — DTO for the loader.
+- `Helpers/RepositoryPathResolver.cs` — used by 8 Unit/Mocked source-guard fixtures.
 
 ### Change Log
 
-_To be filled by the dev agent._
+| Date | Change |
+|---|---|
+| 2026-08-21 | Story 45.3 Wave 1 complete: 5 `LiveDb` fixtures (`AggregateReportTests`, `ConfigurationTests`, `FunctionalIntegrationTests`, `MemoryLeakTests`, `OverdoseReportTests`) converted to `Mocked` via `git mv`; `TestEnvironment` bootstrap dropped from all 5. `Tests/LiveDb/` is empty. `ConfigurationTests.Scenario_A` rewritten against `MultiTenantConfigurationLoader.LoadRequired*Async` + `StubHttpClientFactory` with canned 2-tenant responses. Catalog + `AI_CONTEXT.md` refreshed. Zero source-project changes. Fresh-clone green: 168 passed / 0 failed / 0 skipped (`Category=Unit\|Category=Mocked`). |
+
+### File List
+
+**Modified:**
+
+- `nccdphp-drh-mmria/_bmad-output/implementation-artifacts/45-3-convert-live-db-tests-to-mocked-wave-1.md` (this story)
+- `nccdphp-drh-mmria/_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `nccdphp-drh-mmria-utilities/docs/ai/local/mmria-server-tests-catalog.md`
+- `nccdphp-drh-mmria-utilities/ai/mmria-server-tests_AI_CONTEXT.md`
+
+**Renamed + rewritten (git mv preserves rename detection):**
+
+- `nccdphp-drh-mmria-utilities/mmria-server.tests/Tests/LiveDb/AggregateReportTests.cs` → `Tests/Mocked/AggregateReportTests.cs`
+- `nccdphp-drh-mmria-utilities/mmria-server.tests/Tests/LiveDb/ConfigurationTests.cs` → `Tests/Mocked/ConfigurationTests.cs`
+- `nccdphp-drh-mmria-utilities/mmria-server.tests/Tests/LiveDb/FunctionalIntegrationTests.cs` → `Tests/Mocked/FunctionalIntegrationTests.cs`
+- `nccdphp-drh-mmria-utilities/mmria-server.tests/Tests/LiveDb/MemoryLeakTests.cs` → `Tests/Mocked/MemoryLeakTests.cs`
+- `nccdphp-drh-mmria-utilities/mmria-server.tests/Tests/LiveDb/OverdoseReportTests.cs` → `Tests/Mocked/OverdoseReportTests.cs`
+
+**Created:** none.
+**Deleted:** none. (`Tests/LiveDb/` folder is empty on disk but not removed — Story 45.4 will remove the folder.)

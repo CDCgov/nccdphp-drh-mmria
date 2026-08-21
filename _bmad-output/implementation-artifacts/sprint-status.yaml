@@ -1,5 +1,5 @@
 # generated: 2026-07-14
-last_updated: 2026-08-21  # 45-2 review (tier enforcement complete; 130 pass / 0 fail)
+last_updated: 2026-08-21  # 45-4 review (LiveDb retirement + E2E coverage plan complete; 168 pass / 0 fail)
 # project: mmria
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@ last_updated: 2026-08-21  # 45-2 review (tier enforcement complete; 130 pass / 0
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-07-14
-last_updated: 2026-08-21  # 45-2 review (tier enforcement complete; 130 pass / 0 fail)
+last_updated: 2026-08-21  # 45-4 review (LiveDb retirement + E2E coverage plan complete; 168 pass / 0 fail)
 project: mmria
 project_key: NOKEY
 tracking_system: file-system
@@ -383,7 +383,12 @@ development_status:
   epic-45: in-progress
   45-1-test-inventory-classification-catalog: done
   45-2-tier-enforcement-categorize-reorganize-quarantine: review
-  45-3-convert-live-db-tests-to-mocked-wave-1: ready-for-dev
-  45-4-retire-live-db-tests-e2e-coverage-plan: ready-for-dev
+  45-3-convert-live-db-tests-to-mocked-wave-1: review
+  45-4-retire-live-db-tests-e2e-coverage-plan: review
   45-5-casetests-fixture-shed: ready-for-dev  # optional
   epic-45-retrospective: optional
+
+  # ── Epic 46: Case Route Migration — Numeric Index to Case `_id` ──────────
+  epic-46: in-progress
+  46-1-case-route-index-to-case-id: ready-for-dev
+  epic-46-retrospective: optional

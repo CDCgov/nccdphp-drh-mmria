@@ -390,6 +390,42 @@ No behavior change is introduced for any section other than `case_opening_overvi
 
 ---
 
+### FR-15 — Case Route Migration — Numeric Index to Case `_id`
+
+_(Source: Architectural review with Winston, 2026-08-21. Scoped to case-adjacent JS entry points only.)_
+
+The case editor and its sibling case-facing views (de-identified, committee-member, editor navigation renderers, offline navigation reconciliation, print-version verification) route by **numeric index into `g_ui.case_view_list`** as the first hash segment (`/Case#/0/home_record`). Because that list mutates — sort/filter changes, offline sync inserting cases, a second user adding a case, add-case UI flows — the *same URL* can silently resolve to a *different case* on refresh or navigation. Refresh must also load the case list before it can resolve the index, forcing extra offline-mode reconciliation code paths.
+
+The fix is a surgical URL-identity swap: replace the numeric segment with the CouchDB case `_id` (GUID) while preserving the rest of the URL shape verbatim. All other route segments (`summary`, `field_search`, `notifications`, form names, selected-child ids) are unchanged. Admin pages, aggregate/overdose reports, data-dictionary, and export-list-manager are explicitly out of scope.
+
+**FR-15.1 — Case identity moves from list position to case `_id` in the URL**
+The first hash segment of a case-page URL identifies the case by CouchDB `_id` (GUID). Route shape is preserved otherwise: `/Case#/{caseId}/{form}/{child}` replaces `/Case#/{numericIndex}/{form}/{child}`. Non-case routes such as `#/summary`, `#/field_search/…`, `#/notifications`, and `#/pinned` are unchanged.
+
+**FR-15.2 — Deterministic case-id vs form-keyword discriminator**
+`url_monitor.get_url_state` returns a `selected_case_id` field when `path_array[0]` is a case id, and `selected_form_name` when it is one of the known form keywords (`summary`, `field_search`, `notifications`, `pinned`, and any others enumerated at implementation time from a full grep of `path_array[0] ==` comparisons). Consumers no longer need to guess the segment's role.
+
+**FR-15.3 — Hashchange resolves case by `_id` directly, not by list position**
+The case-editor hashchange handlers consume `url_state.selected_case_id` directly. `case_view_list[index].id` lookups on the URL-resolution path are removed. Any "next/prev in list" navigation UI derives position at click time via `case_view_list.findIndex(c => c.id === currentCaseId)`; position is never persisted in the URL.
+
+**FR-15.4 — Legacy numeric URLs redirect to the case list**
+When `path_array[0]` is purely numeric (`/^\d+$/`), the hashchange handler issues `history.replaceState` to `#/summary` (no back-stack pollution) and emits a single `console.info` tagged with the redirect reason. No silent index → id translation. Old bookmarks land on the case list and the user re-picks.
+
+**FR-15.5 — Unauthorized or unknown case id redirects to the case list**
+When the URL carries a case id the current user cannot open (unauthorized, not-found, or wrong tenant), the hashchange handler redirects to `#/summary` via `history.replaceState`. A `// TODO(46.x): show landing page / modal for unauthorized case access` stub is left at the redirect site. No landing page or modal is implemented in this FR.
+
+**FR-15.6 — Offline navigation consumes case id directly**
+`OfflineNavigationManager.getTargetCaseIdForHashChange` and sibling offline reconciliation code that previously mapped list index → case id is simplified to accept a case id directly. `g_offline_case_index_map` continues to exist as an offline lookup for id-list UI affordances but is no longer read to resolve URL → case. The `case_index` localStorage key (a storage-schema constant unrelated to URL positional indexing) is not renamed.
+
+**FR-15.7 — Scope boundary preserved**
+This FR touches only case-adjacent JS entry points: `wwwroot/scripts/case/`, `de-identified/`, `committee-member/`, the case-facing navigation renderers under `editor/`, `offline/` navigation reconciliation, `url_monitor.js`, and verification-only sweep of `print-version/`. Admin pages, aggregate/overdose reports, data-dictionary, export-list-manager, and server-side C# export tooling that mentions `record_index` (an unrelated data-model concept) are out of scope. Server-side controllers, routes, and Razor views are unchanged.
+
+**FR-15.8 — Hash-based routing shape is preserved**
+The fragment prefix `#/` is retained. Migration to History API path routing (`/case/{caseId}/{form}`) is explicitly a future epic and not part of FR-15.
+
+> **OI-v42-6 (open, minor):** The story assumes CouchDB `_id` GUIDs (36-char UUIDs) never collide with a form-keyword string. If a future form keyword is ever added that could be mistaken for a GUID prefix, the discriminator becomes ambiguous. Bulletproofing via an explicit prefix (e.g. `#/c/{caseId}/…`) is a small follow-on if the risk ever materializes; deferred as low-probability for now.
+
+---
+
 --- All changes must function correctly in Microsoft Edge and Google Chrome.
 
 NFR-2: The geocoding refactor introduces no new client-side dependencies, no bundler changes, and no metadata schema changes.
@@ -425,4 +461,5 @@ FR-10.1 – FR-10.5: Epic TBD — STEVE Download Structured Logging
 FR-11.1 – FR-11.5: Epic TBD — STEVE PRAMS Download Structured Logging  
 FR-12.1 – FR-12.5: Epic TBD — Case Excel Export Column Width Auto-Fit (ClosedXML)  
 FR-13.1 – FR-13.5: Epic 43 — Vitals Import Father's Race Principal Tribe Mapping Correction (BUG 119513)  
-FR-14.1 – FR-14.6: Epic 44 — Case Narrative PDF Render Resilience (BUG 118794)
+FR-14.1 – FR-14.6: Epic 44 — Case Narrative PDF Render Resilience (BUG 118794)  
+FR-15.1 – FR-15.8: Epic 46 — Case Route Migration — Numeric Index to Case `_id`
