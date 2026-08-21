@@ -77,6 +77,7 @@ public sealed partial class AccountController : Controller
     mmria.common.couchdb.SAMSConfigurationDetail sams_config;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    bool? use_sams = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly mmria.common.SharedLibraries.Account.IUserRepository _userRepository;
     private readonly ISessionRepository _sessionRepository;
@@ -101,13 +102,22 @@ public sealed partial class AccountController : Controller
 
         host_prefix = tenantRuntime.EffectiveHostPrefix;
 
-        sams_config = configuration.GetSAMSConfigurationDetail(host_prefix);
+        // Per-tenant: SAMS credential keys are only populated in a SAMS-enabled tenant's
+        // configuration-master doc. Read the flag here and defer GetSAMSConfigurationDetail
+        // to the actions so a password-only tenant's /Account/SignIn* short-circuits to
+        // /Account/Login instead of throwing KeyNotFoundException in the constructor.
+        use_sams = configuration.GetBoolean("sams:is_enabled", host_prefix);
     }
 
 
     [AllowAnonymous] 
     public async Task<ActionResult> SignIn()
     {
+        if (use_sams != true)
+            return RedirectToAction("Login");
+
+        sams_config = configuration.GetSAMSConfigurationDetail(host_prefix);
+
         // Guard: redirect to app-offline page if the system is currently offline for this tenant.
         // This prevents an unnecessary SAMS round-trip when the app is unavailable.
         try
@@ -162,6 +172,10 @@ public sealed partial class AccountController : Controller
     [AllowAnonymous] 
     public async Task<ActionResult> SignInCallback()
     {
+        if (use_sams != true)
+            return RedirectToAction("Login");
+
+        sams_config = configuration.GetSAMSConfigurationDetail(host_prefix);
 
         string priorUserName = "";
         string priorRole = "";

@@ -1,5 +1,5 @@
 # generated: 2026-07-14
-last_updated: 2026-08-21  # story 38-1 delivered to review
+last_updated: 2026-08-21  # 41-2 done (Winston gate, AC #9 deploy-gated); 41-3 & 41-4 backlog
 # project: mmria
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@ last_updated: 2026-08-21  # story 38-1 delivered to review
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-07-14
-last_updated: 2026-08-21  # epic-45 added
+last_updated: 2026-08-21  # 41-2 done (Winston gate, AC #9 deploy-gated); 41-3 & 41-4 backlog
 project: mmria
 project_key: NOKEY
 tracking_system: file-system
@@ -312,8 +312,8 @@ development_status:
   # ── Epic 34: Case Narrative PDF Spacing Fidelity ──────────────────────────
   epic-34: done
   34-1-normalize-case-narrative-pdf-whitespace-conversion: done
-  34-2-collapse-br-empty-paragraph-separators: done
-  epic-34-retrospective: optional
+  34-2-collapse-br-empty-paragraph-separators: done  34-3-preserve-plain-text-paste-line-structure: done
+  34-4-numbered-paragraph-keyboard-continuation: done  epic-34-retrospective: optional
 
   # ── Epic 35: Offline Exit/Go Online UX Cleanup (Rel 4.1 P-Immediate) ──────
   epic-35: done
@@ -341,8 +341,8 @@ development_status:
   epic-37-retrospective: optional
 
   # ── Epic 38: IJE Batch Re-Upload Rejection & Import Observability ───────────
-  epic-38: in-progress
-  38-1-ije-upload-duplicate-prevention-and-logging: review
+  epic-38: done
+  38-1-ije-upload-duplicate-prevention-and-logging: done
   epic-38-retrospective: optional
 
   # ── Epic 39: Update Year of Death Record ID Regression Fix ────────────────
@@ -351,14 +351,16 @@ development_status:
   epic-39-retrospective: optional
 
   # ── Epic 40: Session Expiry Automatic Logout Redirect on 401 ─────────────
-  epic-40: in-progress
-  40-1-session-expiry-401-redirect: ready-for-dev
+  epic-40: done
+  40-1-session-expiry-401-redirect: done
   epic-40-retrospective: optional
 
   # ── Epic 41: Per-Tenant Authentication Mode (SAMS + Password) ────────────
   epic-41: in-progress
-  41-1-per-tenant-auth-investigation: ready-for-dev
-  41-2-per-tenant-auth-implementation: backlog
+  41-1-per-tenant-auth-investigation: done
+  41-2-per-tenant-auth-implementation: done
+  41-3-tenant-config-hot-reload: backlog
+  41-4-account-controller-partial-cross-reference-comment: backlog
   epic-41-retrospective: optional
 
   # ── Epic 42: Geocoding Location Registry (Declarative Refactor) ──────────
@@ -379,7 +381,7 @@ development_status:
 
   # ── Epic 45: mmria-server.tests Reliability Uplift & Live-DB Retirement ───
   epic-45: in-progress
-  45-1-test-inventory-classification-catalog: ready-for-dev
+  45-1-test-inventory-classification-catalog: done
   45-2-tier-enforcement-categorize-reorganize-quarantine: ready-for-dev
   45-3-convert-live-db-tests-to-mocked-wave-1: ready-for-dev
   45-4-retire-live-db-tests-e2e-coverage-plan: ready-for-dev

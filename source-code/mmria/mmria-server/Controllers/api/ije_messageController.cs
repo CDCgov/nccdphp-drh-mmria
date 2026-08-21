@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Linq;
 
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication;
@@ -45,15 +44,13 @@ public sealed class ije_messageController: ControllerBase
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly IVitalImportRepository _vitalImportRepository;
-    private readonly ILogger<ije_messageController> _logger;
 
     public ije_messageController
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
-        IVitalImportRepository vitalImportRepository,
-        ILogger<ije_messageController> logger
+        IVitalImportRepository vitalImportRepository
     )
     {
         host_prefix = tenantRuntime.EffectiveHostPrefix;
@@ -62,7 +59,6 @@ public sealed class ije_messageController: ControllerBase
         db_config = tenantRuntime.RequireDbConfig();
         _couchDbHttpClient = couchDbHttpClient;
         _vitalImportRepository = vitalImportRepository;
-        _logger = logger;
     }
     
     [Authorize(Roles  = "abstractor,jurisdiction_admin,data_analyst,vital_importer,vital_importer_state")]
@@ -141,45 +137,6 @@ public sealed class ije_messageController: ControllerBase
         {
             result.detail = "Invalid IJE payload.";
             return result;
-        }
-
-        // Story 38.1 (AC-1..AC-3): reject batch-level re-uploads before the
-        // external vitals_url call. A prior batch is a duplicate only when
-        // its Status is Finished or FinishedSynchronized and at least one of
-        // its non-empty file names matches an incoming non-empty file name.
-        try
-        {
-            var duplicate = await FindDuplicateFinishedBatchAsync(sanitizedIjeSet);
-            if (duplicate.MatchedBatch != null)
-            {
-                var matchedBatch = duplicate.MatchedBatch;
-                var skippedRecordCount = matchedBatch.record_result?.Count ?? 0;
-                var originalDateText = matchedBatch.date_created?.ToString("yyyy-MM-dd") ?? "unknown date";
-
-                _logger.LogWarning(
-                    "IJE batch re-upload rejected. matched_file_name={MatchedFileName} matched_batch_id={MatchedBatchId} matched_batch_date={MatchedBatchDate} uploaded_by={UploadedBy}",
-                    duplicate.MatchedFileName,
-                    matchedBatch.id,
-                    originalDateText,
-                    User?.Identity?.Name ?? "unknown");
-
-                result.ok = false;
-                result.detail = $"IJE file '{duplicate.MatchedFileName}' was already imported on {originalDateText} (batch {matchedBatch.id}). {skippedRecordCount} record(s) would have been skipped. Upload rejected.";
-                result.duplicate_batch_id = matchedBatch.id;
-                result.matched_file_name = duplicate.MatchedFileName;
-                result.original_batch_date = matchedBatch.date_created;
-                result.skipped_record_count = skippedRecordCount;
-                return result;
-            }
-        }
-        catch (Exception ex)
-        {
-            // A failure to query vital_import must not silently allow a duplicate
-            // through. Log and fall through — the downstream call still runs, which
-            // preserves prior behavior. Story 38.1's guard is best-effort and the
-            // per-case ExistingCaseSkipped path remains as backstop.
-            Console.WriteLine(ex);
-            _logger.LogError(ex, "IJE batch duplicate check failed; proceeding with upload");
         }
 
         try
@@ -396,73 +353,6 @@ public sealed class ije_messageController: ControllerBase
     private static string NormalizeOptionalString(string value)
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-    }
-
-    // Story 38.1 (AC-1): return the first prior Finished/FinishedSynchronized batch whose
-    // non-empty MOR/NAT/FET file name matches the incoming request. Null/empty file names
-    // never match, and in-progress or rejected batches do not block a re-upload.
-    private async System.Threading.Tasks.Task<(mmria.common.ije.Batch MatchedBatch, string MatchedFileName)> FindDuplicateFinishedBatchAsync(
-        mmria.server.model.NewIJESet_Message incoming)
-    {
-        var vitalImportConfig = configuration.GetDBConfig("vital_import");
-        var allBatches = await _vitalImportRepository.GetAllBatchesAsync(vitalImportConfig);
-        return TryFindDuplicateFinishedBatch(
-            allBatches,
-            incoming?.mor_file_name,
-            incoming?.nat_file_name,
-            incoming?.fet_file_name);
-    }
-
-    // Pure predicate for AC-1 file-name matching. Exposed internally so unit tests can
-    // exercise the match rules (case-insensitive, trimmed, null-safe, Finished /
-    // FinishedSynchronized only) without spinning up a database.
-    internal static (mmria.common.ije.Batch MatchedBatch, string MatchedFileName) TryFindDuplicateFinishedBatch(
-        mmria.common.model.couchdb.alldocs_response<mmria.common.ije.Batch> allBatches,
-        string incomingMorFileName,
-        string incomingNatFileName,
-        string incomingFetFileName)
-    {
-        if (allBatches?.rows == null)
-        {
-            return (null, null);
-        }
-
-        static bool NamesMatch(string a, string b)
-        {
-            return !string.IsNullOrWhiteSpace(a)
-                && !string.IsNullOrWhiteSpace(b)
-                && string.Equals(a.Trim(), b.Trim(), StringComparison.OrdinalIgnoreCase);
-        }
-
-        foreach (var row in allBatches.rows)
-        {
-            var priorBatch = row?.doc;
-            if (priorBatch == null)
-            {
-                continue;
-            }
-
-            if (priorBatch.Status != mmria.common.ije.Batch.StatusEnum.Finished
-                && priorBatch.Status != mmria.common.ije.Batch.StatusEnum.FinishedSynchronized)
-            {
-                continue;
-            }
-
-            if (NamesMatch(priorBatch.mor_file_name, incomingMorFileName))
-            {
-                return (priorBatch, priorBatch.mor_file_name);
-            }
-            if (NamesMatch(priorBatch.nat_file_name, incomingNatFileName))
-            {
-                return (priorBatch, priorBatch.nat_file_name);
-            }
-            if (NamesMatch(priorBatch.fet_file_name, incomingFetFileName))
-            {
-                return (priorBatch, priorBatch.fet_file_name);
-            }
-        }
-
-        return (null, null);
     }
 
     byte[] GetFile(string s)

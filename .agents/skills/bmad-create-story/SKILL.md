@@ -406,6 +406,12 @@ Activation is complete. If `activation_steps_prepend` or `activation_steps_appen
     <action>Save file, preserving ALL comments and structure including STATUS DEFINITIONS</action>
   </check>
 
+  <!-- Sync story-index.md work queue -->
+  <action>Open `{implementation_artifacts}/story-index.md` and read its top-of-file Maintenance policy. Follow it exactly.</action>
+  <action>Locate `## Epic {{epic_num}} — <title>` in the file. If that header is missing, insert a new epic section at the end of the file (title sourced from the corresponding epic block in `{epics_file}`), preceded by a `---` separator to match the file's existing style.</action>
+  <action>Under that epic section, append a new bullet in the exact format required by the Maintenance policy: a bold story ID line (`**{{story_id}}**`) followed by a blank line and a fenced code block containing exactly `dev this story {implementation_artifacts}/{{story_key}}.md`. Do not add acceptance criteria, sequencing notes, dependencies, or any other narrative — the Maintenance policy forbids it.</action>
+  <action>Save `story-index.md`. The bullet remains in this file until the story reaches `done` (removed by `bmad-code-review`) or is manually marked `superseded` by the PM.</action>
+
   <action>Report completion</action>
   <output>**🎯 ULTIMATE BMad Method STORY CONTEXT CREATED, {user_name}!**
 

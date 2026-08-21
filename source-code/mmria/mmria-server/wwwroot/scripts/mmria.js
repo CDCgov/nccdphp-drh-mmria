@@ -2884,6 +2884,9 @@ async function mmria_check_session()
 
 function mmria_check_if_need_to_redirect(p_input)
 {
+    // Story 40.1: global 401 interceptor in _LayoutBase.cshtml handles session-expiry redirects.
+    if (p_input && p_input.status === 401) return;
+
     if 
     (
         p_input.ok &&

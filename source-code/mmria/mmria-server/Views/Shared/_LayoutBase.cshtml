@@ -47,6 +47,43 @@ if (top !== self) top.location.replace(self.location.href);
 
 
 <script src="/TemplatePackage/4.0/assets/vendor/js/jquery.min.js"></script>
+
+  @* Session expiry (401) global interceptor — Story 40.1
+     Redirects to /Account/Logout when any fetch or jQuery AJAX call returns 401,
+     so an expired CouchDB session results in a clean login flow instead of a
+     frozen or broken UI. Skipped on /Account/* pages and while in offline mode. *@
+  <script>
+    (function () {
+      var _sessionExpiredRedirectPending = false;
+
+      function _handleSessionExpiry() {
+        if (_sessionExpiredRedirectPending) return;
+        if (window.location.pathname.indexOf('/Account/') === 0) return;
+        try {
+          if (localStorage.getItem('is_offline') === 'true') return;
+        } catch (e) { /* localStorage unavailable — fall through */ }
+        _sessionExpiredRedirectPending = true;
+        window.location.href = '/Account/Logout';
+      }
+
+      var _originalFetch = window.fetch;
+      if (typeof _originalFetch === 'function') {
+        window.fetch = function (input, init) {
+          return _originalFetch.call(this, input, init).then(function (response) {
+            if (response && response.status === 401) _handleSessionExpiry();
+            return response;
+          });
+        };
+      }
+
+      if (typeof jQuery !== 'undefined') {
+        jQuery(document).ajaxError(function (event, jqXHR) {
+          if (jqXHR && jqXHR.status === 401) _handleSessionExpiry();
+        });
+      }
+    })();
+  </script>
+
  @*  This optional RenderSection is used to inject custom scripts/links into the head tag *@
   @RenderSection("HeadScripts", false)
   @RenderSection("styles", false)

@@ -104,6 +104,20 @@ If `{sprint_status}` file exists:
 
 If `{sprint_status}` file does not exist, note that story status was updated in the story file only.
 
+#### Sync story-index.md work queue
+
+`story-index.md` is a work queue containing only stories that still need to be dev'd. Its top-of-file Maintenance policy is authoritative — follow it exactly.
+
+If `{new_status}` is `done`:
+
+1. Load `{implementation_artifacts}/story-index.md`. Skip this subsection if the file does not exist.
+2. Locate the bullet whose fenced code block ends in `/{story_key}.md`.
+3. Remove the story ID line, the fenced code block, and any blank line immediately following, so that no orphaned whitespace remains.
+4. If the parent `## Epic N — <title>` section now contains no remaining story bullets, remove the epic header, its trailing `---` separator, and any orphaned blank lines.
+5. Save the file.
+
+If `{new_status}` is `in-progress` (patch findings remain), leave `story-index.md` unchanged — the bullet stays in the queue until the follow-up review closes the story.
+
 #### Completion summary
 
 > **Review Complete!**

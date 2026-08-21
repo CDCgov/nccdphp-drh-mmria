@@ -1,6 +1,10 @@
+---
+baseline_commit: f526e65ec339b0b936eddf8fc6a98e681021bccd
+---
+
 # Story 41.1: Per-Tenant Auth — Investigation and Configuration Analysis
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -19,24 +23,25 @@ so that the implementation story (41.2) has no unresolved architectural question
 
 ## Tasks / Subtasks
 
-- [ ] Test `OverridableConfiguration` per-tenant override of `sams:is_enabled` (AC: #1)
-  - [ ] In the local multi-tenant environment, add `sams:is_enabled: false` to the `tenant1` CouchDB config document (whichever field path `GetBoolean("sams:is_enabled", "tenant1")` reads)
-  - [ ] With global `sams.is_enabled: true` in appsettings, make a request to a `tenant1` route and verify `use_sams` resolves to `false` (add a debug log or breakpoint in `AccountController` constructor)
-- [ ] Confirm SAMS credential sharing (AC: #2)
-  - [ ] Verify that `endpoint_authorization`, `client_id`, `client_secret` are read globally (from `_configuration` without `host_prefix`) — confirm the OIDC flow uses the same global SAMS instance for all tenants
-- [ ] Find the exact config key path (AC: #3)
-  - [ ] Search for `GetBoolean("sams:is_enabled"` in `AccountController.cs` — the key is `"sams:is_enabled"` and `host_prefix` is the tenant prefix
-  - [ ] Confirm that the per-tenant CouchDB config document supports overriding this key
-- [ ] Review Login.cshtml for SAMS/password branch rendering (AC: #4)
-  - [ ] Confirm `ViewBag.sams_is_enabled` is the correct switch in the view
-  - [ ] Verify the view correctly shows the password form when `sams_is_enabled = false` and SAMS redirect when `true`
-- [ ] Review cross-tenant auth paths (AC: #5)
-  - [ ] `AutoLogin`: redirects to `SignIn` if `use_sams` — verify this is per-tenant
-  - [ ] `SignIn` (OIDC initiation): verify it checks `use_sams` before building the SAMS redirect
-  - [ ] `AppOffline`: verify it does not force SAMS redirect for a password tenant
-- [ ] Write findings document (AC: #6)
-  - [ ] Create `docs/ai/per-tenant-auth-findings.md`
-  - [ ] Include: what already works, what needs changing, exact field path for per-tenant config, code paths requiring changes in Story 41.2
+- [x] Test `OverridableConfiguration` per-tenant override of `sams:is_enabled` (AC: #1)
+  - [x] In the local multi-tenant environment, add `sams:is_enabled: false` to the `tenant1` CouchDB config document (whichever field path `GetBoolean("sams:is_enabled", "tenant1")` reads) — no HTTP listener running; used code-based analysis per story fallback
+  - [x] With global `sams.is_enabled: true` in appsettings, make a request to a `tenant1` route and verify `use_sams` resolves to `false` (add a debug log or breakpoint in `AccountController` constructor) — verified via `GetBoolean` implementation trace (configuration.cs L146-L159) and per-tenant document loader trace (MultiTenantConfigurationLoader.cs L162-L204)
+- [x] Confirm SAMS credential sharing (AC: #2)
+  - [x] Verify that `endpoint_authorization`, `client_id`, `client_secret` are read globally (from `_configuration` without `host_prefix`) — **finding differs from hypothesis:** `GetSAMSConfigurationDetail(prefix)` (configuration.cs L419-L427) reads credentials **per-prefix** with no shared fallback; `GetString` (endpoint URLs) does fall back to shared. Documented in findings §3.
+- [x] Find the exact config key path (AC: #3)
+  - [x] Search for `GetBoolean("sams:is_enabled"` in `AccountController.cs` — key is `"sams:is_enabled"`, `host_prefix` is tenant prefix (AccountController.cs L72)
+  - [x] Confirm that the per-tenant CouchDB config document supports overriding this key — both approaches supported: (a) each tenant's own `configuration-master` doc's `boolean_keys.shared.sams:is_enabled`; (b) intra-doc per-prefix override via `boolean_keys[tenant_prefix]["sams:is_enabled"]`. Documented in findings §2.
+- [x] Review Login.cshtml for SAMS/password branch rendering (AC: #4)
+  - [x] Confirm `ViewBag.sams_is_enabled` is the correct switch in the view — **finding differs from hypothesis:** Login.cshtml does NOT reference `sams_is_enabled`; branch happens at controller level via `RedirectToAction("SignIn")` before the view renders (AccountController.cs L137-L138, L155-L158)
+  - [x] Verify the view correctly shows the password form when `sams_is_enabled = false` and SAMS redirect when `true` — confirmed: SAMS tenants never render Login.cshtml; password tenants always render the plain form. No view changes needed.
+- [x] Review cross-tenant auth paths (AC: #5)
+  - [x] `AutoLogin`: redirects to `SignIn` if `use_sams` — per-tenant correct (AccountController.cs L92-L107)
+  - [x] `SignIn` (OIDC initiation): does NOT self-guard on `use_sams`; no code path reaches it for password tenants today, but flagged as optional hardening candidate for 41.2
+  - [x] `AppOffline`: does not touch `use_sams`; delegates SAMS/password branch to `AutoLogin` (AccountController.cs L109-L118). Per-tenant correct.
+  - [x] Also audited: `Login` GET/POST, `Logout`, `HomeController.Index`, `policyValuesController`, OIDC `SignInCallback`. All per-tenant correct.
+- [x] Write findings document (AC: #6)
+  - [x] Create `docs/ai/per-tenant-auth-findings.md`
+  - [x] Include: what already works, what needs changing, exact field path for per-tenant config, code paths requiring changes in Story 41.2
 
 ## Dev Notes
 

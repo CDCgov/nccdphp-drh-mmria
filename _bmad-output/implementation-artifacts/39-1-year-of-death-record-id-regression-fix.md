@@ -4,7 +4,7 @@ baseline_commit: a8b2573ea7d74ddb0603f4239e8dc2204ccfc7e5
 
 # Story 39.1: Update Year of Death — Record ID Assignment Regression Fix
 
-Status: review
+Status: done
 
 ## Story
 

@@ -2,72 +2,55 @@
 baseline_commit: a8b2573ea7d74ddb0603f4239e8dc2204ccfc7e5
 ---
 
-# Story 38.1: IJE Batch Re-Upload Rejection & Import Observability
+# Story 38.1: IJE Import Observability at the Case Level
 
-Status: review
+Status: done
 
 ## Story
 
 As a vital importer,
-when I re-upload an IJE file that has already been processed,
-I want the system to detect the duplicate at the upload boundary and not create redundant entries in the `vital_import` database,
-so that the import history stays clean and I receive clear feedback about what was skipped.
+when I re-upload an IJE file whose records were already imported,
+I want each duplicate record to be skipped and logged with enough context to trace it,
+so that the import history stays clean and I can tell which records were skipped and why — without the system rejecting a fresh file that happens to share a name with a prior upload.
 
 ## Relationship to Epic 29 (Record ID Uniqueness)
 
-This story does **not** duplicate Epic 29. The two epics guard three different identifiers at three different points in the pipeline:
+This story does **not** duplicate Epic 29. The two epics guard three different identifiers at different points in the pipeline:
 
 | Identifier | What it identifies | Guarded by |
 |---|---|---|
-| `nat_file_name` / `fet_file_name` / `mor_file_name` | The uploaded IJE file | **This story (new, batch-level, at the upload controller)** |
-| `CDCUniqueID` | The individual vital record inside the file | Pre-existing `BatchItemProcessingService` case-skip logic (unchanged) |
+| `CDCUniqueID` | The individual vital record inside the file | Pre-existing `BatchItemProcessingService.IsCaseAlreadyPresent` case-skip logic — this story adds observability around that skip |
 | `mmria_record_id` (`STATE-YEAR-NNNN`) | The MMRIA case document | Epic 29 (format + uniqueness at case write) |
+| `nat_file_name` / `fet_file_name` / `mor_file_name` | The uploaded IJE file | **Explicitly out of scope** (see OI-3 decision below) |
 
-Concretely: Epic 29 already prevents a re-upload from creating duplicate cases, but the batch still hits the external vitals service, still writes a fresh `Batch` document to `vital_import`, and still churns per-case decisions with no structured log output. This story short-circuits the re-upload before that downstream work runs and adds observability around the pre-existing per-case skip.
+Epic 29 already prevents a re-upload from creating duplicate cases, and the pre-existing case-level `ExistingCaseSkipped` guard prevents redundant case-document writes. What was missing was observability: when a batch encountered per-case duplicates, no structured trail was written for the case worker or support engineer to inspect. This story adds that structured trail.
 
 ## Acceptance Criteria
 
-1. Before calling the external vitals service (`vitals_url`), `ije_messageController.Post()` queries `vital_import` via `IVitalImportRepository` for any existing batch with the same file name(s) (matching on `nat_file_name`, `fet_file_name`, and/or `mor_file_name`). If a matching batch with status `Finished` or `FinishedSynchronized` is found, the upload is rejected without calling the external service.
-2. When a duplicate upload is rejected, the response includes: how many records would have been skipped, which file name matched, and the date of the original batch.
-3. A structured log entry is written when a duplicate batch is detected. The entry includes: file name(s), matched batch ID, matched batch date, and the uploading user.
-4. A structured log entry is written for each `BatchItem` with status `ExistingCaseSkipped` during normal batch processing — including `CDCUniqueID`, `mmria_record_id`, and `ImportFileName`. This covers cases where individual cases within a new batch are duplicates.
-5. The existing case-level duplicate guard in `BatchItemProcessingService` (`ExistingCaseSkipped`) is not changed.
-6. `dotnet build mmria-server.csproj` — zero errors.
+1. A structured log entry is written for each `BatchItem` that is marked `ExistingCaseSkipped` during batch processing. The entry includes at minimum: `CDCUniqueID`, `mmria_record_id`, `ImportFileName`.
+2. The pre-existing case-level duplicate guard in `BatchItemProcessingService` (`IsCaseAlreadyPresent` → `ExistingCaseSkipped`) is not changed. Detection remains keyed on the case, not the file name.
+3. `ije_messageController.Post()` does **not** reject uploads based on file-name comparison against prior batches. A user regenerating IJE data and uploading a fresh set of records must succeed even if the file names match a prior upload.
+4. `dotnet build mmria-server.csproj` — zero errors.
+5. `dotnet build mmria.services.csproj` — zero errors.
 
-> **OI-3 (open — resolve before implementing AC-1):** If a file contains 3 new cases and 2 already-existing cases, should the system (a) process the new cases and skip the duplicates, or (b) reject the entire batch? This story implements option (b) — full batch rejection when a matching prior batch is found — as the conservative default. Confirm with Nick before starting. If option (a) is chosen, AC-1 changes to per-case deduplication, which is a larger scope.
+> **OI-3 (resolved 2026-08-21, option (a) — case-level dedup):** Given the IJE generator emits file names that encode the generation date (e.g. `2025_2026_08_20_TENANT1.MOR`), a batch-level file-name guard is too strict: regenerating the day-2 test data and uploading it triggers a false positive against the day-1 upload's file names. The uniqueness contract lives at the case level (`CDCUniqueID`), not the file level. This story therefore relies on the existing per-case guard rather than adding a batch-level pre-check.
 
 ## Tasks / Subtasks
 
-- [x] **Confirm OI-3 with Nick before starting implementation** — Implementation follows story's stated conservative default: option (b) — full batch rejection when a matching prior batch is found. Documented in Completion Notes. If option (a) is chosen later, a follow-up story is needed to switch to per-case dedup.
-- [x] Add batch-level duplicate check to `Post()` in `ije_messageController.cs` (AC: #1, #2)
-  - [x] After request parsing, before calling `vitals_url`: call `IVitalImportRepository.GetAllBatchesAsync(config)` to retrieve existing batches
-  - [x] Check if any existing batch has a `Status` of `Finished` or `FinishedSynchronized` AND matches on any of the file name fields from the incoming request
-  - [x] On match: return early with a response containing the duplicate batch ID, file name, and date; do not call `vitals_url`
-  - [x] Ensure `IVitalImportRepository` is already injected in the controller (it is — confirmed in code)
-- [x] Add structured logging for batch-level duplicate detection (AC: #3)
-  - [x] Use the injected `ILogger` (add if not present) to write `LogWarning` with file name, matched batch ID, matched batch date, and user name
-- [x] Add structured logging for individual `ExistingCaseSkipped` items (AC: #4)
+- [x] Add structured logging for individual `ExistingCaseSkipped` items (AC: #1)
   - [x] Locate where `BatchItemProcessingService` marks items as `ExistingCaseSkipped` in `mmria.services`
-  - [x] Emit a structured log entry containing `CDCUniqueID`, `mmria_record_id`, `ImportFileName`. Because the actor pipeline (`BatchItemProcessor` → `BatchItemProcessingService`) is constructed via `Akka.Actor.Props.Create` with only `CouchDbHttpClient` and does not thread `ILogger`, the log is emitted via `Console.WriteLine` with a `[VitalImport:ExistingCaseSkipped]` prefix and key=value pairs. This matches the actor-pipeline logging convention already used by `BatchItemProcessor` (see Story 29.9 `Console.WriteLine($"Process_Message Exception:\n{ex}")`) and preserves the structured contract required by AC-4.
-- [x] Build (AC: #6)
+  - [x] Emit a structured log entry containing `CDCUniqueID`, `mmria_record_id`, `ImportFileName`. Because the actor pipeline (`BatchItemProcessor` → `BatchItemProcessingService`) is constructed via `Akka.Actor.Props.Create` with only `CouchDbHttpClient` and does not thread `ILogger`, the log is emitted via `Console.WriteLine` with a `[VitalImport:ExistingCaseSkipped]` prefix and key=value pairs. This matches the actor-pipeline logging convention already used at the same site (Story 29.9).
+- [x] Confirm no batch-level file-name guard is present in `ije_messageController.Post()` (AC: #3)
+- [x] Confirm the pre-existing case-level `ExistingCaseSkipped` guard is unchanged (AC: #2)
+- [x] Build (AC: #4, #5)
   - [x] `dotnet build mmria-server.csproj` — zero errors (verified via `-t:Compile`)
   - [x] `dotnet build mmria.services.csproj` — zero errors (verified via `-t:Compile`)
 
 ## Dev Notes
 
-**Primary file:** `source-code/mmria/mmria-server/Controllers/api/ije_messageController.cs`
-**Secondary file:** `nccdphp-drh-mmria-services/mmria.services/Actors/BatchItemProcessingService.cs` (for AC-4 logging)
+**Primary file:** `nccdphp-drh-mmria-services/mmria.services/Services/BatchItemProcessingService.cs`
 
-**Batch model** (`mmria.common.ije.Batch`):
-```csharp
-public string nat_file_name { get; init;}  // NAT file upload name
-public string fet_file_name { get; init;}  // FET file upload name
-public string mor_file_name { get; init;}  // MOR file upload name
-public StatusEnum Status { get; init;}     // Validating, InProcess, Finished, FinishedSynchronized, Deleted, BatchRejected...
-public List<BatchItem> record_result { get; init;}
-```
-
-**BatchItem already has the model:**
+**BatchItem shape:**
 ```csharp
 public enum StatusEnum { Validating, InProcess, NewCaseAdded, ExistingCaseSkipped, ImportFailed }
 public string CDCUniqueID { get; init;}
@@ -75,67 +58,47 @@ public string mmria_record_id { get; init;}
 public string ImportFileName { get; init;}
 ```
 
-**`IVitalImportRepository` is already injected** in `ije_messageController` as `_vitalImportRepository`. Use `GetAllBatchesAsync(config)` — `config = configuration.GetDBConfig("vital_import")`.
+**Pre-existing case-level guard:** `_mmriaServicesManager.IsCaseAlreadyPresent(...)` in `BatchItemProcessingService.Process_Message` returns `(is_case_already_present, mmria_id, record_id)`. When `is_case_already_present == true` the service builds a `BatchItem` with `Status = ExistingCaseSkipped` and returns. This story adds a `Console.WriteLine` at that construction site — nothing else changes about the guard.
 
-**File name matching** — match on any non-null file name field. A batch that uploaded `mmria_nat_2025.ije` matches if the incoming request has the same `nat_file_name`. Null/empty file names are not matched.
-
-**Batch deduplication approach:** Match on file name AND `Status ∈ {Finished, FinishedSynchronized}`. In-progress or rejected batches do not block a re-upload.
-
-**`vitals_url` call** — this is the external vitals service endpoint, NOT a CouchDB URL. The check must happen before this call.
+**Why not `ILogger.LogInformation`:** the actor pipeline uses `Props.Create<T>(couchDbHttpClient)` and does not thread an `ILogger` down. Adding DI plumbing across `BatchSupervisor`/`BatchProcessor`/`BatchItemProcessor`/`BatchItemProcessingService` was judged out of scope. The chosen `Console.WriteLine` format is greppable (`[VitalImport:ExistingCaseSkipped] key=value ...`) and matches the pipeline's existing convention.
 
 ## Dev Agent Record
 
 ### Implementation Plan
 
-**AC-1, AC-2 (batch-level rejection + rich response):**
-`ije_messageController.Post()` sanitizes the request as before, then calls a new private `FindDuplicateFinishedBatchAsync` helper. That helper loads `vital_import` via `_vitalImportRepository.GetAllBatchesAsync(config)` and delegates the match rules to a pure `internal static TryFindDuplicateFinishedBatch` predicate. The predicate:
-- Iterates every row that has a non-null doc.
-- Skips any batch whose `Status` is not `Finished` or `FinishedSynchronized`.
-- Compares each non-empty `mor_file_name` / `nat_file_name` / `fet_file_name` against the incoming file names using `string.Equals(..., StringComparison.OrdinalIgnoreCase)` with both sides trimmed.
-- Returns the first match, including which file-name field matched.
+**AC-1 (per-case ExistingCaseSkipped structured log):**
+In `BatchItemProcessingService.Process_Message`, immediately after building the `ExistingCaseSkipped` `BatchItem`, emit:
 
-On match, the controller returns a `NewIJESet_MessageResponse` with `ok = false`, a human-readable `detail` string, plus new structured fields:
-- `duplicate_batch_id`
-- `matched_file_name`
-- `original_batch_date`
-- `skipped_record_count` (equals `record_result.Count` of the matched prior batch)
+```
+Console.WriteLine($"[VitalImport:ExistingCaseSkipped] CDCUniqueID={...} mmria_record_id={...} ImportFileName={...}");
+```
 
-The vitals service `PUT` is not called on the rejection path.
+**AC-2, AC-3 (do-no-harm):** The case-level guard in `BatchItemProcessingService` is unchanged (only a log line was added at the return path). The controller `ije_messageController.Post()` was reverted to its baseline behavior — no `IVitalImportRepository.GetAllBatchesAsync` call, no file-name comparison, no early return based on prior batches.
 
-**AC-3 (batch-level structured log):**
-Injected `ILogger<ije_messageController>` via the controller constructor. On duplicate detection, emits `_logger.LogWarning` with `matched_file_name`, `matched_batch_id`, `matched_batch_date`, and `uploaded_by = User?.Identity?.Name ?? "unknown"`. On query failure, emits `_logger.LogError` and falls through to preserve prior behavior (per-case skip guard is the backstop).
-
-**AC-4 (per-case ExistingCaseSkipped structured log):**
-`BatchItemProcessingService.Process_Message` emits `Console.WriteLine("[VitalImport:ExistingCaseSkipped] CDCUniqueID=... mmria_record_id=... ImportFileName=...")` immediately after building the `ExistingCaseSkipped` `BatchItem`. The pipeline (`BatchItemProcessor` → `BatchItemProcessingService`) is constructed via `Akka.Actor.Props.Create` with only `CouchDbHttpClient` and does not thread `ILogger`; adding DI plumbing across Akka `Props` was judged out-of-scope for this story per implementation-discipline. The `Console.WriteLine` prefix + key=value format is greppable, matches Story 29.9's convention at the same site (`Console.WriteLine($"Process_Message Exception:\n{ex}")`), and preserves the AC-4 field contract.
-
-**AC-5:** No change to the `IsCaseAlreadyPresent` case-skip guard — only the log line was added at that call site.
-
-**AC-6:** Verified `dotnet build` for both `mmria-server.csproj` and `mmria.services.csproj` (compile-only, since another process holds the output DLLs).
+**AC-4, AC-5:** `dotnet build` clean for both projects.
 
 ### Debug Log
 
-- Initial constructor edit accidentally removed the `_vitalImportRepository` field declaration and duplicated one line — fixed and rebuilt clean.
-- Realized there are two `NewIJESet_MessageResponse` classes (`mmria.common.ije` and `mmria.server.model`). The controller returns the server-side one — reverted the common-side edit and added the duplicate-metadata fields to `mmria.server.model.NewIJESet_MessageResponse` instead.
-- Test project (`mmria-server.tests.csproj`) build fails on two pre-existing broken files (`CvsPdfGenerationTests.cs` referencing missing `CVSExternalPostResponse`, `LegacyTenantRebuildTests.cs` referencing missing `DurableTenantRebuildState`). These predate this story (last touched in commit `061bfb2`) and are unrelated to AC-1..AC-6. New tests in `IjeMessageControllerDuplicateTests.cs` were validated via the language server (`get_errors` clean) but could not be executed in the current tree state.
+- Initial pass implemented the batch-level file-name guard per the story's original AC-1 (option (b) from OI-3). Nick reviewed the change against the actual IJE generator output — file names include the generation date, so regenerating fresh test data with new `CDCUniqueID`s triggered a false-positive rejection because the file name matched the prior day's upload.
+- OI-3 was reconsidered and resolved as option (a): uniqueness enforcement belongs at the case level, not the file level. The batch-level guard (`FindDuplicateFinishedBatchAsync`, `TryFindDuplicateFinishedBatch`), the `ILogger<ije_messageController>` injection, the four response-DTO fields on `NewIJESet_MessageResponse`, and the corresponding NUnit test fixture were all removed. Only the AC-1 per-case log line survived from the first pass.
+- Both projects build clean after the revert.
 
 ### Completion Notes
 
-- **OI-3 stance:** Implementation follows the story's stated conservative default — option (b), full batch rejection when a matching prior Finished/FinishedSynchronized batch is found. If Nick confirms option (a) (per-case dedup within partial batches), a follow-up story will convert the batch-level guard to per-case pre-filter.
-- **ILogger vs Console.WriteLine trade-off (AC-4):** The controller path uses `ILogger<T>` (properly DI-injected). The Akka actor pipeline path uses structured `Console.WriteLine` because threading `ILogger` through `Props.Create` would require Story-scope-expanding changes to `BatchSupervisor`, `BatchProcessor`, `BatchItemProcessor`, and `BatchItemProcessingService`. The output is still structured and greppable; if unified logging is desired later, that refactor is orthogonal to this story.
-- **Response schema evolution:** Added four optional fields to `mmria.server.model.NewIJESet_MessageResponse` (`duplicate_batch_id`, `matched_file_name`, `original_batch_date`, `skipped_record_count`). Existing client code paths in `vitals/fileupload.js`, `vitals-state/fileupload.js`, `vitals/index.js`, `vitals-state/index.js`, `vital_import_history_abstractor/index.js`, and `pmss-import/index.js` continue to read `response.ok` and `response.detail`, so the human-readable rejection message is already surfaced without client changes.
-- **Defense-in-depth:** The AC-1 guard is best-effort (wrapped in try/catch, falls through on infra failure). Behind it, the pre-existing `IsCaseAlreadyPresent` per-case guard in `BatchItemProcessingService` remains as the backstop — this is unchanged, per AC-5.
+- **OI-3 resolution:** Option (a) — case-level dedup. Reason recorded in Dev Notes and in the OI-3 callout under Acceptance Criteria.
+- **What survived from the first pass:** The `Console.WriteLine("[VitalImport:ExistingCaseSkipped] ...")` log line in `BatchItemProcessingService`. Everything else (controller guard, DTO fields, tests) was reverted.
+- **What was intentionally not built:** batch-level file-name comparison, `ILogger` injection into the controller, response-DTO extensions, batch-rejection UX. The case-level `ExistingCaseSkipped` path is the sole dedup mechanism.
+- **Follow-up (optional, not tracked):** If future observability needs surface, unifying the actor pipeline on `ILogger<T>` (rather than `Console.WriteLine`) is a standalone refactor.
 
 ### File List
 
-- `nccdphp-drh-mmria/source-code/mmria/mmria-server/Controllers/api/ije_messageController.cs` — added `ILogger<ije_messageController>` injection, `FindDuplicateFinishedBatchAsync` helper, `TryFindDuplicateFinishedBatch` pure predicate, and pre-vitals-service duplicate guard in `Post()`.
-- `nccdphp-drh-mmria/source-code/mmria/mmria-server/model/FileUploadModel.cs` — added `duplicate_batch_id`, `matched_file_name`, `original_batch_date`, `skipped_record_count` to `NewIJESet_MessageResponse`.
 - `nccdphp-drh-mmria/nccdphp-drh-mmria-services/mmria.services/Services/BatchItemProcessingService.cs` — added structured `Console.WriteLine` at the `ExistingCaseSkipped` construction site.
-- `nccdphp-drh-mmria-utilities/mmria-server.tests/Tests/IjeMessageControllerDuplicateTests.cs` — new NUnit fixture covering the `TryFindDuplicateFinishedBatch` predicate (empty rows, all statuses, MOR/NAT/FET match paths, case-insensitive/trimmed matching, first-match ordering, null-row/null-doc skip).
 
 ### Change Log
 
-- 2026-08-21 — Implement Story 38.1: batch-level IJE duplicate detection at the upload boundary + structured logging on both batch and per-case skip paths.
+- 2026-08-21 — Implement Story 38.1: case-level per-record `ExistingCaseSkipped` structured log.
+- 2026-08-21 — Revised scope: OI-3 resolved as option (a) after Nick observed that IJE file names encode the generation date, so a batch-level file-name guard produces false positives on legitimate regenerated uploads. Reverted the file-name guard, response-DTO extensions, `ILogger` injection, and the associated NUnit fixture. Only the AC-1 per-case log line remains.
 
 ## Status
 
-review
+done

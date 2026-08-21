@@ -53,12 +53,4 @@ public sealed class NewIJESet_MessageResponse
     public bool ok { get; set; }
 
     public string detail { get; set; }
-
-    // Story 38.1: populated when the upload is rejected because a prior
-    // Finished/FinishedSynchronized batch already imported one of the same
-    // file names. Null/empty when this is not a duplicate rejection.
-    public string duplicate_batch_id { get; set; }
-    public string matched_file_name { get; set; }
-    public DateTime? original_batch_date { get; set; }
-    public int? skipped_record_count { get; set; }
 }
