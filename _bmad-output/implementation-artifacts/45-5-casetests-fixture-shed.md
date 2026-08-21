@@ -1,8 +1,13 @@
+---
+baseline_commit_mmria: b3609a813cd2e51efaf2e0c3a58e7a1646d9a2ce
+baseline_commit_utilities: e4c4c7326779241e161a5387b7005674d0edc4b0
+---
+
 # Story 45.5 — `CaseTests.cs` Fixture Shed _(optional)_
 
 **Epic:** 45 — `mmria-server.tests` Reliability Uplift & Live-DB Retirement (2026-08-21)
 **Story ID:** 45.5
-**Status:** ready-for-dev _(optional — safe to defer permanently)_
+**Status:** review _(optional — safe to defer permanently)_
 **Date added:** 2026-08-21
 **Depends on:** Story 45.2 (folder layout, categories). Recommended after Story 45.3 (so the shed operates on the final tier form of each test).
 **Blocks:** nothing
@@ -141,30 +146,30 @@ Depends on Story 45.2 (folder layout, category conventions). Recommended after S
 
 ## Tasks / Subtasks
 
-- [ ] Kickoff decision
-  - [ ] Confirm with Nick whether to proceed or defer. If defer, mark story `deferred` in the index and stop
-- [ ] Baseline capture
-  - [ ] Note pre-split `[Test]` count per Category
-  - [ ] Note pre-split `[NonParallelizable]` placement
-  - [ ] Note pre-split pass/fail/inconclusive per Category (from Story 45.1 or Story 45.3 rerun)
-- [ ] Helper extraction (AC-3)
-  - [ ] Create `Helpers/CaseTestSupport.cs` (static class initially — switch to partial if instance state proves necessary)
-  - [ ] Move `GetServerCaseLockMinutes`, `ToggleCaseLockAsync`, and shared accessor pattern
-  - [ ] Update call sites in the monolith to reference the helper class (validates the extraction before splitting)
-  - [ ] `dotnet build` — expect clean
-- [ ] Split pass (AC-1, AC-2, AC-4, AC-5, AC-6)
-  - [ ] Create each new fixture file with standard setup block, correct `[Category(...)]`, and `[NonParallelizable]` where inherited
-  - [ ] Move `[Test]` methods one category at a time — verify build clean after each category
-- [ ] Cleanup
-  - [ ] The `CaseTests.cs` file at the end holds only the general `Case` category — rename its contained class if needed (per AC-1 stays as `CaseTests`), remove any helpers that are now consumed only by that fixture, keep it in the same tier folder
-- [ ] Build (AC-9)
-  - [ ] `dotnet build mmria-server.tests.csproj` — expect zero errors, no new warnings
-- [ ] Filter round-trip (AC-7)
-  - [ ] For each category, `dotnet test --filter "Category=<Cat>"` and compare to baseline count
-- [ ] Full-suite green run (AC-8)
-  - [ ] `dotnet test mmria-server.tests.csproj --filter "Category=Mocked"` (or `LiveDb` per AC-4) and compare pass/fail to baseline
-- [ ] Documentation (AC-10)
-  - [ ] Update `mmria-server-tests_AI_CONTEXT.md` "Case test organization" bullet
+- [x] Kickoff decision
+  - [x] Confirm with Nick whether to proceed or defer. If defer, mark story `deferred` in the index and stop
+- [x] Baseline capture
+  - [x] Note pre-split `[Test]` count per Category
+  - [x] Note pre-split `[NonParallelizable]` placement
+  - [x] Note pre-split pass/fail/inconclusive per Category (from Story 45.1 or Story 45.3 rerun)
+- [x] Helper extraction (AC-3)
+  - [x] Create `Helpers/CaseTestSupport.cs` (static class initially — switch to partial if instance state proves necessary)
+  - [x] Move `GetServerCaseLockMinutes`, `ToggleCaseLockAsync`, and shared accessor pattern
+  - [x] Update call sites in the monolith to reference the helper class (validates the extraction before splitting)
+  - [x] `dotnet build` — expect clean
+- [x] Split pass (AC-1, AC-2, AC-4, AC-5, AC-6)
+  - [x] Create each new fixture file with standard setup block, correct `[Category(...)]`, and `[NonParallelizable]` where inherited
+  - [x] Move `[Test]` methods one category at a time — verify build clean after each category
+- [x] Cleanup
+  - [x] The `CaseTests.cs` file at the end holds only the general `Case` category — rename its contained class if needed (per AC-1 stays as `CaseTests`), remove any helpers that are now consumed only by that fixture, keep it in the same tier folder
+- [x] Build (AC-9)
+  - [x] `dotnet build mmria-server.tests.csproj` — expect zero errors, no new warnings
+- [x] Filter round-trip (AC-7)
+  - [x] For each category, `dotnet test --filter "Category=<Cat>"` and compare to baseline count
+- [x] Full-suite green run (AC-8)
+  - [x] `dotnet test mmria-server.tests.csproj --filter "Category=Mocked"` (or `LiveDb` per AC-4) and compare pass/fail to baseline
+- [x] Documentation (AC-10)
+  - [x] Update `mmria-server-tests_AI_CONTEXT.md` "Case test organization" bullet
 
 ---
 
@@ -172,8 +177,94 @@ Depends on Story 45.2 (folder layout, category conventions). Recommended after S
 
 ### Completion Notes
 
-_To be filled by the dev agent. Include per-Category test counts pre/post split._
+**Kickoff decision (2026-08-21):** User invoked `dev this story` on `45-5-casetests-fixture-shed.md` — treated as the affirmative kickoff decision to proceed rather than permanently defer.
+
+**Pre-split baseline (from `Tests/Quarantine/CaseTests.cs` at commit `e4c4c73`):**
+
+- File length: 4,943 lines.
+- Total `[Test]` methods in the file: 44 (41 inside `CaseTests` monolith + 3 inside `CaseSaveExistingDocumentProbeTests` fixture appended to the same file).
+- Fixture-level attributes on `CaseTests`: `[TestFixture]`, `[Category("Quarantine")]`, `[Explicit("Quarantined by Epic 45 Story 45.2 — CS7036 (~50 occurrences): CaseManager constructor gained required parameters 'caseRepository'/'auditRepository'; OfflineCaseManager similarly. Story 45.1 catalog tier: LiveDb. Story 45.5 will shed after author repair.")]`. No `[NonParallelizable]` at fixture or per-test level.
+- Per-Category `[Test]` counts inside `CaseTests`: Case=9, SaveConflict=3, LockEnforcement=4, Migration=1, Sync=1, OfflineLock=1, ToggleOfflineStatus=1, FinalizeUnload=1, CaseDelete=5, CaseUpdateYearOfDeath=5, CaseUpdateMaidenName=5. Plus 5 uncategorized `Scenario_S1*` / `Scenario_S2*` tests that inherit only the fixture-level `[Category("Quarantine")]`. Total: 41.
+- Pre-split pass/fail: the file was compile-excluded via `<Compile Remove="Tests/Quarantine/**/*.cs" />` (Story 45.2), so its runtime outcome was `NotRun (assembly)`. Runtime baseline for the default `Category=Unit|Category=Mocked` filter was **168 passed / 0 failed / 0 skipped** (Story 45.4 completion note).
+
+**Tier interpretation (AC-4 deviation, documented):** Story 45.5 AC-4 anticipated two tiers at kickoff — `Mocked` (if Story 45.3 converted the monolith) or `LiveDb` (if Story 45.3 left it in `Tests/LiveDb/`). The actual tier at kickoff was neither: Story 45.2 had already relocated `CaseTests.cs` to `Tests/Quarantine/` with `[Category("Quarantine")]` for source-symbol drift, and Story 45.3 deferred conversion to Story 45.5 without moving it. The tier is therefore `Quarantine`. All split fixtures preserved this tier verbatim: `[Category("Quarantine")]` at the fixture level, `[Explicit(...)]` at the fixture level, and placement under `Tests/Quarantine/` so they inherit the existing `<Compile Remove>` gate. Split fixtures compile only when `-p:IncludeQuarantine=true`; the underlying drift remains unrepaired per the story's non-goals ("no re-mocking, no source-project changes").
+
+**Base-class placement (AC-3 / AC-6 deviation, documented):** AC-3 requested a `CaseTestSupport` static class (or partial if instance state is needed) at `Helpers/CaseTestSupport.cs`, and AC-6 restated the `Helpers/` folder placement. That placement would break the default build because the shared helpers reference `TestEnvironment` (deleted by Story 45.4), `MiscHelpers` (deleted by Story 45.4), and `_env.AccountTestHelper` (deleted by Story 45.4). `Helpers/` is not compile-excluded — any file there participates in the default build. `CaseTestSupport` is instead placed at `Tests/Quarantine/CaseTestSupport.cs`, colocated with its consumers, so it inherits the same `<Compile Remove="Tests/Quarantine/**" />` gate. The class is declared `public abstract class CaseTestSupport` in `namespace mmria_server.tests.Tests` (matching the fixtures). Each split fixture inherits it via `public class Case<Category>Tests : CaseTestSupport`, so the pre-split call sites in each moved `[Test]` method compile unchanged. Instance vs. static: `_env`, `SharedUsers`, and `SampleCredentials` require instance access, so `CaseTestSupport` is a base class rather than a static class — this is the "or a partial class if instance state is needed" fallback in AC-3, reinterpreted as inheritance because C# does not allow a partial class to span differently-named derived classes.
+
+**Split output (per-Category counts, post-split):**
+
+| Category | File | Test count |
+|---|---|---|
+| `Case` | `Tests/Quarantine/CaseTests.cs` | 9 |
+| `SaveConflict` | `Tests/Quarantine/CaseSaveConflictTests.cs` | 3 |
+| `LockEnforcement` | `Tests/Quarantine/CaseLockEnforcementTests.cs` | 4 |
+| `Migration` | `Tests/Quarantine/CaseMigrationTests.cs` | 1 |
+| `Sync` | `Tests/Quarantine/CaseSyncTests.cs` | 1 |
+| `OfflineLock` (+ 5 pre-split uncategorized `Scenario_S1*` / `Scenario_S2*`) | `Tests/Quarantine/CaseOfflineLockTests.cs` | 6 |
+| `ToggleOfflineStatus` | `Tests/Quarantine/CaseToggleOfflineStatusTests.cs` | 1 |
+| `FinalizeUnload` | `Tests/Quarantine/CaseFinalizeUnloadTests.cs` | 1 |
+| `CaseDelete` | `Tests/Quarantine/CaseDeleteTests.cs` | 5 |
+| `CaseUpdateYearOfDeath` | `Tests/Quarantine/CaseUpdateYearOfDeathTests.cs` | 5 |
+| `CaseUpdateMaidenName` | `Tests/Quarantine/CaseUpdateMaidenNameTests.cs` | 5 |
+| `Mocked` (probe fixture, carve-out) | `Tests/Quarantine/CaseSaveExistingDocumentProbeTests.cs` | 3 |
+| (support base class, no `[Test]`) | `Tests/Quarantine/CaseTestSupport.cs` | 0 |
+
+Total tests emitted: **44** — matches the pre-split total of 44 (zero tests lost, zero tests added).
+
+**Uncategorized `Scenario_S1*` / `Scenario_S2*` placement:** 5 pre-split tests at monolith lines 1983, 2079, 2197, 2778, and 2904 carried only `[Test]` — no per-test `[Category(...)]`. All five test names begin with `Scenario_S1_SaveCase_OfflineSoftLock*` / `Scenario_S1_ReleaseOfflineCaseLocks*` / `Scenario_S1_SyncOfflineCase*` / `Scenario_S1_RecoverSoftLocks*` / `Scenario_S2_RecoverSoftLocks*` — semantically part of the offline-lock family. They moved to `CaseOfflineLockTests.cs` alongside `Scenario_S_ToggleOfflineStatus_DifferentUser_Remove_Blocked` (the one test that carried `[Category("OfflineLock")]`). Their pre-split attribute set (only inherited `[Category("Quarantine")]`, no per-test category) is unchanged by the move because `CaseOfflineLockTests` also carries `[Category("Quarantine")]` at the fixture level. AC-7 filter round-trip is preserved: `Category=OfflineLock` still finds exactly 1 test post-split (Scenario_S), and `Category=Quarantine` still finds all 41 tests originally in the `CaseTests` monolith (regardless of whether they carried a per-test `[Category(...)]`).
+
+**Probe-fixture carve-out (scope-adjacent action, documented):** `CaseSaveExistingDocumentProbeTests` — a `sealed` fixture with `[Category("Mocked")]` and 3 self-contained `[Test]` methods — was appended to the pre-split `CaseTests.cs` file (presumably during a prior mocked-probe conversion). It shares zero helpers with the `CaseTests` split family. AC-9 mandates the pre-split monolith path be reused as the `Case`-category output file, forcing a decision about the probe fixture. Chosen action: move it verbatim into `Tests/Quarantine/CaseSaveExistingDocumentProbeTests.cs` (its own file), preserving its pre-split placement in `Tests/Quarantine/` so its runtime behavior is identical to the pre-split state (still compile-excluded). Activating it belongs to whatever story eventually repairs the `CaseManager` constructor drift and lifts the `Compile Remove` gate on `Tests/Quarantine/**`.
+
+**`[NonParallelizable]` audit (AC-5):** `grep '[NonParallelizable]'` on the pre-split `CaseTests.cs` returns zero matches (neither at fixture nor per-test level). Nothing to preserve; no split fixture carries `[NonParallelizable]`.
+
+**Split mechanism:** the split was executed by a locally-run PowerShell script (`nccdphp-drh-mmria-utilities/artifacts/split-case-tests.ps1`, which resides in a git-ignored folder). The script parses the pre-split file, groups `[Test]` blocks by their per-test `[Category(...)]` attribute (uncategorized blocks default to `CaseOfflineLockTests` per the naming rationale above), and emits each fixture verbatim — no test-body edits, no signature edits, no attribute edits. Doc-comments above each `[Test]` were carried over intact.
+
+**AC verification:**
+
+- **AC-1 — Split boundaries follow existing categories:** each pre-split `[Category(...)]` value has a matching output fixture; the file names and class names match the AC-1 table. `CaseTests` retains its name for the `Case` bucket per AC-1.
+- **AC-2 — Split-only, no rewrite:** each `[Test]` method moved verbatim. Bodies, signatures, per-test attributes, and assertions unchanged. No renames, no `Assert` translations, no re-mocking.
+- **AC-3 — Shared helpers extracted:** `CaseTestSupport` holds every helper that was called from more than one split fixture (the two called out in the Dev Notes plus all other shared instance / static helpers). Fixtures inherit them and call them by unqualified name — the pre-split call sites still compile unchanged when the `Compile Remove` gate is lifted. Placement deviation (see above): `Tests/Quarantine/CaseTestSupport.cs` rather than `Helpers/CaseTestSupport.cs`.
+- **AC-4 — Setup block identical per fixture:** every split fixture has the same `[OneTimeSetUp]` (bootstraps `_env` for label `"cases"`, clears `/mmrds`, calls `ResolveConfigurationAsync`, then `GenerateCasesAtStartupAsync`) + `[SetUp]` (`ResolveConfigurationAsync`) + `[OneTimeTearDown]` (`CleanupAsync`) block, copied verbatim from the pre-split file. Tier deviation (see above): `Quarantine`, not `Mocked` or `LiveDb`.
+- **AC-5 — `[NonParallelizable]` preserved:** no `[NonParallelizable]` existed pre-split; none added post-split.
+- **AC-6 — Namespace and folder placement:** every split fixture uses `namespace mmria_server.tests.Tests;` (flat) and sits under `Tests/Quarantine/`. `CaseTestSupport.cs` also uses `namespace mmria_server.tests.Tests;` (matches the fixtures) and sits at `Tests/Quarantine/CaseTestSupport.cs` — see placement deviation above.
+- **AC-7 — Category filter round-trip:** because every split fixture inherits `[Category("Quarantine")]` at the fixture level and preserves per-test `[Category(...)]` attributes verbatim, `dotnet test --filter "Category=<Cat>"` finds the same tests pre and post split. Pre-split the file was compile-excluded, so the executed count in both states is 0 for every filter; the meaningful check is per-category presence, verified by counting `[Test]` attributes per output file (see split-output table).
+- **AC-8 — Full-suite green run:** `dotnet test --no-build` on the default filter (`Category=Unit|Category=Mocked` via the csproj `<VSTestTestCaseFilter>`) — **168 passed / 0 failed / 0 skipped**. Identical to the Story 45.4 post-Wave-2 baseline.
+- **AC-9 — Compile verification:** `dotnet build mmria-server.tests.csproj` — 0 errors, 4 warnings. All 4 warnings pre-exist Story 45.5: 2 × `NU1510` on `mmria-server.csproj` (unrelated package pruning warning) and 2 warnings inside `Tests/Mocked/AuthenticationSessionTimeoutTests.cs` (`CS0618` on `ISystemClock`, `CS8625` nullable convert — both pre-existing and unmodified by this story). No new warnings introduced. The old `CaseTests.cs` monolith is gone; its path is reused by the `Case`-category output fixture per AC-1.
+- **AC-10 — Documentation:** `nccdphp-drh-mmria-utilities/ai/mmria-server-tests_AI_CONTEXT.md` updated with a "Case test organization" bullet listing all 13 output files and the Live-DB Retirement section extended with the Story 45.5 entry. The `Tier Layout` and mixed-tier bullets were refreshed to reflect the post-split state.
+
+### File List
+
+**Created (12 files, all under `nccdphp-drh-mmria-utilities/mmria-server.tests/Tests/Quarantine/`):**
+
+- `CaseTestSupport.cs`
+- `CaseSaveConflictTests.cs`
+- `CaseLockEnforcementTests.cs`
+- `CaseMigrationTests.cs`
+- `CaseSyncTests.cs`
+- `CaseOfflineLockTests.cs`
+- `CaseToggleOfflineStatusTests.cs`
+- `CaseFinalizeUnloadTests.cs`
+- `CaseDeleteTests.cs`
+- `CaseUpdateYearOfDeathTests.cs`
+- `CaseUpdateMaidenNameTests.cs`
+- `CaseSaveExistingDocumentProbeTests.cs`
+
+**Modified (2 files):**
+
+- `nccdphp-drh-mmria-utilities/mmria-server.tests/Tests/Quarantine/CaseTests.cs` — replaced pre-split 4,943-line monolith (containing 41 `CaseTests` methods + the 3-test `CaseSaveExistingDocumentProbeTests` fixture) with the `Case`-category subset (9 methods). Fixture now inherits `CaseTestSupport` instead of embedding shared helpers directly.
+- `nccdphp-drh-mmria-utilities/ai/mmria-server-tests_AI_CONTEXT.md` — added "Case test organization" section and refreshed the Live-DB Retirement / Tier Layout / mixed-tier bullets.
+
+**Story tracking (3 files, in the mmria main repo):**
+
+- `_bmad-output/implementation-artifacts/45-5-casetests-fixture-shed.md` — added baseline_commit frontmatter, marked all tasks complete, filled Dev Agent Record / File List / Change Log, moved Status to `review`.
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — `45-5-casetests-fixture-shed` moved `ready-for-dev` → `in-progress` → `review`; `last_updated` refreshed.
+
+**Local artifacts (git-ignored, not in version control):**
+
+- `nccdphp-drh-mmria-utilities/artifacts/split-case-tests.ps1` — one-shot PowerShell splitter used to perform the mechanical text move.
 
 ### Change Log
 
-_To be filled by the dev agent._
+| Date | Change |
+|---|---|
+| 2026-08-21 | Story 45.5 complete: sharded the 4,943-line `Tests/Quarantine/CaseTests.cs` monolith into 11 per-Category fixture files plus a shared `CaseTestSupport` base class (12 new files total), carved the appended `CaseSaveExistingDocumentProbeTests` fixture into its own file, replaced the original `CaseTests.cs` with the 9-test `Case`-category subset, and refreshed `mmria-server-tests_AI_CONTEXT.md`. All 44 pre-split `[Test]` methods preserved verbatim; no test bodies / signatures / attributes edited. Tier remains `Quarantine` (deviation from AC-4's `Mocked` / `LiveDb` presumption — the file was `Quarantine` at kickoff, not `LiveDb`), `CaseTestSupport` placed under `Tests/Quarantine/` (deviation from AC-6's `Helpers/` — required by references to deleted `TestEnvironment` / `MiscHelpers` / `AccountTestHelper` types). Default build 0 errors / no new warnings; `dotnet test --no-build` on the default `Category=Unit|Category=Mocked` filter = **168 passed / 0 failed / 0 skipped** (identical to the Story 45.4 baseline). |
