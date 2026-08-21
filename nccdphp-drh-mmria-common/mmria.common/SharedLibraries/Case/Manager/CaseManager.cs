@@ -677,12 +677,37 @@ public class CaseManager
         var array = recordId?.Split('-') ?? Array.Empty<string>();
         if (array.Length < 3)
         {
-            // Record ID does not follow the expected STATE-YEAR-NUMBER pattern;
-            // return it unchanged rather than crashing.
+            // Story 39.1 Bug 1 fix: when the case has no valid existing record ID
+            // and the caller supplied a year, generate a fresh unique record ID
+            // using stateDatabase as the state prefix. Pre-v4.1 behavior generated
+            // an ID here; the v4.1 early-return dropped that and left the case
+            // record_id blank on a no-op submission.
+            if (yearOfDeathReplacement.HasValue &&
+                db_info != null &&
+                !string.IsNullOrWhiteSpace(stateDatabase))
+            {
+                return await GenerateUniqueRecordIdAsync(
+                    stateDatabase,
+                    yearOfDeathReplacement.Value.ToString(),
+                    db_info);
+            }
+
+            // Record ID does not follow the expected STATE-YEAR-NUMBER pattern
+            // and we lack the inputs to generate one; return it unchanged.
             return recordId ?? string.Empty;
         }
 
         string new_record_id = $"{array[0]}-{yearOfDeathReplacement}-{array[2]}";
+
+        // Story 39.1 Bug 2 fix: when the year is unchanged, the year-substituted
+        // candidate equals the case's own record ID. RecordIdExistsAsync would
+        // then report the ID as taken (the case itself owns it) and the loop
+        // would allocate a different random suffix, silently rewriting the
+        // record ID on a no-op submission. Preserve the current ID in that case.
+        if (string.Equals(new_record_id, recordId, StringComparison.OrdinalIgnoreCase))
+        {
+            return recordId;
+        }
 
         // Try the initial year-substituted candidate first (Story 39.1 preservation
         // path). If it is already taken, fall through to the shared primitive for

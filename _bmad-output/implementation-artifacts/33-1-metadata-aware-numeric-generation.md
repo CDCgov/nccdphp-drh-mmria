@@ -6,7 +6,7 @@ baseline_commit: 35f51d1c4c5050d9c9c16a0fd05eaa3aa4c0189b
 
 **Epic:** 33 - Case Generator Date and Number Plausibility
 **Story ID:** 33.1
-**Status:** in-progress
+**Status:** done
 
 ---
 

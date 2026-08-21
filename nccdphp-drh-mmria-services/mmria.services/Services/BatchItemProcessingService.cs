@@ -854,6 +854,14 @@ public sealed class BatchItemProcessingService
                 mmria_id = mmria_id,
                 StatusDetail = "matching case found in database"
             };
+
+            // Story 38.1 (AC-4): structured log for per-case duplicate skip.
+            // Emitted through Console because Akka Props creation of the actor
+            // pipeline does not thread ILogger; the key/value shape below is the
+            // observability contract the AC requires.
+            Console.WriteLine(
+                $"[VitalImport:ExistingCaseSkipped] CDCUniqueID={result.CDCUniqueID} mmria_record_id={result.mmria_record_id} ImportFileName={result.ImportFileName}");
+
             // Notify BatchProcessor of completion
             var completion = new mmria.common.ije.BatchItemComplete()
             {
@@ -1681,7 +1689,7 @@ public sealed class BatchItemProcessingService
                         field_set["FRACE14"],
                         field_set["FRACE15"]));
 
-                    gs.set_value(Parent_NAT_IJE_to_MMRIA_Path["FRACE16_17"], FRACE16_17_NAT_Rule(field_set["FRACE16"], field_set["FRACE16"]), new_case);
+                    gs.set_value(Parent_NAT_IJE_to_MMRIA_Path["FRACE16_17"], FRACE16_17_NAT_Rule(field_set["FRACE16"], field_set["FRACE17"]), new_case);
                     gs.set_value(Parent_NAT_IJE_to_MMRIA_Path["FRACE18_19"], FRACE18_19_NAT_Rule(field_set["FRACE18"], field_set["FRACE19"]), new_case);
                     gs.set_value(Parent_NAT_IJE_to_MMRIA_Path["FRACE20_21"], FRACE20_21_NAT_Rule(field_set["FRACE20"], field_set["FRACE21"]), new_case);
                     gs.set_value(Parent_NAT_IJE_to_MMRIA_Path["FRACE22_23"], FRACE22_23_NAT_Rule(field_set["FRACE22"], field_set["FRACE23"]), new_case);
@@ -2023,7 +2031,7 @@ public sealed class BatchItemProcessingService
                         field_set["FRACE14"],
                         field_set["FRACE15"]));
 
-                    gs.set_value(Parent_FET_IJE_to_MMRIA_Path["FRACE16_17"], FRACE16_17_FET_Rule(field_set["FRACE16"], field_set["FRACE16"]), new_case);
+                    gs.set_value(Parent_FET_IJE_to_MMRIA_Path["FRACE16_17"], FRACE16_17_FET_Rule(field_set["FRACE16"], field_set["FRACE17"]), new_case);
                     gs.set_value(Parent_FET_IJE_to_MMRIA_Path["FRACE18_19"], FRACE18_19_FET_Rule(field_set["FRACE18"], field_set["FRACE19"]), new_case);
                     gs.set_value(Parent_FET_IJE_to_MMRIA_Path["FRACE20_21"], FRACE20_21_FET_Rule(field_set["FRACE20"], field_set["FRACE21"]), new_case);
                     gs.set_value(Parent_FET_IJE_to_MMRIA_Path["FRACE22_23"], FRACE22_23_FET_Rule(field_set["FRACE22"], field_set["FRACE23"]), new_case);

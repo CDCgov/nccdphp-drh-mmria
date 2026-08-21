@@ -6,7 +6,7 @@ baseline_commit: c608db41b41b4060cbb343164e240aaed212ea47
 
 **Epic:** 44 — Case Narrative PDF Render Resilience (v4.2)
 **Story ID:** 44.1
-**Status:** review
+**Status:** done
 **Date added:** 2026-08-20
 **Source:** BUG 118794 — Rel 4.1, P-Low, TA: "Unable to create PDF on Case Narrative Case: NJ-2024-7102", reported by NJ (MMRIA\ITDM 25-26 - Option Yr 4). Reproduced against tenant1 record `TENENAT1-2010-7462`.
 **PRD:** FR-14.1 – FR-14.6 in `_bmad-output/planning-artifacts/prds/prd-mmria-2026-08-06/prd.md`

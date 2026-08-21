@@ -2,7 +2,7 @@
 
 **Epic:** 43 — Vitals Import Father's Race Principal Tribe Fix (v4.2)
 **Story ID:** 43.1
-**Status:** ready-for-dev
+**Status:** done
 **Date added:** 2026-08-20
 **Source:** BUG 119513 — Rel 4.2, P-High, reported by Susana (MMRIA\ITDM 25-26 - Option Yr 4)
 **PRD:** FR-13.1 – FR-13.5 in `_bmad-output/planning-artifacts/prds/prd-mmria-2026-08-06/prd.md`
@@ -158,14 +158,17 @@ Independent of all other v4.2 epics. Can be worked immediately.
 
 ## Dev Agent Record
 
-_To be completed by dev agent after implementation._
-
 ### Completion Notes
 
-_TBD_
+- **Root-cause fix (AC-1 – AC-5):** Two single-character copy/paste corrections in `BatchItemProcessingService.cs` — the second argument of the `FRACE16_17_NAT_Rule` call (line ~1692) and the `FRACE16_17_FET_Rule` call (line ~2034) both passed `field_set["FRACE16"]` twice. Changed the second argument at each site to `field_set["FRACE17"]`. The `FRACE16_17_NAT_Rule` / `FRACE16_17_FET_Rule` helper methods in `MMRIAServicesHelper.cs` were verified correct and unchanged (AC-6).
+- **AC-7 (no collateral damage):** Verified by inspection that the adjacent `FRACE18_19`, `FRACE20_21`, and `FRACE22_23` calls in both NAT and FET paths already used the correct `(FRACE_n, FRACE_n+1)` argument pattern. Added a regression assertion in the unit tests that exercises `FRACE18_19_NAT_Rule` against realistic values (`"Chinese"`, `"Vietnamese"`) to lock the pattern.
+- **AC-8 (test coverage):** Added `mmria-server.tests/Tests/FRACEMappingRuleTests.cs` — nine `[Test]` methods, `[Category("IJE")]`. Covers the four-case matrix (both populated, only 16, only 17, both blank) on both the NAT and FET helpers, plus the AC-7 sanity assertion on `FRACE18_19_NAT_Rule`. Tests reference `mmria.common.SharedLibraries.MMRIAServices.Helper.MMRIAServicesHelper` via the existing `mmria.common` project reference — no new project references, no new using aliases, no external DI. Skill applied per user direction: tests written but not executed in this session.
+- **AC-9 (build):** `mmria-server.csproj` build task ran to completion (exit 0). `mmria.services` compilation clean. `mmria-server.tests.csproj` MSBuild step reported no `error CS` output but the file-copy phase for `mmria.common.dll` was blocked by an attached debugger holding the DLL (PID 30852, "Visual Studio Debug Adapter for .NET"); the compile itself succeeded.
+- **Retrospective correction (OI-v42-4):** Out of scope for 43.1 as specified. No retrospective migration was authored. Any previously imported case with only `FRACE17` populated will remain incorrect until a follow-up story is authorized.
 
 ### Change Log
 
 | File | Change |
 |------|--------|
-| _TBD_ | _TBD_ |
+| `nccdphp-drh-mmria-services/mmria.services/Services/BatchItemProcessingService.cs` | NAT path (~line 1692): second arg to `FRACE16_17_NAT_Rule` changed from `field_set["FRACE16"]` to `field_set["FRACE17"]`. FET path (~line 2034): same correction on `FRACE16_17_FET_Rule`. |
+| `nccdphp-drh-mmria-utilities/mmria-server.tests/Tests/FRACEMappingRuleTests.cs` | **New file.** Nine `[Test]` methods covering the four-case matrix on both `FRACE16_17_NAT_Rule` and `FRACE16_17_FET_Rule`, plus an AC-7 sanity assertion on `FRACE18_19_NAT_Rule`. All under `[Category("IJE")]`. |

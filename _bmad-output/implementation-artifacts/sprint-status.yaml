@@ -1,5 +1,5 @@
 # generated: 2026-07-14
-last_updated: 2026-08-20  # epic-29, epic-30, epic-42 closed
+last_updated: 2026-08-21  # story 38-1 delivered to review
 # project: mmria
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@ last_updated: 2026-08-20  # epic-29, epic-30, epic-42 closed
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-07-14
-last_updated: 2026-08-20
+last_updated: 2026-08-21  # epic-45 added
 project: mmria
 project_key: NOKEY
 tracking_system: file-system
@@ -302,11 +302,11 @@ development_status:
   epic-32-retrospective: optional
 
   # Epic 33: Case Generator Date and Number Plausibility
-  epic-33: in-progress
-  33-1-metadata-aware-numeric-generation: in-progress
-  33-2-date-group-validity-timeline-plausibility: review
-  33-3-recursive-date-number-validation-gate: review
-  33-4-generator-regression-coverage: review
+  epic-33: done
+  33-1-metadata-aware-numeric-generation: done
+  33-2-date-group-validity-timeline-plausibility: done
+  33-3-recursive-date-number-validation-gate: done
+  33-4-generator-regression-coverage: done
   epic-33-retrospective: optional
 
   # ── Epic 34: Case Narrative PDF Spacing Fidelity ──────────────────────────
@@ -342,12 +342,12 @@ development_status:
 
   # ── Epic 38: IJE Batch Re-Upload Rejection & Import Observability ───────────
   epic-38: in-progress
-  38-1-ije-upload-duplicate-prevention-and-logging: ready-for-dev
+  38-1-ije-upload-duplicate-prevention-and-logging: review
   epic-38-retrospective: optional
 
   # ── Epic 39: Update Year of Death Record ID Regression Fix ────────────────
   epic-39: in-progress
-  39-1-year-of-death-record-id-regression-fix: ready-for-dev
+  39-1-year-of-death-record-id-regression-fix: review
   epic-39-retrospective: optional
 
   # ── Epic 40: Session Expiry Automatic Logout Redirect on 401 ─────────────
@@ -366,3 +366,22 @@ development_status:
   42-1-geocoding-location-registry-refactor: done
   42-2-restore-certainty-code-modal: done
   epic-42-retrospective: optional
+
+  # ── Epic 43: Vitals Import Father's Race Principal Tribe Fix (BUG 119513) ──
+  epic-43: done
+  43-1-ije-import-father-race-principal-tribe-mapping-fix: done
+  epic-43-retrospective: optional
+
+  # ── Epic 44: Case Narrative PDF Render Resilience (BUG 118794) ──────────
+  epic-44: done
+  44-1-case-narrative-pdf-render-resilience: done
+  epic-44-retrospective: optional
+
+  # ── Epic 45: mmria-server.tests Reliability Uplift & Live-DB Retirement ───
+  epic-45: in-progress
+  45-1-test-inventory-classification-catalog: ready-for-dev
+  45-2-tier-enforcement-categorize-reorganize-quarantine: ready-for-dev
+  45-3-convert-live-db-tests-to-mocked-wave-1: ready-for-dev
+  45-4-retire-live-db-tests-e2e-coverage-plan: ready-for-dev
+  45-5-casetests-fixture-shed: ready-for-dev  # optional
+  epic-45-retrospective: optional

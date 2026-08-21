@@ -1491,7 +1491,7 @@ dev this story _bmad-output/implementation-artifacts/42-2-restore-certainty-code
 
 | Story | File | Status |
 |---|---|---|
-| 43.1 — Fix Father's Race `principle_tribe` Mapping (FRACE16 + FRACE17) | [43-1-ije-import-father-race-principal-tribe-mapping-fix.md](43-1-ije-import-father-race-principal-tribe-mapping-fix.md) | ready-for-dev |
+| 43.1 — Fix Father's Race `principle_tribe` Mapping (FRACE16 + FRACE17) | [43-1-ije-import-father-race-principal-tribe-mapping-fix.md](43-1-ije-import-father-race-principal-tribe-mapping-fix.md) | review |
 
 > ℹ️ **Source:** BUG 119513 — Rel 4.2, P-High, reported by Susana (MMRIA\ITDM 25-26 - Option Yr 4). Covers PRD requirements FR-13.1 – FR-13.5.
 >
@@ -1533,6 +1533,64 @@ dev this story _bmad-output/implementation-artifacts/44-1-case-narrative-pdf-ren
 
 ---
 
+## Epic 45: `mmria-server.tests` Reliability Uplift & Live-DB Retirement _(2026-08-21)_
+
+| Story | File | Status |
+|---|---|---|
+| 45.1 — Test Inventory & Classification Catalog | [45-1-test-inventory-classification-catalog.md](45-1-test-inventory-classification-catalog.md) | ready-for-dev |
+| 45.2 — Tier Enforcement: Categorize, Reorganize, Quarantine Out-of-Sync Tests | [45-2-tier-enforcement-categorize-reorganize-quarantine.md](45-2-tier-enforcement-categorize-reorganize-quarantine.md) | ready-for-dev |
+| 45.3 — Convert Live-DB Tests to Mocked (Wave 1: high-value, low-risk) | [45-3-convert-live-db-tests-to-mocked-wave-1.md](45-3-convert-live-db-tests-to-mocked-wave-1.md) | ready-for-dev |
+| 45.4 — Retire Remaining Live-DB Tests + Playwright E2E Coverage Plan | [45-4-retire-live-db-tests-e2e-coverage-plan.md](45-4-retire-live-db-tests-e2e-coverage-plan.md) | ready-for-dev |
+| 45.5 — `CaseTests.cs` Fixture Shed _(optional)_ | [45-5-casetests-fixture-shed.md](45-5-casetests-fixture-shed.md) | ready-for-dev |
+
+**Sequencing:** 45.1 first (foundation catalog — everything downstream reads from it). 45.2 depends on 45.1. 45.3 depends on 45.2. 45.4 depends on 45.3. 45.5 is optional and independent of 45.3/45.4 — can run any time after 45.2 (but recommended after 45.3 so the shed operates on the final converted form).
+
+> ℹ️ **Source of the epic (2026-08-21 analyst session with Mary):** `nccdphp-drh-mmria-utilities/mmria-server.tests` currently has 38 active `*.cs` fixtures, ~412 `[Test]` methods, ~19,900 lines of code, and no reliable green baseline. The suite silently `Assert.Inconclusive`s when CouchDB is unreachable, so a passing run today can hide dozens of skipped live-DB tests. `[Category(...)]` is inconsistent — no filter distinguishes "safe to run in CI without infra" from "needs the multi-tenant CouchDB pods". A meaningful fraction of the file base was written months ago against schemas / interfaces / route contracts that have since drifted, and no one has been paying the maintenance cost.
+>
+> ℹ️ **Direction (confirmed with Nick, 2026-08-21):**
+> 1. Inventory + formal tier classification (unit / mocked-http / live-DB / broken).
+> 2. Live-DB dependency is **removed entirely** from this project. Live-CouchDB integration coverage migrates to Playwright/E2E — Epic 45 produces the migration plan; execution of the E2E stories lives elsewhere.
+> 3. Out-of-sync tests are **quarantined** (moved to `Tests/Quarantine/` with `[Explicit]` + TODO linking back to the catalog), not deleted. Deletion is a separate decision after quarantine has aged.
+> 4. Epic-only format — no PRD, no planning-artifacts subfolder.
+>
+> ℹ️ **Non-goals:** No new production code. No refactors of `mmria.common` / `mmria-server` / `mmria.services` to make tests easier. If a mock conversion requires a source-side seam (e.g. a new interface), that's out-of-epic — quarantine the test and log the seam in the catalog as a future story input.
+>
+> ⚠️ **Independent** of every other in-flight epic. Zero file conflicts expected against Epics 29–44.
+>
+> ⚠️ **Two open items must be resolved during Story 45.1 execution and rolled forward into 45.2–45.4 scope:** (a) whether the `Tests/Quarantine/` folder lives inside `mmria-server.tests` or as a separate `mmria-server.tests.quarantine` project, and (b) the exact `Category` vocabulary — draft is `Unit` / `Mocked` / `LiveDb` / `Quarantine` / `Slow` / `Contract`.
+
+**Story 45.1 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/45-1-test-inventory-classification-catalog.md
+```
+
+**Story 45.2 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/45-2-tier-enforcement-categorize-reorganize-quarantine.md
+```
+
+**Story 45.3 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/45-3-convert-live-db-tests-to-mocked-wave-1.md
+```
+
+**Story 45.4 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/45-4-retire-live-db-tests-e2e-coverage-plan.md
+```
+
+**Story 45.5 prompt:**
+
+```
+dev this story _bmad-output/implementation-artifacts/45-5-casetests-fixture-shed.md
+```
+
+---
+
 
 | OI       | Affects               | What to resolve                                                                                                                                                                                                                                                                                                                                                                                        |
 | -------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -1546,3 +1604,5 @@ dev this story _bmad-output/implementation-artifacts/44-1-case-narrative-pdf-ren
 | OI-v42-3 | Story 38.1 | **Open** — Confirm partial-batch behavior for IJE re-uploads: (a) skip duplicate cases and process new ones, or (b) reject the entire batch. Story 38.1 implements option (b) as the conservative default. Confirm with Nick before starting. |
 | OI-v42-4 | Story 43.1 (potential Story 43.2) | **Open** — Determine whether to author a retrospective data-correction migration for cases previously imported with the wrong `principle_tribe` mapping (BUG 119513). Depends on whether original IJE files are still available and on impact assessment. Follows the Epic 12 Story 12.2 pattern if approved. |
 | OI-v42-5 | Story 44.1 | **Open** — Confirm final placeholder wording for the Case Narrative PDF fallback with Vilma. Draft candidate: _"Case Narrative could not be included in this report. Please review the Case Narrative in the case and try again."_ Per Nick's direction (2026-08-20) the wording must be brief and must not describe the underlying cause (no mention of tables / HTML / parse errors). Confirm at story kickoff. |
+| OI-e45-1 | Story 45.2 | **Open** — Decide whether the `Tests/Quarantine/` bucket lives inside `mmria-server.tests` (single project, `[Explicit]` gates prevent accidental execution) or as a separate `mmria-server.tests.quarantine` project (hard build/exec separation, but adds a csproj and a `ProjectReference` boundary). Story 45.1 catalog + broken-count total will inform. Resolve at Story 45.2 kickoff. |
+| OI-e45-2 | Stories 45.2, 45.3 | **Open** — Confirm the final `[Category(...)]` vocabulary. Draft: `Unit` (no HTTP + no DB), `Mocked` (`CouchDbHttpClient` on top of a recording/fixed handler), `LiveDb` (needs multi-tenant CouchDB pods), `Quarantine` (`[Explicit]`, drift-flagged), `Slow` (long-running mocked tests worth a separate filter), `Contract` (cross-repo JSON/route/serialization contracts). Story 45.1 catalog surfaces which of these earn a category. Resolve at Story 45.2 kickoff. |
