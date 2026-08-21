@@ -84,7 +84,7 @@ public sealed class CVSManager
                 catch (Exception ex)
                 {
                     // Year query failed — proceed with the original year value.
-                    _logger.LogWarning(ex, "CVS year-list query failed for url={Url}; proceeding with original year={Year}", cvs.cvs_api_url, get_all_data_body.payload.year);
+                    _logger.LogWarning(ex, "CVS year-list query failed; proceeding with original year");
                 }
             }
         }
