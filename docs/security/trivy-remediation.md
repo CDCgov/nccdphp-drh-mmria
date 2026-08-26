@@ -4,6 +4,155 @@ Records are prepended — newest scan block at the top.
 
 ---
 
+## Scan: MMRIA S2I @ 26b70afb — 2026-08-11
+
+- **Commit:** `26b70afb1110cc18d8c5168c5c4e8b7951b3900c`
+- **Service:** `MMRIA S2I`
+- **Scan ID:** `31317`
+- **Severity totals:** C:0  H:14  M:103
+- **Scanned image:** `mmria/mmria-s2i:latest (redhat 9.8)`
+
+> **Scope:** This scan block addresses Critical and High findings only, consistent with the
+> automated remediation workflow. The 103 Medium findings are not triaged here; they are
+> tracked by the scanning pipeline and addressed in a separate review cycle.
+
+### Triage summary
+
+| Severity | Original | Fixed | Pending image update | Residual | Not applicable | Remaining |
+|---|---:|---:|---:|---:|---:|---:|
+| HIGH | 14 | 0 | 0 | 14 | 0 | 14 |
+
+#### Finding inventory — HIGH
+
+| Package | CVE | Installed | Fixed In | Status | Verdict |
+|---|---|---|---|---|---|
+| curl-minimal | CVE-2026-11352 | 7.76.1-40.el9 | — | affected | Residual risk – no fix available |
+| curl-minimal | CVE-2026-11586 | 7.76.1-40.el9 | — | affected | Residual risk – no fix available |
+| curl-minimal | CVE-2026-8286 | 7.76.1-40.el9 | — | affected | Residual risk – no fix available |
+| curl-minimal | CVE-2026-8925 | 7.76.1-40.el9 | — | affected | Residual risk – no fix available |
+| curl-minimal | CVE-2026-9547 | 7.76.1-40.el9 | — | affected | Residual risk – no fix available |
+| libcurl-minimal | CVE-2026-11352 | 7.76.1-40.el9 | — | affected | Residual risk – no fix available |
+| libcurl-minimal | CVE-2026-11586 | 7.76.1-40.el9 | — | affected | Residual risk – no fix available |
+| libcurl-minimal | CVE-2026-8286 | 7.76.1-40.el9 | — | affected | Residual risk – no fix available |
+| libcurl-minimal | CVE-2026-8925 | 7.76.1-40.el9 | — | affected | Residual risk – no fix available |
+| libcurl-minimal | CVE-2026-9547 | 7.76.1-40.el9 | — | affected | Residual risk – no fix available |
+| dotnet-host | CVE-2024-38081 | 10.0.10-1.el9_8 | — | end_of_life | Residual risk – required, not reachable under current controls |
+| dotnet-host | CVE-2025-26682 | 10.0.10-1.el9_8 | — | end_of_life | Residual risk – required, not reachable under current controls |
+| dotnet-host | CVE-2025-59144 | 10.0.10-1.el9_8 | — | end_of_life | Residual risk – required, not reachable under current controls |
+| dotnet-host | CVE-2026-48779 | 10.0.10-1.el9_8 | — | under_investigation | Residual risk – required, not reachable under current controls |
+
+### Fixes made
+
+No new code changes required. The `.s2i/dockerfile` already includes `dnf update -y libacl curl-minimal libcurl-minimal && dnf clean all` (added during scan ef00c008) to automatically apply errata once Red Hat publishes fixed RPMs for the curl CVEs. All 14 findings carry forward from the prior scan with unchanged installed versions and statuses.
+
+### HIGH / CRITICAL release analysis
+
+All 14 findings are identical to scan ef00c008 (2026-08-07). Packages, installed versions, `fixedIn` (empty for all), and statuses are unchanged. Verdicts are carried forward — evidence from the prior scan remains valid.
+
+#### curl-minimal and libcurl-minimal (10 findings)
+
+| Package | CVE | Verdict |
+|---|---|---|
+| curl-minimal | CVE-2026-11352 | Residual risk – no fix available |
+| curl-minimal | CVE-2026-11586 | Residual risk – no fix available |
+| curl-minimal | CVE-2026-8286 | Residual risk – no fix available |
+| curl-minimal | CVE-2026-8925 | Residual risk – no fix available |
+| curl-minimal | CVE-2026-9547 | Residual risk – no fix available |
+| libcurl-minimal | CVE-2026-11352 | Residual risk – no fix available |
+| libcurl-minimal | CVE-2026-11586 | Residual risk – no fix available |
+| libcurl-minimal | CVE-2026-8286 | Residual risk – no fix available |
+| libcurl-minimal | CVE-2026-8925 | Residual risk – no fix available |
+| libcurl-minimal | CVE-2026-9547 | Residual risk – no fix available |
+
+Carried from prior scan — evidence unchanged. No Red Hat errata RPM is available for any of the five CVEs on RHEL 9 (`fixedIn` empty, status `affected`). The `.s2i/dockerfile` `dnf update` layer will apply fixes automatically when errata are published.
+
+#### dotnet-host (4 findings)
+
+| CVE | Status | Verdict |
+|---|---|---|
+| CVE-2024-38081 | end_of_life | Residual risk – required, not reachable under current controls |
+| CVE-2025-26682 | end_of_life | Residual risk – required, not reachable under current controls |
+| CVE-2025-59144 | end_of_life | Residual risk – required, not reachable under current controls |
+| CVE-2026-48779 | under_investigation | Residual risk – required, not reachable under current controls |
+
+Carried from prior scan — evidence unchanged. `dotnet-host` is a required component of the S2I builder image. No fixed version is available from Red Hat for RHEL 9. See SWA entries below for per-CVE justifications.
+
+---
+
+## SWA Exception Justifications
+
+### curl-minimal / CVE-2026-11352
+
+**Verdict:** Residual risk – no fix available
+**Summary:** Carried from prior scan (ef00c008, 2026-08-07) — evidence unchanged. No Red Hat errata RPM for CVE-2026-11352 exists at scan time for `curl-minimal` (version 7.76.1-40.el9). NVD CVSS AV:N/AC:H requires the application to connect to a malicious HTTP/3 server; MMRIA makes no outbound HTTP/3 connections from the S2I builder image. A `dnf update` layer in `.s2i/dockerfile` will apply the fix automatically when errata is released.
+
+### curl-minimal / CVE-2026-11586
+
+**Verdict:** Residual risk – no fix available
+**Summary:** Carried from prior scan (ef00c008, 2026-08-07) — evidence unchanged. No Red Hat errata RPM for CVE-2026-11586 exists at scan time for `curl-minimal` (version 7.76.1-40.el9). The vulnerability requires an active WebSocket connection to a malicious server that floods PING frames; MMRIA's S2I builder makes no outbound WebSocket connections. A `dnf update` layer in `.s2i/dockerfile` ensures automatic remediation when errata is released.
+
+### curl-minimal / CVE-2026-8286
+
+**Verdict:** Residual risk – no fix available
+**Summary:** Carried from prior scan (ef00c008, 2026-08-07) — evidence unchanged. No Red Hat errata RPM for CVE-2026-8286 exists at scan time for `curl-minimal` (version 7.76.1-40.el9). The vulnerability is a STARTTLS TLS-session reuse flaw; the S2I builder image makes no STARTTLS connections during the MMRIA build. A `dnf update` layer in `.s2i/dockerfile` ensures automatic remediation when errata is released.
+
+### curl-minimal / CVE-2026-8925
+
+**Verdict:** Residual risk – no fix available
+**Summary:** Carried from prior scan (ef00c008, 2026-08-07) — evidence unchanged. No Red Hat errata RPM for CVE-2026-8925 exists at scan time for `curl-minimal` (version 7.76.1-40.el9). The double-free GSASL defect requires SASL authentication, which is not used in the MMRIA S2I build pipeline. A `dnf update` layer in `.s2i/dockerfile` ensures automatic remediation when errata is released.
+
+### curl-minimal / CVE-2026-9547
+
+**Verdict:** Residual risk – no fix available
+**Summary:** Carried from prior scan (ef00c008, 2026-08-07) — evidence unchanged. No Red Hat errata RPM for CVE-2026-9547 exists at scan time for `curl-minimal` (version 7.76.1-40.el9). The SCP/SFTP SSH key callback flaw is not triggered because MMRIA's S2I build does not use SCP or SFTP transfers. A `dnf update` layer in `.s2i/dockerfile` ensures automatic remediation when errata is released.
+
+### libcurl-minimal / CVE-2026-11352
+
+**Verdict:** Residual risk – no fix available
+**Summary:** Carried from prior scan (ef00c008, 2026-08-07) — evidence unchanged. No Red Hat errata RPM for CVE-2026-11352 exists at scan time for `libcurl-minimal` (version 7.76.1-40.el9). NVD CVSS AV:N/AC:H requires the application to connect to a malicious HTTP/3 server; MMRIA makes no outbound HTTP/3 connections from the S2I builder image. A `dnf update` layer in `.s2i/dockerfile` will apply the fix automatically when errata is released.
+
+### libcurl-minimal / CVE-2026-11586
+
+**Verdict:** Residual risk – no fix available
+**Summary:** Carried from prior scan (ef00c008, 2026-08-07) — evidence unchanged. No Red Hat errata RPM for CVE-2026-11586 exists at scan time for `libcurl-minimal` (version 7.76.1-40.el9). The vulnerability requires an active WebSocket connection receiving malicious PING floods; MMRIA's S2I builder makes no outbound WebSocket connections. A `dnf update` layer in `.s2i/dockerfile` ensures automatic remediation when errata is released.
+
+### libcurl-minimal / CVE-2026-8286
+
+**Verdict:** Residual risk – no fix available
+**Summary:** Carried from prior scan (ef00c008, 2026-08-07) — evidence unchanged. No Red Hat errata RPM for CVE-2026-8286 exists at scan time for `libcurl-minimal` (version 7.76.1-40.el9). The STARTTLS session-reuse flaw is not triggered during MMRIA's S2I build pipeline, which makes no STARTTLS connections. A `dnf update` layer in `.s2i/dockerfile` ensures automatic remediation when errata is released.
+
+### libcurl-minimal / CVE-2026-8925
+
+**Verdict:** Residual risk – no fix available
+**Summary:** Carried from prior scan (ef00c008, 2026-08-07) — evidence unchanged. No Red Hat errata RPM for CVE-2026-8925 exists at scan time for `libcurl-minimal` (version 7.76.1-40.el9). The double-free GSASL defect requires SASL authentication, which is not used in the MMRIA S2I build pipeline. A `dnf update` layer in `.s2i/dockerfile` ensures automatic remediation when errata is released.
+
+### libcurl-minimal / CVE-2026-9547
+
+**Verdict:** Residual risk – no fix available
+**Summary:** Carried from prior scan (ef00c008, 2026-08-07) — evidence unchanged. No Red Hat errata RPM for CVE-2026-9547 exists at scan time for `libcurl-minimal` (version 7.76.1-40.el9). The SCP/SFTP SSH key callback flaw is not triggered because MMRIA's S2I build does not use SCP or SFTP transfers. A `dnf update` layer in `.s2i/dockerfile` ensures automatic remediation when errata is released.
+
+### dotnet-host / CVE-2024-38081
+
+**Verdict:** Residual risk – required, not reachable under current controls
+**Summary:** Carried from prior scan (ef00c008, 2026-08-07) — evidence unchanged. `dotnet-host` (version 10.0.10-1.el9_8) is the mandatory .NET runtime host component of the S2I builder image; removal would break the build. CVE-2024-38081 is a .NET/Visual Studio Elevation of Privilege vulnerability (NVD CVSS AV:L/AC:L/PR:L — requires local access). The S2I builder runs as non-root (UID 1001) in an OpenShift-managed pod with no interactive shell access, eliminating the local privilege-escalation path. No fixed version is available from Red Hat for RHEL 9 (`fixedIn` empty, status `end_of_life`).
+
+### dotnet-host / CVE-2025-26682
+
+**Verdict:** Residual risk – required, not reachable under current controls
+**Summary:** Carried from prior scan (ef00c008, 2026-08-07) — evidence unchanged. `dotnet-host` (version 10.0.10-1.el9_8) is a required component of the S2I builder image; removal is not possible. CVE-2025-26682 is an ASP.NET Core resource allocation DoS flaw (network-exploitable). The S2I builder image is a build-time artifact, not a web-facing service — no ASP.NET Core request pipeline is active in the builder context. No fixed version is available from Red Hat for RHEL 9 (`fixedIn` empty, status `end_of_life`).
+
+### dotnet-host / CVE-2025-59144
+
+**Verdict:** Residual risk – required, not reachable under current controls
+**Summary:** Carried from prior scan (ef00c008, 2026-08-07) — evidence unchanged. Trivy attributes CVE-2025-59144 to `dotnet-host` (version 10.0.10-1.el9_8), but the CVE description references the `debug` npm JavaScript package (supply-chain attack via a compromised npm account). `dotnet-host` does not ship or execute the `debug` npm package; this appears to be a Trivy scan attribution artefact from scanning bundled Node.js tooling present in the .NET SDK image. The .NET SDK builder image is used only at build time and is not internet-accessible in production. Verification command (Tier-2): `oc rsh <s2i-build-pod> find / -name 'debug' -path '*/node_modules/*' 2>/dev/null` to confirm presence or absence of the npm package in the image.
+
+### dotnet-host / CVE-2026-48779
+
+**Verdict:** Residual risk – required, not reachable under current controls
+**Summary:** Carried from prior scan (ef00c008, 2026-08-07) — evidence unchanged. Trivy attributes CVE-2026-48779 to `dotnet-host` (version 10.0.10-1.el9_8), but the CVE description references the `ws` Node.js WebSocket library (memory-exhaustion DoS). `dotnet-host` does not ship or execute the `ws` npm package; this is likely a Trivy scan attribution artefact from bundled Node.js files in the .NET SDK image. The S2I builder image is a build-time artifact, not a network-accessible service. Red Hat investigation is still `under_investigation` for RHEL 9; no fixed version is available. Verification command (Tier-2): `oc rsh <s2i-build-pod> find / -name 'ws' -path '*/node_modules/*' 2>/dev/null` to confirm presence or absence.
+
+---
+
 ## Scan: MMRIA S2I @ ef00c008 — 2026-08-07
 
 - **Commit:** `ef00c008ace2f269e270b5e124e51f21d6c66de2`
