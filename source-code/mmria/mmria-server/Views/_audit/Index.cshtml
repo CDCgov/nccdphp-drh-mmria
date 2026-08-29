@@ -285,7 +285,7 @@ Updated By
         <td>@change.user_name</td>
         <td>@get_note(item.note)</td>
         <td>@change.prompt</td>
-        <td>@change.dictionary_path.Replace("/", " /")</td>
+        <td>@(change.dictionary_path?.Replace("/", " /"))</td>
         <td>
             @if(string.IsNullOrWhiteSpace(change.old_value))
             {

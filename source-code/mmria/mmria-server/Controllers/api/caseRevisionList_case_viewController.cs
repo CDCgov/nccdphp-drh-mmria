@@ -23,19 +23,21 @@ namespace mmria.server;
 [Route("api/[controller]")]
 public sealed class caseRevisionList_case_viewController: ControllerBase 
 {  
-    mmria.common.couchdb.OverridableConfiguration configuration;
+    private readonly mmria.server.util.RequestTenantRuntime _tenantRuntime;
+    private readonly mmria.server.util.TenantCatalog _tenantCatalog;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     delegate bool is_valid_predicate(mmria.common.model.couchdb.case_view_item item);
  
     public caseRevisionList_case_viewController
     (
-
-        mmria.common.couchdb.OverridableConfiguration _configuration,
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        mmria.server.util.TenantCatalog tenantCatalog,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
-        configuration = _configuration;
+        _tenantRuntime = tenantRuntime;
+        _tenantCatalog = tenantCatalog;
         _couchDbHttpClient = couchDbHttpClient;
     }
 
@@ -46,9 +48,14 @@ public sealed class caseRevisionList_case_viewController: ControllerBase
         System.Threading.CancellationToken cancellationToken,
         string jurisdiction_id,
         string search_key
-    ) 
+    )
     {
-        var config = configuration.GetDBConfig(jurisdiction_id);
+        _ = _tenantRuntime;
+        var config = _tenantCatalog.TryResolveDbConfig(jurisdiction_id);
+        if (config == null)
+        {
+            return null;
+        }
         var caseViewManager = new mmria.common.SharedLibraries.CaseView.CaseViewManager(
             config,
             User,

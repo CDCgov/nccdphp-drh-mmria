@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Akka.Actor;
 using Microsoft.Extensions.DependencyInjection;
+using mmria.common.SharedLibraries.Session;
 using mmria.common.SharedLibraries.Session.Model;
 
 namespace mmria.server.model.actor;
@@ -11,28 +12,26 @@ namespace mmria.server.model.actor;
 public sealed class Post_Session : ReceiveActor
 {
     mmria.common.couchdb.DBConfigurationDetail db_config = null;
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly ISessionRepository _sessionRepository;
 
     public Post_Session
     (
         mmria.common.couchdb.DBConfigurationDetail _db_config,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        ISessionRepository sessionRepository
     )
     {
         db_config = _db_config;
-        _couchDbHttpClient = couchDbHttpClient;
+        _sessionRepository = sessionRepository;
 
         ReceiveAsync<Session_Message>(async session_message =>
         {
             try
             {
                 mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response ();
-                string request_string = db_config.url + $"/{db_config.prefix}session/{session_message._id}";
 
                 try 
                 {
-                    string check_document_json = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
-                    var check_document_expando_object = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.session> (check_document_json);
+                    var check_document_expando_object = await _sessionRepository.GetSessionDocumentAsync(session_message._id, db_config);
 
                     if(!string.IsNullOrWhiteSpace(check_document_expando_object.user_id) && !session_message.user_id.Equals(check_document_expando_object.user_id, StringComparison.OrdinalIgnoreCase))
                     {
@@ -51,8 +50,7 @@ public sealed class Post_Session : ReceiveActor
 
                 try
                 {
-                    string responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", request_string, object_string, db_config.user_name, db_config.user_value);
-                    result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
+                    result = await _sessionRepository.SaveSessionRawAsync(session_message._id, object_string, db_config);
                 }
                 catch(Exception ex)
                 {

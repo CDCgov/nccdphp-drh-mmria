@@ -117,7 +117,7 @@ function filter_by_role(selectedValue) {
             return jurisdiction.role_name === selectedValue && jurisdiction.user_id !== "" && jurisdiction.user_id !== null;
         });
         g_filtered_user_list = g_ui.user_summary_list.filter(user => {
-            return filter_jurisdiction.some(jurisdiction => jurisdiction.user_id.endsWith(user.name) || jurisdiction.user_id === user.name);
+            return filter_jurisdiction.some(jurisdiction => jurisdiction.user_id === user.name);
         });
         console.log(`Filtered Users:`, g_filtered_user_list);
     }

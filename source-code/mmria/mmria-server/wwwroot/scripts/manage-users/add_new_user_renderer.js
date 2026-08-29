@@ -15,6 +15,7 @@ var user = {
 
 function add_new_user_render() {
     user_roles = [];
+    deleted_user_roles = [];
     const result = `
         <div class="d-flex mt-4">
             <div>

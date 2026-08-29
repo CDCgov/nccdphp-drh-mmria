@@ -67,13 +67,17 @@ public sealed class JurisdictionSummary
 {
 
     mmria.common.couchdb.ConfigurationSet ConfigDB;
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.Account.IUserRepository _userRepository;
+    private readonly mmria.common.SharedLibraries.Jurisdiction.IJurisdictionRepository _jurisdictionRepository;
+    private readonly mmria.common.SharedLibraries.Case.ICaseRepository _caseRepository;
 
-    public JurisdictionSummary(mmria.common.couchdb.ConfigurationSet p_config_db, mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+    public JurisdictionSummary(mmria.common.couchdb.ConfigurationSet p_config_db, mmria.common.SharedLibraries.Account.IUserRepository userRepository, mmria.common.SharedLibraries.Jurisdiction.IJurisdictionRepository jurisdictionRepository, mmria.common.SharedLibraries.Case.ICaseRepository caseRepository)
     {
 
         ConfigDB = p_config_db;
-        _couchDbHttpClient = couchDbHttpClient;
+        _userRepository = userRepository;
+        _jurisdictionRepository = jurisdictionRepository;
+        _caseRepository = caseRepository;
     }
 
     public async Task<List<JurisdictionSummaryItem>> execute
@@ -85,8 +89,12 @@ public sealed class JurisdictionSummary
         var result = new Dictionary<string, JurisdictionSummaryItem>(System.StringComparer.OrdinalIgnoreCase);
         var user_count_result = new Dictionary<string, ItemCount>(System.StringComparer.OrdinalIgnoreCase);
         var record_count_result = new Dictionary<string, ItemCount>(System.StringComparer.OrdinalIgnoreCase);
-        var user_count_task_list = new List<Task>();
-        var record_count_task_list = new List<Task>();
+        // Defer task creation. Previously each Add(GetUserCount(...)) immediately
+        // started the task, so by the end of the foreach we had up to 2*N (~144)
+        // CouchDB requests in flight at once. Storing factories lets the bounded
+        // Parallel.ForEachAsync below cap real concurrency.
+        var user_count_task_list = new List<Func<Task>>();
+        var record_count_task_list = new List<Func<Task>>();
         //var jurisdiction_count_task_list = new List<Task>();
 
         var current_date = System.DateTime.Now;
@@ -136,8 +144,8 @@ public sealed class JurisdictionSummary
                     
                     record_count_result.Add(prefix, record_count);
 
-                    user_count_task_list.Add(GetUserCount(cancellationToken, prefix, config.Value, usr_count, jsi, exclude_jurisdiction, _couchDbHttpClient));
-                    record_count_task_list.Add(GetCaseCount(cancellationToken, prefix, config.Value, record_count, exclude_jurisdiction, _couchDbHttpClient));
+                    user_count_task_list.Add(() => GetUserCount(cancellationToken, prefix, config.Value, usr_count, jsi, exclude_jurisdiction, _userRepository));
+                    record_count_task_list.Add(() => GetCaseCount(cancellationToken, prefix, config.Value, record_count, exclude_jurisdiction));
                 }
                 
                 {
@@ -173,8 +181,8 @@ public sealed class JurisdictionSummary
                     record_count.folder_name = folder_name;
                     record_count_result.Add(key_name, record_count);
 
-                    user_count_task_list.Add(GetUserCount(cancellationToken, prefix, config.Value, usr_count, jsi, exclude_jurisdiction, _couchDbHttpClient));
-                    record_count_task_list.Add(GetCaseCount(cancellationToken, prefix, config.Value, record_count, exclude_jurisdiction, _couchDbHttpClient));
+                    user_count_task_list.Add(() => GetUserCount(cancellationToken, prefix, config.Value, usr_count, jsi, exclude_jurisdiction, _userRepository));
+                    record_count_task_list.Add(() => GetCaseCount(cancellationToken, prefix, config.Value, record_count, exclude_jurisdiction));
                     //jurisdiction_count_task_list.Add(GetJurisdictions(cancellationToken, prefix, config.Value, jsi));
                 }
 
@@ -196,16 +204,28 @@ public sealed class JurisdictionSummary
                 record_count.host_name = prefix;
                 record_count_result.Add(prefix, record_count);
 
-                user_count_task_list.Add(GetUserCount(cancellationToken, prefix, config.Value, usr_count, jsi, exclude_jurisdiction, _couchDbHttpClient));
-                record_count_task_list.Add(GetCaseCount(cancellationToken, prefix, config.Value, record_count, exclude_jurisdiction, _couchDbHttpClient));
+                user_count_task_list.Add(() => GetUserCount(cancellationToken, prefix, config.Value, usr_count, jsi, exclude_jurisdiction, _userRepository));
+                record_count_task_list.Add(() => GetCaseCount(cancellationToken, prefix, config.Value, record_count, exclude_jurisdiction));
                 //jurisdiction_count_task_list.Add(GetJurisdictions(cancellationToken, prefix, config.Value, jsi));
             }
         }
 
 
-        await Task.WhenAll(user_count_task_list);
+        // Bound the per-tenant fan-out. With ~72 tenants the previous
+        // Task.WhenAll(list) saturated CouchDB and the local HTTP client pool.
+        // 6 simultaneous calls is conservative; raise if summary latency becomes
+        // dominated by serialised waits.
+        var parallelOptions = new ParallelOptions
+        {
+            MaxDegreeOfParallelism = 6,
+            CancellationToken = cancellationToken
+        };
+
+        await Parallel.ForEachAsync(user_count_task_list, parallelOptions,
+            async (factory, ct) => { await factory(); });
         cancellationToken.ThrowIfCancellationRequested();
-        await Task.WhenAll(record_count_task_list);
+        await Parallel.ForEachAsync(record_count_task_list, parallelOptions,
+            async (factory, ct) => { await factory(); });
         cancellationToken.ThrowIfCancellationRequested();
         //var user_count_call_results = user_count_responses.Where(r => !string.IsNullOrWhiteSpace(r)); //filter out any null values
 
@@ -244,16 +264,12 @@ public sealed class JurisdictionSummary
         ItemCount p_result, 
         JurisdictionSummaryItem p_SummaryItem,
         string exclude_jurisdiction,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.SharedLibraries.Account.IUserRepository userRepository
     ) 
     { 
         try
         {
-            string request_string = $"{p_config_detail.url}/_users/_all_docs?include_docs=true&skip=1";
-
-            string responseFromServer = await couchDbHttpClient.ExecuteAsync("GET", request_string, null, p_config_detail.user_name, p_config_detail.user_value, "application/json");
-
-            var user_alldocs_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_response_header<mmria.common.model.couchdb.user>>(responseFromServer);
+            var user_alldocs_response = await userRepository.GetAllUsersAsync(1, int.MaxValue, p_config_detail);
 
             HashSet<string> user_id_set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             List<mmria.common.model.couchdb.get_response_item<mmria.common.model.couchdb.user>> temp_list = new List<mmria.common.model.couchdb.get_response_item<mmria.common.model.couchdb.user>>();
@@ -293,8 +309,7 @@ public sealed class JurisdictionSummary
                 p_config_detail, 
                 p_SummaryItem, 
                 user_id_set,
-                exclude_jurisdiction,
-                couchDbHttpClient
+                exclude_jurisdiction
             );
 
             p_result.total = user_id_set.Count;
@@ -312,17 +327,13 @@ public sealed class JurisdictionSummary
         string p_id, 
         mmria.common.couchdb.DBConfigurationDetail p_config_detail, 
         ItemCount p_result,
-        string exclude_jurisdiction,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        string exclude_jurisdiction
     ) 
     { 
         try
         {
-            string request_string = $"{p_config_detail.url}/{p_config_detail.prefix}mmrds/_design/sortable/_view/by_jurisdiction_id?skip=0&take=100000";
-
-
             cancellationToken.ThrowIfCancellationRequested();
-            string responseFromServer = await couchDbHttpClient.ExecuteAsync("GET", request_string, null, p_config_detail.user_name, p_config_detail.user_value, "application/json");
+            string responseFromServer = await _caseRepository.GetCasesByJurisdictionIdViewJsonAsync(p_config_detail);
 
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -397,65 +408,17 @@ public sealed class JurisdictionSummary
         mmria.common.couchdb.DBConfigurationDetail p_config_detail, 
         JurisdictionSummaryItem p_result, 
         HashSet<string> p_user_id_set,
-        string exclude_jurisdiction,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        string exclude_jurisdiction
     ) 
     {
-        //string sort = "by_date_created";
-        string search_key = null;
-        bool descending = false;
-        int skip = 0;
-        int take = 20000;
-        search_key = "";
-        string sort_view = "by_date_created";
-
         try
         {
-            System.Text.StringBuilder request_builder = new System.Text.StringBuilder ();
-            request_builder.Append (p_config_detail.url);
-            request_builder.Append ($"/{p_config_detail.prefix}jurisdiction/_design/sortable/_view/{sort_view}?");
-
-
-            if (string.IsNullOrWhiteSpace (search_key))
-            {
-                if (skip > -1) 
-                {
-                    request_builder.Append ($"skip={skip}");
-                } 
-                else 
-                {
-
-                    request_builder.Append ("skip=0");
-                }
-
-
-                if (take > -1) 
-                {
-                    request_builder.Append ($"&limit={take}");
-                }
-
-                if (descending) 
-                {
-                    request_builder.Append ("&descending=true");
-                }
-            } 
-            else 
-            {
-                request_builder.Append ("skip=0");
-
-                if (descending) 
-                {
-                    request_builder.Append ("&descending=true");
-                }
-            }
-
             cancellationToken.ThrowIfCancellationRequested();
 
-            string response_from_server = await couchDbHttpClient.ExecuteAsync("GET", request_builder.ToString(), null, p_config_detail.user_name, p_config_detail.user_value, "application/json");
+            var case_view_response = await _jurisdictionRepository.GetUserRoleJurisdictionSortableViewByParamsAsync(
+                skip: 0, take: 20000, sortView: "by_date_created", hasSearchKey: false, descending: false, p_config_detail);
 
             cancellationToken.ThrowIfCancellationRequested();
-
-            var case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.user_role_jurisdiction>>(response_from_server);
 
             HashSet<string> Jurisdictin_User_Set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var Jurisdictin_Role_Dictionary = new Dictionary<string,HashSet<string>>(StringComparer.OrdinalIgnoreCase)

@@ -66,25 +66,147 @@ $(function () {
   //update_queue_interval_id = window.setInterval(update_queue_task, 10000);
 });
 
+const update_queue_normal_interval_ms = 10000;
+const update_queue_backoff_interval_ms = 30000;
+let update_queue_interval_id = null;
+let update_queue_poll_interval_ms = null;
+
+function get_export_queue_url()
+{
+  return location.protocol + '//' + location.host + '/api/export_queue';
+}
+
+function is_visible_queue_item(item)
+{
+  return (
+    item &&
+    item.status != 'Deleted' &&
+    item.status != 'expunged'
+  );
+}
+
+function copy_visible_queue_items(queue_items)
+{
+  var result = [];
+
+  if (!queue_items) 
+  {
+    return result;
+  }
+
+  for (var i = 0; i < queue_items.length; i++) 
+  {
+    if (is_visible_queue_item(queue_items[i])) 
+    {
+      result.push(queue_items[i]);
+    }
+  }
+
+  return result;
+}
+
+function is_active_export_status(status)
+{
+  if (!status) 
+  {
+    return false;
+  }
+
+  return (
+    status.indexOf('In Queue') === 0 ||
+    status.indexOf('Creating Export') === 0
+  );
+}
+
+function has_active_export_items(items)
+{
+  if (!items || items.length === 0) 
+  {
+    return false;
+  }
+
+  for (var i = 0; i < items.length; i++) 
+  {
+    if (is_active_export_status(items[i].status)) 
+    {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function start_queue_polling(interval_ms)
+{
+  var normalized_interval = interval_ms || update_queue_normal_interval_ms;
+
+  if 
+  (
+    update_queue_interval_id != null &&
+    update_queue_poll_interval_ms === normalized_interval
+  ) 
+  {
+    return;
+  }
+
+  stop_queue_polling();
+  update_queue_interval_id = window.setInterval(update_queue_task, normalized_interval);
+  update_queue_poll_interval_ms = normalized_interval;
+}
+
+function stop_queue_polling()
+{
+  if (update_queue_interval_id != null) 
+  {
+    clearInterval(update_queue_interval_id);
+    update_queue_interval_id = null;
+  }
+
+  update_queue_poll_interval_ms = null;
+}
+
+function sync_queue_polling_state(interval_ms)
+{
+  if (has_active_export_items(g_data)) 
+  {
+    start_queue_polling(interval_ms || update_queue_normal_interval_ms);
+  } 
+  else 
+  {
+    stop_queue_polling();
+  }
+}
+
+function get_confirmation_required_items(items)
+{
+  var result = [];
+
+  if (!items) 
+  {
+    return result;
+  }
+
+  for (var i = 0; i < items.length; i++) 
+  {
+    if (items[i].status == 'Confirmation Required') 
+    {
+      result.push(items[i]);
+    }
+  }
+
+  return result;
+}
+
 function load_data() 
 {
-  var url = location.protocol + '//' + location.host + '/api/export_queue';
+  var url = get_export_queue_url();
 
   $.ajax({
     url: url,
+    cache: false,
   }).done(function (response) {
-    g_data = [];
-    for (var i = 0; i < response.length; i++) 
-    {
-        if 
-        (
-            response[i].status != 'Deleted' && 
-            response[i].status != 'expunged'
-        ) 
-        {
-            g_data.push(response[i]);
-        }
-    }
+    g_data = copy_visible_queue_items(response);
+    sync_queue_polling_state();
 
     load_standard_export_report_set();
     get_metadata();
@@ -283,8 +405,7 @@ function confirm_export_item(p_id)
     item.date_last_updated = new Date().toISOString();
     item.last_updated_by = '';
 
-    var export_queue_url =
-      location.protocol + '//' + location.host + '/api/export_queue';
+    var export_queue_url = get_export_queue_url();
 
     $.ajax({
       url: export_queue_url,
@@ -300,16 +421,7 @@ function confirm_export_item(p_id)
 				}/*/
     }).done(function (response) {
       render();
-
-      if (update_queue_interval_id == null) 
-      {
-        update_queue_interval_id = window.setInterval(update_queue_task, 10000);
-        update_queue_interval_count = 1;
-      } 
-      else 
-      {
-        update_queue_interval_count += 1;
-      }
+      sync_queue_polling_state();
 
       //g_metadata = response;
       //load_data(g_uid, $mmria.getCookie("pwd"));
@@ -328,6 +440,7 @@ function cancel_export_item(p_id)
     }
   }
   render();
+  sync_queue_polling_state();
 }
 
 function download_export_item(p_id) 
@@ -339,21 +452,6 @@ function download_export_item(p_id)
       location.protocol + '//' + location.host + '/api/zip/' + p_id;
     window.open(download_url, '_zip');
     load_data();
-
-    if 
-    (
-        update_queue_interval_id != null && 
-        update_queue_interval_count > 0
-    ) 
-    {
-      update_queue_interval_count -= 1;
-
-      if (update_queue_interval_count == 0) 
-      {
-        clearInterval(update_queue_interval_id);
-        update_queue_interval_id = null;
-      }
-    }
     window.setTimeout(update_queue_task, 2000);
     render();
   }
@@ -368,8 +466,7 @@ function delete_export_item(p_id)
     item.date_last_updated = new Date().toISOString();
     item.last_updated_by = '';
     //item._deleted = true;
-    var export_queue_url =
-      location.protocol + '//' + location.host + '/api/export_queue';
+    var export_queue_url = get_export_queue_url();
 
     $.ajax({
       url: export_queue_url,
@@ -390,46 +487,29 @@ function delete_export_item(p_id)
   }
 }
 
-let update_queue_interval_id = null;
-let update_queue_interval_count = 0;
-
 function update_queue_task() 
 {
-  var temp = [];
-
-  if (g_data == null) 
+  if 
+  (
+    g_data == null ||
+    g_metadata == null
+  ) 
   {
     return;
   }
 
-  for (var i = 0; i < g_data.length; i++) 
-  {
-    if (g_data[i].status == 'Confirmation Required') 
-    {
-      temp.push(g_data[i]);
-    }
-  }
+  var temp = get_confirmation_required_items(g_data);
 
-  var url = location.protocol + '//' + location.host + '/api/export_queue';
+  var url = get_export_queue_url();
 
   $.ajax
   ({
     url: url,
+    cache: false,
   })
     .done(function (response) 
     {
-      g_data = [];
-      for (var i = 0; i < response.length; i++) 
-      {
-        if 
-        (
-          response[i].status != 'Deleted' &&
-          response[i].status != 'expunged'
-        ) 
-        {
-          g_data.push(response[i]);
-        }
-      }
+      g_data = copy_visible_queue_items(response);
 
       for (var i = 0; i < temp.length; i++) 
       {
@@ -437,6 +517,7 @@ function update_queue_task()
       }
 
       render();
+      sync_queue_polling_state();
 
       //document.getElementById('generate_report_button').disabled = false;
       //process_rows();
@@ -450,27 +531,10 @@ function update_queue_task()
         {
             case 503: // service unavailable
             case 504: // gateway time-out
-                if (update_queue_interval_id != null) 
-                {
-                  update_queue_interval_count = 0;
-                  clearInterval(update_queue_interval_id);
-                  update_queue_interval_id = null;
-                }
-                
-                //let interval_of_10_second = 10000;
-                let interval_of_30_second = 30000;
-                
-                update_queue_interval_id = window.setInterval(update_queue_task, interval_of_30_second);
-                update_queue_interval_count = 1;
-
+                sync_queue_polling_state(update_queue_backoff_interval_ms);
                 break;
             default:
-                if (update_queue_interval_id != null) 
-                {
-                  update_queue_interval_count = 0;
-                  clearInterval(update_queue_interval_id);
-                  update_queue_interval_id = null;
-                }
+                stop_queue_polling();
                 break;
         }
 
@@ -572,7 +636,7 @@ function get_metadata()
 
     render();
 
-    update_queue_task();
+    sync_queue_polling_state();
   });
 }
 

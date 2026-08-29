@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using System.Collections.Generic;
 using Microsoft.AspNetCore.Http;
+using mmria.common.SharedLibraries.Session;
 
 using  mmria.server.extension; 
 
@@ -13,38 +14,35 @@ namespace mmria.server.Controllers;
 public sealed class sessionSummaryController : Controller
 {
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     mmria.common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
 
     mmria.common.couchdb.ConfigurationSet ConfigDB;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly ISessionRepository _sessionRepository;
 
     public sessionSummaryController
     (
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        mmria.common.couchdb.ConfigurationSet p_config_db,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        ISessionRepository sessionRepository
     )
     {
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
         
-        ConfigDB = p_config_db;
+        ConfigDB = tenantRuntime.RequireConfigurationSet();
         _couchDbHttpClient = couchDbHttpClient;
+        _sessionRepository = sessionRepository;
     }
 
     public async Task<IActionResult> Index(System.Threading.CancellationToken cancellationToken)
     {
 
-        var result = new mmria.server.utils.SessionSummary(ConfigDB, _couchDbHttpClient);
+        var result = new mmria.server.utils.SessionSummary(ConfigDB, _couchDbHttpClient, _sessionRepository);
 
         return View(await result.execute(cancellationToken));
     }
@@ -53,7 +51,7 @@ public sealed class sessionSummaryController : Controller
     public async Task<IActionResult> GenerateReport(System.Threading.CancellationToken cancellationToken)
     {
 
-        var summary_list = new mmria.server.utils.SessionSummary(ConfigDB, _couchDbHttpClient);
+        var summary_list = new mmria.server.utils.SessionSummary(ConfigDB, _couchDbHttpClient, _sessionRepository);
 
         var summary_row_list = await summary_list.execute(cancellationToken);
 

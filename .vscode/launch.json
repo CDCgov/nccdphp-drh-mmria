@@ -2,21 +2,73 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Launch mmria-server",
+      "name": "Launch Multi-Tenant DBs Only",
+      "type": "node-terminal",
+      "request": "launch",
+      "preLaunchTask": "launch-multi-tenant-dbs-only",
+      "command": "echo Multi-tenant CouchDB pods are ready.",
+      "cwd": "${workspaceFolder}",
+      "presentation": {
+        "group": "main",
+        "order": 0
+      }
+    },
+    {
+      "name": "Launch mmria-server (Local 55555 Single Tenant)",
       "type": "coreclr",
       "request": "launch",
-      "preLaunchTask": "build-server",
+      "preLaunchTask": "prepare-mmria-server-local-55555",
       "requireExactSource": true,
-      "program": "${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server/bin/Debug/net9.0/mmria-server.dll",
+      "program": "${workspaceFolder}/source-code/mmria/mmria-server/bin/Debug/net10.0/mmria-server.dll",
       "args": [],
-      "cwd": "${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server",
+      "cwd": "${workspaceFolder}/source-code/mmria/mmria-server",
       "stopAtEntry": false,
       "env": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
       "internalConsoleOptions": "openOnSessionStart",
       "sourceFileMap": {
-        "/Views": "${workspaceFolder:nccdphp-drh-mmria}/Views"
+        "/Views": "${workspaceFolder}/Views"
+      },
+      "presentation": {
+        "group": "main",
+        "order": 1
+      }
+    },
+    {
+      "name": "Launch mmria-server (Single Tenant)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "prepare-mmria-server-single-tenant",
+      "requireExactSource": true,
+      "program": "${workspaceFolder}/source-code/mmria/mmria-server/bin/Debug/net10.0/mmria-server.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/source-code/mmria/mmria-server",
+      "stopAtEntry": false,
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "internalConsoleOptions": "openOnSessionStart",
+      "sourceFileMap": {
+        "/Views": "${workspaceFolder}/Views"
+      }
+    },
+    {
+      "name": "Launch mmria-server (Multi Tenant)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "prepare-mmria-server-multi-tenant",
+      "requireExactSource": true,
+      "program": "${workspaceFolder}/source-code/mmria/mmria-server/bin/Debug/net10.0/mmria-server.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/source-code/mmria/mmria-server",
+      "stopAtEntry": false,
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "internalConsoleOptions": "openOnSessionStart",
+      "sourceFileMap": {
+        "/Views": "${workspaceFolder}/Views"
       }
     },
     {
@@ -25,16 +77,78 @@
       "request": "launch",
       "preLaunchTask": "build-services",
       "requireExactSource": true,
-      "program": "${workspaceFolder:nccdphp-drh-mmria}/nccdphp-drh-mmria-services/mmria.services/bin/Debug/net9.0/mmria.services.dll",
+      "program": "${workspaceFolder}/nccdphp-drh-mmria-services/mmria.services/bin/Debug/net10.0/mmria.services.dll",
       "args": [],
-      "cwd": "${workspaceFolder:nccdphp-drh-mmria}/nccdphp-drh-mmria-services/mmria.services",
+      "cwd": "${workspaceFolder}/nccdphp-drh-mmria-services/mmria.services",
       "stopAtEntry": false,
       "env": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
       "internalConsoleOptions": "openOnSessionStart",
       "sourceFileMap": {
-        "/Views": "${workspaceFolder:nccdphp-drh-mmria}/Views"
+        "/Views": "${workspaceFolder}/Views"
+      }
+    },
+    {
+      "name": "Launch mmria-server (Single Tenant Raw)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "wait-for-mmria-services",
+      "requireExactSource": true,
+      "program": "${workspaceFolder}/source-code/mmria/mmria-server/bin/Debug/net10.0/mmria-server.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/source-code/mmria/mmria-server",
+      "stopAtEntry": false,
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "internalConsoleOptions": "openOnSessionStart",
+      "sourceFileMap": {
+        "/Views": "${workspaceFolder}/Views"
+      },
+      "presentation": {
+        "hidden": true
+      }
+    },
+    {
+      "name": "Launch mmria-server (Multi Tenant Raw)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "wait-for-mmria-services",
+      "requireExactSource": true,
+      "program": "${workspaceFolder}/source-code/mmria/mmria-server/bin/Debug/net10.0/mmria-server.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/source-code/mmria/mmria-server",
+      "stopAtEntry": false,
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "internalConsoleOptions": "openOnSessionStart",
+      "sourceFileMap": {
+        "/Views": "${workspaceFolder}/Views"
+      },
+      "presentation": {
+        "hidden": true
+      }
+    },
+    {
+      "name": "Launch mmria-services Raw",
+      "type": "coreclr",
+      "request": "launch",
+      "requireExactSource": true,
+      "program": "${workspaceFolder}/nccdphp-drh-mmria-services/mmria.services/bin/Debug/net10.0/mmria.services.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/nccdphp-drh-mmria-services/mmria.services",
+      "stopAtEntry": false,
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "internalConsoleOptions": "openOnSessionStart",
+      "sourceFileMap": {
+        "/Views": "${workspaceFolder}/Views"
+      },
+      "presentation": {
+        "hidden": true
       }
     },
     {
@@ -45,14 +159,14 @@
       "program": "dotnet",
       "args": [
         "test",
-        "${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests/mmria-server.tests.csproj",
+        "${workspaceFolder}/../nccdphp-drh-mmria-utilities/mmria-server.tests/mmria-server.tests.csproj",
         "--filter",
         "FullyQualifiedName~AggregateReportTests.Scenario_A_BasicCoverage",
         "--logger",
         "console;verbosity=detailed",
         "--no-build"
       ],
-      "cwd": "${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests",
+      "cwd": "${workspaceFolder}/../nccdphp-drh-mmria-utilities/mmria-server.tests",
       "stopAtEntry": false,
       "console": "internalConsole",
       "internalConsoleOptions": "openOnSessionStart"
@@ -65,14 +179,14 @@
       "program": "dotnet",
       "args": [
         "test",
-        "${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests/mmria-server.tests.csproj",
+        "${workspaceFolder}/../nccdphp-drh-mmria-utilities/mmria-server.tests/mmria-server.tests.csproj",
         "--filter",
         "Category=AggregateReport",
         "--logger",
         "console;verbosity=detailed",
         "--no-build"
       ],
-      "cwd": "${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests",
+      "cwd": "${workspaceFolder}/../nccdphp-drh-mmria-utilities/mmria-server.tests",
       "stopAtEntry": false,
       "console": "internalConsole",
       "internalConsoleOptions": "openOnSessionStart"
@@ -85,14 +199,14 @@
       "program": "dotnet",
       "args": [
         "test",
-        "${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests/mmria-server.tests.csproj",
+        "${workspaceFolder}/../nccdphp-drh-mmria-utilities/mmria-server.tests/mmria-server.tests.csproj",
         "--filter",
         "Category=OverdoseReport",
         "--logger",
         "console;verbosity=detailed",
         "--no-build"
       ],
-      "cwd": "${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests",
+      "cwd": "${workspaceFolder}/../nccdphp-drh-mmria-utilities/mmria-server.tests",
       "stopAtEntry": false,
       "console": "internalConsole",
       "internalConsoleOptions": "openOnSessionStart"
@@ -102,24 +216,14 @@
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build-mmria-server-memory-tests",
-      "program": "${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests/bin/Debug/net9.0/davinci",
+      "program": "${workspaceFolder}/../nccdphp-drh-mmria-utilities/mmria-server.tests/bin/Debug/net10.0/davinci",
       "args": [],
-      "cwd": "${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests/bin/Debug/net9.0",
+      "cwd": "${workspaceFolder}/../nccdphp-drh-mmria-utilities/mmria-server.tests/bin/Debug/net10.0",
       "stopAtEntry": false,
       "console": "externalTerminal",
       "env": {
         "VSTEST_MODULE_FILTER": "mmria-server.tests.dll",
         "VSTEST_TRACE_FILTER": "OMMIT"
-      }
-    },
-    {
-      "name": "Launch Both (Server + Services)",
-      "configurations": ["Launch mmria-server", "Launch mmria-services"],
-      "stopAll": true,
-      "presentation": {
-        "hidden": false,
-        "group": "main",
-        "order": 1
       }
     }
   ]

@@ -1,22 +1,24 @@
 using System;
-using System.IO;
-using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 using mmria.common.couchdb;
+using mmria.common.getset;
 using mmria.common.model.couchdb;
+using mmria.common.SharedLibraries.Jurisdiction;
 using mmria.common.SharedLibraries.Session.Model;
 using Newtonsoft.Json;
 
 namespace mmria.common.SharedLibraries.Session.DAL;
 
-public class SessionDAL
+public class SessionDAL : ISessionRepository
 {
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IJurisdictionRepository _jurisdictionRepository;
 
-    public SessionDAL(mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+    public SessionDAL(mmria.common.getset.CouchDbHttpClient couchDbHttpClient, IJurisdictionRepository jurisdictionRepository = null)
     {
         _couchDbHttpClient = couchDbHttpClient;
+        _jurisdictionRepository = jurisdictionRepository;
     }
 
     public async Task<get_sortable_view_reponse_header<session>> GetSessionSortableViewAsync(
@@ -27,6 +29,12 @@ public class SessionDAL
         bool descending,
         DBConfigurationDetail dbConfig)
     {
+        if (_jurisdictionRepository != null)
+        {
+            return await _jurisdictionRepository.GetSessionSortableViewAsync(skip, take, sortView, hasSearchKey, descending, dbConfig);
+        }
+
+        // Fallback for backward-compat when instantiated without IJurisdictionRepository
         var requestBuilder = new StringBuilder();
         requestBuilder.Append(dbConfig.url);
         requestBuilder.Append($"/{dbConfig.prefix}jurisdiction/_design/sortable/_view/{sortView}?");
@@ -69,7 +77,7 @@ public class SessionDAL
     public async Task<document_put_response> CreateSessionAsync(Session_Message session, DBConfigurationDetail dbConfig)
     {
         string objectString = JsonConvert.SerializeObject(session, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
-        string requestUrl = $"{dbConfig.url}/{dbConfig.prefix}session/{session._id}";
+        string requestUrl = dbConfig.Get_Prefix_DB_Url($"session/{session._id}");
 
         string response = await _couchDbHttpClient.ExecuteAsync("PUT", requestUrl, objectString, dbConfig.user_name, dbConfig.user_value, "application/json");
         var result = JsonConvert.DeserializeObject<document_put_response>(response);
@@ -79,24 +87,20 @@ public class SessionDAL
     public async Task SaveSessionEventAsync(session_event sessionEvent, DBConfigurationDetail dbConfig)
     {
         string objectString = JsonConvert.SerializeObject(sessionEvent, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
-        string requestUrl = $"{dbConfig.url}/{dbConfig.prefix}session/{sessionEvent._id}";
+        string requestUrl = dbConfig.Get_Prefix_DB_Url($"session/{sessionEvent._id}");
         await _couchDbHttpClient.ExecuteAsync("PUT", requestUrl, objectString, dbConfig.user_name, dbConfig.user_value, "application/json");
     }
 
     public async Task<session_response> GetSessionDatabaseAsync(DBConfigurationDetail dbConfig)
     {
-        string requestString = $"{dbConfig.url}/{dbConfig.prefix}session";
-        WebRequest request = WebRequest.Create(new Uri(requestString));
-        request.PreAuthenticate = false;
-
-        using WebResponse response = await request.GetResponseAsync();
-        string responseFromServer = await ReadResponseAsync(response);
+        string requestString = dbConfig.Get_Prefix_DB_Url("session");
+        string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", requestString);
         return JsonConvert.DeserializeObject<session_response>(responseFromServer);
     }
 
     public async Task<session> GetSessionDocumentAsync(string id, DBConfigurationDetail dbConfig)
     {
-        string requestUrl = $"{dbConfig.url}/{dbConfig.prefix}session/{id}";
+        string requestUrl = dbConfig.Get_Prefix_DB_Url($"session/{id}");
         string response = await _couchDbHttpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value);
         return JsonConvert.DeserializeObject<session>(response);
     }
@@ -104,7 +108,7 @@ public class SessionDAL
     public async Task<document_put_response> SaveSessionAsync(session session, DBConfigurationDetail dbConfig)
     {
         string objectString = JsonConvert.SerializeObject(session, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
-        string requestUrl = $"{dbConfig.url}/{dbConfig.prefix}session/{session._id}";
+        string requestUrl = dbConfig.Get_Prefix_DB_Url($"session/{session._id}");
         string response = await _couchDbHttpClient.ExecuteAsync("PUT", requestUrl, objectString, dbConfig.user_name, dbConfig.user_value);
         return JsonConvert.DeserializeObject<document_put_response>(response);
     }
@@ -112,23 +116,23 @@ public class SessionDAL
     public async Task<session_response> GetCouchDbSessionAsync(string authSessionValue, DBConfigurationDetail dbConfig)
     {
         string requestString = $"{dbConfig.url}/_session";
-        WebRequest request = WebRequest.Create(new Uri(requestString));
-        request.PreAuthenticate = false;
-
-        if (!string.IsNullOrWhiteSpace(authSessionValue))
-        {
-            request.Headers.Add("Cookie", "AuthSession=" + authSessionValue);
-            request.Headers.Add("X-CouchDB-WWW-Authenticate", authSessionValue);
-        }
-
-        using WebResponse response = await request.GetResponseAsync();
-        string responseFromServer = await ReadResponseAsync(response);
+        var requestOptions = string.IsNullOrWhiteSpace(authSessionValue)
+            ? null
+            : new CouchDbRequestOptions
+            {
+                AuthSessionValue = authSessionValue
+            };
+        var response = await _couchDbHttpClient.ExecuteForResponseAsync(
+            "GET",
+            requestString,
+            null,
+            "application/json",
+            requestOptions);
+        string responseFromServer = response.Body;
         session_response result = JsonConvert.DeserializeObject<session_response>(responseFromServer);
 
-        if (response.Headers["Set-Cookie"] != null)
-        {
-            result.auth_session = ExtractAuthSession(response.Headers["Set-Cookie"]);
-        }
+        result ??= new session_response();
+        result.auth_session = ExtractAuthSession(response.GetHeaderValues("Set-Cookie"));
 
         return result;
     }
@@ -139,50 +143,74 @@ public class SessionDAL
         byte[] postByteArray = Encoding.ASCII.GetBytes(postData);
 
         string requestString = $"{dbConfig.url}/_session";
-        WebRequest request = WebRequest.Create(new Uri(requestString));
-        request.PreAuthenticate = false;
-        request.Method = "POST";
-        request.ContentType = "application/x-www-form-urlencoded";
-        request.ContentLength = postByteArray.Length;
-
-        using (Stream stream = request.GetRequestStream())
-        {
-            stream.Write(postByteArray, 0, postByteArray.Length);
-        }
-
-        using WebResponse response = await request.GetResponseAsync();
-        string responseFromServer = await ReadResponseAsync(response);
+        var response = await _couchDbHttpClient.ExecuteBytesForResponseAsync(
+            "POST",
+            requestString,
+            postByteArray,
+            "application/x-www-form-urlencoded",
+            requestOptions: null);
+        string responseFromServer = response.Body;
         login_response result = JsonConvert.DeserializeObject<login_response>(responseFromServer);
-        result.auth_session = ExtractAuthSession(response.Headers["Set-Cookie"]);
+        result ??= new login_response();
+        result.auth_session = ExtractAuthSession(response.GetHeaderValues("Set-Cookie"));
         return result;
     }
 
     public async Task<get_sortable_view_reponse_header<session_event>> GetSessionEventsByUserIdAsync(string userName, DBConfigurationDetail dbConfig)
     {
-        string requestUrl = $"{dbConfig.url}/{dbConfig.prefix}session/_design/session_event_sortable/_view/by_user_id?startkey=\"{userName}\"&endkey=\"{userName}\"";
+        string requestUrl = dbConfig.Get_Prefix_DB_Url($"session/_design/session_event_sortable/_view/by_user_id?startkey=\"{userName}\"&endkey=\"{userName}\"");
         string response = await _couchDbHttpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value);
         return JsonConvert.DeserializeObject<get_sortable_view_reponse_header<session_event>>(response);
     }
 
-    private static async Task<string> ReadResponseAsync(WebResponse response)
+    public async Task<document_put_response?> SaveSessionRawAsync(string sessionId, string sessionJson, DBConfigurationDetail dbConfig)
     {
-        using Stream dataStream = response.GetResponseStream();
-        using StreamReader reader = new StreamReader(dataStream);
-        return await reader.ReadToEndAsync();
+        string requestUrl = dbConfig.Get_Prefix_DB_Url($"session/{sessionId}");
+        string response = await _couchDbHttpClient.ExecuteAsync("PUT", requestUrl, sessionJson, dbConfig.user_name, dbConfig.user_value, "application/json");
+        return JsonConvert.DeserializeObject<document_put_response>(response);
     }
 
-    private static string ExtractAuthSession(string setCookieHeader)
+    public async Task<view_response<session>> GetSessionByDateCreatedViewAsync(bool descending, int limit, DBConfigurationDetail dbConfig)
     {
-        if (string.IsNullOrWhiteSpace(setCookieHeader))
+        string requestUrl = dbConfig.Get_Prefix_DB_Url(
+            $"session/_design/session_sortable/_view/by_date_created?descending={descending.ToString().ToLower()}&limit={limit}");
+        string response = await _couchDbHttpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value, "application/json");
+        return JsonConvert.DeserializeObject<view_response<session>>(response);
+    }
+
+    public async Task<string?> GetSessionDocumentRawAsync(string id, DBConfigurationDetail dbConfig)
+    {
+        string requestUrl = dbConfig.Get_Prefix_DB_Url($"session/{id}");
+        return await _couchDbHttpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value);
+    }
+
+    public async Task DeleteSessionAsync(string id, string rev, DBConfigurationDetail dbConfig)
+    {
+        string requestUrl = dbConfig.Get_Prefix_DB_Url($"session/{id}?rev={rev}");
+        await _couchDbHttpClient.ExecuteAsync("DELETE", requestUrl, null, dbConfig.user_name, dbConfig.user_value);
+    }
+
+    private static string ExtractAuthSession(System.Collections.Generic.IEnumerable<string> setCookieHeaders)
+    {
+        if (setCookieHeaders == null)
         {
             return string.Empty;
         }
 
-        string[] setCookie = setCookieHeader.Split(';');
-        string[] authArray = setCookie[0].Split('=');
-        if (authArray.Length > 1)
+        foreach (var setCookieHeader in setCookieHeaders)
         {
-            return authArray[1];
+            if (string.IsNullOrWhiteSpace(setCookieHeader))
+            {
+                continue;
+            }
+
+            string[] setCookie = setCookieHeader.Split(';');
+            string[] authArray = setCookie[0].Split('=');
+            if (authArray.Length > 1 &&
+                authArray[0].Equals("AuthSession", StringComparison.OrdinalIgnoreCase))
+            {
+                return authArray[1];
+            }
         }
 
         return string.Empty;

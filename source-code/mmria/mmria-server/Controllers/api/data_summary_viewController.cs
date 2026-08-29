@@ -17,6 +17,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Http;
 
 using  mmria.server.extension;
+using mmria.common.SharedLibraries.Report;
 namespace mmria.server;
 
 [Authorize(Roles  = "abstractor, data_analyst")]
@@ -37,28 +38,26 @@ public sealed class data_summary_viewControllerController: ControllerBase
     } 
     
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IReportRepository _reportRepository;
 
     public data_summary_viewControllerController
     (
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        IReportRepository reportRepository
     )
     {
-        configuration = _configuration;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
         _couchDbHttpClient = couchDbHttpClient;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        _reportRepository = reportRepository;
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
     }
     public async Task<mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.server.model.SummaryReport.FrequencySummaryDocument>> Get(string skip)
     {
@@ -69,28 +68,16 @@ public sealed class data_summary_viewControllerController: ControllerBase
 
         int.TryParse(skip, out skip_number);
 
-        var config_couchdb_url = db_config.url;
-        var config_timer_user_name = db_config.user_name;
-        var config_timer_value = db_config.user_value;
-        var config_db_prefix = db_config.prefix;
-        
         try
         {
 
-            string find_url = $"{config_couchdb_url}/{config_db_prefix}report/_design/data_summary_view_report/_view/year_of_death?skip={skip_number}&limit={take}";
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                "GET",
-                find_url,
-                null,
-                config_timer_user_name,
-                config_timer_value
-            );
+            string responseFromServer = await _reportRepository.GetDataSummaryViewAsync(skip_number, take, db_config);
             
             #if !IS_PMSS_ENHANCED
-                var jurisdiction_hashset = mmria.common.SharedLibraries.Other.authorization.get_current_jurisdiction_id_set_for(db_config, User);
+                var jurisdiction_hashset = mmria.common.SharedLibraries.Other.authorization.get_current_jurisdiction_id_set_for(db_config, User, _couchDbHttpClient);
             #endif
             #if IS_PMSS_ENHANCED
-                var jurisdiction_hashset = mmria.pmss.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, User);
+                var jurisdiction_hashset = mmria.pmss.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, User, _couchDbHttpClient);
             #endif
 
             List<mmria.server.model.SummaryReport.FrequencySummaryDocument> new_list = new();

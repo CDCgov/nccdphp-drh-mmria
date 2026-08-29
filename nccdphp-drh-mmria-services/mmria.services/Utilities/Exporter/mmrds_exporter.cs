@@ -5,6 +5,13 @@ using System.Net.Http.Headers;
 using System.Linq;
 using Microsoft.Extensions.Configuration;
 using mmria.common.getset;
+using mmria.common.SharedLibraries.Case;
+using mmria.common.SharedLibraries.Case.DAL;
+using mmria.common.SharedLibraries.ExportQueue;
+using mmria.common.SharedLibraries.Jurisdiction;
+using mmria.common.SharedLibraries.Jurisdiction.DAL;
+using mmria.common.SharedLibraries.MetadataVersion;
+using mmria.common.SharedLibraries.MetadataVersion.DAL;
 using mmria.services.Models;
 
 
@@ -55,15 +62,24 @@ public sealed class mmrds_exporter
 
     private ScheduleInfoMessage Configuration;
     private mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IMetadataRepository _metadataRepository;
+    private ICaseRepository _caseRepository;
+    private readonly IJurisdictionRepository _jurisdictionRepository;
+    private IExportQueueRepository _exportQueueRepository;
 
     public mmrds_exporter
     (
         ScheduleInfoMessage configuration,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        IExportQueueRepository exportQueueRepository
     )
     {
         this.Configuration = configuration;
         _couchDbHttpClient = couchDbHttpClient;
+        _exportQueueRepository = exportQueueRepository;
+        _caseRepository = new CaseDAL(_couchDbHttpClient);
+        _metadataRepository = new MetadataVersionDAL(_couchDbHttpClient);
+        _jurisdictionRepository = new JurisdictionDAL(_couchDbHttpClient);
 
         db_config = new()
         {
@@ -83,8 +99,9 @@ public sealed class mmrds_exporter
         this.user_name = this.Configuration.user_name;
         this.value_string = this.Configuration.user_value;
 
-        this.item_file_name = queue_item.file_name;
-        this.item_directory_name = queue_item.file_name.Substring(0, queue_item.file_name.IndexOf("."));
+        var validated_file_name = PathSanitizer.ValidatePathSegment(queue_item.file_name, nameof(queue_item.file_name));
+        this.item_file_name = validated_file_name;
+        this.item_directory_name = System.IO.Path.GetFileNameWithoutExtension(validated_file_name);
         this.item_id = queue_item._id;
 
         this.is_excel_file_type = queue_item.case_file_type == "xlsx" ? true : false;
@@ -149,8 +166,7 @@ public sealed class mmrds_exporter
         #endif
 
 
-        string metadata_url = db_config.url + $"/metadata/version_specification-{this.Configuration.version_number}/metadata";
-        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, this.user_name, this.value_string));
+        mmria.common.metadata.app metadata = await _metadataRepository.GetAppDocumentAsync(this.Configuration.version_number, db_config);
         this.current_metadata = metadata;
 
         System.Collections.Generic.Dictionary<string, int> path_to_int_map = new Dictionary<string, int>();
@@ -246,88 +262,35 @@ public sealed class mmrds_exporter
             de_identified_set.Add(path.TrimStart('/'));
             }
         }
-
-
-        HashSet<string> Custom_Case_Id_List = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var id in queue_item.case_set)
-        {
-            Custom_Case_Id_List.Add(id);
-        }
-
-        List<System.Dynamic.ExpandoObject> all_cases_rows = new List<System.Dynamic.ExpandoObject>();
-
         #if !IS_PMSS_ENHANCED
-        var jurisdiction_hashset = await mmria.services.authorization.get_current_jurisdiction_id_set_for(db_config, this.juris_user_name, _couchDbHttpClient);
+        var jurisdiction_hashset = await mmria.services.authorization.get_current_jurisdiction_id_set_for(db_config, this.juris_user_name, _jurisdictionRepository);
         #endif
         #if IS_PMSS_ENHANCED
         var jurisdiction_hashset = await mmria.pmss.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, this.juris_user_name, _couchDbHttpClient);
         #endif
 
-        if (queue_item.case_filter_type == "custom")
+        async IAsyncEnumerable<string> get_case_ids_to_process()
         {
-            /*
-            foreach (System.Dynamic.ExpandoObject case_row in all_cases.rows)
+            if (string.Equals(queue_item.case_filter_type, "custom", StringComparison.OrdinalIgnoreCase))
             {
-            var check_item = ((IDictionary<string, object>)case_row)["doc"] as System.Dynamic.ExpandoObject;
-            if (check_item != null)
-            {
-                var temp = check_item as IDictionary<string, object>;
-
-                if
-                (
-                temp != null &&
-                temp.ContainsKey("_id") &&
-
-                temp["_id"] != null &&
-                Custom_Case_Id_List.Contains(temp["_id"].ToString())
-                )
+                foreach (var caseId in PagedCaseIdLoader.GetRequestedCaseIds(queue_item.case_set))
                 {
-                all_cases_rows.Add(check_item);
+                    yield return caseId;
                 }
 
+                yield break;
             }
 
-            }*/
+            await foreach (var caseId in PagedCaseIdLoader.GetCaseIdsAsync(db_config, _caseRepository))
+            {
+                yield return caseId;
+            }
         }
 
-        else
+        var _utcSettings = new Newtonsoft.Json.JsonSerializerSettings { DateTimeZoneHandling = Newtonsoft.Json.DateTimeZoneHandling.RoundtripKind };
+        await foreach(string case_id in get_case_ids_to_process())
         {
-
-            try
-            {
-                string request_string = $"{db_config.url}/{db_config.prefix}mmrds/_design/sortable/_view/by_date_created?skip=0&take=250000";
-
-                string case_view_responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
-
-                mmria.common.model.couchdb.case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(case_view_responseFromServer);
-
-                foreach (mmria.common.model.couchdb.case_view_item cvi in case_view_response.rows)
-                {
-                    Custom_Case_Id_List.Add(cvi.id);
-
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex);
-            }
-
-    /*
-            foreach (System.Dynamic.ExpandoObject case_row in all_cases.rows)
-            {
-            all_cases_rows.Add(((IDictionary<string, object>)case_row)["doc"] as System.Dynamic.ExpandoObject);
-            }
-            */
-        }
-
-
-
-        //foreach (System.Dynamic.ExpandoObject case_row in all_cases_rows)
-        foreach(string case_id in Custom_Case_Id_List)
-        {
-            string URL = $"{db_config.url}/{db_config.prefix}mmrds/{case_id}";
-            System.Dynamic.ExpandoObject case_row = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(await _couchDbHttpClient.ExecuteAsync("GET", URL, null, this.user_name, this.value_string));
+            System.Dynamic.ExpandoObject case_row = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(await _caseRepository.GetCaseDocumentJsonAsync(case_id, db_config), _utcSettings);
 
             IDictionary<string, object> case_doc = case_row as IDictionary<string, object>;
 
@@ -733,7 +696,7 @@ public sealed class mmrds_exporter
                     }
 
                     string file_field_name = path_to_field_name_map[path];
-                    row[file_field_name] = val;
+                    row[file_field_name] = val is System.DateTime dt ? dt.ToString("MM/dd/yyyy HH:mm:ss") : val;
 
                     }
                     break;
@@ -811,6 +774,11 @@ public sealed class mmrds_exporter
                         {
                             try
                             {
+                                if (!should_export_node(path_to_node_map[node]))
+                                {
+                                    continue;
+                                }
+
                                 var test_key = path_to_node_map[node].name;
                                 if (!grid_item_row.ContainsKey(test_key))
                                 {
@@ -824,6 +792,11 @@ public sealed class mmrds_exporter
                                 }
 
                                 string file_field_name = path_to_field_name_map[node];
+                                if (!grid_row.Table.Columns.Contains(file_field_name))
+                                {
+                                    continue;
+                                }
+
                                 if (val != null)
                                 {
                                     switch (path_to_node_map[node].type.ToLower())
@@ -1059,7 +1032,7 @@ public sealed class mmrds_exporter
 
 
 
-                                        grid_row[file_field_name] = val;
+                                        grid_row[file_field_name] = val is System.DateTime dt ? dt.ToString("MM/dd/yyyy HH:mm:ss") : val;
                                         break;
                                     }
                                 }
@@ -1084,7 +1057,7 @@ public sealed class mmrds_exporter
                                     }
                                 }
                             }
-                            catch (Exception)
+                            catch (Exception ex)
                             {
 
                             }
@@ -1483,12 +1456,12 @@ public sealed class mmrds_exporter
                             else
                             {
                                 form_row[file_field_name] = val;
-                            }							
+                            }						
                         }
                         else
                         {
                             // If regular row, then copy field
-                            form_row[file_field_name] = val;
+                            form_row[file_field_name] = val is System.DateTime fdt ? fdt.ToString("MM/dd/yyyy HH:mm:ss") : val;
                         }
                         }
                         break;
@@ -1827,8 +1800,8 @@ public sealed class mmrds_exporter
         );
 
 
-        string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}export_queue/" + this.item_id, null, this.user_name, this.value_string);
-        export_queue_item export_queue_item = Newtonsoft.Json.JsonConvert.DeserializeObject<export_queue_item>(responseFromServer);
+        export_queue_item export_queue_item;
+        export_queue_item = await _exportQueueRepository.GetQueueDocumentAsync<export_queue_item>(this.item_id, db_config);
 
         export_queue_item.status = "Download";
 
@@ -1836,7 +1809,7 @@ public sealed class mmrds_exporter
         Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings();
         settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
         string object_string = Newtonsoft.Json.JsonConvert.SerializeObject(export_queue_item, settings);
-        responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue/" + export_queue_item._id, object_string, this.user_name, this.value_string);
+        await _exportQueueRepository.SaveQueueDocumentAsync(export_queue_item._id, object_string, db_config);
 
 
         Console.WriteLine("{0} Export Finished", System.DateTime.Now);
@@ -1849,15 +1822,15 @@ public sealed class mmrds_exporter
         catch (Exception ex)
         {
 
-        string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}export_queue/" + this.item_id, null, this.user_name, this.value_string);
-        export_queue_item export_queue_item = Newtonsoft.Json.JsonConvert.DeserializeObject<export_queue_item>(responseFromServer);
+        export_queue_item export_queue_item;
+        export_queue_item = await _exportQueueRepository.GetQueueDocumentAsync<export_queue_item>(this.item_id, db_config);
 
         export_queue_item.status = "Queue Failed:" + ex.ToString();
 
         Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings();
         settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
         string object_string = Newtonsoft.Json.JsonConvert.SerializeObject(export_queue_item, settings);
-        responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue/" + export_queue_item._id, object_string, this.user_name, this.value_string);
+        await _exportQueueRepository.SaveQueueDocumentAsync(export_queue_item._id, object_string, db_config);
 
 
         return false;
@@ -2031,6 +2004,10 @@ public sealed class mmrds_exporter
                     {
                         try
                         {
+                            if (!should_export_node(path_to_node_map[field_node]))
+                            {
+                                continue;
+                            }
 
                             var key_name = field_node.Substring(field_node.LastIndexOf("/") + 1, field_node.Length - field_node.LastIndexOf("/") - 1);
 
@@ -2047,6 +2024,11 @@ public sealed class mmrds_exporter
                             }
 
                             string file_field_name = path_to_field_name_map[field_node];
+                            if (!grid_row.Table.Columns.Contains(file_field_name))
+                            {
+                                continue;
+                            }
+
                             if (grid_item_value != null)
                             {
 
@@ -2303,6 +2285,34 @@ public sealed class mmrds_exporter
     }
 
 
+    private static bool should_export_node(mmria.common.metadata.node node)
+    {
+        if (node == null || string.IsNullOrWhiteSpace(node.type))
+        {
+            return false;
+        }
+
+        switch (node.type.ToLower())
+        {
+            case "app":
+            case "form":
+            case "grid":
+            case "always_enabled_button":
+            case "button":
+            case "chart":
+            case "label":
+                return false;
+            case "group":
+                return
+                    node.tags != null &&
+                    node.tags.Length > 0 &&
+                    node.tags[0].Equals("CALC_DATE", StringComparison.OrdinalIgnoreCase);
+            default:
+                return node.mirror_reference == null;
+        }
+    }
+
+
     private void create_header_row
     (
         System.Collections.Generic.Dictionary<string, int> p_path_to_int_map,
@@ -2407,6 +2417,8 @@ public sealed class mmrds_exporter
             column.ColumnName = $"{file_field_name}_{p_path_to_int_map[path].ToString()}";
             p_Table.Columns.Add(column);
         }
+
+        path_to_field_name_map[path] = column.ColumnName;
 
         }
     }
@@ -2945,11 +2957,11 @@ public sealed class mmrds_exporter
 
         if (this.qualitativeStreamCount[index] == 0)
         {
-            this.qualitativeStreamWriter[index].WriteLine($"{record_split}\nhr_r_id={p_record_id}\nid={p_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}");
+            this.qualitativeStreamWriter[index].Write($"{record_split}\nhr_r_id={p_record_id}\nid={p_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}\n");
         }
         else
         {
-            this.qualitativeStreamWriter[index].WriteLine($"\n{record_split}\nhr_r_id={p_record_id}\nid={p_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}");
+            this.qualitativeStreamWriter[index].Write($"\n{record_split}\nhr_r_id={p_record_id}\nid={p_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}\n");
         }
         this.qualitativeStreamCount[index] += 1;
     }

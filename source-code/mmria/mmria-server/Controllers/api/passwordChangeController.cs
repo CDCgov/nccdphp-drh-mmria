@@ -25,35 +25,36 @@ namespace mmria.server;
 public sealed class passwordChangeController: ControllerBase 
 { 
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.Account.IUserRepository _userRepository;
+    private readonly mmria.common.SharedLibraries.Session.ISessionRepository _sessionRepository;
     mmria.common.SharedLibraries.Session.Manager.SessionManager _sessionManager;
     IHttpContextAccessor accessor;
     
 
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     mmria.common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     public passwordChangeController
     (
         mmria.common.SharedLibraries.Session.Manager.SessionManager sessionManager,
         IHttpContextAccessor _accessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.Account.IUserRepository userRepository,
+        mmria.common.SharedLibraries.Session.ISessionRepository sessionRepository
     )
     {
         _couchDbHttpClient = couchDbHttpClient;
+        _userRepository = userRepository;
+        _sessionRepository = sessionRepository;
 
         _sessionManager = sessionManager;
         accessor = _accessor;
-        configuration = _configuration;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
-        host_prefix = accessor.HttpContext.Request.Host.GetPrefix();
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
     }
 
 
@@ -77,12 +78,9 @@ public sealed class passwordChangeController: ControllerBase
                     u => u.IsAuthenticated && 
                     u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
 
-                var session_event_request_url = db_config.Get_Prefix_DB_Url($"session/_design/session_event_sortable/_view/by_user_id?startkey=\"{userName}\"&endkey=\"{userName}\"");
-
-                string response_from_server = await _couchDbHttpClient.ExecuteAsync("GET", session_event_request_url, null, db_config.user_name, db_config.user_value);
+                var session_event_response = await _sessionRepository.GetSessionEventsByUserIdAsync(userName, db_config);
 
                 //var session_event_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_object_key_header<mmria.common.model.couchdb.session_event>>(response_from_server);
-                var session_event_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.session_event>>(response_from_server);
 
                 DateTime first_item_date = DateTime.Now;
                 DateTime last_item_date = DateTime.Now;
@@ -124,11 +122,12 @@ public sealed class passwordChangeController: ControllerBase
 
 
     [HttpPost]
-    public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post([FromBody] ApplicationUser user) 
-    { 
+    public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post()
+    {
         //bool valid_login = false;
+        var user = await mmria.server.util.JsonRequestBodyReader.ReadAsync<ApplicationUser>(Request);
 
-        string object_string = null;
+        var safeRequest = CreateSanitizedPasswordChangeRequest(user);
         mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response ();
 
         var userName = User.Identities.First(
@@ -137,27 +136,21 @@ public sealed class passwordChangeController: ControllerBase
 
         try
         {
-            string user_db_url = db_config.url + "/_users/org.couchdb.user:" + userName;
-            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", user_db_url, object_string, db_config.user_name, db_config.user_value);
-            var user_object = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.user>(responseFromServer);
+            var user_object = await _userRepository.CheckUserAsync("org.couchdb.user:" + userName, db_config);
 
             if
             (
-                user_object == null ||
-                !user.UserName.Equals(userName, StringComparison.OrdinalIgnoreCase)
+                string.IsNullOrWhiteSpace(user_object._id) ||
+                safeRequest == null ||
+                !safeRequest.UserName.Equals(userName, StringComparison.OrdinalIgnoreCase)
             )
             {
                 return null;
             }
 
-            user_object.password = user.Value;
+            user_object.password = safeRequest.Value;
 
-            Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-            settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-            object_string = Newtonsoft.Json.JsonConvert.SerializeObject(user_object, settings);
-
-            responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", user_db_url, object_string, db_config.user_name, db_config.user_value);
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
+            result = await _userRepository.PutUserAsync(user_object, db_config);
 
             if (result.ok) 
             {
@@ -181,6 +174,20 @@ public sealed class passwordChangeController: ControllerBase
 
         return result;
     } 
+
+    private static ApplicationUser CreateSanitizedPasswordChangeRequest(ApplicationUser request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.UserName))
+        {
+            return null;
+        }
+
+        return new ApplicationUser
+        {
+            UserName = request.UserName.Trim(),
+            Value = request.Value
+        };
+    }
 
 } 
 

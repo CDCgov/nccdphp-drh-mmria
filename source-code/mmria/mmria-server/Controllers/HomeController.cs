@@ -17,8 +17,6 @@ public sealed class HomeController : Controller
 {
 
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     mmria.common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.SharedLibraries.Session.Manager.SessionManager _sessionManager;
@@ -27,32 +25,19 @@ public sealed class HomeController : Controller
     public HomeController
     (
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.common.SharedLibraries.Session.Manager.SessionManager sessionManager,
         mmria.common.SharedLibraries.ManageUsers.Manager.ManageUsersManager manageUsersManager
     )
     {
-        configuration = _configuration;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
         _sessionManager = sessionManager;
         _manageUsersManager = manageUsersManager;
         
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
         
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(
-            _overridableConfigSets,
-            _configuration,
-            host_prefix
-        );
+        configuration = tenantRuntime.RequireConfiguration();
         
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(
-            _dbConfigSets,
-            _configuration,
-            host_prefix
-        );
+        db_config = tenantRuntime.RequireDbConfig();
     }
 
     public async Task<IActionResult> Index()
@@ -108,6 +93,8 @@ public sealed class HomeController : Controller
         ViewBag.is_offline_mode_enabled = configuration.GetBoolean("is_offline_mode_enabled", host_prefix) ?? false;
         ViewBag.is_offline_logging_enabled = configuration.GetBoolean("is_offline_logging_enabled", host_prefix) ?? false;
         ViewBag.offline_logging_max_logs = configuration.GetInteger("offline_logging_max_logs", host_prefix) ?? 10000;
+        ViewBag.omb_expiration_date = configuration.GetString("omb_expiration_date", host_prefix) ?? "05/31/2026";
+        ViewBag.mmria_version = configuration.GetString("mmria_version", host_prefix) ?? "MMRIA V 4.1";
         var LinkList = configuration.GetExternalHomePageLinks();
 
         

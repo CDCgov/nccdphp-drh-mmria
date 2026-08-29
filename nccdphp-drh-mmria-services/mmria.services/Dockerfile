@@ -1,5 +1,5 @@
 # ----- Stage 1: Build -----
-FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-90:9.0.110-1758501291@sha256:c34a55b413118073024ab517352d7af930cfac369baf305e3134457762f16042 AS build
+FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100:9.8-1786438823@sha256:5e17d5b16b55828defad53f99e85cdec6ec90e6821c5f4f1a731c669a8509bce AS build
 WORKDIR /src
 
 # Copy the mmria.services project file first to leverage layer caching for restores.
@@ -19,7 +19,7 @@ WORKDIR /src/nccdphp-drh-mmria-services/mmria.services
 RUN dotnet restore
 
 # Build specifying the targeted framework (project targets multiple frameworks)
-RUN dotnet build -c Release -f net9.0 -o /app/build
+RUN dotnet build -c Release -f net10.0 -o /app/build
 
 USER 1001
 
@@ -29,13 +29,18 @@ USER root
 WORKDIR /src/nccdphp-drh-mmria-services/mmria.services
 
 # Publish the specific target framework to reduce final image size
-RUN dotnet publish -c Release -f net9.0 -o /app/publish
+RUN dotnet publish -c Release -f net10.0 -o /app/publish
 
 USER 1001
 
 # ----- Stage 3: Runtime -----
-FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-90-runtime:9.0.9-1758211314@sha256:699c83e64b5e931eb0158c803de38cfe176d1a107030ae3b07f678e15c37a88e AS runtime
+FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100-aspnet:9.8-1786442384@sha256:4c6dc7a25515d540eb5672287078d0c042075c8963ba9306f770032277ee8206 AS runtime
 WORKDIR /app
+
+# Update libacl to address CVE-2026-54369 (symlink traversal privilege escalation;
+# fixed in libacl-2.4.0-1.el9_8). Fall back to microdnf for UBI-minimal variants.
+USER root
+RUN (dnf update -y libacl && dnf clean all) || (microdnf update -y libacl && microdnf clean all)
 
 # Copy published output from build image
 COPY --from=publish /app/publish .

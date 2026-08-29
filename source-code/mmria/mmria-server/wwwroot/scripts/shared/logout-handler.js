@@ -18,7 +18,7 @@ async function encryptCasesOnOfflineLogout(enteredKey) {
         const sessionData = await getSessionDataForValidation();
         if (!sessionData || !sessionData.keySalt) return;
 
-        // Send password to service worker to derive and set key
+        // Send the offline access key to the service worker helper to derive and set the key
         const keySet = await ServiceWorkerManager.setOfflineKey(enteredKey, sessionData.keySalt);
         if (!keySet) return;
 
@@ -127,6 +127,7 @@ function validateOfflineSession() {
  */
 function clearOfflineSessionData() {
     localStorage.setItem('has_active_offline_session', 'false');
+    localStorage.removeItem('mmria_offline_last_activity_at');
     
     // Clear all case data from localStorage for security
     try {
@@ -137,16 +138,12 @@ function clearOfflineSessionData() {
                 keysToRemove.push(key);
             }
         }
-        
-        // Remove all case-related keys
+
         keysToRemove.forEach(key => {
             localStorage.removeItem(key);
         });
-        
-        // Clear the case index as well
         localStorage.removeItem('case_index');
-        
-        offlineLog.log('LogoutHandler', `Cleared ${keysToRemove.length} case data items from localStorage on logout`);
+        offlineLog.log('LogoutHandler', 'Cleared legacy offline case shadow-copy data from browser storage on logout');
     } catch (error) {
         offlineLog.error('LogoutHandler', 'Error clearing case data on logout:', error);
     }

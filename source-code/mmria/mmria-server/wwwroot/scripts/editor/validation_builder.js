@@ -695,7 +695,8 @@ var global_ast =  {
 var create_property_ast = function(
 	p_name,
 	p_params,
-	p_body
+	p_body,
+	p_async
 ) 
 {
 	return {
@@ -711,6 +712,7 @@ var create_property_ast = function(
                     "params": p_params,
                     "body": p_body,
                     "generator": false,
+                    "async": p_async === true,
                     "expression": false
                   },
                   "kind": "init",
@@ -749,7 +751,7 @@ function create_global_ast(x, p_output_json)
 						}
 						else if(x.id.name.indexOf('$') == 0)
 						{
-							var res = create_property_ast(x.id.name.substring(1), x.params, x.body);
+							var res = create_property_ast(x.id.name.substring(1), x.params, x.body, x.async);
 							global_ast.properties.push(res);
 						}
 						else

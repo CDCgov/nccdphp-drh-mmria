@@ -120,16 +120,31 @@ prenatal/routine_monitoring/date_and_time
     common.couchdb.DBConfigurationDetail connection;
     string metadata_release_version_name;
     mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository _metadataRepository;
+    private readonly System.Dynamic.ExpandoObject _source_object;
+    private readonly mmria.common.metadata.app _metadata;
     
 
-    public c_generate_frequency_summary_report (common.couchdb.DBConfigurationDetail p_connection, string p_metadata_release_version_name, string p_source_json, mmria.common.getset.CouchDbHttpClient couchDbHttpClient, string p_type = "dqr-detail")
+    public c_generate_frequency_summary_report
+    (
+        common.couchdb.DBConfigurationDetail p_connection,
+        string p_metadata_release_version_name,
+        string p_source_json,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        string p_type = "dqr-detail",
+        System.Dynamic.ExpandoObject p_source_object = null,
+        mmria.common.metadata.app p_metadata = null
+    )
     {
 
         connection = p_connection;
         metadata_release_version_name = p_metadata_release_version_name;
         source_json = p_source_json;
         _couchDbHttpClient = couchDbHttpClient;
+        _metadataRepository = new mmria.common.SharedLibraries.MetadataVersion.DAL.MetadataVersionDAL(couchDbHttpClient);
         this.data_type = p_type;
+        _source_object = p_source_object;
+        _metadata = p_metadata;
     }
 
     public async Task<string> execute ()
@@ -138,11 +153,13 @@ prenatal/routine_monitoring/date_and_time
 
         var gs = new migrate.C_Get_Set_Value(new ());
         
-        string metadata_url = connection.url + $"/metadata/version_specification-{metadata_release_version_name}/metadata";
-        var metadata_response = await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, connection.user_name, connection.user_value);
-        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_response);
+        var metadata = _metadata;
+        if(metadata == null)
+        {
+            metadata = await _metadataRepository.GetAppDocumentAsync(metadata_release_version_name, connection);
+        }
 
-		System.Dynamic.ExpandoObject source_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (source_json);
+		System.Dynamic.ExpandoObject source_object = _source_object ?? Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(source_json);
 
 
 

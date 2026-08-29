@@ -59,6 +59,7 @@ $(function ()
     };*/
 	//profile.initialize_profile();
 
+    bind_case_folder_event_handlers();
 	load_values();
 
 	$(document).keydown(function(evt){
@@ -80,6 +81,89 @@ $(function ()
 		}
 	};
 });
+
+function bind_case_folder_event_handlers()
+{
+    var form_content = document.getElementById('form_content_id');
+    if(!form_content || form_content.dataset.caseFolderEventsBound === 'true')
+    {
+        return;
+    }
+
+    form_content.dataset.caseFolderEventsBound = 'true';
+
+    form_content.addEventListener('submit', function(evt)
+    {
+        evt.preventDefault();
+    });
+
+    // This page renders through sanitized markup, so behavior must be bound after render rather than inline.
+    form_content.addEventListener('click', function(evt)
+    {
+        if(!(evt.target instanceof Element))
+        {
+            return;
+        }
+
+        var action_target = evt.target.closest('[data-folder-action]');
+        if(!action_target || !form_content.contains(action_target))
+        {
+            return;
+        }
+
+        evt.preventDefault();
+
+        switch(action_target.dataset.folderAction)
+        {
+            case 'add-folder':
+                var input_control = document.getElementById(action_target.dataset.inputId);
+                jurisdiction_add_child_click
+                (
+                    action_target.dataset.addChildParentId,
+                    input_control ? input_control.value : "",
+                    ""
+                );
+                break;
+            case 'delete-folder':
+                jurisdiction_remove_child_click
+                (
+                    action_target.dataset.parentId,
+                    action_target.dataset.nodeId,
+                    ""
+                );
+                break;
+            case 'show-children':
+                set_jurisdiction_show_hide_children_state(action_target.dataset.nodeId, true, false, true);
+                break;
+            case 'hide-children':
+                set_jurisdiction_show_hide_children_state(action_target.dataset.nodeId, false, false, false);
+                break;
+            case 'save-tree':
+                save_jurisdiction_tree_click();
+                break;
+        }
+    });
+
+    form_content.addEventListener('input', function(evt)
+    {
+        if(!(evt.target instanceof HTMLInputElement))
+        {
+            return;
+        }
+
+        if
+        (
+            evt.target.dataset.addChildParentId &&
+            (
+                evt.target.getAttribute('aria-invalid') === 'true' ||
+                evt.target.classList.contains('is-invalid')
+            )
+        )
+        {
+            set_jurisdiction_add_child_control_valid_state(evt.target.dataset.addChildParentId, true);
+        }
+    });
+}
 
 function load_values()
 {
@@ -221,7 +305,7 @@ function load_jurisdictions()
 	{
 
 			g_jurisdiction_tree = response;
-            document.getElementById('form_content_id').innerHTML = jurisdiction_render(g_jurisdiction_tree).join("");
+            $mmria.set_sanitized_html(document.getElementById('form_content_id'), jurisdiction_render(g_jurisdiction_tree).join(""));
 			//load_user_jurisdictions();
 			//document.getElementById('navigation_id').innerHTML = navigation_render(g_jurisdiction_list, 0, g_uid).join("");
 
@@ -245,11 +329,11 @@ function server_save(p_user)
 			{
 
 
-						var response_obj = eval(response);
+						var response_obj = typeof response === 'string' ? JSON.parse(response) : response;
 						if(response_obj.ok)
 						{
 							g_user_list._rev = response_obj.rev; 
-							document.getElementById('form_content_id').innerHTML = editor_render(g_user_list, "").join("");
+							$mmria.set_sanitized_html(document.getElementById('form_content_id'), editor_render(g_user_list, "").join(""));
 						}
 						//{ok: true, id: "2016-06-12T13:49:24.759Z", rev: "3-c0a15d6da8afa0f82f5ff8c53e0cc998"}
 					console.log("metadata sent", response);
@@ -396,7 +480,11 @@ function jurisdiction_add_child_click(p_parent_id, p_name, p_user_id)
                 var x = render_new_case_folder(new_child, null, parseInt(y.dataset.nestedLevel));
                 if(y.dataset.nestedLevel == '0')
                 {
-                    $('#case_folder_break').before(x);
+                    var case_folder_break = document.getElementById('case_folder_break');
+                    if(case_folder_break && case_folder_break.parentNode)
+                    {
+                        case_folder_break.parentNode.insertBefore(x, case_folder_break);
+                    }
                 }
                 else
                 {
@@ -426,13 +514,13 @@ function set_jurisdiction_add_child_control_valid_state(p_parent_id, is_valid, m
     {
         add_child_form_control.setAttribute('aria-invalid', true);
         add_child_form_control.classList.add('is-invalid');
-        add_child_form_control_error.innerHTML = message;
+        add_child_form_control_error.textContent = message;
     }
     else
     {
         add_child_form_control.setAttribute('aria-invalid', false);
         add_child_form_control.classList.remove('is-invalid');
-        add_child_form_control_error.innerHTML = '';
+        add_child_form_control_error.textContent = '';
     }
 }
 
@@ -580,7 +668,7 @@ async function save_jurisdiction_tree_click()
 	if(g_jurisdiction_tree && g_current_u_id)
 	{
         const response = await get_http_post_response("api/jurisdiction_tree", g_jurisdiction_tree);
-        const response_obj = eval(response);
+        const response_obj = typeof response === 'string' ? JSON.parse(response) : response;
         if(response_obj.ok)
         {
             g_jurisdiction_tree._rev = response_obj.rev;
@@ -627,13 +715,11 @@ async function get_http_post_response
         $mmria.unstable_network_dialog_show(xhr, xhr.status);
         if (xhr.status == 401) 
         {
-            let redirect_url = location.protocol + '//' + location.host;
-            window.location = redirect_url;
+            window.location = "/";
         }
         else if (xhr.status == 200 && xhr.responseText.length >= 49000) 
         {
-            let redirect_url = location.protocol + '//' + location.host;
-            window.location = redirect_url;
+            window.location = "/";
         }
     }
 

@@ -1,0 +1,326 @@
+@using System.Security.Claims;
+@{
+  Layout = "_LayoutBase";
+
+  ViewBag.BreadCrumbs = true;
+
+  var userName = "";
+
+  if (User.Identities.Any(u => u.IsAuthenticated))
+  {
+    userName = User.Identities.First(
+        u => u.IsAuthenticated &&
+        u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+  }
+}
+
+@section styles {
+    <link rel="stylesheet" href="/css/index.css">
+}
+
+<div>
+    <h1 class="h2 no-print" tabindex="-1">System Offline Configuration</h1>
+    <p>Configure warn and offline dates and messages for a planned outage. Users will see the warn message before the offline date and the offline message after. <strong>All dates and times are in Eastern Time (ET).</strong></p>
+
+    <div id="status_message_id" role="alert" style="display:none;" class="alert"></div>
+
+    <form id="system_offline_form_id">
+        <div class="form-group">
+            <label for="warn_date_id">Warn Date (ET)</label>
+            <input type="datetime-local" id="warn_date_id" name="warn_date" class="form-control" />
+        </div>
+        <div class="form-group">
+            <label for="warn_message_id">Warn Message</label>
+            <textarea id="warn_message_id" name="warn_message" class="form-control" rows="3"></textarea>
+        </div>
+        <div class="form-group">
+            <label for="offline_date_id">Offline Date (ET)</label>
+            <input type="datetime-local" id="offline_date_id" name="offline_date" class="form-control" />
+            <button type="button" class="btn btn-outline-secondary btn-sm mt-2" onclick="clearDates()">Clear Dates</button>
+        </div>
+        <div class="form-group">
+            <label for="restoration_hours_id">Estimated Maintenance Duration (hours)</label>
+            <input type="number" id="restoration_hours_id" name="restoration_hours" class="form-control" min="1" max="720" style="max-width:140px;" value="2" />
+            <small class="form-text text-muted">Used by <code>{{outage_duration}}</code> and <code>{{estimated_restoration}}</code> tokens.</small>
+        </div>
+        <div class="form-group">
+            <label for="auto_logout_minutes_id">Auto Sign-Out Delay (minutes)</label>
+            <input type="number" id="auto_logout_minutes_id" name="auto_logout_minutes" class="form-control" min="1" max="60" style="max-width:140px;" value="5" />
+            <small class="form-text text-muted">When the offline modal appears, users are automatically signed out after this many minutes unless they click OK first.</small>
+        </div>
+        <div class="form-group">
+            <label for="offline_modal_message_id">Offline Modal Message</label>
+            <textarea id="offline_modal_message_id" name="offline_modal_message" class="form-control" rows="3"></textarea>
+        </div>
+        <div class="form-group">
+            <label for="offline_page_message_id">Offline Page Message</label>
+            <textarea id="offline_page_message_id" name="offline_page_message" class="form-control" rows="3"></textarea>
+        </div>
+
+        <div class="mt-3 mb-3 p-3" style="background:#f8f4f9; border-left:4px solid #7b2d8e; border-radius:0 4px 4px 0;">
+            <div class="font-weight-bold" style="font-size:0.9em; margin-bottom:6px;">Available tokens for message fields</div>
+            <table class="table table-sm" style="font-size:0.85em; margin-bottom:0;">
+                <thead><tr class="header-level-2"><th>Token</th><th>Replaced with</th></tr></thead>
+                <tbody>
+                    <tr><td><code>{{warn_date}}</code></td><td>Warn date (ET)</td></tr>
+                    <tr><td><code>{{offline_date}}</code></td><td>Offline date (ET)</td></tr>
+                    <tr><td><code>{{outage_duration}}</code></td><td>Estimated maintenance duration (e.g. &ldquo;3 hours&rdquo;)</td></tr>
+                    <tr><td><code>{{estimated_restoration}}</code></td><td>Offline date + maintenance duration (ET)</td></tr>
+                </tbody>
+            </table>
+            <div style="font-size:0.8em; color:#666; margin-top:4px;">Example: <em>The system will go offline on {{offline_date}} for approximately {{outage_duration}}.</em></div>
+        </div>
+        <div class="mt-4">
+            <div class="font-weight-bold h6 mt-2">Jurisdiction Targeting</div>
+            <p class="text-muted" style="font-size:0.9em;">Controls which sites receive the offline/warn window.</p>
+            <div style="margin-left: 1.2rem !important;" class="form-check mb-1">
+                <input class="form-check-input big-checkbox" type="radio" name="jurisdiction_scope" id="scope_all_id" value="all" checked onchange="onScopeChange(this)">
+                <label class="form-check-label" for="scope_all_id">All Jurisdictions</label>
+            </div>
+            <div style="margin-left: 1.2rem !important;" class="form-check mb-1">
+                <input class="form-check-input big-checkbox" type="radio" name="jurisdiction_scope" id="scope_select_id" value="select" onchange="onScopeChange(this)">
+                <label class="form-check-label" for="scope_select_id">Select Jurisdictions</label>
+            </div>
+
+            <div id="jurisdiction_list_container_id" style="display:none; margin-top:12px;">
+                <p align="center" style="text-align:right">
+                    <button type="button" class="btn primary-button" onclick="checkAllJurisdictions()">Check All</button>
+                    <button type="button" class="btn primary-button" onclick="uncheckAllJurisdictions()">Uncheck All</button>
+                </p>
+                <div id="jurisdiction_table_id">
+                    <em class="text-muted">Loading jurisdictions&hellip;</em>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <button type="button" id="save_button_id" class="btn primary-button" onclick="saveConfig()">Save</button>
+        </div>
+    </form>
+</div>
+
+@section HeadScripts
+{
+<script type="text/javascript">
+'use strict';
+
+var _allJurisdictions = [];
+
+window.addEventListener('load', function () {
+    loadConfig();
+});
+
+async function loadConfig() {
+    try {
+        var [configResponse, jurisdictionsResponse] = await Promise.all([
+            fetch('/system-offline/GetConfig'),
+            fetch('/system-offline/GetJurisdictions')
+        ]);
+
+        if (!configResponse.ok) {
+            showStatus('Failed to load configuration.', false);
+            return;
+        }
+
+        var config = await configResponse.json();
+        _allJurisdictions = jurisdictionsResponse.ok ? await jurisdictionsResponse.json() : [];
+
+        document.getElementById('warn_date_id').value = toDatetimeLocal(config.warn_date);
+        document.getElementById('warn_message_id').value = config.warn_message || '';
+        document.getElementById('offline_date_id').value = toDatetimeLocal(config.offline_date);
+        document.getElementById('restoration_hours_id').value = config.restoration_hours ?? 2;
+        document.getElementById('auto_logout_minutes_id').value = config.auto_logout_minutes ?? 5;
+        document.getElementById('offline_modal_message_id').value = config.offline_modal_message || '';
+        document.getElementById('offline_page_message_id').value = config.offline_page_message || '';
+
+        var applyToAll = config.apply_to_all_jurisdictions !== false;
+        document.getElementById('scope_all_id').checked = applyToAll;
+        document.getElementById('scope_select_id').checked = !applyToAll;
+
+        renderJurisdictionTable(config.selected_jurisdictions || []);
+        updateJurisdictionListVisibility(!applyToAll);
+
+    } catch (err) {
+        showStatus('Error loading configuration: ' + err, false);
+    }
+}
+
+function renderJurisdictionTable(selectedJurisdictions) {
+    var container = document.getElementById('jurisdiction_table_id');
+    if (_allJurisdictions.length === 0) {
+        container.innerHTML = '<em class="text-muted">No jurisdictions found.</em>';
+        return;
+    }
+
+    var rows = '';
+    for (var i = 0; i < _allJurisdictions.length; i++) {
+        var jur = _allJurisdictions[i];
+        var isChecked = selectedJurisdictions.some(function (s) { return s.toLowerCase() === jur.toLowerCase(); });
+        var disabledAttr = '';
+        var checkedAttr = isChecked ? ' checked' : '';
+        var nameSuffix = '';
+        rows += '<tr>' +
+            '<td>' + (i + 1) + '</td>' +
+            '<td>' +
+                '<div class="form-check d-flex justify-content-center">' +
+                    '<input class="form-input-check big-checkbox jurisdiction-checkbox" aria-label="Select ' + escapeHtml(jur) + '" id="jur_' + i + '" type="checkbox" value="' + i + '"' + checkedAttr + disabledAttr + '>' +
+                    '<label></label>' +
+                '</div>' +
+            '</td>' +
+            '<td style="text-align:left"><label for="jur_' + i + '">' + escapeHtml(jur) + nameSuffix + '</label></td>' +
+            '</tr>';
+    }
+
+    container.innerHTML =
+        '<table class="table" align="center">' +
+            '<caption class="table-caption">Table listing all jurisdictions and checkboxes to select which sites receive the offline window.</caption>' +
+            '<thead>' +
+                '<tr class="header-level-2" align="center">' +
+                    '<th class="text-left">#</th>' +
+                    '<th>Include in Offline Window</th>' +
+                    '<th>Jurisdiction Name</th>' +
+                '</tr>' +
+            '</thead>' +
+            '<tbody>' + rows + '</tbody>' +
+        '</table>';
+}
+
+/**
+ * Returns the epoch ms that corresponds to what Eastern Time's wall clock shows at `date`,
+ * expressed as a UTC timestamp — used to compute the ET↔UTC offset.
+ */
+function getEtWallClockAsUtcMs(date) {
+    var parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/New_York',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        hour12: false
+    }).formatToParts(date);
+    var get = function (type) { return parseInt(parts.find(function (p) { return p.type === type; }).value, 10); };
+    var h = get('hour');
+    if (h === 24) h = 0;
+    return Date.UTC(get('year'), get('month') - 1, get('day'), h, get('minute'), get('second'));
+}
+
+/**
+ * Converts a stored UTC ISO date string to the value expected by a datetime-local input,
+ * displayed in Eastern Time (ET) so admins enter and read ET directly.
+ */
+function toDatetimeLocal(utcStr) {
+    if (!utcStr) return '';
+    var d = new Date(utcStr);
+    if (isNaN(d.getTime())) return '';
+    var parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/New_York',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit',
+        hour12: false
+    }).formatToParts(d);
+    var get = function (type) { return parts.find(function (p) { return p.type === type; }).value; };
+    var hour = get('hour');
+    if (hour === '24') hour = '00';
+    return get('year') + '-' + get('month') + '-' + get('day') + 'T' + hour + ':' + get('minute');
+}
+
+/**
+ * Converts a datetime-local input value (entered as Eastern Time) to a UTC ISO string.
+ * Strategy: parse as UTC for a reference epoch, determine the ET offset at that moment,
+ * then shift to produce the true UTC equivalent of the ET wall-clock time entered.
+ */
+function fromDatetimeLocal(etStr) {
+    if (!etStr) return null;
+    var naive = new Date(etStr + 'Z'); // treat input as UTC to get a reference epoch
+    if (isNaN(naive.getTime())) return null;
+    var etWallMs = getEtWallClockAsUtcMs(naive);       // what ET shows at that epoch, as UTC ms
+    var offsetMs = naive.getTime() - etWallMs;         // ET offset from UTC (e.g. +4h for EDT)
+    return new Date(naive.getTime() + offsetMs).toISOString();
+}
+
+function escapeHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function onScopeChange(radio) {
+    var isSelect = radio.value === 'select';
+    updateJurisdictionListVisibility(isSelect);
+}
+
+function updateJurisdictionListVisibility(show) {
+    var container = document.getElementById('jurisdiction_list_container_id');
+    container.style.display = show ? 'block' : 'none';
+}
+
+function checkAllJurisdictions() {
+    document.querySelectorAll('.jurisdiction-checkbox:not(:disabled)').forEach(function (cb) {
+        cb.checked = true;
+    });
+}
+
+function uncheckAllJurisdictions() {
+    document.querySelectorAll('.jurisdiction-checkbox:not(:disabled)').forEach(function (cb) {
+        cb.checked = false;
+    });
+}
+
+function getSelectedJurisdictions() {
+    var selected = [];
+    document.querySelectorAll('.jurisdiction-checkbox:checked').forEach(function (cb) {
+        var idx = parseInt(cb.value, 10);
+        if (!isNaN(idx) && idx >= 0 && idx < _allJurisdictions.length) {
+            selected.push(_allJurisdictions[idx]);
+        }
+    });
+    return selected;
+}
+
+async function saveConfig() {
+    var btn = document.getElementById('save_button_id');
+    btn.disabled = true;
+
+    var applyToAll = document.getElementById('scope_all_id').checked;
+
+    var payload = {
+        warn_date: fromDatetimeLocal(document.getElementById('warn_date_id').value),
+        warn_message: document.getElementById('warn_message_id').value || null,
+        offline_date: fromDatetimeLocal(document.getElementById('offline_date_id').value),
+        offline_modal_message: document.getElementById('offline_modal_message_id').value || null,
+        offline_page_message: document.getElementById('offline_page_message_id').value || null,
+        restoration_hours: parseInt(document.getElementById('restoration_hours_id').value, 10) || 2,
+        auto_logout_minutes: parseInt(document.getElementById('auto_logout_minutes_id').value, 10) || 5,
+        apply_to_all_jurisdictions: applyToAll,
+        selected_jurisdictions: applyToAll ? [] : getSelectedJurisdictions()
+    };
+
+    try {
+        var response = await fetch('/system-offline/SaveConfig', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        var result = await response.json();
+        if (result && result.ok) {
+            showStatus('Configuration saved successfully.', true);
+        } else {
+            showStatus('Save failed: ' + (result && result.error ? result.error : 'unknown error'), false);
+        }
+    } catch (err) {
+        showStatus('Error saving configuration: ' + err, false);
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+function clearDates() {
+    document.getElementById('warn_date_id').value = '';
+    document.getElementById('offline_date_id').value = '';
+}
+
+function showStatus(message, success) {
+    var el = document.getElementById('status_message_id');
+    el.textContent = message;
+    el.className = 'alert ' + (success ? 'alert-success' : 'alert-danger');
+    el.style.display = 'block';
+}
+</script>
+}

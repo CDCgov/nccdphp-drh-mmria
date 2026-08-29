@@ -8,6 +8,7 @@ using System.Net;
 using System.Dynamic;
 using Newtonsoft.Json;
 using mmria.common.SharedLibraries.CaseView.DAL;
+using mmria.common.SharedLibraries.Jurisdiction;
 
 namespace mmria.common.SharedLibraries.CaseView;
 
@@ -22,6 +23,7 @@ public sealed class CaseViewManager
     mmria.common.SharedLibraries.Other.ResourceRightEnum ResourceRight;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly CaseViewDAL _dal;
+    private readonly IJurisdictionRepository _jurisdictionRepository;
 
     public CaseViewManager
     (
@@ -29,7 +31,8 @@ public sealed class CaseViewManager
         System.Security.Claims.ClaimsPrincipal p_user, 
         bool p_is_case_identified_data = false,
         bool p_include_pinned_cases = false,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient = null
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient = null,
+        IJurisdictionRepository jurisdictionRepository = null
     )
     {
         db_config = p_configuration;
@@ -39,6 +42,7 @@ public sealed class CaseViewManager
         is_include_pinned_cases = p_include_pinned_cases;
         _couchDbHttpClient = couchDbHttpClient;
         _dal = new CaseViewDAL(_couchDbHttpClient);
+        _jurisdictionRepository = jurisdictionRepository;
 
         if(is_case_identified_data)
         {
@@ -918,7 +922,9 @@ public sealed class CaseViewManager
     ) 
     {
 
-        var jurisdiction_hashset = mmria.common.SharedLibraries.Other.authorization.get_current_jurisdiction_id_set_for(db_config, User);
+        var jurisdiction_hashset = _couchDbHttpClient == null
+            ? mmria.common.SharedLibraries.Other.authorization.get_current_jurisdiction_id_set_for(db_config, User)
+            : mmria.common.SharedLibraries.Other.authorization.get_current_jurisdiction_id_set_for(db_config, User, _couchDbHttpClient);
 
         string sort_view = sort.ToLower ();
 
@@ -1248,8 +1254,9 @@ public sealed class CaseViewManager
 
         try
         {
-            string request_string = $"{db_config.url}/jurisdiction/pinned-case-set";
-            result = await _dal.GetPinnedCaseSetAsync(request_string, db_config);
+            result = _jurisdictionRepository != null
+                ? await _jurisdictionRepository.GetPinnedCaseSetAsync(db_config)
+                : await _dal.GetPinnedCaseSetAsync(db_config.Get_Prefix_DB_Url("jurisdiction/pinned-case-set"), db_config);
         }
         catch (Exception ex)
         {
@@ -1402,10 +1409,13 @@ public sealed class CaseViewManager
 
         try
         {
-            string request_string = use_prefix_route
-                ? db_config.Get_Prefix_DB_Url("jurisdiction/pinned-case-set")
-                : $"{db_config.url}/jurisdiction/pinned-case-set";
-            result = await _dal.GetPinnedCaseSetAsync(request_string, db_config);
+            result = _jurisdictionRepository != null
+                ? await _jurisdictionRepository.GetPinnedCaseSetAsync(db_config)
+                : await _dal.GetPinnedCaseSetAsync(
+                    use_prefix_route
+                        ? db_config.Get_Prefix_DB_Url("jurisdiction/pinned-case-set")
+                        : $"{db_config.url}/jurisdiction/pinned-case-set",
+                    db_config);
         }
         catch (WebException wex)
         {
@@ -1440,20 +1450,24 @@ public sealed class CaseViewManager
     {
         var result = new mmria.common.model.couchdb.document_put_response();
 
-        JsonSerializerSettings settings = new JsonSerializerSettings();
-        settings.NullValueHandling = NullValueHandling.Ignore;
-
-        var document_content = JsonConvert.SerializeObject(value, settings);
-
         if (value._id == "pinned-case-set")
         {
-            string request_string = use_prefix_route
-                ? db_config.Get_Prefix_DB_Url("jurisdiction/pinned-case-set")
-                : $"{db_config.url}/jurisdiction/pinned-case-set";
-
             try
             {
-                result = await _dal.SavePinnedCaseSetAsync(request_string, document_content, db_config);
+                if (_jurisdictionRepository != null)
+                {
+                    result = await _jurisdictionRepository.SavePinnedCaseSetAsync(value, db_config);
+                }
+                else
+                {
+                    JsonSerializerSettings settings = new JsonSerializerSettings();
+                    settings.NullValueHandling = NullValueHandling.Ignore;
+                    var document_content = JsonConvert.SerializeObject(value, settings);
+                    string request_string = use_prefix_route
+                        ? db_config.Get_Prefix_DB_Url("jurisdiction/pinned-case-set")
+                        : $"{db_config.url}/jurisdiction/pinned-case-set";
+                    result = await _dal.SavePinnedCaseSetAsync(request_string, document_content, db_config);
+                }
             }
             catch (Exception ex)
             {
@@ -1616,11 +1630,20 @@ public sealed class CaseViewManager
     private async Task<mmria.common.model.couchdb.case_view_response> GetDuplicateCaseViewAsync(
         string search_key,
         int skip = 0,
-        int take = 268_435_456,
+        int take = 200,
         string sort = "by_last_name",
         bool descending = false,
         string case_status = "all")
     {
+        // Hard cap take. Callers historically passed Int32-near-max values which would
+        // fetch every case in the database for any duplicate-detection check.
+        // 1000 is well above any realistic per-surname result set.
+        const int MaxTake = 1000;
+        if (take <= 0 || take > MaxTake)
+        {
+            take = MaxTake;
+        }
+
         string sort_view = sort.ToLower();
         switch (sort_view)
         {
@@ -1667,6 +1690,21 @@ public sealed class CaseViewManager
             if (descending)
             {
                 request_builder.Append("&descending=true");
+            }
+
+            // For the by_last_name view, scope the read to just the matching surname
+            // by passing startkey/endkey. Without these, CouchDB streams the whole view
+            // back to the pod and we filter client-side — the original 268M-take bug.
+            // The view emits keys as lower-cased last_name strings, so we lower-case the
+            // search key and add a high-codepoint sentinel for the endkey.
+            if (sort_view == "by_last_name" && !string.IsNullOrWhiteSpace(search_key))
+            {
+                string normalized = search_key.ToLowerInvariant().Trim(new char[] { '"' });
+                string startKey = System.Net.WebUtility.UrlEncode($"\"{normalized}\"");
+                // \ufff0 is a high codepoint that follows any normal character, giving
+                // us an inclusive prefix scan equivalent to last_name LIKE 'normalized%'.
+                string endKey = System.Net.WebUtility.UrlEncode($"\"{normalized}\ufff0\"");
+                request_builder.Append($"&startkey={startKey}&endkey={endKey}");
             }
 
             mmria.common.model.couchdb.case_view_response case_view_response = await _dal.GetCaseViewResponseAsync(request_builder.ToString(), db_config);

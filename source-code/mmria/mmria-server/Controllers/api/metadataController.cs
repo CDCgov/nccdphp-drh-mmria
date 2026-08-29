@@ -4,8 +4,10 @@ using Microsoft.AspNetCore.Mvc;
 using System.Linq;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
+using mmria.common.utils;
 
 using  mmria.server.extension;
+using mmria.server.util;
 
 namespace mmria.server;
 
@@ -14,42 +16,27 @@ public sealed class metadataController: ControllerBase
 { 
     private readonly mmria.common.SharedLibraries.MetadataVersion.Manager.MetadataVersionManager _metadataVersionManager;
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     public metadataController
     (
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.common.SharedLibraries.MetadataVersion.Manager.MetadataVersionManager metadataVersionManager
     )
     {
         _metadataVersionManager = metadataVersionManager;
-        configuration = _configuration;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
         
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
         
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(
-            _overridableConfigSets,
-            _configuration,
-            host_prefix
-        );
+        configuration = tenantRuntime.RequireConfiguration();
         
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(
-            _dbConfigSets,
-            _configuration,
-            host_prefix
-        );
+        db_config = tenantRuntime.RequireDbConfig();
     }
     
     [AllowAnonymous] 
     [HttpGet]
-    public async System.Threading.Tasks.Task<System.Dynamic.ExpandoObject> Get()
+    public async System.Threading.Tasks.Task<IActionResult> Get()
     {
         //System.Console.WriteLine ("Recieved message.");
         string result = null;
@@ -63,14 +50,17 @@ public sealed class metadataController: ControllerBase
             Console.WriteLine (ex);
         }
 
-        return json_result;
+        var omb_date = configuration.GetString("omb_expiration_date", host_prefix) ?? "05/31/2026";
+        var json_string = Newtonsoft.Json.JsonConvert.SerializeObject(json_result);
+        json_string = json_string.Replace("{{omb_expiration_date}}", omb_date);
+        return Content(json_string, "application/json");
     }
 
 
     [AllowAnonymous] 
     [Route("{id}")]
     [HttpGet]
-    public async System.Threading.Tasks.Task<System.Dynamic.ExpandoObject> Get(string id)
+    public async System.Threading.Tasks.Task<IActionResult> Get(string id)
     {
         //System.Console.WriteLine ("Recieved message.");
         string result = null;
@@ -84,23 +74,35 @@ public sealed class metadataController: ControllerBase
             Console.WriteLine (ex);
         }
 
-        return json_result;
+        var omb_date = configuration.GetString("omb_expiration_date", host_prefix) ?? "05/31/2026";
+        var json_string = Newtonsoft.Json.JsonConvert.SerializeObject(json_result);
+        json_string = json_string.Replace("{{omb_expiration_date}}", omb_date);
+        return Content(json_string, "application/json");
     }
 
 
     [Authorize(Policy = "form_designer")]
     [HttpPost]
-    public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post
-    (
-        [FromBody] mmria.common.metadata.app metadata
-    ) 
+    public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post() 
     { 
-        string object_string = null;
         mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response ();
+        var metadata = await JsonRequestBodyReader.ReadAsync<mmria.common.metadata.app>(Request);
+        var sanitizedMetadata = DocumentPayloadCloneHelper.CloneMetadataApp(metadata, GetCurrentUserName());
+
+        if (sanitizedMetadata == null)
+        {
+            return result;
+        }
 
         try
         {
-            result = await _metadataVersionManager.SaveMetadataAsync(metadata, db_config);
+            result = await _metadataVersionManager.SaveMetadataAsync(sanitizedMetadata, db_config);
+            if (result == null || !result.ok)
+            {
+                var revisionHandling = CouchDbRevisionHelper.DescribeRevisionHandling(metadata?._rev, null);
+                Console.WriteLine(
+                    $"Metadata save failed for {sanitizedMetadata._id}: rev={revisionHandling}; response={result?.error_description}");
+            }
 
             if (!result.ok) 
             {
@@ -176,17 +178,20 @@ public sealed class metadataController: ControllerBase
     [HttpPost]
     public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post
     (
-        [FromBody] mmria.common.metadata.Version_Specification p_version_specification
+        string id
     ) 
     { 
         mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response ();
+        var p_version_specification = await JsonRequestBodyReader.ReadAsync<mmria.common.metadata.Version_Specification>(Request);
+        var sanitizedVersionSpecification = DocumentPayloadCloneHelper.CloneVersionSpecification(p_version_specification, GetCurrentUserName());
 
         if
         (
-            p_version_specification.data_type == null ||
-            p_version_specification.data_type != "version-specification" || 
-            p_version_specification._id == "2016-06-12T13:49:24.759Z" ||
-            p_version_specification._id == "de-identified-list"
+            sanitizedVersionSpecification == null ||
+            sanitizedVersionSpecification.data_type == null ||
+            sanitizedVersionSpecification.data_type != "version-specification" || 
+            sanitizedVersionSpecification._id == "2016-06-12T13:49:24.759Z" ||
+            sanitizedVersionSpecification._id == "de-identified-list"
 
         )
         {
@@ -197,7 +202,13 @@ public sealed class metadataController: ControllerBase
         try
         {
 
-            result = await _metadataVersionManager.SaveMetadataVersionSpecificationAsync(p_version_specification, db_config);
+            result = await _metadataVersionManager.SaveMetadataVersionSpecificationAsync(sanitizedVersionSpecification, db_config);
+            if (result == null || !result.ok)
+            {
+                var revisionHandling = CouchDbRevisionHelper.DescribeRevisionHandling(p_version_specification?._rev, null);
+                Console.WriteLine(
+                    $"Metadata version specification save failed for {sanitizedVersionSpecification._id}: rev={revisionHandling}; response={result?.error_description}");
+            }
 
             if (!result.ok) 
             {
@@ -211,6 +222,20 @@ public sealed class metadataController: ControllerBase
         }
         
         return result;
+    }
+
+    private string GetCurrentUserName()
+    {
+        if (User?.Identities?.Any(u => u.IsAuthenticated) == true)
+        {
+            return User.Identities.First(
+                u => u.IsAuthenticated &&
+                u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name))
+                .FindFirst(System.Security.Claims.ClaimTypes.Name)
+                .Value;
+        }
+
+        return null;
     }
 
 } 

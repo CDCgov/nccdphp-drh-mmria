@@ -4,28 +4,29 @@ using System.Security.Claims;
 using System.Text.Encodings.Web;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Net.Http.Headers;
 using Microsoft.Extensions.Configuration;
 using mmria.server.extension;
+using System;
 
 namespace mmria.server.authentication;
 
 public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
 {
-    mmria.common.couchdb.OverridableConfiguration _configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
+    private const string SuppressSessionSlideHeaderName = "X-MMRIA-Suppress-Session-Slide";
+    private readonly mmria.server.util.RequestTenantRuntime _tenantRuntime;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.Session.ISessionRepository _sessionRepository;
 
 
     public CustomAuthHandler
     (
-        mmria.common.couchdb.OverridableConfiguration configuration, 
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.Session.ISessionRepository sessionRepository,
         IOptionsMonitor<CustomAuthOptions> options, 
         ILoggerFactory logger, 
         UrlEncoder encoder, 
@@ -33,18 +34,16 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
     ) 
         : base(options, logger, encoder, clock)
     {
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;       
-        _configuration = configuration;
+        _tenantRuntime = tenantRuntime;
         _couchDbHttpClient = couchDbHttpClient;
+        _sessionRepository = sessionRepository;
     }
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        string host_prefix = Request.Host.GetPrefix();
-
-        var configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        var db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        string host_prefix = _tenantRuntime.HostPrefix ?? Request.Host.GetPrefix();
+        var configuration = _tenantRuntime.Configuration;
+        var db_config = _tenantRuntime.DbConfig;
 
         if(db_config == null)
         {
@@ -86,20 +85,33 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
             mmria.common.SharedLibraries.Session.Model.Session_MessageDTO session_message = null;
             try
             {
-                string request_string = db_config.Get_Prefix_DB_Url($"session/{Request.Cookies["sid"]}");
-                var responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
+                var responseFromServer = await _sessionRepository.GetSessionDocumentRawAsync(Request.Cookies["sid"], db_config);
 
                 session_message = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.SharedLibraries.Session.Model.Session_MessageDTO>(responseFromServer);
 
             }
             catch(System.Exception ex)
             {
-                System.Console.WriteLine (ex);
+                Logger.LogError(
+                    ex,
+                    "Auth session lookup failed for {RequestPath}. hostPrefix={HostPrefix}; sidPresent={SidPresent}; userCookiePresent={UserCookiePresent}",
+                    Request.Path.Value,
+                    host_prefix,
+                    Request.Cookies.ContainsKey("sid"),
+                    Request.Cookies.ContainsKey("uid"));
 
             } 
 
             if(session_message == null)
             {
+                if (IsApiRequest())
+                {
+                    Logger.LogWarning(
+                        "Auth session lookup returned no session for {RequestPath}. hostPrefix={HostPrefix}; sidPresent={SidPresent}",
+                        Request.Path.Value,
+                        host_prefix,
+                        Request.Cookies.ContainsKey("sid"));
+                }
                 return AuthenticateResult.Fail("Invalid session.");
             }
 
@@ -125,13 +137,20 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
             {
 
                 var date_diff = session_message.date_expired.Value - System.DateTime.Now;
-                var time_out_value = _configuration.GetInteger("session_idle_timeout_minutes", "shared");
-                double time_out = 15;
-                
-                if(time_out_value.HasValue)
-                {
-                    time_out = time_out_value.Value;
-                }
+                var session_idle_timeout_minutes = mmria.server.util.SessionTimeoutHelper.GetSessionIdleTimeoutMinutes(
+                    configuration,
+                    configuration ?? new mmria.common.couchdb.OverridableConfiguration(),
+                    host_prefix);
+                var suppressSessionSlideRequested =
+                    Request.Headers.TryGetValue(SuppressSessionSlideHeaderName, out var suppressHeaderValues) &&
+                    suppressHeaderValues.Any(value => string.Equals(value, "true", System.StringComparison.OrdinalIgnoreCase));
+                var isOfflineModeSession =
+                    session_message.role_list?.Contains("offline_mode") == true;
+                var shouldRefreshSessionExpiration =
+                    !suppressSessionSlideRequested &&
+                    !isOfflineModeSession &&
+                    date_diff.TotalMinutes < session_idle_timeout_minutes &&
+                    session_idle_timeout_minutes - date_diff.TotalMinutes > 1;
 
                 var session_url = false;
 
@@ -140,31 +159,40 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
 
                 }
 
-                if
-                (
-                    date_diff.TotalMinutes < time_out &&
-                    time_out - date_diff.TotalMinutes  > 1
-                )
+                if(shouldRefreshSessionExpiration)
                 {   
-
-                    session_message.date_expired = System.DateTime.Now.AddMinutes(time_out);
+                    var refreshedExpiration = System.DateTime.Now.AddMinutes(session_idle_timeout_minutes);
+                    session_message.date_expired = refreshedExpiration;
                     string session_message_json = Newtonsoft.Json.JsonConvert.SerializeObject(session_message);
                     try
                     {
-                        string request_string = db_config.Get_Prefix_DB_Url($"session/{Request.Cookies["sid"]}");
-                        
-                        var responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", request_string, session_message_json, db_config.user_name, db_config.user_value);
-
-                        var response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer); 
-                        if(!response.ok)
+                        var response = await _sessionRepository.SaveSessionRawAsync(Request.Cookies["sid"], session_message_json, db_config);
+                        if(response is null || !response.ok)
                         {
                             System.Console.WriteLine ("problem saving session update.");
+                        }
+                        else
+                        {
+                            mmria.server.util.AppSessionCookieHelper.AppendAppSessionCookies(
+                                Response,
+                                Request.Cookies["sid"],
+                                refreshedExpiration,
+                                Request.IsHttps,
+                                sessionScope: isOfflineModeSession
+                                    ? mmria.server.util.AppSessionCookieHelper.OfflineModeSessionScopeValue
+                                    : mmria.server.util.AppSessionCookieHelper.StandardSessionScopeValue);
                         }
 
                     }
                     catch(System.Exception ex)
                     {
-                        System.Console.WriteLine (ex);
+                        Logger.LogWarning(
+                            ex,
+                            "Auth session slide refresh failed for {RequestPath}. hostPrefix={HostPrefix}; userId={UserId}; sid={SessionId}",
+                            Request.Path.Value,
+                            host_prefix,
+                            session_message.user_id,
+                            Request.Cookies["sid"]);
                     } 
                 }
 
@@ -176,7 +204,7 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
                 var claims = new List<Claim>();
                 claims.Add(new Claim(ClaimTypes.Name, session_message.user_id, ClaimValueTypes.String, Issuer));
 
-                foreach(var role in session_message.role_list)
+                foreach(var role in session_message.role_list ?? Enumerable.Empty<string>())
                 {
                     if (role == "installation_admin")
                     {
@@ -188,32 +216,25 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
                     }
                 }
 
-                #if !IS_PMSS_ENHANCED
-                foreach(var role in mmria.common.SharedLibraries.Other.authorization.get_current_user_role_jurisdiction_set_for(db_config, session_message.user_id).Select( jr => jr.role_name).Distinct())
+                if(!isOfflineModeSession)
                 {
-                    claims.Add(new Claim(ClaimTypes.Role, role, ClaimValueTypes.String, Issuer));
+                    #if !IS_PMSS_ENHANCED
+                    foreach(var role in mmria.common.SharedLibraries.Other.authorization.get_current_user_role_jurisdiction_set_for(db_config, session_message.user_id, _couchDbHttpClient).Select( jr => jr.role_name).Distinct())
+                    {
+                        claims.Add(new Claim(ClaimTypes.Role, role, ClaimValueTypes.String, Issuer));
+                    }
+                    #endif
+                    #if IS_PMSS_ENHANCED
+                    foreach(var role in mmria.pmss.server.utils.authorization.get_current_user_role_jurisdiction_set_for(db_config, session_message.user_id, _couchDbHttpClient).Select( jr => jr.role_name).Distinct())
+                    {
+                        claims.Add(new Claim(ClaimTypes.Role, role, ClaimValueTypes.String, Issuer));
+                    }
+                    #endif
                 }
-                #endif
-                #if IS_PMSS_ENHANCED
-                foreach(var role in mmria.pmss.server.utils.authorization.get_current_user_role_jurisdiction_set_for(db_config, session_message.user_id).Select( jr => jr.role_name).Distinct())
-                {
-                    claims.Add(new Claim(ClaimTypes.Role, role, ClaimValueTypes.String, Issuer));
-                }
-                #endif
 
                 var userIdentity = new ClaimsIdentity("SuperSecureLogin");
                 userIdentity.AddClaims(claims);
                 var userPrincipal = new ClaimsPrincipal(userIdentity);
-
-                /*
-                var session_idle_timeout_minutes = 15;
-                
-                var temp_int = _configuration.GetInteger("session_idle_timeout_minutes", host_prefix);
-                if(temp_int.HasValue)
-                {
-                    session_idle_timeout_minutes = temp_int.Value;
-                }
-                */
 
                 var ticket = new AuthenticationTicket(userPrincipal,"custom");
 
@@ -245,8 +266,14 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
         }
     }
 
-    protected override async Task HandleChallengeAsync(AuthenticationProperties properties)
+    protected override Task HandleChallengeAsync(AuthenticationProperties properties)
     {
+        if (IsApiRequest())
+        {
+            Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return Task.CompletedTask;
+        }
+
         if(this.Options.Is_SAMS)
         {
             Response.Redirect("/Account/SignIn");
@@ -256,6 +283,25 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
             Response.Redirect("/Account/Login");
 
         }
+
+        return Task.CompletedTask;
+    }
+
+    protected override Task HandleForbiddenAsync(AuthenticationProperties properties)
+    {
+        if (IsApiRequest())
+        {
+            Response.StatusCode = StatusCodes.Status403Forbidden;
+            return Task.CompletedTask;
+        }
+
+        return base.HandleForbiddenAsync(properties);
+    }
+
+    private bool IsApiRequest()
+    {
+        return Request.Path.HasValue &&
+            Request.Path.Value.StartsWith("/api/", StringComparison.OrdinalIgnoreCase);
     }
 
 }

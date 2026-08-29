@@ -44,6 +44,18 @@
     }
 })();
 
+function getEffectiveActiveOfflineSessionStatus() {
+    try {
+        if (window.OfflineStatus && typeof window.OfflineStatus.hasEffectiveActiveSession === 'function') {
+            return window.OfflineStatus.hasEffectiveActiveSession();
+        }
+
+        return localStorage.getItem('has_active_offline_session') === 'true';
+    } catch (_error) {
+        return false;
+    }
+}
+
 // Helper object for service worker management
 window.ServiceWorkerManager = {
     
@@ -83,6 +95,105 @@ window.ServiceWorkerManager = {
         }
         
         navigator.serviceWorker.controller.postMessage(message);
+    },
+
+    requestResponse: async function(message, options = {}) {
+        const timeoutMs = options.timeoutMs || 15000;
+        const useController = options.useController !== false;
+
+        if (!('serviceWorker' in navigator)) {
+            throw new Error('Service Worker not supported');
+        }
+
+        const registration = await navigator.serviceWorker.ready;
+        const target = useController ? navigator.serviceWorker.controller : registration.active;
+
+        if (!target) {
+            throw new Error('No active service worker target available');
+        }
+
+        return new Promise((resolve, reject) => {
+            const messageChannel = new MessageChannel();
+            let isSettled = false;
+
+            const timeoutId = setTimeout(() => {
+                if (isSettled) {
+                    return;
+                }
+
+                isSettled = true;
+                reject(new Error(`Service worker request timed out for ${message.type}`));
+            }, timeoutMs);
+
+            messageChannel.port1.onmessage = (event) => {
+                if (isSettled) {
+                    return;
+                }
+
+                isSettled = true;
+                clearTimeout(timeoutId);
+                resolve(event.data);
+            };
+
+            try {
+                target.postMessage(message, [messageChannel.port2]);
+            } catch (error) {
+                if (isSettled) {
+                    return;
+                }
+
+                isSettled = true;
+                clearTimeout(timeoutId);
+                reject(error);
+            }
+        });
+    },
+
+    hasAllCacheEntries: async function(cache, paths) {
+        for (const path of paths) {
+            const match = await cache.match(path);
+            if (!match) {
+                return false;
+            }
+        }
+
+        return true;
+    },
+
+    waitForCacheReadiness: async function(expectedOfflineIds, options = {}) {
+        const timeoutMs = options.timeoutMs || 20000;
+        const pollMs = options.pollMs || 500;
+        const startTime = Date.now();
+        const requiredStaticFiles = window.OfflineCacheManifest ? (window.OfflineCacheManifest.requiredStaticFiles || []) : [];
+        const requiredRouteEntries = ['/Case', '/Home/Index', '/', '/Account/OfflineLogin', '/Account/OfflineLogin/'];
+        const requiredApiEntries = ['/api/OfflineCase/cache-version'];
+
+        while ((Date.now() - startTime) < timeoutMs) {
+            const sessionInfo = await this.session.getCurrent();
+            if (sessionInfo && sessionInfo.cacheNames && sessionInfo.cacheNames.static && sessionInfo.cacheNames.api) {
+                const staticCache = await caches.open(sessionInfo.cacheNames.static);
+                const apiCache = await caches.open(sessionInfo.cacheNames.api);
+
+                const hasAllStaticFiles = await this.hasAllCacheEntries(staticCache, requiredStaticFiles);
+                const hasAllRoutes = await this.hasAllCacheEntries(apiCache, requiredRouteEntries);
+                const hasAllApiEntries = await this.hasAllCacheEntries(apiCache, requiredApiEntries);
+                const hasAllCases = await this.hasAllCacheEntries(
+                    apiCache,
+                    (expectedOfflineIds || []).map(caseId => `/api/case?case_id=${caseId}`)
+                );
+
+                const apiKeys = await apiCache.keys();
+                const hasOfflineSessionData = apiKeys.some(request => request.url.indexOf('CACHE_OFFLINE_SESSION_DATA') >= 0);
+
+                if (hasAllStaticFiles && hasAllRoutes && hasAllApiEntries && hasAllCases && hasOfflineSessionData) {
+                    return { success: true };
+                }
+            }
+
+            await new Promise(resolve => setTimeout(resolve, pollMs));
+        }
+
+        throw new Error('Timed out waiting for offline cache readiness');
     },
     
     // =============================================================================
@@ -232,6 +343,64 @@ window.ServiceWorkerManager = {
     clearCaches: function() {
         this.sendMessage({ type: 'CLEAR_CACHES' });
     },
+
+    getActiveApiCacheName: async function() {
+        const sessionInfo = await this.session.getCurrent();
+        if (sessionInfo && sessionInfo.cacheNames && sessionInfo.cacheNames.api) {
+            return sessionInfo.cacheNames.api;
+        }
+
+        return null;
+    },
+
+    cacheOfflineSessionData: async function(sessionData) {
+        if (!sessionData) {
+            throw new Error('Offline session data is required');
+        }
+
+        const result = await this.requestResponse({
+            type: 'CACHE_OFFLINE_SESSION_DATA',
+            data: sessionData
+        }, {
+            timeoutMs: 10000
+        });
+
+        if (!result || result.success !== true) {
+            throw new Error(result && result.error ? result.error : 'Failed to cache offline session data');
+        }
+
+        return true;
+    },
+
+    getOfflineRemovedCasesState: async function(sessionId) {
+        const result = await this.requestResponse({
+            type: 'GET_OFFLINE_REMOVED_CASES_STATE',
+            data: { sessionId: sessionId || null }
+        }, {
+            timeoutMs: 10000
+        });
+
+        if (!result || result.success !== true) {
+            throw new Error(result && result.error ? result.error : 'Failed to load offline removed cases state');
+        }
+
+        return result.state || null;
+    },
+
+    setOfflineRemovedCasesState: async function(state) {
+        const result = await this.requestResponse({
+            type: 'SET_OFFLINE_REMOVED_CASES_STATE',
+            data: { state: state || null }
+        }, {
+            timeoutMs: 10000
+        });
+
+        if (!result || result.success !== true) {
+            throw new Error(result && result.error ? result.error : 'Failed to save offline removed cases state');
+        }
+
+        return result.state || null;
+    },
     
     // Cache metadata resources for offline use
     cacheMetadataResources: function(version) {
@@ -310,15 +479,21 @@ window.ServiceWorkerManager = {
                     if (response.ok) {
                         const caseData = await response.json();
                         
-                        // Send to service worker for caching (with encryption if key is set)
-                        registration.active.postMessage({
+                        const cacheResult = await this.requestResponse({
                             type: 'CACHE_CASE_DATA',
                             data: {
                                 caseId: caseId,
                                 caseData: caseData
                             }
+                        }, {
+                            timeoutMs: 15000,
+                            useController: false
                         });
-                        
+
+                        if (!cacheResult || cacheResult.success !== true) {
+                            throw new Error(cacheResult && cacheResult.error ? cacheResult.error : 'Service worker did not confirm case cache');
+                        }
+
                         cachedCount++;
                     } else {
                         offlineLog.error('ServiceWorkerManager', `Failed to fetch case ${caseId}: ${response.status}`);
@@ -402,40 +577,19 @@ window.ServiceWorkerManager = {
                 throw new Error('Invalid metadata version - cannot cache metadata without valid version');
             }
             
-            // Check if service worker is available and active
-            if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-                // Send message to service worker to cache metadata
-                navigator.serviceWorker.controller.postMessage({
-                    type: 'CACHE_METADATA',
-                    version: version
-                });
-                
-                // Wait for service worker to process the caching request
-                await new Promise(resolve => setTimeout(resolve, 3000));
-                
-            } else {
-                offlineLog.warn('ServiceWorkerManager', 'Service worker not available for metadata caching');
+            if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
+                throw new Error('Service worker not available for metadata caching');
             }
-            
-            // Always perform basic fetch to ensure resources are cached (fallback or supplement)
-            const criticalEndpoints = [
-                `/api/version/${version}/metadata`,
-                `/api/version/${version}/ui_specification`,
-                `/api/version/${version}/validation`,
-                '/_users/GetFormAccess',
-                '/api/user/my-user',
-                '/api/user_role_jurisdiction_view/my-roles'
-            ];
-            
-            for (const endpoint of criticalEndpoints) {
-                try {
-                    const response = await fetch(endpoint);
-                    if (!response.ok) {
-                        offlineLog.warn('ServiceWorkerManager', `Failed to fetch ${endpoint}: ${response.status}`);
-                    }
-                } catch (error) {
-                    offlineLog.warn('ServiceWorkerManager', `Error fetching ${endpoint}:`, error);
-                }
+
+            const metadataResult = await this.requestResponse({
+                type: 'CACHE_METADATA',
+                data: { version: version }
+            }, {
+                timeoutMs: 30000
+            });
+
+            if (!metadataResult || metadataResult.success !== true) {
+                throw new Error(metadataResult && metadataResult.error ? metadataResult.error : 'Metadata caching was not confirmed by the service worker');
             }
             
             offlineLog.log('ServiceWorkerManager', 'Metadata caching completed');
@@ -446,7 +600,7 @@ window.ServiceWorkerManager = {
         }
     },
     
-    // Derive encryption key from password and send to service worker (password never transmitted)
+    // Derive the offline encryption key in-page and send only the result to the service worker
     setOfflineKey: async function(password, saltHex) {
         if (!('serviceWorker' in navigator)) return false;
 
@@ -457,11 +611,11 @@ window.ServiceWorkerManager = {
             // Convert hex salt to Uint8Array
             const saltBytes = new Uint8Array(saltHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
             
-            // Encode password as UTF-8
+            // Encode the user-provided secret as UTF-8
             const encoder = new TextEncoder();
             const passwordBytes = encoder.encode(password);
             
-            // Import password as key material
+            // Import the user-provided secret as key material
             const keyMaterial = await crypto.subtle.importKey(
                 'raw',
                 passwordBytes,
@@ -488,10 +642,10 @@ window.ServiceWorkerManager = {
             const derivedKeyBytes = await crypto.subtle.exportKey('raw', derivedKey);
             const derivedKeyArray = new Uint8Array(derivedKeyBytes);
             
-            // Clear password from memory (best effort)
+            // Clear the raw secret from memory (best effort)
             passwordBytes.fill(0);
             
-            // Send only the derived key to service worker (never the password)
+            // Send only the derived key to the service worker
             return new Promise(resolve => {
                 const messageChannel = new MessageChannel();
 
@@ -585,7 +739,7 @@ if ('serviceWorker' in navigator) {
                 
             case 'GET_ACTIVE_OFFLINE_SESSION':
                 // Service worker is asking for active offline session status (via port)
-                const hasActiveSession = localStorage.getItem('has_active_offline_session') === 'true';
+                const hasActiveSession = getEffectiveActiveOfflineSessionStatus();
                 event.ports[0].postMessage({
                     type: 'ACTIVE_OFFLINE_SESSION_RESPONSE',
                     hasActiveSession: hasActiveSession
@@ -604,7 +758,7 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.ready.then(function(registration) {
         if (registration.active) {
             const offlineStatus = ServiceWorkerManager.checkOfflineStatus();
-            const activeOfflineSession = localStorage.getItem('has_active_offline_session') === 'true';
+            const activeOfflineSession = getEffectiveActiveOfflineSessionStatus();
             
             registration.active.postMessage({
                 type: 'INITIAL_STATUS_SETUP',

@@ -1,0 +1,1307 @@
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Akka.Actor;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using mmria.common.couchdb;
+using mmria.common.getset;
+using mmria.server.model.actor;
+using mmria.server.utils;
+using Newtonsoft.Json.Linq;
+
+namespace mmria.server.util;
+
+public sealed class MultiTenantSetupPageModel
+{
+    public string current_host_prefix { get; set; }
+    public string summary_host_prefix { get; set; }
+    public string template_couchdb_url { get; set; }
+    public List<string> loaded_tenants { get; set; } = new();
+}
+
+public sealed class MultiTenantSetupResult
+{
+    public bool success { get; set; }
+    public int status_code { get; set; }
+    public string tenant { get; set; }
+    public string action { get; set; }
+    public string message { get; set; }
+    public string error { get; set; }
+    public bool setup_completed { get; set; }
+    public bool quartz_supervisor_created { get; set; }
+    public bool rebuild_started { get; set; }
+    public List<string> loaded_tenants { get; set; } = new();
+}
+
+public sealed class MultiTenantBulkRebuildResult
+{
+    public bool success { get; set; }
+    public int status_code { get; set; }
+    public string action { get; set; }
+    public string message { get; set; }
+    public string error { get; set; }
+    public int started_count { get; set; }
+    public int conflict_count { get; set; }
+    public int failed_count { get; set; }
+    public List<string> visible_tenants { get; set; } = new();
+    public List<string> loaded_tenants { get; set; } = new();
+    public List<MultiTenantSetupResult> results { get; set; } = new();
+}
+
+public sealed class MultiTenantSetupService
+{
+    private sealed class ManualRebuildSummaryContext
+    {
+        public string SummaryHostPrefix { get; set; }
+        public List<string> ConfiguredTenants { get; set; } = new();
+    }
+
+    private const string StartupRebuildSecurityPayload =
+        "{\"admins\":{\"names\":[],\"roles\":[\"form_designer\"]},\"members\":{\"names\":[],\"roles\":[\"abstractor\",\"data_analyst\",\"timer\"]}}";
+
+    private readonly IConfiguration _configuration;
+    private readonly List<OverridableConfiguration> _overridableConfigSets;
+    private readonly List<ConfigurationSet> _dbConfigSets;
+    private readonly RootRuntimeSettings _rootRuntimeSettings;
+    private readonly TenantCatalog _tenantCatalog;
+    private readonly CouchDbHttpClient _couchDbHttpClient;
+    private readonly ActorSystem _actorSystem;
+    private readonly ILogger<MultiTenantSetupService> _logger;
+    private readonly mmria.common.SharedLibraries.MMRIARebuild.Manager.MMRIARebuildManager _mmriaRebuildManager;
+    private readonly MultiTenantConfigurationLoader _configLoader;
+    private readonly ConcurrentDictionary<string, SemaphoreSlim> _tenantLocks = new(StringComparer.OrdinalIgnoreCase);
+
+    public MultiTenantSetupService
+    (
+        IConfiguration configuration,
+        List<OverridableConfiguration> overridableConfigSets,
+        List<ConfigurationSet> dbConfigSets,
+        RootRuntimeSettings rootRuntimeSettings,
+        TenantCatalog tenantCatalog,
+        CouchDbHttpClient couchDbHttpClient,
+        ActorSystem actorSystem,
+        mmria.common.SharedLibraries.MMRIARebuild.Manager.MMRIARebuildManager mmriaRebuildManager,
+        ILogger<MultiTenantSetupService> logger
+    )
+    {
+        _configuration = configuration;
+        _overridableConfigSets = overridableConfigSets;
+        _dbConfigSets = dbConfigSets;
+        _rootRuntimeSettings = rootRuntimeSettings;
+        _tenantCatalog = tenantCatalog;
+        _couchDbHttpClient = couchDbHttpClient;
+        _actorSystem = actorSystem;
+        _mmriaRebuildManager = mmriaRebuildManager;
+        _logger = logger;
+        _configLoader = new MultiTenantConfigurationLoader(configuration);
+    }
+
+    public MultiTenantSetupPageModel BuildPageModel(string currentHostPrefix)
+    {
+        return new MultiTenantSetupPageModel
+        {
+            current_host_prefix = currentHostPrefix,
+            summary_host_prefix = GetSummaryHostPrefix(currentHostPrefix),
+            template_couchdb_url = GetTemplateCouchDbUrl(),
+            loaded_tenants = GetLoadedTenantNames()
+        };
+    }
+
+    public bool IsTenantLoaded(string tenant)
+    {
+        string normalizedTenant = NormalizeTenant(tenant);
+        if (string.IsNullOrWhiteSpace(normalizedTenant))
+        {
+            return false;
+        }
+
+        if (!IsMultiTenantMode())
+        {
+            return string.Equals(
+                GetSingleTenantName(),
+                normalizedTenant,
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        lock (_dbConfigSets)
+        {
+            return _dbConfigSets.Any(configSet => string.Equals(
+                configSet?._id,
+                normalizedTenant,
+                StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    public async Task<MultiTenantSetupResult> LoadTenantAsync(string tenant)
+    {
+        string normalizedTenant = NormalizeTenant(tenant);
+        if (string.IsNullOrWhiteSpace(normalizedTenant))
+        {
+            return CreateResult(StatusCodes.Status400BadRequest, normalizedTenant, "load", false, "Tenant is required.");
+        }
+
+        var tenantLock = _tenantLocks.GetOrAdd(normalizedTenant, _ => new SemaphoreSlim(1, 1));
+        await tenantLock.WaitAsync();
+
+        try
+        {
+            string templateCouchDbUrl = GetTemplateCouchDbUrl();
+            string sharedConfigId = GetSharedConfigId();
+            string timerUserName = GetTimerUserName();
+            string timerPassword = GetTimerPassword();
+
+            if (string.IsNullOrWhiteSpace(templateCouchDbUrl))
+            {
+                return CreateResult(
+                    StatusCodes.Status400BadRequest,
+                    normalizedTenant,
+                    "load",
+                    false,
+                    "The multi-tenant CouchDB template URL is not configured.");
+            }
+
+            OverridableConfiguration loadedOverridableConfiguration = await _configLoader.LoadTenantOverridableConfigurationAsync(
+                normalizedTenant,
+                templateCouchDbUrl,
+                timerUserName,
+                timerPassword,
+                sharedConfigId,
+                _couchDbHttpClient);
+
+            if (loadedOverridableConfiguration == null)
+            {
+                return CreateResult(
+                    StatusCodes.Status404NotFound,
+                    normalizedTenant,
+                    "load",
+                    false,
+                    $"No shared configuration document was found for tenant '{normalizedTenant}'.");
+            }
+
+            ConfigurationSet loadedConfigurationSet = await _configLoader.LoadTenantConfigurationSetAsync(
+                normalizedTenant,
+                templateCouchDbUrl,
+                timerUserName,
+                timerPassword,
+                _couchDbHttpClient);
+
+            if (loadedConfigurationSet == null)
+            {
+                return CreateResult(
+                    StatusCodes.Status404NotFound,
+                    normalizedTenant,
+                    "load",
+                    false,
+                    $"No configuration-set document was found for tenant '{normalizedTenant}'.");
+            }
+
+            if (!TryGetTenantDbConfig(loadedOverridableConfiguration, normalizedTenant, out var tenantDbConfig))
+            {
+                return CreateResult(
+                    StatusCodes.Status400BadRequest,
+                    normalizedTenant,
+                    "load",
+                    false,
+                    $"The shared configuration document for tenant '{normalizedTenant}' does not contain a usable DB configuration.");
+            }
+
+            if (loadedConfigurationSet.detail_list == null || !loadedConfigurationSet.detail_list.ContainsKey(normalizedTenant))
+            {
+                return CreateResult(
+                    StatusCodes.Status400BadRequest,
+                    normalizedTenant,
+                    "load",
+                    false,
+                    $"The configuration-set document for tenant '{normalizedTenant}' does not contain a matching tenant entry.");
+            }
+
+            loadedOverridableConfiguration._id = $"{normalizedTenant}_{sharedConfigId}";
+
+            await new c_db_setup(
+                _actorSystem,
+                loadedOverridableConfiguration,
+                normalizedTenant,
+                _couchDbHttpClient,
+                _mmriaRebuildManager).Setup(triggerStartupRebuild: false);
+
+            bool alreadyLoaded = IsTenantLoaded(normalizedTenant);
+
+            lock (_overridableConfigSets)
+            {
+                int existingIndex = FindExactOverridableConfigurationIndex(normalizedTenant);
+                if (existingIndex >= 0)
+                {
+                    _overridableConfigSets[existingIndex] = loadedOverridableConfiguration;
+                }
+                else
+                {
+                    _overridableConfigSets.Add(loadedOverridableConfiguration);
+                }
+            }
+
+            lock (_dbConfigSets)
+            {
+                int existingIndex = FindExactConfigurationSetIndex(normalizedTenant);
+                if (existingIndex >= 0)
+                {
+                    _dbConfigSets[existingIndex] = loadedConfigurationSet;
+                }
+                else
+                {
+                    _dbConfigSets.Add(loadedConfigurationSet);
+                }
+            }
+
+            UpdateRuntimeSharedKeys();
+            bool quartzSupervisorCreated = EnsureQuartzSupervisor(normalizedTenant, loadedOverridableConfiguration, loadedConfigurationSet);
+            string action = alreadyLoaded ? "reloaded" : "added";
+            string safeTenantName = SanitizeSingleLineText(normalizedTenant, 128);
+            string safeAction = SanitizeSingleLineText(action, 32);
+
+            _logger.LogInformation("Tenant {Tenant} {Action} into the multi-tenant runtime.", safeTenantName, safeAction);
+
+            return new MultiTenantSetupResult
+            {
+                success = true,
+                status_code = StatusCodes.Status200OK,
+                tenant = safeTenantName,
+                action = safeAction,
+                message = $"Tenant '{safeTenantName}' was {safeAction} successfully.",
+                setup_completed = true,
+                quartz_supervisor_created = quartzSupervisorCreated,
+                loaded_tenants = GetLoadedTenantNames()
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load tenant {Tenant} into the multi-tenant runtime.", SanitizeSingleLineText(normalizedTenant, 128));
+            return CreateResult(
+                StatusCodes.Status500InternalServerError,
+                normalizedTenant,
+                "load",
+                false,
+                $"Failed to load tenant '{normalizedTenant}'.",
+                "An unexpected error occurred while loading the tenant.");
+        }
+        finally
+        {
+            tenantLock.Release();
+        }
+    }
+
+    public async Task<MultiTenantSetupResult> RebuildTenantAsync(string tenant, string currentHostPrefix)
+    {
+        string normalizedTenant = NormalizeTenant(tenant);
+        if (string.IsNullOrWhiteSpace(normalizedTenant))
+        {
+            return CreateResult(StatusCodes.Status400BadRequest, normalizedTenant, "rebuild", false, "Tenant is required.");
+        }
+
+        var summaryContext = await ResolveManualRebuildSummaryContextAsync(currentHostPrefix, normalizedTenant);
+        return await RebuildTenantAsync(normalizedTenant, summaryContext);
+    }
+
+    private async Task<MultiTenantSetupResult> RebuildTenantAsync(string tenant, ManualRebuildSummaryContext summaryContext)
+    {
+        string normalizedTenant = NormalizeTenant(tenant);
+        if (string.IsNullOrWhiteSpace(normalizedTenant))
+        {
+            return CreateResult(StatusCodes.Status400BadRequest, normalizedTenant, "rebuild", false, "Tenant is required.");
+        }
+
+        if (!IsTenantLoaded(normalizedTenant))
+        {
+            var loadResult = await LoadTenantAsync(normalizedTenant);
+            if (!loadResult.success)
+            {
+                loadResult.action = "rebuild";
+                return loadResult;
+            }
+        }
+
+        var tenantConfiguration = FindOverridableConfiguration(normalizedTenant);
+        string rebuildServiceUrl = mmria.common.SharedLibraries.MMRIARebuild.Manager.MMRIARebuildManager.BuildServiceUrl(
+            tenantConfiguration?.GetString("vitals_url", normalizedTenant));
+        string vitalServiceKey = tenantConfiguration?.GetString("vital_service_key", normalizedTenant);
+
+        if (string.IsNullOrWhiteSpace(rebuildServiceUrl) || string.IsNullOrWhiteSpace(vitalServiceKey))
+        {
+            return CreateResult(
+                StatusCodes.Status400BadRequest,
+                normalizedTenant,
+                "rebuild",
+                false,
+                $"The rebuild service URL or service key is not configured for tenant '{normalizedTenant}'.");
+        }
+
+        try
+        {
+            var rebuildResponse = await _mmriaRebuildManager.QueueRebuildOnServiceAsync(
+                new mmria.common.SharedLibraries.MMRIARebuild.Model.MMRIARebuildRequest
+                {
+                    tenant = normalizedTenant,
+                    source = "manual",
+                    configured_tenants = summaryContext?.ConfiguredTenants?.ToList() ?? new List<string>(),
+                    summary_host_prefix = summaryContext?.SummaryHostPrefix
+                },
+                rebuildServiceUrl,
+                vitalServiceKey);
+
+            if (!rebuildResponse.success)
+            {
+                return CreateResult(
+                    rebuildResponse.status_code <= 0 ? StatusCodes.Status500InternalServerError : rebuildResponse.status_code,
+                    normalizedTenant,
+                    "rebuild",
+                    false,
+                    rebuildResponse.message ?? $"Failed to start a rebuild for tenant '{normalizedTenant}'.",
+                    rebuildResponse.error);
+            }
+
+            return new MultiTenantSetupResult
+            {
+                success = true,
+                status_code = rebuildResponse.status_code <= 0 ? StatusCodes.Status202Accepted : rebuildResponse.status_code,
+                tenant = SanitizeSingleLineText(normalizedTenant, 128),
+                action = "rebuild",
+                message = SanitizeSingleLineText(rebuildResponse.message ?? $"Started a fresh rebuild for tenant '{normalizedTenant}'."),
+                rebuild_started = rebuildResponse.rebuild_started,
+                loaded_tenants = GetLoadedTenantNames()
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to start manual rebuild for tenant {Tenant}.", SanitizeSingleLineText(normalizedTenant, 128));
+            return CreateResult(
+                StatusCodes.Status500InternalServerError,
+                normalizedTenant,
+                "rebuild",
+                false,
+                $"Failed to start a rebuild for tenant '{normalizedTenant}'.",
+                "An unexpected error occurred while starting the rebuild.");
+        }
+    }
+
+    public async Task<MultiTenantBulkRebuildResult> RebuildAllVisibleSummaryTenantsAsync(string currentHostPrefix)
+    {
+        var summaryContext = await ResolveManualRebuildSummaryContextAsync(currentHostPrefix);
+        var visibleTenants = summaryContext.ConfiguredTenants.ToList();
+        var result = new MultiTenantBulkRebuildResult
+        {
+            status_code = StatusCodes.Status200OK,
+            action = "rebuild-all",
+            visible_tenants = visibleTenants
+        };
+
+        if (visibleTenants.Count == 0)
+        {
+            result.success = false;
+            result.message = "No tenant summary data is available to rebuild.";
+            result.loaded_tenants = GetLoadedTenantNames();
+            return SanitizeBulkResult(result);
+        }
+
+        foreach (string tenant in visibleTenants)
+        {
+            MultiTenantSetupResult tenantResult = await RebuildTenantAsync(tenant, summaryContext);
+            result.results.Add(tenantResult);
+
+            if (tenantResult.status_code == StatusCodes.Status409Conflict)
+            {
+                result.conflict_count++;
+            }
+            else if (tenantResult.success && tenantResult.rebuild_started)
+            {
+                result.started_count++;
+            }
+            else
+            {
+                result.failed_count++;
+            }
+        }
+
+        result.loaded_tenants = GetLoadedTenantNames();
+        result.success = result.conflict_count == 0 && result.failed_count == 0;
+        result.message =
+            $"Rebuild-all finished for {visibleTenants.Count} tenant(s): " +
+            $"started {result.started_count}, conflicts {result.conflict_count}, failed {result.failed_count}.";
+
+        if (result.failed_count > 0)
+        {
+            result.error = "One or more tenant rebuild requests failed.";
+        }
+
+        return SanitizeBulkResult(result);
+    }
+
+    public async Task<JObject> GetStartupRunSummaryAsync(string currentHostPrefix)
+    {
+        var summarySnapshot = await GetNormalizedStartupRunSummarySnapshotAsync(currentHostPrefix);
+        JObject summary = summarySnapshot.summary;
+
+        UpdateSummaryTotals(summary);
+        summary["loaded_tenants"] = new JArray(GetLoadedTenantNames());
+        summary["active_rebuilds"] = BuildActiveRebuilds(summary);
+        return summary;
+    }
+
+    private string GetTemplateCouchDbUrl()
+    {
+        return _configLoader.GetConfig("multi_tenant_shared_config_id_template_couchdb_url")
+            ?? _configLoader.GetConfig("couchdb_url");
+    }
+
+    private string GetSharedConfigId()
+    {
+        return _configLoader.GetConfig("multi_tenant_shared_config_id")
+            ?? _configLoader.GetConfig("shared_config_id")
+            ?? "shared_config";
+    }
+
+    private string GetTimerUserName()
+    {
+        return _configLoader.GetConfig("timer_user_name");
+    }
+
+    private string GetTimerPassword()
+    {
+        return _configLoader.GetConfig("timer_password")
+            ?? _configLoader.GetConfig("timer_value");
+    }
+
+    private string GetSummaryHostPrefix(string currentHostPrefix)
+    {
+        return DbRebuildSettings.ResolveStartupSummaryHostPrefix(
+            _rootRuntimeSettings.MultiTenantRebuildSource,
+            GetConfiguredStartupRebuildTenantNames(),
+            currentHostPrefix);
+    }
+
+    private List<string> GetConfiguredStartupRebuildTenantNames()
+    {
+        var configuredTenants = DbRebuildSettings.NormalizeTenantListPreservingOrder(_rootRuntimeSettings.StartupRebuildTenants);
+
+        return configuredTenants.Count > 0
+            ? configuredTenants
+            : GetLoadedTenantNames();
+    }
+
+    private List<string> GetLoadedTenantNames()
+    {
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        if (!IsMultiTenantMode())
+        {
+            string singleTenantName = GetSingleTenantName();
+            if (!string.IsNullOrWhiteSpace(singleTenantName))
+            {
+                result.Add(singleTenantName);
+            }
+
+            return result
+                .Where(item => !string.IsNullOrWhiteSpace(item))
+                .OrderBy(item => item, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        lock (_dbConfigSets)
+        {
+            foreach (var configSet in _dbConfigSets)
+            {
+                if (!string.IsNullOrWhiteSpace(configSet?._id))
+                {
+                    result.Add(configSet._id.Trim());
+                }
+            }
+        }
+
+        if (result.Count == 0)
+        {
+            lock (_overridableConfigSets)
+            {
+                foreach (var config in _overridableConfigSets)
+                {
+                    string tenantName = GetTenantNameFromOverridableConfiguration(config);
+                    if (!string.IsNullOrWhiteSpace(tenantName))
+                    {
+                        result.Add(tenantName);
+                    }
+                }
+            }
+        }
+
+        return result
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .OrderBy(item => item, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private void UpdateRuntimeSharedKeys()
+    {
+        List<string> loadedTenants = GetLoadedTenantNames();
+        string loadedTenantCsv = string.Join(",", loadedTenants);
+        string startupRebuildTenantCsv = DbRebuildSettings.ToCsv(GetConfiguredStartupRebuildTenantNames());
+        string templateCouchDbUrl = GetTemplateCouchDbUrl() ?? string.Empty;
+        string summaryHostPrefix = GetSummaryHostPrefix(
+            loadedTenants.FirstOrDefault()
+            ?? GetSingleTenantName()
+            ?? string.Empty);
+        string isMultiTenantMode = IsMultiTenantMode() ? "true" : "false";
+        bool startupDbRebuildEnabled = _rootRuntimeSettings.StartupDbRebuildEnabled;
+
+        lock (_overridableConfigSets)
+        {
+            foreach (var config in _overridableConfigSets)
+            {
+                config.SetString("shared", "multi_tenant_jurisdictions", loadedTenantCsv);
+                config.SetString("shared", DbRebuildSettings.StartupRebuildTenantsKey, startupRebuildTenantCsv);
+                config.SetBoolean("shared", DbRebuildSettings.StartupRebuildEnabledKey, startupDbRebuildEnabled);
+                config.SetString("shared", "multi_tenant_shared_config_id_template_couchdb_url", templateCouchDbUrl);
+                config.SetString("shared", "multi_tenant_re_build_src", summaryHostPrefix);
+                config.SetString("shared", "is_multi_tenant_mode", isMultiTenantMode);
+                config.SetBoolean("shared", "is_multi_tenant_mode", IsMultiTenantMode());
+            }
+        }
+    }
+
+    private int FindExactOverridableConfigurationIndex(string tenant)
+    {
+        string expectedDocumentId = BuildOverridableConfigurationDocumentId(tenant);
+        for (int i = 0; i < _overridableConfigSets.Count; i++)
+        {
+            if (MatchesOverridableConfigurationDocument(_overridableConfigSets[i], expectedDocumentId))
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private int FindExactConfigurationSetIndex(string tenant)
+    {
+        for (int i = 0; i < _dbConfigSets.Count; i++)
+        {
+            if (string.Equals(_dbConfigSets[i]?._id, tenant, StringComparison.OrdinalIgnoreCase))
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private string BuildOverridableConfigurationDocumentId(string tenant)
+    {
+        string sharedConfigId = GetSharedConfigId();
+        return string.IsNullOrWhiteSpace(tenant) || string.IsNullOrWhiteSpace(sharedConfigId)
+            ? null
+            : $"{tenant}_{sharedConfigId}";
+    }
+
+    private static bool MatchesOverridableConfigurationDocument(
+        OverridableConfiguration configuration,
+        string expectedDocumentId)
+    {
+        return
+            configuration != null &&
+            !string.IsNullOrWhiteSpace(expectedDocumentId) &&
+            string.Equals(configuration._id, expectedDocumentId, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private OverridableConfiguration FindOverridableConfiguration(string tenant)
+    {
+        lock (_overridableConfigSets)
+        {
+            int exactIndex = FindExactOverridableConfigurationIndex(tenant);
+            if (exactIndex >= 0)
+            {
+                return _overridableConfigSets[exactIndex];
+            }
+        }
+
+        return _tenantCatalog.TryResolveConfiguration(tenant);
+    }
+
+    private string GetTenantNameFromOverridableConfiguration(OverridableConfiguration configuration)
+    {
+        if (configuration == null || string.IsNullOrWhiteSpace(configuration._id))
+        {
+            return null;
+        }
+
+        string expectedSuffix = $"_{GetSharedConfigId()}";
+        if (!configuration._id.EndsWith(expectedSuffix, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        string tenantName = configuration._id[..^expectedSuffix.Length];
+        return string.IsNullOrWhiteSpace(tenantName) ? null : tenantName.Trim();
+    }
+
+    private string GetSingleTenantName()
+    {
+        return string.IsNullOrWhiteSpace(_rootRuntimeSettings.SingleTenantName)
+            ? null
+            : _rootRuntimeSettings.SingleTenantName.Trim();
+    }
+
+    private bool IsMultiTenantMode()
+    {
+        return _rootRuntimeSettings.IsMultiTenantMode;
+    }
+
+    private static string GetTenantName(ConfigurationSet configurationSet)
+    {
+        if (configurationSet?.detail_list == null)
+        {
+            return null;
+        }
+
+        foreach (var key in configurationSet.detail_list.Keys)
+        {
+            if (!string.Equals(key, "vital_import", StringComparison.OrdinalIgnoreCase))
+            {
+                return key?.Trim();
+            }
+        }
+
+        return null;
+    }
+
+    private static bool TryGetTenantDbConfig(OverridableConfiguration configuration, string tenant, out DBConfigurationDetail dbConfig)
+    {
+        dbConfig = null;
+        if (configuration == null || string.IsNullOrWhiteSpace(tenant))
+        {
+            return false;
+        }
+
+        try
+        {
+            dbConfig = configuration.GetDBConfig(tenant);
+            return
+                dbConfig != null &&
+                !string.IsNullOrWhiteSpace(dbConfig.url) &&
+                !string.IsNullOrWhiteSpace(dbConfig.user_name) &&
+                !string.IsNullOrWhiteSpace(dbConfig.user_value);
+        }
+        catch
+        {
+            dbConfig = null;
+            return false;
+        }
+    }
+
+    private bool EnsureQuartzSupervisor(
+        string tenant,
+        OverridableConfiguration overridableConfiguration,
+        ConfigurationSet configurationSet)
+    {
+        string actorName = $"QuartzSupervisor-{tenant}";
+
+        try
+        {
+            var metadataRepository = new mmria.common.SharedLibraries.MetadataVersion.DAL.MetadataVersionDAL(_couchDbHttpClient);
+            var actorRef = _actorSystem.ActorOf(
+                Props.Create<QuartzSupervisor>(
+                    overridableConfiguration,
+                    tenant,
+                    configurationSet,
+                    _couchDbHttpClient,
+                    (mmria.common.SharedLibraries.ExportQueue.IExportQueueRepository)null,
+                    metadataRepository),
+                actorName);
+
+            actorRef.Tell("init");
+            _logger.LogInformation("Created QuartzSupervisor actor for tenant {Tenant}.", SanitizeSingleLineText(tenant, 128));
+            return true;
+        }
+        catch (InvalidActorNameException)
+        {
+            _logger.LogInformation("QuartzSupervisor actor already exists for tenant {Tenant}.", SanitizeSingleLineText(tenant, 128));
+            return false;
+        }
+    }
+
+    private async Task UpsertStartupRunSummaryTenantAsync(
+        string currentHostPrefix,
+        string tenant,
+        string metadataVersion,
+        string status,
+        string lastError = null,
+        bool preserveExistingStatus = false)
+    {
+        if (string.IsNullOrWhiteSpace(tenant) || !TryGetSummaryDbConfig(currentHostPrefix, out var summaryDbConfig))
+        {
+            return;
+        }
+
+        await EnsureRebuildDatabaseExistsAsync(summaryDbConfig);
+
+        var summary = await TryGetStartupRunSummaryDocumentAsync(summaryDbConfig)
+            ?? CreateStartupRunSummaryDocument(currentHostPrefix, metadataVersion, GetConfiguredStartupRebuildTenantNames());
+
+        var mergedTenants = MergeTenantNames(
+            GetConfiguredStartupRebuildTenantNames(),
+            GetConfiguredTenants(summary),
+            [tenant]);
+
+        summary["summary_host_prefix"] = GetSummaryHostPrefix(currentHostPrefix);
+        if (string.IsNullOrWhiteSpace(summary.Value<string>("metadata_version")) && !string.IsNullOrWhiteSpace(metadataVersion))
+        {
+            summary["metadata_version"] = metadataVersion;
+        }
+
+        summary["configured_tenants"] = new JArray(mergedTenants);
+        EnsureSummaryTenantEntries(summary, mergedTenants);
+
+        var tenantStatuses = GetTenantStatuses(summary);
+        if (tenantStatuses[tenant] is not JObject tenantStatus)
+        {
+            tenantStatus = new JObject
+            {
+                ["host_prefix"] = tenant
+            };
+            tenantStatuses[tenant] = tenantStatus;
+        }
+
+        tenantStatus["host_prefix"] = tenant;
+        if (TryGetTenantDbConfig(FindOverridableConfiguration(tenant), tenant, out var tenantDbConfig))
+        {
+            tenantStatus["couchdb_url"] = tenantDbConfig.url;
+        }
+
+        if (!string.IsNullOrWhiteSpace(metadataVersion))
+        {
+            tenantStatus["metadata_version"] = metadataVersion;
+        }
+
+        if (!string.IsNullOrWhiteSpace(status) &&
+            (!preserveExistingStatus || string.IsNullOrWhiteSpace(tenantStatus.Value<string>("status"))))
+        {
+            tenantStatus["status"] = status;
+        }
+
+        if (!string.IsNullOrWhiteSpace(lastError))
+        {
+            tenantStatus["last_error"] = lastError;
+        }
+        else if (!string.Equals(status, "paused", StringComparison.OrdinalIgnoreCase))
+        {
+            tenantStatus.Remove("last_error");
+        }
+
+        if (!string.Equals(status, "completed", StringComparison.OrdinalIgnoreCase))
+        {
+            tenantStatus.Remove("completed_utc");
+        }
+
+        tenantStatus["last_updated_utc"] = DateTime.UtcNow.ToString("o");
+        UpdateSummaryTotals(summary);
+        await SaveStartupRunSummaryDocumentAsync(summaryDbConfig, summary);
+        StartupRunSummaryCache.Set(GetSummaryHostPrefix(currentHostPrefix), summary);
+    }
+
+    private bool TryGetSummaryDbConfig(string currentHostPrefix, out DBConfigurationDetail summaryDbConfig)
+    {
+        summaryDbConfig = null;
+        string summaryHostPrefix = GetSummaryHostPrefix(currentHostPrefix);
+
+        return TryGetTenantDbConfig(
+            FindOverridableConfiguration(summaryHostPrefix),
+            summaryHostPrefix,
+            out summaryDbConfig);
+    }
+
+    private async Task EnsureRebuildDatabaseExistsAsync(DBConfigurationDetail dbConfig)
+    {
+        string rebuildDbUrl = $"{dbConfig.url}/{dbConfig.prefix}db_rebuild";
+        string response = await _couchDbHttpClient.ExecuteAsync(
+            "GET",
+            rebuildDbUrl,
+            null,
+            dbConfig.user_name,
+            dbConfig.user_value,
+            throwOnError: false);
+
+        bool notFound = true;
+        if (!string.IsNullOrWhiteSpace(response))
+        {
+            var payload = JObject.Parse(response);
+            notFound = string.Equals(payload.Value<string>("error"), "not_found", StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (!notFound)
+        {
+            return;
+        }
+
+        await _couchDbHttpClient.ExecuteAsync(
+            "PUT",
+            rebuildDbUrl,
+            null,
+            dbConfig.user_name,
+            dbConfig.user_value);
+
+        await _couchDbHttpClient.ExecuteAsync(
+            "PUT",
+            $"{rebuildDbUrl}/_security",
+            StartupRebuildSecurityPayload,
+            dbConfig.user_name,
+            dbConfig.user_value);
+    }
+
+    private async Task<JObject> TryGetStartupRunSummaryDocumentAsync(DBConfigurationDetail dbConfig)
+    {
+        string summaryUrl = $"{dbConfig.url}/{dbConfig.prefix}db_rebuild/startup-run-summary";
+        string response = await _couchDbHttpClient.ExecuteAsync(
+            "GET",
+            summaryUrl,
+            null,
+            dbConfig.user_name,
+            dbConfig.user_value,
+            throwOnError: false);
+
+        if (string.IsNullOrWhiteSpace(response))
+        {
+            return null;
+        }
+
+        var payload = JObject.Parse(response);
+        if (string.Equals(payload.Value<string>("error"), "not_found", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return payload;
+    }
+
+    private async Task SaveStartupRunSummaryDocumentAsync(DBConfigurationDetail dbConfig, JObject summary)
+    {
+        string summaryUrl = $"{dbConfig.url}/{dbConfig.prefix}db_rebuild/startup-run-summary";
+        summary["_id"] = "startup-run-summary";
+        summary["last_updated_utc"] = DateTime.UtcNow.ToString("o");
+
+        for (int attempt = 0; attempt < 2; attempt++)
+        {
+            string payload = Newtonsoft.Json.JsonConvert.SerializeObject(
+                summary,
+                new Newtonsoft.Json.JsonSerializerSettings
+                {
+                    NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore
+                });
+
+            string response = await _couchDbHttpClient.ExecuteAsync(
+                "PUT",
+                summaryUrl,
+                payload,
+                dbConfig.user_name,
+                dbConfig.user_value,
+                throwOnError: false);
+
+            if (!string.IsNullOrWhiteSpace(response))
+            {
+                var result = JObject.Parse(response);
+                if (result.Value<bool?>("ok") == true)
+                {
+                    summary["_rev"] = result.Value<string>("rev");
+                    return;
+                }
+
+                if (attempt == 0 &&
+                    string.Equals(result.Value<string>("error"), "conflict", StringComparison.OrdinalIgnoreCase))
+                {
+                    var latestSummary = await TryGetStartupRunSummaryDocumentAsync(dbConfig);
+                    summary["_rev"] = latestSummary?.Value<string>("_rev");
+                    continue;
+                }
+            }
+
+            return;
+        }
+    }
+
+    private JObject CreateStartupRunSummaryDocument(
+        string currentHostPrefix,
+        string metadataVersion,
+        IEnumerable<string> configuredTenants)
+    {
+        var mergedTenants = MergeTenantNames(configuredTenants, [currentHostPrefix]);
+        var summary = new JObject
+        {
+            ["_id"] = "startup-run-summary",
+            ["status"] = "running",
+            ["metadata_version"] = metadataVersion,
+            ["summary_host_prefix"] = GetSummaryHostPrefix(currentHostPrefix),
+            ["configured_tenants"] = new JArray(mergedTenants),
+            ["tenant_statuses"] = new JObject(),
+            ["started_utc"] = DateTime.UtcNow.ToString("o"),
+            ["last_updated_utc"] = DateTime.UtcNow.ToString("o")
+        };
+
+        EnsureSummaryTenantEntries(summary, mergedTenants);
+        UpdateSummaryTotals(summary);
+        return summary;
+    }
+
+    private static List<string> GetConfiguredTenants(JObject summary)
+    {
+        var result = new List<string>();
+        if (summary?["configured_tenants"] is not JArray configuredTenants)
+        {
+            return result;
+        }
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (string tenant in configuredTenants.Values<string>())
+        {
+            if (string.IsNullOrWhiteSpace(tenant))
+            {
+                continue;
+            }
+
+            string normalizedTenant = tenant.Trim();
+            if (seen.Add(normalizedTenant))
+            {
+                result.Add(normalizedTenant);
+            }
+        }
+
+        return result;
+    }
+
+    private static List<string> MergeTenantNames(params IEnumerable<string>[] tenantGroups)
+    {
+        var result = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var tenantGroup in tenantGroups)
+        {
+            if (tenantGroup == null)
+            {
+                continue;
+            }
+
+            foreach (string tenant in tenantGroup)
+            {
+                if (string.IsNullOrWhiteSpace(tenant))
+                {
+                    continue;
+                }
+
+                string normalizedTenant = tenant.Trim();
+                if (seen.Add(normalizedTenant))
+                {
+                    result.Add(normalizedTenant);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private static JObject GetTenantStatuses(JObject summary)
+    {
+        if (summary?["tenant_statuses"] is JObject tenantStatuses)
+        {
+            return tenantStatuses;
+        }
+
+        tenantStatuses = new JObject();
+        summary["tenant_statuses"] = tenantStatuses;
+        return tenantStatuses;
+    }
+
+    private static void EnsureSummaryTenantEntries(JObject summary, IEnumerable<string> tenants)
+    {
+        var tenantStatuses = GetTenantStatuses(summary);
+        foreach (string tenant in tenants)
+        {
+            if (tenantStatuses[tenant] != null)
+            {
+                continue;
+            }
+
+            tenantStatuses[tenant] = new JObject
+            {
+                ["host_prefix"] = tenant,
+                ["status"] = "pending"
+            };
+        }
+    }
+
+    private static void UpdateSummaryTotals(JObject summary)
+    {
+        var tenantStatuses = GetTenantStatuses(summary);
+        var configuredTenants = GetConfiguredTenants(summary);
+        if (configuredTenants.Count == 0)
+        {
+            configuredTenants = tenantStatuses.Properties()
+                .Select(property => property.Name)
+                .Where(item => !string.IsNullOrWhiteSpace(item))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(item => item, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            summary["configured_tenants"] = new JArray(configuredTenants);
+        }
+
+        int completedTenantCount = 0;
+        int pausedTenantCount = 0;
+        int runningTenantCount = 0;
+        int pendingTenantCount = 0;
+        int excludedTenantCount = 0;
+        int totalProcessedCaseCount = 0;
+        int totalSkippedCaseCount = 0;
+        int totalDocumentErrorCount = 0;
+        int totalDeIdBulkErrorCount = 0;
+        int totalReportBulkErrorCount = 0;
+        int totalDeIdDocCount = 0;
+        int totalReportDocCount = 0;
+        string firstError = null;
+
+        foreach (string tenant in configuredTenants)
+        {
+            if (tenantStatuses[tenant] is not JObject tenantStatus)
+            {
+                pendingTenantCount++;
+                continue;
+            }
+
+            totalProcessedCaseCount += tenantStatus.Value<int?>("processed_case_count") ?? 0;
+            totalSkippedCaseCount += tenantStatus.Value<int?>("skipped_case_count") ?? 0;
+            totalDocumentErrorCount += tenantStatus.Value<int?>("document_error_count") ?? 0;
+            totalDeIdBulkErrorCount += tenantStatus.Value<int?>("de_id_bulk_error_count") ?? 0;
+            totalReportBulkErrorCount += tenantStatus.Value<int?>("report_bulk_error_count") ?? 0;
+            totalDeIdDocCount += tenantStatus.Value<int?>("total_de_id_doc_count") ?? 0;
+            totalReportDocCount += tenantStatus.Value<int?>("total_report_doc_count") ?? 0;
+            firstError ??= tenantStatus.Value<string>("last_error");
+
+            switch (tenantStatus.Value<string>("status")?.ToLowerInvariant())
+            {
+                case "completed":
+                    completedTenantCount++;
+                    break;
+                case "paused":
+                    pausedTenantCount++;
+                    break;
+                case "excluded":
+                    excludedTenantCount++;
+                    break;
+                case "queued":
+                case "running":
+                    runningTenantCount++;
+                    break;
+                default:
+                    pendingTenantCount++;
+                    break;
+            }
+        }
+
+        int totalTenantCount = configuredTenants.Count;
+        summary["total_tenant_count"] = totalTenantCount;
+        summary["completed_tenant_count"] = completedTenantCount;
+        summary["paused_tenant_count"] = pausedTenantCount;
+        summary["running_tenant_count"] = runningTenantCount;
+        summary["pending_tenant_count"] = pendingTenantCount;
+        summary["total_processed_case_count"] = totalProcessedCaseCount;
+        summary["total_skipped_case_count"] = totalSkippedCaseCount;
+        summary["total_document_error_count"] = totalDocumentErrorCount;
+        summary["total_de_id_bulk_error_count"] = totalDeIdBulkErrorCount;
+        summary["total_report_bulk_error_count"] = totalReportBulkErrorCount;
+        summary["total_de_id_doc_count"] = totalDeIdDocCount;
+        summary["total_report_doc_count"] = totalReportDocCount;
+        summary["last_error"] = firstError;
+        summary["last_updated_utc"] = DateTime.UtcNow.ToString("o");
+
+        if (totalTenantCount > 0 && completedTenantCount + excludedTenantCount == totalTenantCount)
+        {
+            summary["status"] = "completed";
+            if (summary["completed_utc"] == null)
+            {
+                summary["completed_utc"] = DateTime.UtcNow.ToString("o");
+            }
+        }
+        else if (runningTenantCount > 0)
+        {
+            summary["status"] = "running";
+            summary.Remove("completed_utc");
+        }
+        else if (pausedTenantCount > 0)
+        {
+            summary["status"] = "incomplete";
+            summary.Remove("completed_utc");
+        }
+        else
+        {
+            summary["status"] = "running";
+            summary.Remove("completed_utc");
+        }
+    }
+
+    private static JArray BuildActiveRebuilds(JObject summary)
+    {
+        var result = new JArray();
+        var tenantStatuses = GetTenantStatuses(summary);
+
+        foreach (var property in tenantStatuses.Properties())
+        {
+            if (property.Value is not JObject tenantStatus)
+            {
+                continue;
+            }
+
+            string status = tenantStatus.Value<string>("status");
+            if (!string.Equals(status, "queued", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(status, "running", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            result.Add(new JObject
+            {
+                ["tenant"] = property.Name,
+                ["source"] = "unknown",
+                ["mode"] = "legacy",
+                ["status"] = status,
+                ["requested_utc"] = tenantStatus.Value<string>("started_utc") ?? tenantStatus.Value<string>("last_updated_utc")
+            });
+        }
+
+        return result;
+    }
+
+    private async Task<(string effectiveHostPrefix, JObject summary)> GetNormalizedStartupRunSummarySnapshotAsync(string currentHostPrefix)
+    {
+        string effectiveHostPrefix = NormalizeTenant(currentHostPrefix)
+            ?? GetLoadedTenantNames().FirstOrDefault()
+            ?? "shared";
+        string summaryHostPrefix = GetSummaryHostPrefix(effectiveHostPrefix);
+        JObject summary = null;
+
+        if (TryGetSummaryDbConfig(effectiveHostPrefix, out var summaryDbConfig))
+        {
+            summary = await _mmriaRebuildManager.TryGetStartupRunSummaryDocumentAsync(summaryDbConfig);
+        }
+
+        summary ??= CreateStartupRunSummaryDocument(
+            effectiveHostPrefix,
+            metadataVersion: null,
+            configuredTenants: GetConfiguredStartupRebuildTenantNames());
+
+        var mergedTenants = MergeTenantNames(
+            GetConfiguredTenants(summary),
+            GetTenantStatuses(summary).Properties().Select(property => property.Name));
+
+        summary["summary_host_prefix"] = summaryHostPrefix;
+        summary["configured_tenants"] = new JArray(mergedTenants);
+        EnsureSummaryTenantEntries(summary, mergedTenants);
+
+        return (effectiveHostPrefix, summary);
+    }
+
+    private async Task<ManualRebuildSummaryContext> ResolveManualRebuildSummaryContextAsync(
+        string currentHostPrefix,
+        string requestedTenant = null)
+    {
+        var summarySnapshot = await GetNormalizedStartupRunSummarySnapshotAsync(currentHostPrefix);
+        var visibleTenants = GetTenantStatuses(summarySnapshot.summary)
+            .Properties()
+            .Select(property => property.Name)
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(item => item, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        string normalizedRequestedTenant = NormalizeTenant(requestedTenant);
+        if (!string.IsNullOrWhiteSpace(normalizedRequestedTenant) &&
+            !visibleTenants.Contains(normalizedRequestedTenant, StringComparer.OrdinalIgnoreCase))
+        {
+            visibleTenants.Add(normalizedRequestedTenant);
+        }
+
+        return new ManualRebuildSummaryContext
+        {
+            SummaryHostPrefix =
+                NormalizeTenant(summarySnapshot.summary?.Value<string>("summary_host_prefix"))
+                ?? GetSummaryHostPrefix(summarySnapshot.effectiveHostPrefix),
+            ConfiguredTenants = visibleTenants
+        };
+    }
+
+    private static string NormalizeTenant(string tenant)
+    {
+        return string.IsNullOrWhiteSpace(tenant) ? null : tenant.Trim();
+    }
+
+    private static MultiTenantSetupResult CreateResult(
+        int statusCode,
+        string tenant,
+        string action,
+        bool success,
+        string message,
+        string error = null)
+    {
+        return new MultiTenantSetupResult
+        {
+            success = success,
+            status_code = statusCode,
+            tenant = SanitizeSingleLineText(tenant, 128),
+            action = SanitizeSingleLineText(action, 32),
+            message = SanitizeSingleLineText(message),
+            error = SanitizeSingleLineText(error)
+        };
+    }
+
+    private static string SanitizeSingleLineText(string value, int maxLength = 512)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return value;
+        }
+
+        var singleLineValue = new string(value.Where(character => !char.IsControl(character)).ToArray())
+            .Replace('\r', ' ')
+            .Replace('\n', ' ')
+            .Replace('\t', ' ')
+            .Trim();
+
+        while (singleLineValue.Contains("  ", StringComparison.Ordinal))
+        {
+            singleLineValue = singleLineValue.Replace("  ", " ", StringComparison.Ordinal);
+        }
+
+        return singleLineValue.Length > maxLength
+            ? singleLineValue[..maxLength]
+            : singleLineValue;
+    }
+
+    private static MultiTenantBulkRebuildResult SanitizeBulkResult(MultiTenantBulkRebuildResult result)
+    {
+        if (result == null)
+        {
+            return null;
+        }
+
+        result.action = SanitizeSingleLineText(result.action, 32);
+        result.message = SanitizeSingleLineText(result.message);
+        result.error = SanitizeSingleLineText(result.error);
+        result.visible_tenants = result.visible_tenants?
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Select(item => SanitizeSingleLineText(item, 128))
+            .ToList() ?? new List<string>();
+        result.loaded_tenants = result.loaded_tenants?
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Select(item => SanitizeSingleLineText(item, 128))
+            .ToList() ?? new List<string>();
+        result.results ??= new List<MultiTenantSetupResult>();
+        return result;
+    }
+}

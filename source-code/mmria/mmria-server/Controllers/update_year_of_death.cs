@@ -7,40 +7,38 @@ using System.Linq;
 using Microsoft.AspNetCore.Http;
 
 using mmria.server.extension;
+using mmria.server.util;
 namespace mmria.server.Controllers;
 
 [Authorize(Roles = "cdc_admin,jurisdiction_admin")]
 public sealed class update_year_of_deathController : Controller
 {
   mmria.common.couchdb.OverridableConfiguration configuration;
-  List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-  List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
   mmria.common.couchdb.DBConfigurationDetail db_config;
   string host_prefix = null;
   private readonly mmria.common.couchdb.ConfigurationSet _dbConfigSet;
   private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+  private readonly mmria.common.SharedLibraries.Audit.IAuditRepository _auditRepository;
 
 
   private System.Collections.Generic.Dictionary<string, string> YearOfDeathToDisplay;
   public update_year_of_deathController
   (
-      mmria.common.couchdb.ConfigurationSet DbConfigurationSet,
       IHttpContextAccessor httpContextAccessor,
-      mmria.common.couchdb.OverridableConfiguration _configuration,
-      List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-      List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
-      mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+      mmria.server.util.RequestTenantRuntime tenantRuntime,
+      mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+      mmria.common.SharedLibraries.Audit.IAuditRepository auditRepository
   )
   {
     _couchDbHttpClient = couchDbHttpClient;
+    _auditRepository = auditRepository;
 
-    _overridableConfigSets = overridableConfigSets;
-    _dbConfigSets = dbConfigSets;
-    host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-    configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-    db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+    host_prefix = tenantRuntime.EffectiveHostPrefix;
+    configuration = tenantRuntime.RequireConfiguration();
 
-    _dbConfigSet = DbConfigurationSet;
+    db_config = tenantRuntime.RequireDbConfig();
+
+    _dbConfigSet = tenantRuntime.RequireConfigurationSet();
 
     if (_dbConfigSet.detail_list.ContainsKey("vital_import"))
     {
@@ -62,20 +60,28 @@ public sealed class update_year_of_deathController : Controller
     return View(_dbConfigSet);
   }
 
-
-  public async Task<IActionResult> FindRecord(mmria.server.model.year_of_death.YearOfDeathRequest Model)
+  [HttpPost]
+  public async Task<IActionResult> FindRecord(
+    [Bind(
+      nameof(mmria.server.model.year_of_death.YearOfDeathRequest.StateDatabase) + "," +
+      nameof(mmria.server.model.year_of_death.YearOfDeathRequest.RecordId))]
+    mmria.server.model.year_of_death.YearOfDeathRequest Model)
   {
+    Model ??= new mmria.server.model.year_of_death.YearOfDeathRequest();
     var model = new mmria.server.model.year_of_death.YearOfDeathRequestResponse();
     model.SearchText = Model.RecordId;
     TempData["YearOfDeathSearchRecordId"] = model.SearchText;
     try
     {
-      var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient);
+      var isCdcAdmin = AuthorizedWorkflowScopeHelper.IsCdcAdmin(User);
+      var effectiveRole = isCdcAdmin ? "cdc_admin" : "jurisdiction_admin";
+      var effectiveStateDatabase = AuthorizedWorkflowScopeHelper.ResolveAuthorizedStateDatabase(User, Model.StateDatabase, host_prefix, _dbConfigSet);
+      var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient, new mmria.common.SharedLibraries.Case.DAL.CaseDAL(_couchDbHttpClient), _auditRepository);
 
       var items = await caseManager.FindYearOfDeathRecordsAsync(
       Model.RecordId,
-      Model.Role,
-      Model.StateDatabase,
+      effectiveRole,
+      effectiveStateDatabase,
       db_config,
       _dbConfigSet
       );
@@ -97,9 +103,9 @@ public sealed class update_year_of_deathController : Controller
           LastUpdatedBy = item.value?.last_updated_by,
           DateLastUpdated = item.value?.date_last_updated,
           YearOfDeath = item.value.date_of_death_year,
-        StateDatabase = Model.StateDatabase,
+        StateDatabase = effectiveStateDatabase,
           CaseStatus = item.value.case_status,
-        Role = Model.Role
+        Role = effectiveRole
       };
 
       model.YearOfDeathDetail.Add(x);
@@ -113,29 +119,76 @@ public sealed class update_year_of_deathController : Controller
 
     return View(model);
   }
-
-  public async Task<IActionResult> ConfirmUpdateYearOfDeathRequest(mmria.server.model.year_of_death.YearOfDeathDetail Model)
+  [HttpPost]
+  public async Task<IActionResult> ConfirmUpdateYearOfDeathRequest(
+    [Bind(
+      nameof(mmria.server.model.year_of_death.YearOfDeathDetail._id) + "," +
+      nameof(mmria.server.model.year_of_death.YearOfDeathDetail.RecordId) + "," +
+      nameof(mmria.server.model.year_of_death.YearOfDeathDetail.FirstName) + "," +
+      nameof(mmria.server.model.year_of_death.YearOfDeathDetail.LastName) + "," +
+      nameof(mmria.server.model.year_of_death.YearOfDeathDetail.MiddleName) + "," +
+      nameof(mmria.server.model.year_of_death.YearOfDeathDetail.DateOfDeath) + "," +
+      nameof(mmria.server.model.year_of_death.YearOfDeathDetail.StateOfDeath) + "," +
+      nameof(mmria.server.model.year_of_death.YearOfDeathDetail.LastUpdatedBy) + "," +
+      nameof(mmria.server.model.year_of_death.YearOfDeathDetail.DateLastUpdated) + "," +
+      nameof(mmria.server.model.year_of_death.YearOfDeathDetail.YearOfDeath) + "," +
+      nameof(mmria.server.model.year_of_death.YearOfDeathDetail.YearOfDeathReplacement) + "," +
+      nameof(mmria.server.model.year_of_death.YearOfDeathDetail.StateDatabase))]
+    mmria.server.model.year_of_death.YearOfDeathDetail Model)
   {
-    var model = Model;
+    var model = Model ?? new mmria.server.model.year_of_death.YearOfDeathDetail();
+    var isCdcAdmin = AuthorizedWorkflowScopeHelper.IsCdcAdmin(User);
+    var effectiveRole = isCdcAdmin ? "cdc_admin" : "jurisdiction_admin";
+    var effectiveStateDatabase = AuthorizedWorkflowScopeHelper.ResolveAuthorizedStateDatabase(User, model.StateDatabase, host_prefix, _dbConfigSet);
+    model.Role = effectiveRole;
+    model.StateDatabase = effectiveStateDatabase;
 
-    var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient);
-    Model.RecordIdReplacement = await caseManager.GetRecordIdReplacementForYearOfDeathAsync(
-      Model.Role,
-      Model.StateDatabase,
-      Model.RecordId,
-      Model.YearOfDeathReplacement,
-      _dbConfigSet
-    );
+    try
+    {
+      var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient, new mmria.common.SharedLibraries.Case.DAL.CaseDAL(_couchDbHttpClient), _auditRepository);
+      model.RecordIdReplacement = await caseManager.GetRecordIdReplacementForYearOfDeathAsync(
+        effectiveRole,
+        effectiveStateDatabase,
+        model.RecordId,
+        model.YearOfDeathReplacement,
+        _dbConfigSet
+      );
+    }
+    catch (Exception ex)
+    {
+      model.StatusText = ex.ToString();
+    }
 
     return View(model);
   }
-
-  public async Task<IActionResult> UpdateYearOfDeath(mmria.server.model.year_of_death.YearOfDeathDetail Model)
+  [HttpPost]
+  public async Task<IActionResult> UpdateYearOfDeath(
+    [Bind(
+      nameof(mmria.server.model.year_of_death.YearOfDeathDetail._id) + "," +
+      nameof(mmria.server.model.year_of_death.YearOfDeathDetail.RecordId) + "," +
+      nameof(mmria.server.model.year_of_death.YearOfDeathDetail.RecordIdReplacement) + "," +
+      nameof(mmria.server.model.year_of_death.YearOfDeathDetail.FirstName) + "," +
+      nameof(mmria.server.model.year_of_death.YearOfDeathDetail.LastName) + "," +
+      nameof(mmria.server.model.year_of_death.YearOfDeathDetail.MiddleName) + "," +
+      nameof(mmria.server.model.year_of_death.YearOfDeathDetail.DateOfDeath) + "," +
+      nameof(mmria.server.model.year_of_death.YearOfDeathDetail.StateOfDeath) + "," +
+      nameof(mmria.server.model.year_of_death.YearOfDeathDetail.LastUpdatedBy) + "," +
+      nameof(mmria.server.model.year_of_death.YearOfDeathDetail.DateLastUpdated) + "," +
+      nameof(mmria.server.model.year_of_death.YearOfDeathDetail.YearOfDeath) + "," +
+      nameof(mmria.server.model.year_of_death.YearOfDeathDetail.YearOfDeathReplacement) + "," +
+      nameof(mmria.server.model.year_of_death.YearOfDeathDetail.is_only_record_id_change) + "," +
+      nameof(mmria.server.model.year_of_death.YearOfDeathDetail.StateDatabase))]
+    mmria.server.model.year_of_death.YearOfDeathDetail Model)
   {
-    var model = Model;
+    var model = Model ?? new mmria.server.model.year_of_death.YearOfDeathDetail();
+    var isCdcAdmin = AuthorizedWorkflowScopeHelper.IsCdcAdmin(User);
+    var effectiveRole = isCdcAdmin ? "cdc_admin" : "jurisdiction_admin";
+    var effectiveStateDatabase = AuthorizedWorkflowScopeHelper.ResolveAuthorizedStateDatabase(User, model.StateDatabase, host_prefix, _dbConfigSet);
+    model.Role = effectiveRole;
+    model.StateDatabase = effectiveStateDatabase;
     try
     {
-      var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient);
+      var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient, new mmria.common.SharedLibraries.Case.DAL.CaseDAL(_couchDbHttpClient), _auditRepository);
 
       // Best-effort: tab id is generated client-side per browser tab and posted
       // with the confirmation form. Used to enforce same-user/different-tab locks.
@@ -146,12 +199,12 @@ public sealed class update_year_of_deathController : Controller
       }
 
       var updateResult = await caseManager.UpdateYearOfDeathAsync(
-        Model._id,
-        Model.Role,
-        Model.StateDatabase,
-        Model.YearOfDeathReplacement,
-        Model.RecordIdReplacement,
-        Model.DateOfDeath,
+        model._id,
+        effectiveRole,
+        effectiveStateDatabase,
+        model.YearOfDeathReplacement,
+        model.RecordIdReplacement,
+        model.DateOfDeath,
         User,
         db_config,
         _dbConfigSet,
@@ -177,15 +230,8 @@ public sealed class update_year_of_deathController : Controller
             var dal = new mmria.common.SharedLibraries.Case.DAL.CaseDAL(_couchDbHttpClient);
             string caseJson;
 
-            if (Model.Role != null && Model.Role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase))
-            {
-              var db_info = _dbConfigSet.detail_list[Model.StateDatabase];
-              caseJson = await dal.GetCaseDocumentJsonAsync(Model._id, db_info);
-            }
-            else
-            {
-              caseJson = await dal.GetCaseDocumentJsonAsync(Model._id, db_config);
-            }
+            var effectiveDbConfig = AuthorizedWorkflowScopeHelper.ResolveAuthorizedDbConfig(User, effectiveStateDatabase, host_prefix, db_config, _dbConfigSet);
+            caseJson = await dal.GetCaseDocumentJsonAsync(model._id, effectiveDbConfig);
 
             var doc = Newtonsoft.Json.Linq.JObject.Parse(caseJson);
             lockedBy = doc.Value<string>("last_checked_out_by");
@@ -209,9 +255,9 @@ public sealed class update_year_of_deathController : Controller
       // Only overwrite display fields on success.
       if (updateResult != null && updateResult.IsSuccessful)
       {
-        Model.LastUpdatedBy = updateResult.LastUpdatedBy;
-        Model.DateLastUpdated = updateResult.DateLastUpdated;
-        Model.DateOfDeath = updateResult.DateOfDeath;
+        model.LastUpdatedBy = updateResult.LastUpdatedBy;
+        model.DateLastUpdated = updateResult.DateLastUpdated;
+        model.DateOfDeath = updateResult.DateOfDeath;
       }
 
       model.StatusText = updateResult?.StatusText;

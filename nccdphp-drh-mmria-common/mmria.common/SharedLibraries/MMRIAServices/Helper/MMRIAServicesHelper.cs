@@ -4,6 +4,8 @@ using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace mmria.common.SharedLibraries.MMRIAServices.Helper;
 
@@ -19,12 +21,225 @@ public sealed class BatchImportInitializationResult
 
 public static class MMRIAServicesHelper
 {
+    public static bool HasUsableDatabaseConfiguration(mmria.common.couchdb.DBConfigurationDetail itemDbInfo)
+    {
+        return
+            itemDbInfo != null &&
+            !string.IsNullOrWhiteSpace(itemDbInfo.url) &&
+            !string.IsNullOrWhiteSpace(itemDbInfo.user_name) &&
+            !string.IsNullOrWhiteSpace(itemDbInfo.user_value);
+    }
+
+    public static string ResolveDatabaseScriptPath(string scriptFileName)
+    {
+        if(string.IsNullOrWhiteSpace(scriptFileName))
+        {
+            throw new ArgumentException("scriptFileName is required.", nameof(scriptFileName));
+        }
+
+        var safeFileName = System.IO.Path.GetFileName(scriptFileName);
+        var candidateDirectories = new[]
+        {
+            System.IO.Path.Combine(AppContext.BaseDirectory, "database-scripts"),
+            System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "database-scripts"),
+            System.IO.Path.GetFullPath(System.IO.Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "source-code", "mmria", "mmria-server", "database-scripts")),
+            System.IO.Path.GetFullPath(System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "..", "..", "source-code", "mmria", "mmria-server", "database-scripts"))
+        }
+        .Distinct(StringComparer.OrdinalIgnoreCase);
+
+        foreach(var candidateDirectory in candidateDirectories)
+        {
+            var candidatePath = System.IO.Path.Combine(candidateDirectory, safeFileName);
+            if(System.IO.File.Exists(candidatePath))
+            {
+                return candidatePath;
+            }
+        }
+
+        throw new System.IO.FileNotFoundException($"Unable to find database script '{safeFileName}'.");
+    }
+
+    public static async Task<bool> UrlExistsAsync(
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        string url,
+        string userName,
+        string userValue)
+    {
+        if(couchDbHttpClient == null)
+        {
+            throw new ArgumentNullException(nameof(couchDbHttpClient));
+        }
+
+        if(string.IsNullOrWhiteSpace(url))
+        {
+            throw new ArgumentException("url is required.", nameof(url));
+        }
+
+        try
+        {
+            await couchDbHttpClient.ExecuteAsync(
+                "HEAD",
+                url,
+                null,
+                userName,
+                userValue,
+                timeoutSeconds: 300,
+                throwOnError: true);
+
+            return true;
+        }
+        catch (HttpRequestException ex) when (IsNotFound(ex))
+        {
+            return false;
+        }
+    }
+
+    public static async Task<bool> ClearDatabaseDocumentsPreservingSystemDocsAsync(
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        string databaseUrl,
+        string userName,
+        string userValue,
+        int batchSize = 500)
+    {
+        if(couchDbHttpClient == null)
+        {
+            throw new ArgumentNullException(nameof(couchDbHttpClient));
+        }
+
+        if(string.IsNullOrWhiteSpace(databaseUrl))
+        {
+            throw new ArgumentException("databaseUrl is required.", nameof(databaseUrl));
+        }
+
+        if(batchSize < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(batchSize), "batchSize must be at least 1.");
+        }
+
+        if(!await UrlExistsAsync(couchDbHttpClient, databaseUrl, userName, userValue))
+        {
+            return false;
+        }
+
+        string nextStartKey = null;
+        for(;;)
+        {
+            int requestedRowCount = batchSize;
+            var queryParameters = new List<string>();
+            if(!string.IsNullOrWhiteSpace(nextStartKey))
+            {
+                requestedRowCount++;
+                string startKeyParameter = Uri.EscapeDataString(JsonConvert.SerializeObject(nextStartKey));
+                queryParameters.Add($"startkey={startKeyParameter}");
+            }
+
+            queryParameters.Add($"limit={requestedRowCount}");
+
+            string response = await couchDbHttpClient.ExecuteAsync(
+                "GET",
+                $"{databaseUrl}/_all_docs?{string.Join("&", queryParameters)}",
+                null,
+                userName,
+                userValue,
+                timeoutSeconds: 300,
+                throwOnError: true);
+
+            var payload = JObject.Parse(response);
+            var rows = payload["rows"] as JArray;
+            if(rows == null || rows.Count == 0)
+            {
+                break;
+            }
+
+            string lastRowId = null;
+            var docsToDelete = new JArray();
+
+            foreach(var row in rows.OfType<JObject>())
+            {
+                string id = row.Value<string>("id");
+                if(string.IsNullOrWhiteSpace(id))
+                {
+                    continue;
+                }
+
+                lastRowId = id;
+
+                if(!string.IsNullOrWhiteSpace(nextStartKey) &&
+                    string.Equals(id, nextStartKey, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if(IsSystemDocumentId(id))
+                {
+                    continue;
+                }
+
+                string rev = row["value"]?["rev"]?.ToString();
+                if(string.IsNullOrWhiteSpace(rev))
+                {
+                    continue;
+                }
+
+                docsToDelete.Add(new JObject
+                {
+                    ["_id"] = id,
+                    ["_rev"] = rev,
+                    ["_deleted"] = true
+                });
+            }
+
+            if(docsToDelete.Count > 0)
+            {
+                string bulkDeletePayload = new JObject
+                {
+                    ["docs"] = docsToDelete
+                }.ToString(Formatting.None);
+
+                await couchDbHttpClient.ExecuteAsync(
+                    "POST",
+                    $"{databaseUrl}/_bulk_docs",
+                    bulkDeletePayload,
+                    userName,
+                    userValue,
+                    timeoutSeconds: 300,
+                    throwOnError: true);
+            }
+
+            if(string.IsNullOrWhiteSpace(lastRowId) || rows.Count < requestedRowCount)
+            {
+                break;
+            }
+
+            nextStartKey = lastRowId;
+        }
+
+        return true;
+    }
+
+    private static bool IsSystemDocumentId(string documentId)
+    {
+        return
+            documentId.StartsWith("_design/", StringComparison.OrdinalIgnoreCase) ||
+            documentId.StartsWith("_local/", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsNotFound(HttpRequestException exception)
+    {
+        string message = exception?.Message ?? string.Empty;
+        return
+            message.Contains("404", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("not_found", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("Object Not Found", StringComparison.OrdinalIgnoreCase);
+    }
+
     public static BatchImportInitializationResult InitializeBatchImport(
         mmria.common.ije.NewIJESet_Message message,
         mmria.common.couchdb.ConfigurationSet db_config_set,
         int mor_max_length,
         int nat_max_length,
-        int fet_max_length)
+        int fet_max_length,
+        string? vitalsImportAdditionalTenantsCsv)
     {
         Console.WriteLine($"Process_Message started");
         Console.WriteLine($"Processing Message : {message}");
@@ -44,23 +259,18 @@ public static class MMRIAServicesHelper
 
         Console.WriteLine("Checking file names");
 
-        var test_tenants = new string[] { "tenant1", "tenant2", "tenant3", "tenant4", "tenant5" };
-        var qa_tenants = new string[] { "tenant1qa", "tenant2qa", "tenant3qa", "tenant4qa", "tenant5qa" };
+        var ReportingState = get_state_from_file_name(message.mor_file_name);
+        var additionalTenants = ParseCommaSeparatedValues(vitalsImportAdditionalTenantsCsv);
 
-        if (qa_tenants.Any(t => message.mor_file_name.ToLower().Contains(t)))
+        if (additionalTenants.Contains(ReportingState))
         {
-            var patt = new System.Text.RegularExpressions.Regex("^[0-9]{4}_20[0-9]{2}_[0-2][0-9]_[0-3][0-9]_(tenant[1-5]qa).[mM][oO][rR]$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            string tenantAlternation = string.Join("|", additionalTenants.Select(System.Text.RegularExpressions.Regex.Escape));
+            var patt = new System.Text.RegularExpressions.Regex(
+                $"^[0-9]{{4}}_20[0-9]{{2}}_[0-2][0-9]_[0-3][0-9]_({tenantAlternation})\\.[mM][oO][rR]$",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             if (!patt.IsMatch(message.mor_file_name))
             {
-                status_builder.AppendLine("mor file name format incorrect. File name must be in ####_20##_Year_Month_Day_TENANT[1-5]QA format. (e.g. 2026_2026_01_18_TENANT2QA.MOR)");
-            }
-        }
-        else if (test_tenants.Any(t => message.mor_file_name.ToLower().Contains(t)))
-        {
-            var patt = new System.Text.RegularExpressions.Regex("^[0-9]{4}_20[0-9]{2}_[0-2][0-9]_[0-3][0-9]_(tenant[1-5]).[mM][oO][rR]$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            if (!patt.IsMatch(message.mor_file_name))
-            {
-                status_builder.AppendLine("mor file name format incorrect. File name must be in ####_20##_Year_Month_Day_TENANT[1-5] format. (e.g. 2026_2026_01_18_TENANT2.MOR)");
+                status_builder.AppendLine($"mor file name format incorrect. File name must be in ####_20##_Year_Month_Day_{ReportingState.ToUpperInvariant()} format. (e.g. 2026_2026_01_18_{ReportingState.ToUpperInvariant()}.MOR)");
             }
         }
         else
@@ -76,19 +286,29 @@ public static class MMRIAServicesHelper
         if (!nat_length_is_valid) status_builder.AppendLine("nat length is invalid.");
         if (!fet_length_is_valid) status_builder.AppendLine("fet length is invalid.");
 
-        var ReportingState = get_state_from_file_name(message.mor_file_name);
         var ImportDate = DateTime.Now;
         Console.WriteLine($"ReportingState: {ReportingState}");
 
         mmria.common.couchdb.DBConfigurationDetail item_db_info = null;
-        if (db_config_set.detail_list.ContainsKey(ReportingState))
+        if
+        (
+            db_config_set?.detail_list != null &&
+            db_config_set.detail_list.TryGetValue(ReportingState, out item_db_info) &&
+            HasUsableDatabaseConfiguration(item_db_info)
+        )
         {
             is_valid_file_name = true;
-            item_db_info = db_config_set.detail_list[ReportingState];
         }
         else
         {
-            status_builder.AppendLine($"Invalid reporting state {ReportingState}");
+            if(db_config_set?.detail_list != null && db_config_set.detail_list.ContainsKey(ReportingState))
+            {
+                status_builder.AppendLine($"Database configuration is missing or incomplete for reporting state {ReportingState}");
+            }
+            else
+            {
+                status_builder.AppendLine($"Invalid reporting state {ReportingState}");
+            }
         }
 
         return new BatchImportInitializationResult
@@ -100,6 +320,25 @@ public static class MMRIAServicesHelper
             ImportDate = ImportDate,
             ItemDbInfo = item_db_info
         };
+    }
+
+    private static HashSet<string> ParseCommaSeparatedValues(string? csv)
+    {
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (string.IsNullOrWhiteSpace(csv))
+        {
+            return result;
+        }
+
+        foreach (string rawValue in csv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (!string.IsNullOrWhiteSpace(rawValue))
+            {
+                result.Add(rawValue);
+            }
+        }
+
+        return result;
     }
 
     public static bool validate_length(IList<string> p_array, int p_max_length)
@@ -170,7 +409,7 @@ public static class MMRIAServicesHelper
             DateTime ImportDate,
             string ImportFileName,
             string ReportingState,
-            HashSet<string> ExistingRecordIds
+            HashSet<string> BatchLocalRecordIds
     )
     {
         /*
@@ -187,6 +426,11 @@ public static class MMRIAServicesHelper
             StatusDetail
             */
 
+        // Story 29.7: BatchLocalRecordIds is a fresh per-batch HashSet used only to prevent
+        // two rows in the same MOR file from generating the same 4-digit suffix. Cross-writer
+        // and cross-DB uniqueness is now enforced at write time by CaseManager.SaveCaseAsync
+        // via the Story 29.1 guard and Story 29.7 collision-retry loop in BatchItemProcessingService.
+
         var x = mor_get_header(LineItem);
 
         string record_id = null;
@@ -195,8 +439,8 @@ public static class MMRIAServicesHelper
         {
             record_id = $"{ReportingState.ToUpper()}-{x["DOD_YR"]}-{GenerateRandomFourDigits().ToString()}";
         }
-        while (ExistingRecordIds.Contains(record_id));
-        ExistingRecordIds.Add(record_id);
+        while (BatchLocalRecordIds.Contains(record_id));
+        BatchLocalRecordIds.Add(record_id);
 
         var result = new mmria.common.ije.BatchItem()
         {

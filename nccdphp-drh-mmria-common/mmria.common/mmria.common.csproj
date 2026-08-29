@@ -1,13 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <!--LangVersion>9.0</LangVersion-->
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.10" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="Bogus" Version="35.6.1" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="census\" />
@@ -15,5 +14,8 @@
     <Folder Include="metadata\" />
     <Folder Include="texas_am\" />
     <Folder Include="couchdb\password\" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="SharedLibraries\MMRIARebuild\database-scripts\*.json" />
   </ItemGroup>
 </Project>

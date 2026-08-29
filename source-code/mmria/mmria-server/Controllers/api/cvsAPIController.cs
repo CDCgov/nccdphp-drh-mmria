@@ -16,8 +16,11 @@ using Microsoft.AspNetCore.Identity;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 
+using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 using  mmria.server.extension;   
 using mmria.common.cvs;
+using mmria.server.util;
 
 namespace mmria.server;
 
@@ -38,44 +41,49 @@ public sealed class cvsAPIController: ControllerBase
 
         public bool is_valid_address { get;set; } = true;
         public bool is_valid_year { get;set; } = true;
+        public string message { get;set; }
 
     }
 
     string folder_name = null;
 
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly System.Net.Http.HttpClient _externalHttpClient;
     private readonly mmria.common.SharedLibraries.CVS.Manager.CVSManager _cvsManager;
+    private readonly ILogger<cvsAPIController> _logger;
     public cvsAPIController
     (
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
-        mmria.common.SharedLibraries.CVS.Manager.CVSManager cvsManager
+        mmria.common.SharedLibraries.CVS.Manager.CVSManager cvsManager,
+        ILogger<cvsAPIController> logger
     )
     {
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
         _couchDbHttpClient = couchDbHttpClient;
         _cvsManager = cvsManager;
+        _logger = logger;
         var httpClientFactory = new mmria.common.SimpleHttpClientFactory();
         _externalHttpClient = httpClientFactory.CreateClient("external");
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
 
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        configuration = tenantRuntime.RequireConfiguration();
 
-        this.folder_name = System.IO.Path.Combine(configuration.GetString("export_directory", host_prefix), "csv");
+        db_config = tenantRuntime.RequireDbConfig();
 
-        System.IO.Directory.CreateDirectory(this.folder_name);
+        this.folder_name = ContainedPathHelper.EnsureContainedDirectoryExists(
+            configuration.GetString("export_directory", host_prefix),
+            "csv");
 
+    }
+
+    private static string GetCvsPdfFileName(string id)
+    {
+        var safeId = ContainedPathHelper.ValidateContainedName(id, nameof(id));
+        return ContainedPathHelper.ValidateContainedName($"CVS-{safeId}.pdf", nameof(id));
     }
 
 
@@ -85,13 +93,16 @@ public sealed class cvsAPIController: ControllerBase
     {
 
 
-        var file_name = $"CVS-{id}.pdf";
-        var file_path = System.IO.Path.Combine(folder_name, file_name);
+        var file_name = GetCvsPdfFileName(id);
 
-        if(System.IO.File.Exists(file_path))
+        if (ContainedPathHelper.ContainedFileExists(folder_name, file_name))
         {
-            byte[] fileBytes = await GetFile(file_path);
-            return File(fileBytes, System.Net.Mime.MediaTypeNames.Application.Octet, file_name);
+            byte[] fileBytes = await ContainedPathHelper.ReadContainedFileAsync(folder_name, file_name);
+            return SafeFileDownloadResultFactory.Create(
+                fileBytes,
+                System.Net.Mime.MediaTypeNames.Application.Octet,
+                file_name,
+                "CVS-download.pdf");
         }
         else
         {
@@ -104,12 +115,17 @@ public sealed class cvsAPIController: ControllerBase
 
     
     [Authorize(Roles  = "abstractor,data_analyst,committee_member")]
+    [ValidateAntiForgeryToken]
     [HttpPost]
-    public async Task<IActionResult> Post
-    (
-        [FromBody] post_payload post_payload
-    ) 
+    public async Task<IActionResult> Post() 
     { 
+        var post_payload = await JsonRequestBodyReader.ReadAsync<post_payload>(Request);
+        var safePayload = CreateSanitizedPostPayload(post_payload);
+        if (safePayload == null)
+        {
+            return BadRequest();
+        }
+
         var is_abstractor = false;
 
         foreach(var role in User.Identities.First(u => u.IsAuthenticated &&  u.HasClaim(c => c.Type == ClaimTypes.Name)).Claims.Where(c=> c.Type == ClaimTypes.Role))
@@ -131,17 +147,14 @@ public sealed class cvsAPIController: ControllerBase
         System.Collections.Generic.IDictionary<string,object> responseDictionary = null;
         var cvs = configuration.GetCVSConfigurationDetail();
 
-        var base_url = cvs.cvs_api_url;
-
         try
         {
             
 
-            switch(post_payload.action)
+            switch(safePayload.action)
             {
                 case "server":
                     response_string = await _cvsManager.GetServerStatusAsync(cvs);
-                    System.Console.WriteLine(response_string);
 
                     result = Ok(response_string);
 
@@ -150,11 +163,16 @@ public sealed class cvsAPIController: ControllerBase
                 case "data":
                     if(is_abstractor)
                     {
-                        var tc = await _cvsManager.GetAllDataAsync(post_payload, cvs);
-
-                        result =  Ok(tc);
-
-        
+                        var tc = await _cvsManager.GetAllDataAsync(safePayload, cvs);
+                        if (tc == null)
+                        {
+                            return StatusCode(502, new { message = "CVS data service did not return a valid response. The data may not be available for the requested geography or year." });
+                        }
+                        result = Ok(tc);
+                    }
+                    else
+                    {
+                        return Forbid();
                     }
 
                     break;
@@ -162,20 +180,24 @@ public sealed class cvsAPIController: ControllerBase
                 case "dashboard":
 
                     var file_status_result = new CVS_File_Status();
-                    var dashboardResult = await _cvsManager.GetDashboardAsync(post_payload, cvs, db_config);
+                    var dashboardStopwatch = Stopwatch.StartNew();
+                    var dashboardResult = await _cvsManager.GetDashboardAsync(safePayload, cvs, db_config);
+                    dashboardStopwatch.Stop();
                     file_status_result.file_status = dashboardResult.file_status;
                     file_status_result.updated_lat = dashboardResult.updated_lat;
                     file_status_result.updated_lon = dashboardResult.updated_lon;
                     file_status_result.updated_year = dashboardResult.updated_year;
                     file_status_result.is_valid_address = dashboardResult.is_valid_address;
                     file_status_result.is_valid_year = dashboardResult.is_valid_year;
+                    file_status_result.message = dashboardResult.message;
                     if (dashboardResult.PdfBytes != null)
                     {
-                        var file_path = System.IO.Path.Combine(folder_name, $"CVS-{post_payload.id}.pdf");
-                        System.IO.File.WriteAllBytes(file_path, dashboardResult.PdfBytes);
+                        var file_name = GetCvsPdfFileName(safePayload.id);
+                        await using var fileStream = ContainedPathHelper.OpenContainedWriteStream(folder_name, file_name);
+                        await fileStream.WriteAsync(dashboardResult.PdfBytes, 0, dashboardResult.PdfBytes.Length);
                     }
                     result = Ok(file_status_result);
-                    
+                    _logger.LogInformation("CVS dashboard request completed. status={Status} duration_ms={DurationMs}", file_status_result.file_status ?? "unknown", dashboardStopwatch.ElapsedMilliseconds);
                     break;
             }
         }
@@ -186,7 +208,7 @@ public sealed class cvsAPIController: ControllerBase
             return Problem(
                 type: "/docs/errors/forbidden",
                 title: "CVS API Error",
-                detail: ex.Message,
+                detail: "The CVS API request failed.",
                 statusCode: (int) ex.Status,
                 instance: HttpContext.Request.Path
             );
@@ -205,23 +227,29 @@ public sealed class cvsAPIController: ControllerBase
         }
     }
 
-    async Task<byte[]> GetFile(string s)
+    private static post_payload CreateSanitizedPostPayload(post_payload request)
     {
-        byte[] data;
-        int br;
-        int fs_length;
-
-        using(FileStream fs = new FileStream (s, FileMode.Open, FileAccess.Read))
+        if (request == null || string.IsNullOrWhiteSpace(request.action))
         {
-            fs_length = (int) fs.Length;
-            data = new byte[fs.Length];
-            br = await fs.ReadAsync(data, 0, data.Length);
+            return null;
         }
-        if (br != (int) fs_length)
-            throw new System.IO.IOException(s);
-        return data;
+
+        return new post_payload
+        {
+            action = request.action.Trim().ToLowerInvariant(),
+            c_geoid = NormalizeOptionalString(request.c_geoid),
+            t_geoid = NormalizeOptionalString(request.t_geoid),
+            year = NormalizeOptionalString(request.year),
+            lat = NormalizeOptionalString(request.lat),
+            lon = NormalizeOptionalString(request.lon),
+            id = NormalizeOptionalString(request.id)
+        };
     }
 
+    private static string NormalizeOptionalString(string value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
 
 } 
 

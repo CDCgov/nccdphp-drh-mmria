@@ -1,3 +1,4 @@
+using System;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using System.Collections.Generic;
@@ -13,8 +14,6 @@ namespace mmria.server.Controllers;
 public sealed class view_data_summaryController : Controller
 {
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     mmria.common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
 
@@ -22,20 +21,15 @@ public sealed class view_data_summaryController : Controller
 
     public view_data_summaryController    
     (
-        mmria.common.couchdb.ConfigurationSet p_config_db,
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        mmria.server.util.RequestTenantRuntime tenantRuntime
     )
     {
+        ConfigDB = tenantRuntime.RequireConfigurationSet();
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+        configuration = tenantRuntime.RequireConfiguration();
 
-        ConfigDB = p_config_db;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        db_config = tenantRuntime.RequireDbConfig();
     }
 
     [Route("view-data-summary")]
@@ -53,14 +47,16 @@ public sealed class view_data_summaryController : Controller
 
     [Route("view-data-summary/GenerateReport")]
     [HttpPost]
-    public async Task<IActionResult> GenerateReport
-    (
-        [FromBody]
-        ReportParams rp
-    )
+    public async Task<IActionResult> GenerateReport()
     {
+        var rp = await mmria.server.util.JsonRequestBodyReader.ReadAsync<ReportParams>(Request);
+        var safeParams = CreateSanitizedReportParams(rp);
+        if (safeParams == null)
+        {
+            return BadRequest();
+        }
 
-        var summary_row_list = rp.fd.Split(",");
+        var summary_row_list = safeParams.fd.Split(",", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
         FastExcel.Row ConvertToDetail(int p_row_number, string item)
         {
@@ -103,7 +99,7 @@ public sealed class view_data_summaryController : Controller
             var row_number = 1;
 
             var header = new List<FastExcel.Cell>();
-            header.Add(new FastExcel.Cell(1, $"View Data Summary {rp.fn} {rp.fs}"));
+            header.Add(new FastExcel.Cell(1, $"View Data Summary {safeParams.fn} {safeParams.fs}"));
             rows.Add(new FastExcel.Row(row_number, header));
 
             foreach (var item in summary_row_list)
@@ -121,6 +117,22 @@ public sealed class view_data_summaryController : Controller
         byte[] fileBytes = GetFile(Output_xlsx);
         return File(fileBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "xlJurisdictionCounts.xlsx");;
     }
+
+    private static ReportParams CreateSanitizedReportParams(ReportParams request)
+    {
+        if (request == null)
+        {
+            return null;
+        }
+
+        return new ReportParams
+        {
+            fn = string.IsNullOrWhiteSpace(request.fn) ? string.Empty : request.fn.Trim(),
+            fs = string.IsNullOrWhiteSpace(request.fs) ? string.Empty : request.fs.Trim(),
+            fd = request.fd ?? string.Empty
+        };
+    }
+
     byte[] GetFile(string s)
     {
         byte[] data;

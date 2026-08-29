@@ -22,19 +22,22 @@ public sealed class c_cdc_de_identifier
 
     mmria.common.couchdb.DBConfigurationDetail db_config;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository _metadataRepository;
     
     public c_cdc_de_identifier 
     (
         string p_case_item_json, 
         string p_prefix,
         mmria.server.model.actor.ScheduleInfoMessage p_scheduleInfo,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository metadataRepository
     )
     {
         this.case_item_json = p_case_item_json;
         this.prefix = p_prefix;
         metadata_version = p_scheduleInfo.version_number;
         _couchDbHttpClient = couchDbHttpClient;
+        _metadataRepository = metadataRepository;
 
         db_config = new()
         {
@@ -66,8 +69,7 @@ public sealed class c_cdc_de_identifier
     {
         string result = null;
 
-        string de_identified_response = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + "/metadata/de-identified-export-list", null, db_config.user_name, db_config.user_value, "application/json");
-        System.Dynamic.ExpandoObject de_identified_ExpandoObject = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(de_identified_response);
+        System.Dynamic.ExpandoObject de_identified_ExpandoObject = await _metadataRepository.GetDeIdentifiedExportListAsync(db_config);
         IDictionary<string, object> idictionary = de_identified_ExpandoObject as IDictionary<string, object>;
         if(idictionary != null)
         {

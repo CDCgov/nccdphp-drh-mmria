@@ -5,6 +5,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using Microsoft.AspNetCore.Http;
+using mmria.common.SharedLibraries.Jurisdiction;
+using mmria.common.SharedLibraries.Case;
 
 using  mmria.server.extension; 
 
@@ -14,47 +16,49 @@ namespace mmria.server.Controllers;
 public sealed class jurisdictionSummaryController : Controller
 {
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     mmria.common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
 
     mmria.common.couchdb.ConfigurationSet ConfigDB;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.Account.IUserRepository _userRepository;
+    private readonly IJurisdictionRepository _jurisdictionRepository;
+    private readonly ICaseRepository _caseRepository;
 
     public jurisdictionSummaryController
     (
-        mmria.common.couchdb.ConfigurationSet p_config_db,
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.Account.IUserRepository userRepository,
+        IJurisdictionRepository jurisdictionRepository,
+        ICaseRepository caseRepository
     )
     {
+        ConfigDB = tenantRuntime.RequireConfigurationSet();
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+        configuration = tenantRuntime.RequireConfiguration();
 
-        ConfigDB = p_config_db;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        db_config = tenantRuntime.RequireDbConfig();
         _couchDbHttpClient = couchDbHttpClient;
+        _userRepository = userRepository;
+        _jurisdictionRepository = jurisdictionRepository;
+        _caseRepository = caseRepository;
     }
 
     public async Task<IActionResult> Index(System.Threading.CancellationToken cancellationToken)
     {
 
-        var result = new mmria.server.utils.JurisdictionSummary(ConfigDB, _couchDbHttpClient);
-
-        return View(await result.execute(cancellationToken));
+        var summary = new mmria.server.utils.JurisdictionSummary(ConfigDB, _userRepository, _jurisdictionRepository, _caseRepository);
+        var summary_row_list = await summary.execute(cancellationToken);
+        return View(summary_row_list);
     }
 
 
     public async Task<IActionResult> GenerateReport(System.Threading.CancellationToken cancellationToken)
     {
 
-        var summary_list = new mmria.server.utils.JurisdictionSummary(ConfigDB, _couchDbHttpClient);
+        var summary_list = new mmria.server.utils.JurisdictionSummary(ConfigDB, _userRepository, _jurisdictionRepository, _caseRepository);
 
         var summary_row_list = await summary_list.execute(cancellationToken);
 

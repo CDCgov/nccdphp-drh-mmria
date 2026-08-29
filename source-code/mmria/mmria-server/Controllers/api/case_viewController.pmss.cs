@@ -27,30 +27,30 @@ public sealed class case_viewController: ControllerBase
 
     IHttpContextAccessor httpContextAccessor;
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.Case.ICaseRepository _caseRepository;
+    private readonly mmria.common.SharedLibraries.Jurisdiction.IJurisdictionRepository _jurisdictionRepository;
 
     string host_prefix = null;
 
     public case_viewController  (
         IHttpContextAccessor p_httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.Case.ICaseRepository caseRepository,
+        mmria.common.SharedLibraries.Jurisdiction.IJurisdictionRepository jurisdictionRepository
     )
     {
         httpContextAccessor = p_httpContextAccessor;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
         _couchDbHttpClient = couchDbHttpClient;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
+        _caseRepository = caseRepository;
+        _jurisdictionRepository = jurisdictionRepository;
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
 
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        configuration = tenantRuntime.RequireConfiguration();
 
+        db_config = tenantRuntime.RequireDbConfig();
     }
 
     [HttpGet]
@@ -81,7 +81,10 @@ public sealed class case_viewController: ControllerBase
             db_config, 
             User,
             is_identefied_case,
-            include_pinned_cases
+            include_pinned_cases,
+            _couchDbHttpClient,
+            _jurisdictionRepository,
+            _caseRepository
         );
 
         var result = await cvs.execute
@@ -114,15 +117,7 @@ public sealed class case_viewController: ControllerBase
 
         try
         {
-            string request_string = $"{db_config.url}/{db_config.prefix}mmrds/_design/sortable/_view/by_date_created?skip=0&take=250000";
-
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                "GET",
-                request_string,
-                null,
-                db_config.user_name,
-                db_config.user_value
-            );
+            string responseFromServer = await _caseRepository.GetCasesByDateCreatedViewJsonAsync(db_config);
 
             mmria.common.model.couchdb.pmss_case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.pmss_case_view_response>(responseFromServer);
 
@@ -152,9 +147,7 @@ public sealed class case_viewController: ControllerBase
 
         try
         {
-            string request_string = $"{db_config.url}/{db_config.prefix}mmrds/_design/sortable/_view/by_pmss_number?skip=0&take=250000";
-
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
+            string responseFromServer = await _caseRepository.GetCasesByPmssNumberViewJsonAsync(db_config);
 
             mmria.common.model.couchdb.pmss_case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.pmss_case_view_response>(responseFromServer);
 

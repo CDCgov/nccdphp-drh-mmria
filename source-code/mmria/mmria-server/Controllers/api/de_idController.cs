@@ -8,6 +8,7 @@ using mmria.common.model;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Http;
+using mmria.common.SharedLibraries.DeIdentified;
 
 using  mmria.server.extension; 
 namespace mmria.server;
@@ -17,48 +18,39 @@ namespace mmria.server;
 public sealed class de_idController: ControllerBase 
 {     
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IDeIdentifiedRepository _deIdentifiedRepository;
 
     public de_idController
     (
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        IDeIdentifiedRepository deIdentifiedRepository
     )
     {
-        configuration = _configuration;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
-        _couchDbHttpClient = couchDbHttpClient;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        _deIdentifiedRepository = deIdentifiedRepository;
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
     }
 
     public async Task<System.Dynamic.ExpandoObject> Get(string case_id = null) 
     { 
         try
         {
-            string request_string = db_config.Get_Prefix_DB_Url($"de_id/_all_docs?include_docs=true");
+            string responseFromServer;
 
             if (!string.IsNullOrWhiteSpace (case_id)) 
             {
-                request_string = db_config.Get_Prefix_DB_Url($"de_id/{case_id}");
-            } 
-
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                "GET",
-                request_string,
-                null,
-                db_config.user_name,
-                db_config.user_value
-            );
+                responseFromServer = await _deIdentifiedRepository.GetDocumentJsonAsync(case_id, db_config);
+            }
+            else
+            {
+                responseFromServer = await _deIdentifiedRepository.GetAllDocumentsJsonAsync(true, db_config);
+            }
 
             var result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (responseFromServer);
 

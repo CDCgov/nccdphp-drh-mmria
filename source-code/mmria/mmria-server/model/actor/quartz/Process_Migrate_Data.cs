@@ -13,6 +13,9 @@ public sealed class Process_Initial_Migrations_Message
     }
     public DateTime time_sent { get; private set; }
 }
+// Data migration actor — direct CouchDB access is intentional.
+// This actor performs one-time bulk data corrections and is not used in production case-management flows.
+// Excluded from the repository pattern by design. See epics.md §Epic 27 Story 27.2.
 public sealed class Process_Migrate_Data : ReceiveActor
 {
     //protected override void PreStart() => Console.WriteLine("Process_Migrate_Data started");

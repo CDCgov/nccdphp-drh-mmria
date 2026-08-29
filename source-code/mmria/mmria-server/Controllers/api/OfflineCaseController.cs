@@ -7,11 +7,15 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using System.Threading.Tasks;
 using System.Security.Claims;
+using Akka.Actor;
 using mmria.server.extension;
 using mmria.common.SharedLibraries.OfflineCase.Manager;
 using mmria.common.SharedLibraries.OfflineCase.Model;
 using mmria.common.couchdb;
 using mmria.common.model.couchdb;
+using mmria.common.utils;
+using mmria.common.SharedLibraries.DeIdentified;
+using mmria.common.SharedLibraries.Report;
 namespace mmria.server;
 
 [Route("api/[controller]")]
@@ -20,34 +24,33 @@ public sealed class OfflineCaseController: ControllerBase
     private readonly IOfflineCaseManager _manager;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly OverridableConfiguration _configuration;
+    private readonly ActorSystem _actorSystem;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly DBConfigurationDetail db_config;
     private string host_prefix = null;
+    private readonly IDeIdentifiedRepository _deIdentifiedRepository;
+    private readonly IReportRepository _reportRepository;
 
     public OfflineCaseController
     (
         IHttpContextAccessor httpContextAccessor,
         IOfflineCaseManager manager,
-        OverridableConfiguration configuration,
-        List<OverridableConfiguration> overridableConfigSets,
-        List<ConfigurationSet> dbConfigSets
+        ActorSystem actorSystem,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        IDeIdentifiedRepository deIdentifiedRepository,
+        IReportRepository reportRepository
     )
     {
         _httpContextAccessor = httpContextAccessor;
         _manager = manager;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        
-        // Resolve configuration once at controller level
-        _configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(
-            overridableConfigSets,
-            configuration,
-            host_prefix
-        );
-        
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(
-            dbConfigSets,
-            configuration,
-            host_prefix
-        );
+        _actorSystem = actorSystem;
+        _couchDbHttpClient = couchDbHttpClient;
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+        _configuration = tenantRuntime.RequireConfiguration();
+        db_config = tenantRuntime.RequireDbConfig();
+        _deIdentifiedRepository = deIdentifiedRepository;
+        _reportRepository = reportRepository;
     }
 
     private string GetUserName()
@@ -86,16 +89,19 @@ public sealed class OfflineCaseController: ControllerBase
 
     [Authorize(Roles = "abstractor, data_analyst")]
     [HttpPost]
-    public async Task<document_put_response> Post([FromBody] OfflineCaseRequest request)
+    public async Task<document_put_response> Post()
     {
         try
         {
+            var request = await mmria.server.util.JsonRequestBodyReader.ReadAsync<OfflineCaseRequest>(Request);
             string userName = GetUserName();
             if (string.IsNullOrWhiteSpace(userName))
             {
                 return new document_put_response { ok = false, error_description = "Unable to determine user" };
             }
-            return await _manager.CreateOfflineCaseAsync(request, userName, db_config);
+
+            var sanitizedRequest = CreateSanitizedOfflineCaseRequest(request);
+            return await _manager.CreateOfflineCaseAsync(sanitizedRequest, userName, db_config);
         }
         catch (Exception ex)
         {
@@ -236,24 +242,25 @@ public sealed class OfflineCaseController: ControllerBase
 
     [Authorize(Roles = "offline_mode")]
     [HttpPost("update-cases/{id}")]
-    public async Task<IActionResult> SaveOfflineCases(string id, [FromBody] SaveOfflineCasesRequest request)
+    public async Task<IActionResult> SaveOfflineCases(string id)
     {
         try
         {
+            var request = await mmria.server.util.JsonRequestBodyReader.ReadAsync<SaveOfflineCasesRequest>(Request);
             if (string.IsNullOrEmpty(id) || request == null || request.CaseDocuments == null)
             {
                 return BadRequest(new { error = "Invalid request" });
             }
 
             string userName = GetUserName();
-            request.OfflineSessionId = id;
-            var result = await _manager.UpdateCasesAsync(request, userName, db_config);
+            var sanitizedRequest = CreateSanitizedSaveOfflineCasesRequest(request, id, userName);
+            var result = await _manager.UpdateCasesAsync(sanitizedRequest, userName, db_config);
             if (result.ok)
             {
                 return Ok(new {
                     message = "Case documents saved successfully",
                     offlineCaseId = id,
-                    documentCount = request.CaseDocuments.Count,
+                    documentCount = sanitizedRequest.CaseDocuments.Count,
                     revision = result.rev,
                     offline_state = 1,
                     shouldSetProcessOffline = true
@@ -288,25 +295,64 @@ public sealed class OfflineCaseController: ControllerBase
         }
     }
 
+    [Authorize(Roles = "abstractor, data_analyst")]
+    [HttpPost("sync-case")]
+    public async Task<document_put_response> SyncOfflineCase()
+    {
+        try
+        {
+            var request = await mmria.server.util.JsonRequestBodyReader.ReadAsync<SyncOfflineCaseRequest>(Request);
+            string userName = GetUserName();
+            if (string.IsNullOrWhiteSpace(userName))
+            {
+                return new document_put_response { ok = false, error_description = "Unable to determine user" };
+            }
+
+            var sanitizedRequest = CreateSanitizedSyncOfflineCaseRequest(request);
+            var saveResult = await _manager.SyncOfflineCaseAsync(sanitizedRequest, userName, User, db_config, _configuration, host_prefix);
+
+            if (saveResult.Response.ok && !string.IsNullOrWhiteSpace(saveResult.CaseId))
+            {
+                var syncDocumentMessage = new mmria.server.model.actor.Sync_Document_Message(
+                    saveResult.CaseId,
+                    saveResult.SerializedCase,
+                    "PUT",
+                    _configuration.GetString("metadata_version", host_prefix)
+                );
+
+                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, _configuration, host_prefix, _deIdentifiedRepository, _reportRepository)).Tell(syncDocumentMessage);
+            }
+
+            return saveResult.Response;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+            return new document_put_response { ok = false, error_description = ex.Message };
+        }
+    }
+
     /// <summary>
     /// Updates the sync status of a specific document change within an offline session.
     /// This allows tracking which documents have been synced, abandoned, or errored.
     /// </summary>
     [Authorize(Roles = "abstractor, data_analyst")]
     [HttpPost("update-sync-status")]
-    public async Task<IActionResult> UpdateDocumentSyncStatus([FromBody] DocumentChangeSyncStatusRequest request)
+    public async Task<IActionResult> UpdateDocumentSyncStatus()
     {
         try
         {
-            if (request == null || string.IsNullOrWhiteSpace(request.OfflineSessionId) || string.IsNullOrWhiteSpace(request._id))
+            var request = await mmria.server.util.JsonRequestBodyReader.ReadAsync<DocumentChangeSyncStatusRequest>(Request);
+            var sanitizedRequest = CreateSanitizedDocumentChangeSyncStatusRequest(request);
+            if (request == null || string.IsNullOrWhiteSpace(sanitizedRequest.OfflineSessionId) || string.IsNullOrWhiteSpace(sanitizedRequest._id))
             {
                 return BadRequest(new { error = "Invalid request" });
             }
 
-            var result = await _manager.UpdateSyncStatusAsync(request, db_config);
+            var result = await _manager.UpdateSyncStatusAsync(sanitizedRequest, db_config);
             if (result.ok)
             {
-                string statusDescription = request.SyncState switch
+                string statusDescription = sanitizedRequest.SyncState switch
                 {
                     0 => "not synced",
                     1 => "synced",
@@ -316,9 +362,9 @@ public sealed class OfflineCaseController: ControllerBase
                 };
                 return Ok(new {
                     message = "Document sync status updated successfully",
-                    offlineSessionId = request.OfflineSessionId,
-                    documentId = request._id,
-                    syncState = request.SyncState,
+                    offlineSessionId = sanitizedRequest.OfflineSessionId,
+                    documentId = sanitizedRequest._id,
+                    syncState = sanitizedRequest.SyncState,
                     syncStatusDescription = statusDescription,
                     revision = result.rev
                 });
@@ -369,19 +415,21 @@ public sealed class OfflineCaseController: ControllerBase
     /// </summary>
     [Authorize(Roles = "abstractor, data_analyst")]
     [HttpPost("update-offline-state")]
-    public async Task<IActionResult> UpdateOfflineState([FromBody] UpdateOfflineStateRequest request)
+    public async Task<IActionResult> UpdateOfflineState()
     {
         try
         {
-            if (request == null || string.IsNullOrWhiteSpace(request.OfflineSessionId))
+            var request = await mmria.server.util.JsonRequestBodyReader.ReadAsync<UpdateOfflineStateRequest>(Request);
+            var sanitizedRequest = CreateSanitizedUpdateOfflineStateRequest(request);
+            if (request == null || string.IsNullOrWhiteSpace(sanitizedRequest.OfflineSessionId))
             {
                 return BadRequest(new { error = "Invalid request" });
             }
 
-            var result = await _manager.UpdateOfflineStateAsync(request, db_config);
+            var result = await _manager.UpdateOfflineStateAsync(sanitizedRequest, db_config);
             if (result.ok)
             {
-                string stateDescription = request.OfflineState switch
+                string stateDescription = sanitizedRequest.OfflineState switch
                 {
                     0 => "initial/not started",
                     1 => "in progress",
@@ -391,8 +439,8 @@ public sealed class OfflineCaseController: ControllerBase
                 };
                 return Ok(new {
                     message = "Offline state updated successfully",
-                    offlineSessionId = request.OfflineSessionId,
-                    offlineState = request.OfflineState,
+                    offlineSessionId = sanitizedRequest.OfflineSessionId,
+                    offlineState = sanitizedRequest.OfflineState,
                     stateDescription = stateDescription,
                     revision = result.rev,
                     updatedBy = GetUserName(),
@@ -403,6 +451,64 @@ public sealed class OfflineCaseController: ControllerBase
             {
                 return StatusCode(500, new { error = "Failed to update offline state", details = result.error_description });
             }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+            return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+        }
+    }
+
+    [Authorize(Roles = "abstractor, data_analyst")]
+    [HttpPost("release-case-locks")]
+    public async Task<IActionResult> ReleaseCaseLocks()
+    {
+        try
+        {
+            var request = await mmria.server.util.JsonRequestBodyReader.ReadAsync<ReleaseOfflineCaseLocksRequest>(Request);
+            string userName = GetUserName();
+            if (string.IsNullOrWhiteSpace(userName))
+            {
+                return BadRequest(new { error = "Unable to determine user" });
+            }
+
+            var sanitizedRequest = CreateSanitizedReleaseOfflineCaseLocksRequest(request);
+            var result = await _manager.ReleaseOfflineCaseLocksAsync(sanitizedRequest, userName, db_config);
+            if (result.ok)
+            {
+                return Ok(result);
+            }
+
+            return BadRequest(result);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+            return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+        }
+    }
+
+    [Authorize(Roles = "abstractor, data_analyst")]
+    [HttpPost("recover-softlocks")]
+    public async Task<IActionResult> RecoverSoftLocks()
+    {
+        try
+        {
+            var request = await mmria.server.util.JsonRequestBodyReader.ReadAsync<RecoverSoftLocksRequest>(Request);
+            string userName = GetUserName();
+            if (string.IsNullOrWhiteSpace(userName))
+            {
+                return BadRequest(new { error = "Unable to determine user" });
+            }
+
+            var sanitizedRequest = CreateSanitizedRecoverSoftLocksRequest(request);
+            var result = await _manager.RecoverSoftLocksAsync(sanitizedRequest, userName, db_config);
+            if (result.ok)
+            {
+                return Ok(result);
+            }
+
+            return BadRequest(result);
         }
         catch (Exception ex)
         {
@@ -425,7 +531,13 @@ public sealed class OfflineCaseController: ControllerBase
             }
 
             var sessionId = await _manager.CreateOfflineAuthTokenAsync(userName, db_config);
-            Response.Cookies.Append("sid", sessionId, new CookieOptions { HttpOnly = true, Expires = DateTime.Now.AddMinutes(24 * 7 * 60), SameSite = SameSiteMode.Strict });
+            var offlineAuthExpiration = OfflineAuthSessionDefaults.GetExpirationDateTime(DateTime.Now);
+            mmria.server.util.AppSessionCookieHelper.AppendAppSessionCookies(
+                Response,
+                sessionId,
+                offlineAuthExpiration,
+                Request.IsHttps,
+                sessionScope: mmria.server.util.AppSessionCookieHelper.OfflineModeSessionScopeValue);
 
             return Ok(new { status = "success" });
         }
@@ -434,6 +546,179 @@ public sealed class OfflineCaseController: ControllerBase
             Console.WriteLine(ex);
             return StatusCode(500, new { error = "Internal server error creating offline token", details = ex.Message });
         }
+    }
+
+    private static OfflineCaseRequest CreateSanitizedOfflineCaseRequest(OfflineCaseRequest request)
+    {
+        return new OfflineCaseRequest
+        {
+            offline_ids = SanitizeIdentifierList(request?.offline_ids),
+            offline_key = SanitizeSingleLineText(request?.offline_key, 1024),
+            device_id = SanitizeSingleLineText(request?.device_id, 256),
+            browser_id = SanitizeSingleLineText(request?.browser_id, 256),
+            tab_id = SanitizeSingleLineText(request?.tab_id, 256)
+        };
+    }
+
+    private static SaveOfflineCasesRequest CreateSanitizedSaveOfflineCasesRequest(
+        SaveOfflineCasesRequest request,
+        string offlineSessionId,
+        string userName)
+    {
+        return new SaveOfflineCasesRequest
+        {
+            OfflineSessionId = SanitizeSingleLineText(offlineSessionId, 256),
+            CaseDocuments = request?.CaseDocuments?
+                .Where(change => change != null)
+                .Select(change => CreateSanitizedDocumentChange(change, offlineSessionId, userName))
+                .ToList() ?? new List<DocumentChange>()
+        };
+    }
+
+    private static SyncOfflineCaseRequest CreateSanitizedSyncOfflineCaseRequest(SyncOfflineCaseRequest request)
+    {
+        return new SyncOfflineCaseRequest
+        {
+            OfflineSessionId = SanitizeSingleLineText(request?.OfflineSessionId, 256),
+            CaseId = SanitizeSingleLineText(request?.CaseId, 256)
+        };
+    }
+
+    private static DocumentChangeSyncStatusRequest CreateSanitizedDocumentChangeSyncStatusRequest(DocumentChangeSyncStatusRequest request)
+    {
+        return new DocumentChangeSyncStatusRequest
+        {
+            OfflineSessionId = SanitizeSingleLineText(request?.OfflineSessionId, 256),
+            _id = SanitizeSingleLineText(request?._id, 256),
+            SyncState = NormalizeSyncState(request?.SyncState ?? 0)
+        };
+    }
+
+    private static UpdateOfflineStateRequest CreateSanitizedUpdateOfflineStateRequest(UpdateOfflineStateRequest request)
+    {
+        return new UpdateOfflineStateRequest
+        {
+            OfflineSessionId = SanitizeSingleLineText(request?.OfflineSessionId, 256),
+            OfflineState = NormalizeOfflineState(request?.OfflineState ?? 0)
+        };
+    }
+
+    private static ReleaseOfflineCaseLocksRequest CreateSanitizedReleaseOfflineCaseLocksRequest(ReleaseOfflineCaseLocksRequest request)
+    {
+        return new ReleaseOfflineCaseLocksRequest
+        {
+            OfflineSessionId = SanitizeSingleLineText(request?.OfflineSessionId, 256),
+            CaseIds = SanitizeIdentifierList(request?.CaseIds)
+        };
+    }
+
+    private static RecoverSoftLocksRequest CreateSanitizedRecoverSoftLocksRequest(RecoverSoftLocksRequest request)
+    {
+        return new RecoverSoftLocksRequest
+        {
+            OfflineSessionId = SanitizeSingleLineText(request?.OfflineSessionId, 256),
+            tab_id = SanitizeSingleLineText(request?.tab_id, 256),
+            CaseIds = SanitizeIdentifierList(request?.CaseIds)
+        };
+    }
+
+    private static DocumentChange CreateSanitizedDocumentChange(DocumentChange request, string offlineSessionId, string userName)
+    {
+        return new DocumentChange
+        {
+            DocumentId = SanitizeSingleLineText(request?.DocumentId, 256),
+            OriginalDocument = request?.OriginalDocument,
+            ModifiedDocument = request?.ModifiedDocument,
+            Timestamp = SanitizeSingleLineText(request?.Timestamp, 128),
+            ChangeDescription = SanitizeMultilineText(request?.ChangeDescription, 2048),
+            SyncState = NormalizeSyncState(request?.SyncState ?? 0),
+            UserId = SanitizeSingleLineText(userName, 256),
+            SessionId = SanitizeSingleLineText(offlineSessionId, 256),
+            ChangeStackItems = request?.ChangeStackItems?
+                .Where(item => item != null)
+                .Select(item => CreateSanitizedChangeStackItem(item, userName))
+                .ToList() ?? new List<mmria.common.model.couchdb.Change_Stack_Item>()
+        };
+    }
+
+    private static mmria.common.model.couchdb.Change_Stack_Item CreateSanitizedChangeStackItem(
+        mmria.common.model.couchdb.Change_Stack_Item request,
+        string userName)
+    {
+        return new mmria.common.model.couchdb.Change_Stack_Item
+        {
+            _id = SanitizeSingleLineText(request?._id, 256),
+            _rev = CouchDbRevisionHelper.NormalizeIncomingRevision(request?._rev),
+            user_name = SanitizeSingleLineText(userName, 256),
+            temp_index = request?.temp_index,
+            date_created = request?.date_created,
+            object_path = SanitizeSingleLineText(request?.object_path, 512),
+            metadata_path = SanitizeSingleLineText(request?.metadata_path, 512),
+            old_value = request?.old_value,
+            new_value = request?.new_value,
+            dictionary_path = SanitizeSingleLineText(request?.dictionary_path, 512),
+            form_index = request?.form_index,
+            grid_index = request?.grid_index,
+            prompt = SanitizeMultilineText(request?.prompt, 512),
+            metadata_type = SanitizeSingleLineText(request?.metadata_type, 128),
+            doc_type = "Change_Stack_Item"
+        };
+    }
+
+    private static List<string> SanitizeIdentifierList(IEnumerable<string> values)
+    {
+        if (values == null)
+        {
+            return new List<string>();
+        }
+
+        var result = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var value in values)
+        {
+            var sanitized = SanitizeSingleLineText(value, 256);
+            if (string.IsNullOrWhiteSpace(sanitized) || !seen.Add(sanitized))
+            {
+                continue;
+            }
+
+            result.Add(sanitized);
+        }
+
+        return result;
+    }
+
+    private static int NormalizeSyncState(int value) =>
+        value < 0 ? 0 : value > 6 ? 6 : value;
+
+    private static int NormalizeOfflineState(int value) =>
+        value < 0 ? 0 : value > 3 ? 3 : value;
+
+    private static string SanitizeSingleLineText(string value, int maxLength = 512)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var sanitized = new string(value.Where(character => !char.IsControl(character)).ToArray()).Trim();
+        return sanitized.Length > maxLength
+            ? sanitized[..maxLength]
+            : sanitized;
+    }
+
+    private static string SanitizeMultilineText(string value, int maxLength = 2048)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var sanitized = new string(value.Where(character => character == '\r' || character == '\n' || !char.IsControl(character)).ToArray()).Trim();
+        return sanitized.Length > maxLength
+            ? sanitized[..maxLength]
+            : sanitized;
     }
 
 }

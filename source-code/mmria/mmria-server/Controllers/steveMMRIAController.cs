@@ -13,6 +13,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 
 using  mmria.server.extension; 
+using mmria.server.util;
 namespace mmria.server.Controllers;
 
 [Authorize(Roles = "cdc_admin,steve_mmria")]
@@ -22,8 +23,6 @@ public sealed class steveMMRIAController : Controller
 
 
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     mmria.common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     ActorSystem _actorSystem;
@@ -47,18 +46,15 @@ public sealed class steveMMRIAController : Controller
         ActorSystem actorSystem,
         ILogger<steveMMRIAController> logger,
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        mmria.server.util.RequestTenantRuntime tenantRuntime
     )
     {
         _actorSystem = actorSystem;
         _logger = logger;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
     }
 
     string userName
@@ -75,8 +71,10 @@ public sealed class steveMMRIAController : Controller
                         u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name)
                     )
                     .FindFirst(System.Security.Claims.ClaimTypes.Name)
-                    .Value.Replace("@","-").Replace("'","-");
+                    .Value;
                 }
+
+                _userName = ContainedPathHelper.CreateSafeContainedName(_userName, "user");
             }
             return _userName;
         }
@@ -88,8 +86,9 @@ public sealed class steveMMRIAController : Controller
         {
             if (_download_directory == null)
             {
-
-                _download_directory = System.IO.Path.Combine(configuration.GetString("export_directory", host_prefix), userName);
+                _download_directory = ContainedPathHelper.ResolveContainedDirectoryPath(
+                    configuration.GetString("export_directory", host_prefix),
+                    userName);
             }
             return _download_directory;
         }
@@ -160,29 +159,34 @@ public sealed class steveMMRIAController : Controller
 
 
     [HttpPost]
-    public async Task<JsonResult> SetDownloadRequest
-    (
-        [FromBody] DownloadRequest request
-    )
+    public async Task<JsonResult> SetDownloadRequest()
     {
         var queue_Result = new mmria.common.steve.QueueResult();
-        if(mailbox_map.ContainsKey(request.Mailbox))
+        var request = await JsonRequestBodyReader.ReadAsync<DownloadRequestBody>(Request);
+        var inboundRequest = CreateSanitizedInboundRequest(request);
+
+        if(inboundRequest != null && mailbox_map.ContainsKey(inboundRequest.Mailbox))
         {
             System.DateTime? result = null; 
 
             var steve_api = configuration.GetSteveAPIConfigurationDetail();
-
-            request.seaBucketKMSKey = steve_api.sea_bucket_kms_key;
-            request.clientName = steve_api.client_name;
-            request.clientSecretKey = steve_api.client_secret_key;
-            request.base_url = steve_api.base_url;
-            request.download_directory = download_directory;
-            request.file_name = GetFileName(request.Mailbox);
+            var safeRequest = new DownloadRequest
+            {
+                BeginDate = inboundRequest.BeginDate,
+                EndDate = inboundRequest.EndDate,
+                Mailbox = inboundRequest.Mailbox,
+                seaBucketKMSKey = steve_api.sea_bucket_kms_key,
+                clientName = steve_api.client_name,
+                clientSecretKey = steve_api.client_secret_key,
+                base_url = steve_api.base_url,
+                download_directory = download_directory,
+                file_name = GetFileName(inboundRequest.Mailbox)
+            };
 
             var processor = _actorSystem.ActorSelection("user/steve-api-supervisor");
 
             //result = (System.DateTime) await processor.Ask(request);
-            processor.Tell(request);
+            processor.Tell(safeRequest);
             
             //System.Console.WriteLine("here");
 
@@ -193,48 +197,51 @@ public sealed class steveMMRIAController : Controller
         
         return Json(queue_Result);
     }
+
+    public sealed class DownloadRequestBody
+    {
+        public DateTime BeginDate { get; set; }
+        public DateTime EndDate { get; set; }
+        public string Mailbox { get; set; }
+    }
+
+    private static DownloadRequest CreateSanitizedInboundRequest(DownloadRequestBody request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.Mailbox))
+        {
+            return null;
+        }
+
+        return new DownloadRequest
+        {
+            BeginDate = request.BeginDate,
+            EndDate = request.EndDate,
+            Mailbox = request.Mailbox.Trim()
+        };
+    }
     
 
     [HttpGet]
     public  async Task<FileResult> GetFileResult(string FileName)
     {
         var queue_Result = new mmria.common.steve.QueueResult();
-        var path = System.IO.Path.Combine (download_directory, FileName);
-
-        byte[] fileBytes = GetFile(path);
-        return File(fileBytes, System.Net.Mime.MediaTypeNames.Application.Octet, FileName);
+        var safeFileName = ContainedPathHelper.ValidateContainedName(FileName, nameof(FileName));
+        byte[] fileBytes = await ContainedPathHelper.ReadContainedFileAsync(download_directory, safeFileName);
+        return SafeFileDownloadResultFactory.Create(
+            fileBytes,
+            System.Net.Mime.MediaTypeNames.Application.Octet,
+            safeFileName,
+            "steve-download.bin");
 
     }
 
     [HttpGet]
     public  async Task<JsonResult> DeleteFileResult(string FileName)
     {
-        var path = System.IO.Path.Combine (download_directory, FileName);
-
-        if(System.IO.File.Exists(path))
-        {
-            System.IO.File.Delete(path);
-        }
+        var safeFileName = ContainedPathHelper.ValidateContainedName(FileName, nameof(FileName));
+        ContainedPathHelper.DeleteContainedFile(download_directory, safeFileName);
 
         return await GetQueueResult();
-    }
-
-
-    byte[] GetFile(string s)
-    {
-        byte[] data;
-        int br;
-        int fs_length;
-
-        using(FileStream fs = new FileStream (s, FileMode.Open, FileAccess.Read))
-        {
-            fs_length = (int) fs.Length;
-            data = new byte[fs.Length];
-            br = fs.Read(data, 0, data.Length);
-        }
-        if (br != (int) fs_length)
-            throw new System.IO.IOException(s);
-        return data;
     }
 
     string GetFileName(string p_file_name)

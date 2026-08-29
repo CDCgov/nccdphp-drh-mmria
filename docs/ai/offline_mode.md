@@ -1,5 +1,11 @@
 # MMRIA Offline Mode - Technical Documentation
 
+- Status: Active
+- Scope: Offline architecture, service worker caching, local encrypted storage, session integrity, and online/offline transition behavior.
+- When to use: Read this before changing offline session handling, sync flows, service worker logic, or cached case behavior.
+- Last verified: 2026-04-14
+
+
 ## Overview
 Offline Mode enables users to take 0 to many cases into an offline state where they can work without internet connectivity. Cases are stored encrypted at rest using AES-256-GCM encryption with PBKDF2 key derivation. Users can edit existing cases and create new cases while offline, with all changes automatically tracked and synchronized when returning online.
 
@@ -10,32 +16,70 @@ Offline Mode enables users to take 0 to many cases into an offline state where t
 ### 1. Client-Side Modules (JavaScript)
 Located in `/wwwroot/scripts/offline/`:
 
-| Module | Purpose |
-|--------|---------|
-| `offline-session-manager.js` | Manages offline session lifecycle and validation |
-| `offline-case-manager.js` | Handles case operations (add, remove, create) |
-| `offline-sync-manager.js` | Coordinates synchronization with server |
-| `offline-transition-manager.js` | Controls online↔offline transitions |
-| `offline-change-tracker.js` | Tracks field-level changes for audit trail |
-| `offline-network-monitor.js` | Monitors connectivity status |
-| `offline-utils.js` | Cryptographic utilities and helper functions |
-| `service-worker-manager.js` | Manages service worker lifecycle and messaging |
-| `offline-ui-renderer.js` | Renders offline mode UI elements |
-| `offline-modals.js` | Modal dialogs for offline operations |
-| `offline-status-manager.js` | Manages offline status indicators |
-| `offline-session-validator.js` | Validates offline session integrity |
-| `offline-logout-button.js` | Handles logout during offline mode |
-| `offline-navigation-manager.js` | Routes navigation in offline mode |
-| `offline-logger.js` | Debug logging subsystem |
-| `offline-debug-modal.js` | Debug console for offline troubleshooting |
+| Area | Primary modules | Why they matter |
+|--------|---------|---------|
+| Session lifecycle | `offline-session-manager.js`, `offline-session-validator.js`, `offline-inactivity-manager.js`, `offline-navigation-manager.js` | Own the offline session state machine, idle timeout enforcement, and re-auth routing. |
+| Transition and sync | `offline-transition-manager.js`, `offline-sync-manager.js`, `offline-case-manager.js`, `offline-change-tracker.js` | Drive Go Offline / Go Online flow, case selection, local change capture, and upload preparation. |
+| Service-worker bridge | `service-worker-manager.js`, `offline-integrity-validator.js`, `offline-cache-manifest.js` | Coordinate cache population, cache validation, and encrypted case access. |
+| UI and diagnostics | `offline-ui-renderer.js`, `offline-modals.js`, `offline-status-manager.js`, `offline-logout-button.js`, `offline-network-monitor.js`, `offline-logger.js`, `offline-debug-modal.js`, `offline-utils.js` | Surface offline state, connectivity, debugging, and crypto/helper behavior to the user and developers. |
 
 ### 2. Service Worker (`/wwwroot/service-worker.js`)
-- **Size**: 3,573 lines - comprehensive caching and encryption logic
-- **Cache Strategy**: Cache-first for offline access with fallback to network
-- **Encryption**: AES-256-GCM encryption/decryption in memory (key never persisted)
-- **Cache Management**: Versioned caches for static assets, API responses, and case data
-- **Request Interception**: Intercepts network requests and serves from cache when offline
-- **Version Control**: Automatically detects cache version from server API endpoint
+- Handles offline cache population, encrypted case storage, cache-version checks, and request interception.
+- Keeps the crypto key only in service-worker memory; a restart requires offline re-auth before cached cases can be decrypted again.
+- Must distinguish between session-scoped case caches and broader static/API caches so one session cannot read another session's encrypted payloads.
+
+### 2a. Shared Cache Contract (`/wwwroot/scripts/offline/offline-cache-manifest.js`)
+- The service worker and integrity validator share one manifest instead of maintaining separate hard-coded expectations.
+- The manifest distinguishes required static assets, HTML routes, and API routes because each category has different validity checks.
+- Keep the naming distinction straight:
+  - `offline_session_id` identifies the offline session document and localStorage state.
+  - cache names use a separate service-worker cache session id.
+  - the validator matches them by checking session payload, cache naming, and expected case overlap together.
+
+### 2b. Offline Integrity Validator (`/wwwroot/scripts/offline/offline-integrity-validator.js`)
+- This is the main integrity gate for offline mode. It validates localStorage state, service-worker state, session-specific caches, cached session payloads, expected case ids, and manifest-backed required artifacts.
+- It returns a structured diagnostic object rather than ad hoc booleans, which is why it is the right place to add new offline health checks.
+- Important checkpoints:
+
+| Checkpoint | Purpose |
+| --- | --- |
+| `go_offline_pre_auth` | Verifies cache readiness before offline auth/session creation. This guards the hosted-environment timing race where cache writes finish later than localhost. |
+| `go_offline_precomplete` | Verifies the fully assembled offline session state before the transition is finalized. |
+| `offline_monitor` | Periodic steady-state integrity check while offline. |
+| `offline_login` | Blocks offline login if cached session artifacts are missing or corrupted. |
+| `case_list_load`, `case_detail_load` | Narrower diagnostics during normal offline browsing and editing. |
+| `go_online_preflight` | Validates the session before Go Online processing starts. |
+
+- When `offline_monitor` finds a blocking failure in steady-state offline mode, the client now shows `show_go_online_failure_modal()` once and stops the monitor before recovery begins.
+
+### 2c. Offline Inactivity Re-Auth
+
+- Offline mode enforces a client-side inactivity timeout using `session_idle_timeout_minutes` while the browser is offline and actively authenticated.
+- Activity is tracked through `localStorage["mmria_offline_last_activity_at"]`, which lets one active tab keep the offline session alive for the browser profile.
+- When the timeout is exceeded, the client asks the service worker to drop the in-memory key, marks the session as no longer actively authenticated, and redirects to `/Account/OfflineLogin`.
+- This is intentionally separate from the narrow offline server auth token, which exists only for the initial Go Online handoff before the browser returns to normal `/Account/AutoLogin` authentication.
+- Logging should stay high-signal: milestone summaries, validator outcomes, warnings, and errors are valuable; per-request noise is not.
+
+### 2d. Go Offline Cache Completion Handshake
+
+The Go Offline transition now uses explicit service-worker acknowledgments and a cache-readiness barrier before `go_offline_pre_auth`.
+
+- `ServiceWorkerManager.prefetchCases()` waits for an acknowledgment that each case was written and re-read from cache.
+- `ServiceWorkerManager.cacheMetadata()` waits for an explicit success/failure response instead of sleeping for a fixed delay.
+- `ServiceWorkerManager.waitForCacheReadiness()` blocks until required static assets, route aliases, API entries, expected case documents, and the cached offline-session payload are all present.
+
+This barrier exists because cloud-hosted deployments can be slow enough that a validator run immediately after background cache requests will see a partial cache even though the service worker is still working.
+
+### 2e. Case Fetch Rule During Go Offline
+
+`/api/case?case_id=...` must remain network-only until offline mode is fully established.
+
+- During Go Offline setup there should be no legitimate case reads from cache yet.
+- Case prefetch may populate the future session cache, but the service worker must not serve case reads from cache until both `is_offline` and `has_active_offline_session` are true.
+- This rule prevents the hosted-environment race where an early cache-first `/api/case` read can hit an encrypted response from the wrong session and fail with `offline_decrypt_failed`.
+- Once steady-state offline mode is active, case reads must come from the active session API cache only, not from global cache lookup across all caches.
+
+This rule is important because offline mode is transactional. A user should not be able to read case data from cache until the offline transition has completed successfully.
 
 ### 3. Server-Side Components (C#)
 
@@ -76,7 +120,13 @@ Located in `/wwwroot/scripts/offline/`:
 - Key validation happens locally against cached hash (no network required for validation)
 - Device fingerprinting via User-Agent
 - Session-specific salts prevent rainbow table attacks
-- Lockout mechanism after failed login attempts (tracked in service worker)
+- Offline login validation is enforced by the service worker via `VALIDATE_OFFLINE_KEY`
+- Lockout mechanism after 3 failed login attempts is tracked per offline session in the service worker cache
+- Lockout duration is 2 hours, and the offline login page shows remaining attempts or remaining lockout time inline
+- After the 2-hour lockout window expires, the failed-attempt counter resets and the user gets a fresh set of attempts
+- When the offline login page loads during an active lockout, it immediately shows the lockout banner before another submit
+- When cached offline cases exist but the in-memory offline crypto key is missing, the service worker now returns `401 { error: "offline_key_required" }` for case-list reads instead of `200` with an empty list.
+- Offline case-list and case-detail clients redirect that state to `/Account/OfflineLogin` so cached encrypted cases do not silently disappear behind a blank list.
 - Cryptographically secure random number generation for salts
 
 ---
@@ -104,10 +154,20 @@ Located in `/wwwroot/scripts/offline/`:
    - Selected case documents (encrypted with AES-256-GCM)
    - API responses for offline views
    - User roles and jurisdiction data
-6. Updates case documents in main database:
+   - Cache validation now happens in two stages:
+     - before offline auth/session setup (`go_offline_pre_auth`)
+     - again before the transition is finalized (`go_offline_precomplete`)
+6. Service worker validates required cached resources using the shared manifest:
+   - required static assets must return usable non-empty responses
+   - required HTML routes must return `200` and a valid HTML shell
+   - required API routes must satisfy endpoint-specific status/content/shape rules
+   - example: `/api/jurisdiction_tree` is expected to be a `200` JSON payload with a `children` array; a `204 No Content` response should be treated as a failure, not a successful cache fill
+7. Updates case documents in main database:
    - Sets `is_offline: true`
    - Sets `offline_by: username`
    - Sets `offline_date: ISO8601 timestamp`
+   - Sets `offline_lock_type: 1` for the pre-session soft lock
+   - Sets `offline_by_tab_id` to the current browser tab id
 7. Creates offline session document in `offline_cases` database:
    ```javascript
    {
@@ -120,68 +180,41 @@ Located in `/wwwroot/scripts/offline/`:
      "device_info": "User-Agent string"
    }
    ```
+   - Session creation now also carries the initiating browser tab id internally so the server can enforce the one-tab offline rule without changing the public response contract.
 8. Sets localStorage flags:
    - `is_offline: "true"`
    - `offline_session_id: "session_guid"`
    - `mmria_offline_session: {sessionData}`
 9. Reloads page to activate offline mode
 
+### One-Tab Offline Rule
+- Soft locks for offline mode are enforced per browser tab, not just per user.
+- `POST /api/case/toggle-offline/{caseId}` add operations require a `tab_id`.
+- The server rejects a soft-lock add when the same user already owns any offline soft lock from another tab.
+- `goOfflineFinal()` posts the current `tab_id` to `POST /api/OfflineCase`.
+- The server rejects offline-session creation when the same user:
+  - has offline soft locks owned by another tab, or
+  - already has an active offline session owned by another tab.
+- Case editing is also tab-scoped for offline-owned cases:
+  - the client blocks `Enable Edit` when `is_offline == true`, `offline_by == current user`, and `offline_by_tab_id` belongs to another tab
+  - the server blocks `SaveCaseAsync` for the same condition so the rule still applies if client checks are bypassed
+- Unload cleanup (`/api/case/finalize-unload`) removes offline soft locks only when `offline_by_tab_id` matches the current tab.
+- UI behavior reuses `show_locked_case_modal()`:
+  - `show_add_offline_softlock_tab_conflict_modal(caseId)` for add-to-offline conflicts
+  - `show_go_offline_tab_conflict_modal()` for go-offline transition conflicts
+  - `show_edit_offline_case_tab_conflict_modal(caseId)` for edit/save conflicts on offline-owned cases from another tab
+
 ### Phase 2: While Offline
 
-**Case Access:**
-- Service worker intercepts all HTTP requests
-- For case data requests (`/api/case?case_id=X`):
-  1. Checks if case is in cache
-  2. If encrypted (`X-Offline-Encrypted: 1` header), decrypts using in-memory key
-  3. Serves decrypted JSON to application
-  4. Falls back to network if not in cache (will fail if truly offline)
-
-**Editing Existing Cases:**
-- User opens and edits case forms normally
-- On each field change:
-  1. `offline-change-tracker.js` captures:
-     - Field metadata path (e.g., `/home_record/first_name`)
-     - Old value
-     - New value
-     - Timestamp
-     - User name
-  2. Change accumulated in `g_offline_changes` Map (in memory)
-  3. Updated document sent to service worker for re-encryption and cache update
-  4. Change stack persisted to localStorage as backup
-- All form validation and business logic continues to work normally
-
-**Creating New Cases:**
-- User clicks "Add New Case" button (limited by `offline_mode_max_new_cases`)
-- System generates temporary case ID
-- Record ID assigned with `-offline` suffix (e.g., `2024-US-001-offline`)
-- New case cached and encrypted like edited cases
-- Marked with `is_offline: true` and creation metadata
-
-**Persistence Across Sessions:**
-- User can close browser completely
-- User can restart computer
-- User can switch to airplane mode
-- On return:
-  1. Service worker detects existing session from cache
-  2. User must re-enter offline key (key not persisted)
-  3. Key validates against stored hash
-  4. Cases decrypted and available for continued work
-
-**Network Monitoring:**
-- `offline-network-monitor.js` polls connectivity every interval
-- Tests endpoint: `/api/OfflineCase/connectivity-check`
-- Updates "Go Online" button state:
-  - **Enabled**: Network available
-  - **Disabled**: No network detected
-- Visual indicator shows offline status in UI
-
-**Debug Logging:**
-- If `is_offline_logging_enabled: true`:
-  - All operations logged to localStorage
-  - Max logs: `offline_logging_max_logs` (default: 10,000)
-  - Logs include timestamps, module names, and detailed messages
-  - Debug modal accessible for troubleshooting
-  - Logs synced to server when returning online
+| Concern | Current behavior |
+| --- | --- |
+| Case reads | The service worker intercepts requests and serves decrypted case JSON only from the active session cache; a cache miss falls back to network and will fail if the browser is truly offline. |
+| Editing existing cases | Field changes are captured into `g_offline_changes`, mirrored to local backup state, and written back through the service worker so the cached case stays encrypted and current. |
+| Creating new cases | New offline cases receive temporary record ids with the `-offline` suffix and stay in the same encrypted/session-scoped workflow as edited cases. |
+| Resume after browser restart | The cached session can survive browser close or machine restart, but the user must re-enter the offline key because the decryption key is never persisted. |
+| Connectivity state | `offline-network-monitor.js` polls `/api/OfflineCase/connectivity-check` and controls whether Go Online actions are enabled. |
+| Debug logging | When enabled, offline logs are stored locally, shown in the debug modal, and uploaded during Go Online cleanup. |
+| Integrity monitoring | `offline_monitor` periodically validates localStorage, session cache state, expected case ids, and manifest-backed responses. Blocking failures surface the Go Online failure modal instead of allowing continued work in a corrupted session. |
 
 ### Phase 3: Different Browser/Cache Clear Warning
 
@@ -202,176 +235,33 @@ Located in `/wwwroot/scripts/offline/`:
 
 ### Phase 4: Returning Online
 
-**User Actions:**
-1. User clicks "Go Online" button (enabled when network available)
-2. System shows "Going Online..." modal
-
-**System Actions:**
-
-**Step 1: Pre-flight Checks**
-- Network connectivity verified via `/api/OfflineCase/connectivity-check`
-- Active session validation
-- Modified case count calculated
-
-**Step 2: Save Cases to offline_cases Database**
-- Endpoint: `POST /api/OfflineCase/update-cases/{sessionId}`
-- Payload includes:
-  ```javascript
-  {
-    "OfflineSessionId": "session_guid",
-    "CaseDocuments": [
-      {
-        "documentId": "case_id",
-        "modifiedDocument": { /* full case data */ },
-        "syncState": 1, // 1 = pending sync
-        "changeStackItems": [
-          {
-            "_id": "case_id",
-            "_rev": "revision",
-            "object_path": "home_record.first_name",
-            "metadata_path": "/home_record/first_name",
-            "old_value": "Jane",
-            "new_value": "Janet",
-            "dictionary_path": "/home_record/first_name",
-            "metadata_type": "string",
-            "prompt": "First Name",
-            "date_created": "ISO8601",
-            "user_name": "username"
-          }
-          // ... more field changes
-        ]
-      }
-      // ... more cases
-    ]
-  }
-  ```
-- Server updates offline session document with all modifications
-- Response indicates success and sets `offline_state: 1` (processing)
-
-**Step 3: Transition Service Worker**
-- Set localStorage: `process_offline_cases: "true"`
-- Clear offline mode flags: `is_offline`, `has_active_offline_session`
-- Send message to service worker: `CLEAR_CACHES`
-- Wait for cache clearing to complete
-
-**Step 4: Cleanup**
-- Unregister service worker
-- Clear offline session data from memory
-- Clear cached cases from localStorage
-- Stop service worker keep-alive interval
-- Remove offline mode CSS class from body
-
-**Step 5: Sync Logs (if enabled)**
-- Upload debug logs to server
-- Endpoint: `POST /api/log/offline-logs`
-- Clear local log storage
-
-**Step 6: Redirect**
-- Redirect to `/account/login`
-- User logs in normally
-- System detects `process_offline_cases: "true"` flag
-- Loads processing mode UI
+| Step | Current behavior |
+| --- | --- |
+| Pre-flight | Verify connectivity, confirm the active offline session, and calculate the modified case count. |
+| Persist offline work | `POST /api/OfflineCase/update-cases/{sessionId}` saves the modified documents plus change stacks into the `offline_cases` session document and marks the session as processing. |
+| Transition runtime state | Set `process_offline_cases`, clear active offline flags, ask the service worker to clear caches, and wait for cleanup to finish. |
+| Cleanup | Unregister the service worker, clear runtime-only local state, stop keep-alive timers, and remove offline UI state. |
+| Optional log upload | If offline logging is enabled, upload logs before clearing local log state. |
+| Return to normal auth | Redirect through `/Account/AutoLogin`; after login, the app detects processing mode and shows the offline-processing UI. |
 
 ### Phase 5: Processing Mode
 
 After returning online, user enters "Processing Offline Cases" mode where they must resolve each modified case.
 
-**UI Display:**
-- Special table shows all modified cases
-- Each row displays:
-  - Case identifier (record ID)
-  - Patient name
-  - Modification type (Edited vs. Created)
-  - Sync status
-  - Action buttons
+Authentication boundary during processing mode:
+- The narrowed offline server session is only allowed to call `POST /api/OfflineCase/update-cases/{sessionId}`.
+- The remaining processing APIs (`active-user-session`, `sync-case`, `update-sync-status`, `update-offline-state`, `release-case-locks`, `recover-softlocks`, and generic `/api/case` reads/writes) are expected to run only after normal login is restored.
+- If the browser is still carrying the narrow offline token when processing-mode pages or recovery flows load, the client redirects through `/Account/AutoLogin` before those APIs are called.
 
-**For Edited Cases (Existing Records):**
+| Case type | Action | Current behavior |
+| --- | --- | --- |
+| Existing case | Upload | Load the cached modified document, compare revisions with the current server copy, and save through the normal case pipeline if no admin/conflict mismatch is found. On success, clear offline flags and mark the processing item complete. |
+| Existing case | Abandon | Mark the item abandoned, reload the server copy, clear offline fields, and discard the cached offline edits. |
+| New offline case | Upload | Remove the `-offline` suffix, validate the final identifier, create the record in the main database, and mark the processing item complete. |
+| New offline case | Delete | Mark the processing item deleted and discard the offline-only record without creating a server-side case. |
 
-**Option 1: Upload (Sync to Server)**
-- User clicks "Upload" button
-- System performs sync operation:
-
-  1. **Retrieve Modified Document** from offline session
-  2. **Fetch Current Document** from server: `GET /api/case?case_id=X`
-  3. **Revision Conflict Check**:
-     - Compare `_rev` of cached document vs. current server document
-     - If mismatch detected (admin unlocked case):
-       - Show modal: "This case was modified by an administrator while offline"
-       - Automatically abandon changes (syncState: 4)
-       - Unlock case in database
-       - Exit sync process
-     - If match: proceed with sync
-  4. **Prepare Save Request**:
-     - Clear offline flags: `is_offline: false`, `offline_by: null`, `offline_date: null`
-     - Remove `-offline` suffix from `record_id` if present
-     - Set `date_last_updated` and `last_updated_by`
-     - Include accumulated change stack items from offline tracking
-  5. **Save to Server**: `POST /api/case`
-     - Payload: `{ Case_Data: {...}, Change_Stack: {...} }`
-     - Change stack includes all field-level modifications for audit trail
-  6. **Update Sync Status**: `POST /api/OfflineCase/update-sync-status`
-     - Set `syncState: 0` (completed/released)
-  7. **Remove from Processing Table**
-  
-- **Success**: Case synced, unlocked, available to all users
-- **Failure**: Error modal, case remains in processing queue
-
-**Option 2: Abandon Changes**
-- User clicks "Abandon Changes" button
-- Confirmation modal: "Are you sure? All offline changes will be lost."
-- System performs abandon operation:
-  
-  1. **Update Sync Status**: `POST /api/OfflineCase/update-sync-status`
-     - Set `syncState: 2` (abandoned)
-  2. **Fetch Original Document**: `GET /api/case?case_id=X`
-  3. **Clear Offline Flags**: 
-     - Set `is_offline: false`, `offline_by: null`, `offline_date: null`
-  4. **Save Cleared Document**: `POST /api/case`
-     - Change stack notes: "Abandoned offline changes"
-  5. **Remove from Processing Table**
-
-- **Result**: Case unlocked, all offline changes discarded
-
-**For Created Cases (New Records):**
-
-**Option 1: Upload (Create in Database)**
-- User clicks "Upload" button
-- System creates new case:
-
-  1. **Retrieve Modified Document** from offline session
-  2. **Validate Record ID**:
-     - Remove `-offline` suffix
-     - Check for duplicates
-  3. **Generate Permanent GUID** (if needed)
-  4. **Save to Server**: `POST /api/case`
-     - Full case data with all field values
-     - Change stack notes case creation
-  5. **Update Sync Status**: Set `syncState: 0` (completed)
-  6. **Remove from Processing Table**
-
-- **Result**: New case permanently saved to database
-
-**Option 2: Delete (Abandon New Case)**
-- User clicks "Delete" button
-- Confirmation modal: "Delete this new case? This cannot be undone."
-- System deletes case:
-
-  1. **Update Sync Status**: Set `syncState: 3` (deleted)
-  2. **Remove from Processing Table**
-  3. **No database record created**
-
-- **Result**: New case permanently discarded
-
-**Bulk Operations:**
-- No bulk upload/abandon buttons (intentional safety measure)
-- User must process each case individually
-- Prevents accidental mass data loss
-
-**Processing Complete:**
-- When all cases resolved (uploaded or abandoned)
-- System clears `process_offline_cases` flag
-- Deletes offline session document from `offline_cases` database
-- User returns to normal operation mode
+- Bulk actions remain intentionally unsupported because offline-processing mode is designed to favor explicit per-case decisions over fast mass operations.
+- When all items are resolved, the app clears `process_offline_cases`, deletes the session document, and returns to normal runtime state.
 
 ---
 
@@ -391,18 +281,6 @@ After returning online, user enters "Processing Offline Cases" mode where they m
 ## Configuration Options
 
 Configuration settings found in `appsettings.json`, accessed via `CaseController.cs`:
-
-```json
-{
-  "is_offline_mode_enabled": true,
-  "offline_mode_max_new_cases": 3,
-  "offline_mode_max_existing_cases": 3,
-  "is_offline_logging_enabled": true,
-  "offline_logging_max_logs": 10000
-}
-```
-
-**Configuration Details:**
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
@@ -424,18 +302,7 @@ Configuration settings found in `appsettings.json`, accessed via `CaseController
 
 ### Case Document Fields (Main Database)
 
-Standard case documents extended with offline fields:
-
-```javascript
-{
-  "_id": "case_guid",
-  "_rev": "1-abc123",
-  // ... standard case fields ...
-  "is_offline": false,           // boolean - case in offline mode
-  "offline_date": null,           // ISO8601 or null - when taken offline
-  "offline_by": null              // string or null - username
-}
-```
+Standard case documents are extended with offline ownership and lock fields such as `is_offline`, `offline_date`, `offline_by`, `offline_lock_type`, and `offline_by_tab_id` so offline selection, cleanup, and cross-tab enforcement can be coordinated against the normal case record.
 
 **CouchDB Design Document:**
 - File: `database-scripts/case_design_sortable.json`
@@ -444,62 +311,14 @@ Standard case documents extended with offline fields:
 
 ### Offline Session Document (offline_cases Database)
 
-```javascript
-{
-  "_id": "550e8400-e29b-41d4-a716-446655440000",  // GUID
-  "_rev": "2-def456",
-  "user_name": "abstractor@jurisdiction.gov",
-  "offline_state": 1,              // 0=abandoned/released, 1=processing
-  "offline_ids": [                 // Original case IDs taken offline
-    "case_guid_1",
-    "case_guid_2",
-    "case_guid_3"
-  ],
-  "case_documents": [
-    {
-      "documentId": "case_guid_1",
-      "modifiedDocument": {
-        // Full case document with all modifications
-        "_id": "case_guid_1",
-        "_rev": "3-xyz789",
-        "home_record": {
-          "first_name": "Janet",  // Modified while offline
-          // ... all other fields ...
-        },
-        // ... rest of case data ...
-      },
-      "syncState": 1,              // See Sync States Reference above
-      "changeStackItems": [
-        {
-          "_id": "case_guid_1",
-          "_rev": "3-xyz789",
-          "object_path": "home_record.first_name",
-          "metadata_path": "/home_record/first_name",
-          "old_value": "Jane",
-          "new_value": "Janet",
-          "dictionary_path": "/home_record/first_name",
-          "metadata_type": "string",
-          "prompt": "First Name",
-          "date_created": "2024-11-15T14:32:00Z",
-          "user_name": "abstractor@jurisdiction.gov"
-        },
-        // ... more field changes ...
-      ]
-    },
-    // ... more modified cases ...
-  ],
-  "date_created": "2024-11-15T10:00:00Z",
-  "date_last_updated": "2024-11-15T14:32:00Z",
-  "device_info": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)..."
-}
-```
+The `offline_cases` document is the durable session envelope. It stores:
 
-**Field Explanations:**
-- `offline_state`: Controls whether session is active (1) or completed (0)
-- `offline_ids`: Tracks which cases were originally selected for offline work
-- `case_documents`: Array of modified cases with full data and change tracking
-- `syncState`: Per-case status during processing (see Sync States Reference)
-- `changeStackItems`: Audit trail of field-level changes for each case
+- session identity and ownership (`_id`, `user_name`, `device_info`)
+- overall session state (`offline_state`)
+- the original selected case ids (`offline_ids`)
+- per-case modified documents plus `syncState`
+- accumulated `changeStackItems` used for audit and upload processing
+- created/updated timestamps used for monitoring and cleanup
 
 ---
 
@@ -518,154 +337,26 @@ Standard case documents extended with offline fields:
 | POST | `/api/OfflineCase/update-cases/{id}` | Saves modified cases when returning online | Yes |
 | POST | `/api/OfflineCase/update-sync-status` | Updates individual case sync state | Yes |
 | DELETE | `/api/OfflineCase/{documentId}` | Deletes offline session document | Yes |
-| GET | `/api/OfflineCase/connectivity-check` | Network connectivity test (200 OK response) | Yes |
+| GET | `/api/OfflineCase/connectivity-check` | Network connectivity test (200 OK response) | No |
 
 **Authentication:**
-- All endpoints require authentication
+- All protected endpoints require authentication
 - Roles: `abstractor`, `data_analyst` (most endpoints)
-- Role: `offline_mode` (update-cases endpoint)
-
-**Request/Response Examples:**
-
-**Create Offline Session:**
-```http
-POST /api/OfflineCase
-Content-Type: application/json
-
-{
-  "caseIds": ["case_guid_1", "case_guid_2"],
-  "offlineKey": "(never transmitted - only hash)",
-  "deviceInfo": "User-Agent string"
-}
-
-Response:
-{
-  "ok": true,
-  "id": "session_guid",
-  "rev": "1-abc123"
-}
-```
-
-**Update Cases (Return from Offline):**
-```http
-POST /api/OfflineCase/update-cases/session_guid
-Content-Type: application/json
-
-{
-  "OfflineSessionId": "session_guid",
-  "CaseDocuments": [/* array of modified cases */]
-}
-
-Response:
-{
-  "message": "Case documents saved successfully",
-  "offlineCaseId": "session_guid",
-  "documentCount": 3,
-  "revision": "2-def456",
-  "offline_state": 1,
-  "shouldSetProcessOffline": true
-}
-```
+- Role: `offline_mode` is intentionally limited to `POST /api/OfflineCase/update-cases/{id}`
+- `GET /api/OfflineCase/connectivity-check` is anonymous
 
 ---
 
 ## User Flows & Edge Cases
 
-### Flow 1: Normal Operation (Happy Path)
-
-1. User selects 3 cases → Goes offline → Works for 2 hours
-2. Edits all 3 cases, creates 1 new case
-3. Closes browser, goes home
-4. Next day: Opens browser → Enters offline key → Continues work
-5. Returns online when network available
-6. Uploads all 4 cases successfully
-7. Returns to normal operation
-
-**Result**: ✅ All changes saved, cases unlocked
-
-### Flow 2: Browser Cache Cleared
-
-1. User goes offline with 2 cases
-2. Edits both cases
-3. Accidentally clears browser data/cache
-4. Attempts to log in
-5. System detects active session but no local cache
-6. Warning modal: "You will lose your offline session"
-7. User clicks Cancel → Cannot proceed
-8. User contacts admin to release session
-
-**Result**: ⚠️ Data loss - changes cannot be recovered without cache
-
-### Flow 3: Service Worker Restart
-
-1. User in offline mode, actively editing
-2. Browser terminates service worker (memory pressure)
-3. User tries to navigate to another case
-4. Service worker restarts, loses encryption key from memory
-5. System redirects to offline login page
-6. User re-enters offline key
-7. Key validates, cases decrypt, work continues
-
-**Result**: ✅ No data loss - seamless recovery
-
-### Flow 4: Admin Unlocks Case While User Offline
-
-1. User takes Case A offline
-2. Admin needs urgent access
-3. Admin manually unlocks Case A (clears offline flags)
-4. User returns online, attempts to upload Case A
-5. System detects revision mismatch (current rev ≠ cached rev)
-6. Shows modal: "Case was modified by administrator"
-7. Automatically abandons changes (syncState: 4)
-8. Case unlocked, user notified
-
-**Result**: ⚠️ User changes lost (expected behavior for conflict)
-
-### Flow 5: Network Loss During Transition
-
-1. User clicks "Go Online"
-2. Network connectivity check passes initially
-3. During cache save: network drops
-4. API call to `/api/OfflineCase/update-cases` fails
-5. System shows error: "Failed to save to server"
-6. Go Online button re-enabled
-7. User waits for network
-8. Tries again successfully
-
-**Result**: ✅ Safe failure - user can retry
-
-### Flow 6: Different Browser Attempt
-
-1. User has active offline session in Chrome
-2. Opens Firefox, navigates to app
-3. System checks for active session via API
-4. Detects existing session for user
-5. Shows warning modal: "Active session exists"
-6. User clicks Cancel
-7. Continues work in Chrome
-
-**Result**: ✅ Data protection - prevents split sessions
-
-### Flow 7: Maximum Case Limits
-
-1. User tries to select 5 existing cases (limit: 3)
-2. "Go Offline" button remains disabled
-3. UI shows: "Maximum 3 cases allowed"
-4. User deselects 2 cases
-5. Button enables, user proceeds
-
-**Result**: ✅ Configuration enforced
-
-### Flow 8: Creating Too Many New Cases
-
-1. User offline with 2 existing cases
-2. Creates 3 new cases (reaches limit)
-3. Attempts to create 4th new case
-4. "Add New Case" button disabled
-5. UI shows: "Maximum 3 new cases allowed"
-6. User must upload or delete before creating more
-
-**Result**: ✅ Configuration enforced
+| Scenario | Expected outcome |
+| --- | --- |
+| Normal offline session, restart, and upload | User can re-enter the offline key, continue work, and later upload or abandon each case in processing mode. |
+| Browser cache cleared or different browser used | The server may still know about the active session, but the encrypted browser cache is gone; the user gets a warning and the session cannot be resumed from that browser state. |
+| Service worker restart | The key is lost, the user is redirected to offline login, and work resumes after re-auth if the cache is intact. |
+| Admin unlock or server-side revision drift | Upload detects the mismatch and abandons the offline edits for that case rather than forcing an unsafe merge. |
+| Network loss during Go Online | The transition fails safely and can be retried once connectivity returns. |
+| Case-count limits reached | Go Offline or Add New Case remains disabled until the selection/count is back within configured bounds. |
 
 ---
 
@@ -673,105 +364,33 @@ Response:
 
 ### Change Tracking Mechanism
 
-**In-Memory Tracking (`g_offline_changes`):**
-- JavaScript Map object stores changes by case ID
-- Structure:
-  ```javascript
-  g_offline_changes = new Map([
-    ["case_id_1", {
-      documentId: "case_id_1",
-      modifiedDocument: { /* full case */ },
-      changeStackItems: [
-        { metadata_path: "/home_record/first_name", old_value: "Jane", new_value: "Janet" },
-        { metadata_path: "/home_record/date_of_death/year", old_value: "2023", new_value: "2024" }
-      ]
-    }]
-  ]);
-  ```
-
-**Duplicate Prevention:**
-- Changes tracked by `metadata_path`
-- Multiple edits to same field: keeps only most recent
-- Accumulates changes across multiple edit sessions
-- Example: User changes field 3 times → only records first old_value and final new_value
-
-**Persistence:**
-- Changes saved to `localStorage.mmria_offline_changes` as backup
-- Synced to service worker encrypted cache on each modification
-- Sent to server in batch when returning online
+- `g_offline_changes` is the client-side source for per-case modified documents plus field-level change stacks.
+- Change deduplication is metadata-path based: repeated edits to the same field preserve the original `old_value` and latest `new_value`.
+- The same change state is mirrored into localStorage and encrypted cache so browser refreshes and offline resumes can reconstruct the working set.
 
 ### Record ID Handling
 
-**Problem**: New offline cases need temporary IDs that don't conflict
-
-**Solution**:
-1. User creates new case: assigned temporary record ID
-2. System appends `-offline` suffix: `2024-US-001-offline`
-3. Case saved to cache and tracked with suffix
-4. When uploaded: suffix removed before server save
-5. Server validates uniqueness of final record ID
-6. If conflict: user prompted to resolve
+- New offline cases use temporary record ids with the `-offline` suffix so they cannot collide with real server-side records during disconnected work.
+- The suffix is removed only when the user uploads the case back to the server and the final identifier passes normal uniqueness checks.
 
 ### Service Worker Keep-Alive
 
-**Problem**: Browsers terminate idle service workers, losing encryption key
-
-**Solution**:
-1. Set interval: `setInterval(() => ping service worker, 10000)` (every 10 seconds)
-2. Ping message: `{ type: 'KEEP_ALIVE' }`
-3. Service worker responds, preventing termination
-4. Interval cleared when returning online
-5. If termination occurs anyway: user redirected to offline login
+- Browsers can terminate an idle service worker and thereby drop the in-memory crypto key.
+- A keep-alive ping reduces that risk, but restart/re-auth still has to be treated as normal recovery behavior rather than something the client can prevent with certainty.
 
 ### Cache Versioning Strategy
 
-**Problem**: Hardcoded cache versions become stale
-
-**Solution**:
-1. Server maintains single source of truth: `/api/OfflineCase/cache-version`
-2. Returns: `{ baseVersion: "v38-stable", buildTimestamp: "..." }`
-3. Service worker fetches on install
-4. Cache names include version: `mmria-static-v38-stable-session123`
-5. Version mismatch: old caches automatically deleted
-6. Ensures consistency across deployments
+- `/api/OfflineCase/cache-version` is the canonical source for the current cache generation.
+- Cache names include both the base version and session identity so stale deployments can be cleaned up without mixing session data.
 
 ### Session-Specific Caching
 
-**Problem**: Multiple users on same device could see each other's data
-
-**Solution**:
-1. Each offline session gets unique cache set
-2. Cache names include session ID: `mmria-api-v38-stable-session_guid`
-3. Service worker scopes to current session only
-4. Different sessions completely isolated
-5. Logout clears session-specific caches only
+- Each offline session gets its own cache namespace.
+- The service worker should serve case data only from the active session cache, which is the main guardrail against cross-session data exposure on the same device.
 
 ### Global Variables Used
 
-JavaScript global state (defined in `app.mmria.js`):
-
-```javascript
-// Change tracking
-window.g_offline_changes = new Map();
-window.g_original_offline_documents = new Map();
-
-// Offline mode flags
-window.g_network_connected = true;
-window.g_offline_operation_in_progress = false;
-window.g_processing_operation_in_progress = false;
-
-// Service worker reference
-window.g_service_worker_keep_alive_interval = null;
-
-// Case index for navigation
-window.g_offline_case_index_map = [];
-
-// Release version for change stack
-window.g_release_version = "v38";
-
-// Current user
-window.g_user_name = "user@example.com";
-```
+Key global state includes the change maps, offline/processing in-progress flags, connectivity state, service-worker keep-alive handle, offline case index map, and the current user/release markers used in change-stack generation.
 
 ---
 
@@ -779,49 +398,13 @@ window.g_user_name = "user@example.com";
 
 ### Developer Testing Checklist
 
-**Phase 1: Going Offline**
-- [ ] Select cases within configured limits
-- [ ] Verify "Go Offline" button enables
-- [ ] Enter valid offline key
-- [ ] Confirm service worker registers
-- [ ] Check cases cached in DevTools → Application → Cache Storage
-- [ ] Verify cases marked `is_offline: true` in database
-- [ ] Confirm offline session created in `offline_cases` database
-
-**Phase 2: Offline Operations**
-- [ ] Disconnect network completely
-- [ ] Open cached cases - should load instantly
-- [ ] Edit multiple fields in different sections
-- [ ] Create new case (check `-offline` suffix)
-- [ ] Close browser completely
-- [ ] Reopen, enter offline key
-- [ ] Verify all changes preserved
-- [ ] Check change tracking in localStorage
-
-**Phase 3: Returning Online**
-- [ ] Reconnect network
-- [ ] Verify "Go Online" button enables
-- [ ] Click "Go Online"
-- [ ] Confirm cases saved to `offline_cases` DB
-- [ ] Check redirect to login
-- [ ] Verify `process_offline_cases` flag set
-
-**Phase 4: Processing**
-- [ ] Login normally
-- [ ] Verify processing mode UI appears
-- [ ] Upload edited case - check database updated
-- [ ] Abandon edited case - verify changes discarded
-- [ ] Upload new case - verify record created
-- [ ] Delete new case - verify not in database
-- [ ] Confirm all cases cleared from processing queue
-
-**Phase 5: Edge Cases**
-- [ ] Try different browser - verify warning
-- [ ] Clear cache while offline - verify data loss warning
-- [ ] Simulate service worker restart
-- [ ] Test network loss during transition
-- [ ] Attempt to exceed case limits
-- [ ] Try invalid offline key login
+| Test area | Minimum checks |
+| --- | --- |
+| Go Offline | Select cases within limits, verify service-worker registration, confirm cached assets/cases, and verify offline flags/session creation in CouchDB. |
+| Offline editing | Edit multiple fields, create a new offline case, restart the browser, re-enter the offline key, and confirm cached work resumes. |
+| Go Online | Reconnect network, save modified cases into `offline_cases`, verify redirect through login, and confirm processing mode appears. |
+| Processing mode | Upload and abandon an edited case, upload and delete a new case, and confirm the queue clears correctly. |
+| Edge cases | Test different browser, cache clear, service-worker restart, transition-time network loss, case-count limits, invalid key attempts, and lockout-expiry behavior. |
 
 ### Browser DevTools Inspection
 
@@ -853,174 +436,44 @@ navigator.serviceWorker.controller.postMessage({ type: 'DEBUG_STATUS' });
 
 ## Troubleshooting Guide
 
-### Issue: "Encryption key missing" error
-
-**Symptoms**: Cannot open cases, error in console about missing `offlineCryptoKey`
-
-**Cause**: Service worker restarted, lost in-memory encryption key
-
-**Solution**:
-1. User will be redirected to offline login
-2. Re-enter offline key
-3. Service worker re-initializes encryption
-4. Cases decrypt and become accessible
-
-### Issue: Cases won't upload, revision conflict
-
-**Symptoms**: Upload fails with "Case modified by administrator" message
-
-**Cause**: Admin manually unlocked case while user offline
-
-**Solution**:
-1. Changes automatically abandoned (syncState: 4)
-2. Case unlocked in database
-3. User must re-enter changes after returning online
-4. **Prevention**: Communicate before unlocking offline cases
-
-### Issue: "Go Online" button disabled
-
-**Symptoms**: Button grayed out, tooltip says "No network"
-
-**Cause**: Network connectivity check failing
-
-**Solution**:
-1. Verify internet connection
-2. Check firewall/proxy settings
-3. Test endpoint: `curl https://yourserver/api/OfflineCase/connectivity-check`
-4. Wait for network monitor to detect connectivity (polls every 30 seconds)
-
-### Issue: Data lost after cache clear
-
-**Symptoms**: Cases not in cache, offline session exists in database
-
-**Cause**: User cleared browser data/cache
-
-**Solution**:
-1. **Data cannot be recovered** from browser
-2. Check if admin has backup of cases
-3. Admin must manually clear offline flags in database:
-   ```javascript
-   // In CouchDB
-   doc.is_offline = false;
-   doc.offline_by = null;
-   doc.offline_date = null;
-   ```
-4. **Prevention**: Warn users not to clear cache during offline mode
-
-### Issue: Stuck in processing mode
-
-**Symptoms**: Processing UI won't clear, even after all cases resolved
-
-**Cause**: `process_offline_cases` flag not cleared
-
-**Solution**:
-1. Open browser console
-2. Run: `localStorage.removeItem('process_offline_cases');`
-3. Refresh page
-4. Should return to normal mode
-
-### Issue: Cannot create more new cases
-
-**Symptoms**: "Add New Case" button disabled
-
-**Cause**: Reached `offline_mode_max_new_cases` limit
-
-**Solution**:
-1. Upload or delete existing offline-created cases
-2. Or increase configuration limit (requires admin)
-3. Return online to reset counter
+| Issue | Likely cause | Response |
+| --- | --- | --- |
+| Missing encryption key / `offlineCryptoKey` error | Service worker restarted and lost the in-memory key | Redirect to offline login and re-enter the offline key. |
+| Upload blocked by revision conflict | Admin or another server-side process changed the case while the user was offline | The case is abandoned with conflict state `4`; the user must re-enter the changes online if needed. |
+| Go Online button disabled | Connectivity check is failing | Verify the network path to `/api/OfflineCase/connectivity-check` and wait for the monitor to re-enable the action. |
+| Offline data lost after cache clear | Browser cache/storage was cleared | The encrypted browser copy is gone; clear the server-side offline flags/session and recover operationally, not by expecting the browser data back. |
+| Stuck in processing mode | `process_offline_cases` flag or session cleanup did not finish | Verify processing completion, then clear the local flag and reload if the runtime state is stale. |
+| Cannot create more offline cases | Configured new/existing-case limit reached | Upload, delete, or reduce selection count, or raise the configured limit if policy allows. |
 
 ---
 
 ## Security Considerations
 
-### Threat: Offline Key Brute Force
-
-**Mitigation**:
-- PBKDF2 with 100,000 iterations slows attacks
-- Lockout after failed attempts (tracked in service worker)
-- Key never transmitted over network
-- Per-session salts prevent rainbow tables
-
-### Threat: Browser Cache Extraction
-
-**Mitigation**:
-- All case data encrypted with AES-256-GCM
-- Encryption key exists only in volatile memory
-- Key lost on service worker restart
-- Authenticated encryption prevents tampering
-
-### Threat: Service Worker Compromise
-
-**Mitigation**:
-- Service worker served over HTTPS only
-- Content Security Policy (CSP) restricts execution
-- Service worker scope limited to app origin
-- Regular security audits of service worker code
-
-### Threat: Man-in-the-Middle During Transition
-
-**Mitigation**:
-- All API calls over HTTPS/TLS
-- Certificate pinning (if configured)
-- Data encrypted at rest before transmission
-- Change stack provides audit trail
-
-### Threat: Unauthorized Session Access
-
-**Mitigation**:
-- Device fingerprinting via User-Agent
-- Session-specific cache isolation
-- Active session tracking in database
-- Warning on different browser attempt
+| Threat | Mitigation summary |
+| --- | --- |
+| Offline key brute force | PBKDF2, per-session salts, and the offline-login lockout window slow repeated guessing attempts. |
+| Browser cache extraction | Case data stays AES-256-GCM encrypted and the decryption key remains only in volatile service-worker memory. |
+| Service worker compromise | HTTPS delivery, CSP restrictions, and origin scoping reduce the execution surface. |
+| Transition-time interception | Go Offline / Go Online API traffic remains on HTTPS/TLS and the change stack preserves auditability. |
+| Unauthorized session access | Session-specific cache isolation, active-session tracking, device/browser checks, and warning flows reduce split-session exposure. |
 
 ---
 
 ## Performance Considerations
 
-### Initial Cache Population
-- **Time**: 5-30 seconds depending on case count and size
-- **Size**: ~2-5 MB per case (encrypted)
-- **Network**: Downloads metadata, specifications, cases in parallel
-- **Optimization**: Cases cached on-demand, not all at once
-
-### Cache Storage Limits
-- **Quota**: Browser-dependent (typically 50% of available disk)
-- **Monitoring**: Service worker tracks cache size
-- **Eviction**: Oldest caches deleted if quota exceeded
-- **Recommendation**: Limit to 10-15 cases per session
-
-### Service Worker Lifecycle
-- **Install**: 1-3 seconds
-- **Activation**: Immediate (skipWaiting)
-- **Termination**: After ~30 seconds idle (browser-dependent)
-- **Keep-Alive**: Ping every 10 seconds prevents termination
-
-### Encryption Performance
-- **Algorithm**: AES-GCM hardware-accelerated in modern browsers
-- **Overhead**: <100ms per case encrypt/decrypt
-- **Memory**: Negligible (streaming encryption)
-- **CPU**: Minimal impact on battery life
-
----
-
-## Future Enhancements (Potential)
-
-- **Sync Conflict Resolution UI**: Show diff between offline and server versions
-- **Partial Case Upload**: Upload specific forms instead of entire case
-- **Background Sync API**: Auto-sync when network returns (Service Worker API)
-- **IndexedDB Storage**: Alternative to Cache API for structured data
-- **Progressive Web App (PWA)**: Install as native app
-- **Multi-Device Sync**: Share offline session across devices (complex security implications)
-- **Compression**: Compress case data before encryption (reduce cache size)
-- **Offline-First Default**: Make offline mode default, sync in background
+| Area | Operational note |
+| --- | --- |
+| Initial cache population | Usually dominated by case count, case size, and hosted-environment latency. |
+| Browser storage quota | Browser-dependent; session count and case volume should stay conservative to reduce quota and eviction risk. |
+| Service-worker lifecycle | Keep-alive reduces termination risk, but restart/re-auth still has to be treated as normal recovery behavior. |
+| Encryption overhead | Modern browsers generally keep AES-GCM overhead small relative to the network/cache work. |
 
 ---
 
 ## Related Documentation
 
 - [MMRIA Background Jobs Documentation](./MMRIA_Background_Jobs_Documentation.md) - Background services and scheduled tasks
-- [AI Context](./AI_CONTEXT.md) - AI-assisted development guidelines
+- [AI Context Index](./AI_CONTEXT.md) - AI-assisted development guidelines
 - Database Scripts: `database-scripts/offline_design_sortable.json`
 - Configuration: `appsettings.json` - Offline mode settings
 
@@ -1043,11 +496,11 @@ navigator.serviceWorker.controller.postMessage({ type: 'DEBUG_STATUS' });
 
 ---
 
-**Document Version**: 1.0  
-**Last Updated**: 2026-02-10  
-**Maintained By**: Development Team  
-**Related Code Paths**:
-- `/wwwroot/scripts/offline/` - Client-side modules
-- `/wwwroot/service-worker.js` - Service worker implementation
-- `/Controllers/api/OfflineCaseController.cs` - API endpoints
-- `/util/OfflineSessionHelper.cs` - Server utilities
+## Recent Locking Changes
+
+| Change | Why it matters |
+| --- | --- |
+| One-tab offline rule | Offline add/edit/session-entry flows are tab-scoped, so another tab for the same user cannot quietly take over a live offline lock. |
+| Go-online cleanup for unchanged cases | Unchanged-case cleanup now uses an offline-session-specific release path instead of pushing full case saves through the normal `/api/case` pipeline. |
+| Offline resume sync across tabs/browsers | `POST /api/OfflineCase/sync-case` supports the real recovery flow where the same user resumes processing from another tab/browser with the same valid offline session. |
+| Failed go-offline and damaged-state recovery | `POST /api/OfflineCase/recover-softlocks` preserves or restores soft locks so bad transitions and damaged caches do not strand cases in hard-lock state. |

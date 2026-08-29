@@ -7,31 +7,48 @@ using System.Linq;
 using System.Text;
 using Akka.Actor;
 using mmria.common.ije;
+using mmria.common.SharedLibraries.MMRIAServices.Model;
+using mmria.common.SharedLibraries.MetadataVersion;
+using mmria.common.SharedLibraries.MetadataVersion.DAL;
+using mmria.common.SharedLibraries.VitalImport;
+using mmria.common.couchdb;
 
 namespace mmria.services.populate_cdc_instance;
 
 public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
 {
     public record PopulateFinished(DateTime Date_Completed);
+    private static readonly TimeSpan ProgressStatusSaveInterval = TimeSpan.FromSeconds(15);
 
     string transfer_result = "Ready to transfer";
+    string transfer_progress_detail = "Ready to transfer.";
     int transfer_status_number = 0;
     DateTime? date_submitted = DateTime.Now;
     DateTime? date_completed;
     int duration_in_hours = 0;
     int duration_in_minutes = 0;
+    DateTime? last_progress_status_saved_at;
 
     string error_message = "";
       
     IConfiguration configuration;
     ILogger logger;
     mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IMetadataRepository _metadataRepository;
+    private readonly PopulateCdcThrottleSettings _populateCdcThrottleSettings;
+    private readonly IVitalImportRepository? _vitalImportRepository;
 
     protected override void PreStart() => Console.WriteLine("Process_Message started");
     protected override void PostStop() => Console.WriteLine("Process_Message stopped");
-    public PopulateCDCInstanceSupervisor(mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+    public PopulateCDCInstanceSupervisor(
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        PopulateCdcThrottleSettings populateCdcThrottleSettings,
+        IVitalImportRepository? vitalImportRepository = null)
     {
         _couchDbHttpClient = couchDbHttpClient;
+        _metadataRepository = new MetadataVersionDAL(couchDbHttpClient);
+        _populateCdcThrottleSettings = populateCdcThrottleSettings ?? PopulateCdcThrottleSettings.CreateDefaults();
+        _vitalImportRepository = vitalImportRepository;
         
         //Context.ActorOf<PopulateCDCInstance>("child");
 
@@ -40,6 +57,15 @@ public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
 
         Receive<DateTime>(message =>
         {
+            if(transfer_status_number == 1)
+            {
+                UpdateRunningDuration(DateTime.Now);
+            }
+
+            var current_transfer_result = transfer_status_number == 1
+                ? BuildRunningTransferResult(DateTime.Now)
+                : transfer_result;
+
             mmria.common.metadata.Populate_CDC_Instance_Record result;
             if
             (
@@ -49,7 +75,7 @@ public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
             {
                 result = new mmria.common.metadata.Populate_CDC_Instance_Record()
                 {
-                    transfer_result = transfer_result,
+                    transfer_result = current_transfer_result,
                     transfer_status_number = transfer_status_number,
                     date_submitted = date_submitted,
                     date_completed = date_completed,
@@ -65,7 +91,7 @@ public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
                 var running_duration_in_minutes = (int) time_diff.Value.TotalMinutes % 60;
                 result = new mmria.common.metadata.Populate_CDC_Instance_Record()
                 {
-                    transfer_result = transfer_result,
+                    transfer_result = current_transfer_result,
                     transfer_status_number = transfer_status_number,
                     date_submitted = date_submitted,
                     date_completed = date_completed,
@@ -82,7 +108,10 @@ public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
 
             //var processor = Context.ActorSelection("akka://mmria-actor-system/user/populate-cdc-instance-supervisor/child*");
 
-            var processor = Context.ActorOf(Akka.Actor.Props.Create<PopulateCDCInstance>(_couchDbHttpClient));
+            var processor = Context.ActorOf(
+                Akka.Actor.Props.Create<PopulateCDCInstance>(
+                    _couchDbHttpClient,
+                    _populateCdcThrottleSettings));
             
             processor.Tell(message);
 
@@ -92,8 +121,10 @@ public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
             date_completed = null;
             duration_in_hours = 0;
             duration_in_minutes = 0;
-            transfer_result = $"Transfer in progress (Submitted {GetDateString(date_submitted)} at {GetTimeString(date_submitted)}). Please check again later for completion status.";
+            transfer_progress_detail = "Preparing CDC transfer.";
+            transfer_result = BuildRunningTransferResult(date_submitted);
             error_message = "";
+            last_progress_status_saved_at = DateTime.Now;
 
             SetTransferStatus();
 
@@ -130,30 +161,53 @@ public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
         
         Receive<PopulateCDCInstance.Status>(message =>
         {
-            date_completed = DateTime.Now;
-            var time_diff = date_completed - date_submitted;
-            duration_in_hours = (int) time_diff.Value.TotalHours;
-            duration_in_minutes = (int) time_diff.Value.TotalMinutes % 60;
-            
             if(message.Name == "Error")
             {
+                date_completed = DateTime.Now;
+                var time_diff = date_completed - date_submitted;
+                duration_in_hours = (int) time_diff.Value.TotalHours;
+                duration_in_minutes = (int) time_diff.Value.TotalMinutes % 60;
                 transfer_status_number = 2;
+                transfer_progress_detail = "Transfer failed.";
                 transfer_result =  @$"Transfer could not be completed ( Time to transfer: {duration_in_hours} hrs {duration_in_minutes} min | Submitted {GetDateString(date_submitted)} at {GetTimeString(date_submitted)}| Failed {GetDateString(date_completed)} at {GetTimeString(date_completed)}).
 
         Please contact your system administrator for assistance.Transfer complete.";
 
                 error_message = message.Description;
             }
+            else if(message.Name == "Progress")
+            {
+                transfer_status_number = 1;
+                date_completed = null;
+                UpdateRunningDuration(DateTime.Now);
+                transfer_progress_detail = message.Description;
+                transfer_result = BuildRunningTransferResult(DateTime.Now);
+                error_message = "";
+
+                if(ShouldPersistProgressUpdate())
+                {
+                    SetTransferStatus();
+                }
+            }
             else
             {
+                date_completed = DateTime.Now;
+                var time_diff = date_completed - date_submitted;
+                duration_in_hours = (int) time_diff.Value.TotalHours;
+                duration_in_minutes = (int) time_diff.Value.TotalMinutes % 60;
                 transfer_status_number = 0;
+                transfer_progress_detail = message.Description;
                 transfer_result = $"Transfer complete. Time to transfer: {duration_in_hours} hrs {duration_in_minutes} min | Submitted {GetDateString(date_submitted)} at {GetTimeString(date_submitted)} | Completed {GetDateString(date_completed)} at {GetTimeString(date_completed)}";
                 error_message = "";
+                last_progress_status_saved_at = null;
             }
 
-            SetTransferStatus();
-            
-            
+            if(message.Name != "Progress")
+            {
+                SetTransferStatus();
+            }
+             
+             
         });
 
     }
@@ -171,6 +225,7 @@ public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
             else
             {
                 transfer_result = data.transfer_result;
+                transfer_progress_detail = data.transfer_result;
                 transfer_status_number = data.transfer_status_number.Value;
                 date_submitted = data.date_submitted;
                 date_completed = data.date_completed;
@@ -189,7 +244,7 @@ public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
     {
         return new mmria.common.metadata.Populate_CDC_Instance_Record()
                 {
-                    transfer_result = transfer_result,
+                    transfer_result = transfer_status_number == 1 ? BuildRunningTransferResult(DateTime.Now) : transfer_result,
                     transfer_status_number = transfer_status_number,
                     date_submitted = date_submitted,
                     date_completed = date_completed,
@@ -197,6 +252,46 @@ public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
                     duration_in_minutes = duration_in_minutes,
                     error_message = error_message
                 };
+    }
+
+    (int Hours, int Minutes) GetRunningDuration(DateTime? referenceTime = null)
+    {
+        if(!date_submitted.HasValue)
+        {
+            return (0, 0);
+        }
+
+        var end_time = referenceTime ?? DateTime.Now;
+        var time_diff = end_time - date_submitted.Value;
+        return ((int)time_diff.TotalHours, (int)time_diff.TotalMinutes % 60);
+    }
+
+    void UpdateRunningDuration(DateTime? referenceTime = null)
+    {
+        var running_duration = GetRunningDuration(referenceTime);
+        duration_in_hours = running_duration.Hours;
+        duration_in_minutes = running_duration.Minutes;
+    }
+
+    string BuildRunningTransferResult(DateTime? referenceTime = null)
+    {
+        var running_duration = GetRunningDuration(referenceTime);
+        return $"Transfer in progress. Time elapsed: {running_duration.Hours} hrs {running_duration.Minutes} min | Submitted {GetDateString(date_submitted)} at {GetTimeString(date_submitted)} | {transfer_progress_detail}";
+    }
+
+    bool ShouldPersistProgressUpdate()
+    {
+        if
+        (
+            !last_progress_status_saved_at.HasValue ||
+            DateTime.Now - last_progress_status_saved_at.Value >= ProgressStatusSaveInterval
+        )
+        {
+            last_progress_status_saved_at = DateTime.Now;
+            return true;
+        }
+
+        return false;
     }
 
     string GetDateString(DateTime? value)
@@ -250,12 +345,25 @@ public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
     {
         var result = new mmria.common.model.couchdb.alldocs_response<mmria.common.ije.Batch>();
 
-        string url = $"{mmria.services.vitalsimport.Program.couchdb_url}/vital_import/_all_docs?include_docs=true";
         try
         {
-            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", url, null, mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.alldocs_response<mmria.common.ije.Batch>>(responseFromServer);
-            
+            var dbConfig = new DBConfigurationDetail
+            {
+                url = mmria.services.vitalsimport.Program.couchdb_url,
+                user_name = mmria.services.vitalsimport.Program.timer_user_name,
+                user_value = mmria.services.vitalsimport.Program.timer_value
+            };
+
+            if (_vitalImportRepository != null)
+            {
+                result = await _vitalImportRepository.GetAllBatchesAsync(dbConfig);
+            }
+            else
+            {
+                string url = $"{mmria.services.vitalsimport.Program.couchdb_url}/vital_import/_all_docs?include_docs=true";
+                var responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", url, null, mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
+                result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.alldocs_response<mmria.common.ije.Batch>>(responseFromServer);
+            }
         }
         catch(Exception ex)
         {
@@ -294,9 +402,13 @@ public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
         mmria.common.metadata.Populate_CDC_Instance result = new();
         try
         {
-            string request_string = $"{mmria.services.vitalsimport.Program.couchdb_url}/metadata/populate-cdc-instance";
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.Populate_CDC_Instance>(responseFromServer);
+            var metadata_db_config = new mmria.common.couchdb.DBConfigurationDetail
+            {
+                url = mmria.services.vitalsimport.Program.couchdb_url,
+                user_name = mmria.services.vitalsimport.Program.timer_user_name,
+                user_value = mmria.services.vitalsimport.Program.timer_value
+            };
+            result = await _metadataRepository.GetPopulateCDCInstanceDocumentAsync(metadata_db_config);
     
         }
         catch (Exception ex)
@@ -314,11 +426,13 @@ public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
         {
             if(data._id == "populate-cdc-instance")
             {
-                var json = Newtonsoft.Json.JsonConvert.SerializeObject(data);
-
-                string request_string = $"{mmria.services.vitalsimport.Program.couchdb_url}/metadata/populate-cdc-instance";
-                string responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", request_string, json, mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
-                result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
+                var metadata_db_config = new mmria.common.couchdb.DBConfigurationDetail
+                {
+                    url = mmria.services.vitalsimport.Program.couchdb_url,
+                    user_name = mmria.services.vitalsimport.Program.timer_user_name,
+                    user_value = mmria.services.vitalsimport.Program.timer_value
+                };
+                result = await _metadataRepository.SavePopulateCDCInstanceDocumentAsync(data, metadata_db_config);
             }
     
         }

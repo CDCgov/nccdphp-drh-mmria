@@ -47,25 +47,25 @@ This opens the multi-root workspace with all 4 folders.
 ```bash
 docker run -d --name couchdb \
   -p 5984:5984 \
-  -e COUCHDB_USER=mmrds \
-  -e COUCHDB_PASSWORD=mmrds \
+  -e COUCHDB_USER=***** \
+  -e COUCHDB_PASSWORD=***** \
   couchdb:latest
 ```
 
 ### Option B: Local Install
 
 - Download from https://couchdb.apache.org/
-- Create user: `mmrds` / `mmrds`
+- Create user: `****` / `****`
 - Ensure accessible at http://localhost:5984
 
 ### Create Configuration Document
 
 ```bash
 # Create configuration database
-curl -X PUT http://mmrds:mmrds@localhost:5984/configuration
+curl -X PUT http://*****:**@localhost:5984/configuration
 
 # Create localhost configuration (copy from another dev or create new)
-curl -X PUT http://mmrds:mmrds@localhost:5984/configuration/localhost \
+curl -X PUT http://*****:*****@localhost:5984/configuration/localhost \
   -H "Content-Type: application/json" \
   -d @path/to/localhost-config.json
 ```
@@ -80,8 +80,8 @@ Create `appsettings.local.json` in both projects:
 {
   "mmria_settings": {
     "is_environment_based": "false",
-    "timer_user_name": "mmrds",
-    "timer_value": "mmrds",
+    "timer_user_name": "*****",
+    "timer_value": "*****",
     "couchdb_url": "http://localhost:5984"
   }
 }
@@ -93,8 +93,8 @@ Create `appsettings.local.json` in both projects:
 {
   "mmria_settings": {
     "is_environment_based": "false",
-    "timer_user_name": "mmrds",
-    "timer_password": "mmrds",
+    "timer_user_name": "*****",
+    "timer_password": "*****",
     "config_id": "localhost",
     "couchdb_url": "http://localhost:5984"
   }

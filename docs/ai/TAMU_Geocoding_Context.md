@@ -1,171 +1,68 @@
 # TAMU Geocoding Service Integration
 
-**Referenced by:** [AI_CONTEXT.md](./AI_CONTEXT.md)
+- Status: Active
+- Scope: TAMU geocoding fields, current API controller location, and case-generator guardrails for TAMU-backed values.
+- When to use: Read this before changing TAMU geocoding, address-derived case fields, or test-data generation that touches geocode fields.
+- Last verified: 2026-03-24
+- Related docs: [AI Context Index](./AI_CONTEXT.md), [CVS Community Vital Signs Context](./CVS_Community_Vital_Signs_Context.md), [Strongly Typed Case Generator Workflow](./strongly_typed_case_generator.md)
 
 ## Overview
 
-TAMU (Texas A&M Geocoding Service) is an external API service that provides geocoding data for address fields throughout the MMRIA application. The service converts street addresses into precise geographic coordinates and census data.
+TAMU (Texas A&M Geocoding Service) provides geocoding data for address fields throughout MMRIA. It converts addresses into coordinates plus related census and geography values.
 
-**Critical Rule for Case Generator:** TAMU geocode fields must NEVER be generated with fake data. They should be left empty ("") because they require real external API calls to the Texas A&M Geocoding Service.
+## Case-generator rule
 
-## Service Details
+TAMU-backed fields should not be populated with fake values during case generation. Leave them blank so the real geocoding workflow can populate them later.
 
-**Namespace:** `mmria.common.texas_am`
+## Backend and client locations
 
-**C# Data Structures:**
-- `geocode_response.cs` - Response wrapper
-- `OutputGeocode` - Geocode result with coordinates
-- `CensusValue` - Census tract and demographic data
-- `Census_Variables.cs` - Census variable definitions
+### API controller
 
-**JavaScript Integration:**
-- **validator.js** (lines 1920-2100) - Auto-geocode on address changes for 8 locations
-- **MMRIA_calculations.js** (lines 880-2700) - Manual geocoding button handlers for all 10 locations
+- [Controllers/api/tamuGeoCodeController.cs](../../source-code/mmria/mmria-server/Controllers/api/tamuGeoCodeController.cs) is the current server-side controller for TAMU geocoding requests.
 
-## The 16 Standard Geocode Fields
+### JavaScript callers
 
-Most geocode locations populate all 16 fields:
+- [wwwroot/scripts/mmria.js](../../source-code/mmria/mmria-server/wwwroot/scripts/mmria.js)
+- [wwwroot/scripts/mmria.committee_member.js](../../source-code/mmria/mmria-server/wwwroot/scripts/mmria.committee_member.js)
+- [wwwroot/scripts/validator.js](../../source-code/mmria/mmria-server/wwwroot/scripts/validator.js)
 
-### Core Location Fields (2)
-- `latitude` - Geographic latitude coordinate
-- `longitude` - Geographic longitude coordinate
+## Standard field groups
 
-### Feature Matching Fields (2)
-- `feature_matching_result_type` - Match quality indicator (FeatureMatchingResultType)
-- `feature_matching_geography_type` - Geography type of match (FeatureMatchingGeographyType)
+Most geocode locations populate these field groups:
 
-### NAACCR GIS Fields (4)
-- `naaccr_gis_coordinate_quality_code` - NAACCR coordinate quality code (1-9)
-- `naaccr_gis_coordinate_quality_type` - NAACCR coordinate quality description
-- `naaccr_census_tract_certainty_code` - NAACCR census tract certainty code (1-9)
-- `naaccr_census_tract_certainty_type` - NAACCR census tract certainty description
+- Core location fields such as `latitude` and `longitude`
+- Match-quality fields such as `feature_matching_result_type`
+- NAACCR GIS fields
+- Census FIPS fields
+- Derived fields such as `urban_status` and `state_county_fips`
 
-### Census FIPS Fields (6)
-- `census_state_fips` - State FIPS code (2 digits)
-- `census_county_fips` - County FIPS code (3 digits)
-- `census_tract_fips` - Census tract FIPS code (6 digits)
-- `census_cbsa_fips` - Core-Based Statistical Area FIPS code
-- `census_cbsa_micro` - Micropolitan indicator (0 or 1)
-- `census_met_div_fips` - Metropolitan Division FIPS code
+## Geocode locations in the case model
 
-### Calculated Fields (2)
-- `urban_status` - Urban classification (calculated from census data)
-  - Values: "Metropolitan Division", "Metropolitan", "Micropolitan", "Rural", "Undetermined"
-- `state_county_fips` - Combined state + county FIPS (calculated: census_state_fips + census_county_fips)
+Single-form locations include:
 
-## All Geocode Locations (10 Total)
+- `death_certificate/place_of_last_residence/`
+- `death_certificate/address_of_injury/`
+- `death_certificate/address_of_death/`
+- `birth_fetal_death_certificate_parent/facility_of_delivery_location/`
+- `birth_fetal_death_certificate_parent/location_of_residence/`
+- `prenatal/location_of_primary_prenatal_care_facility/`
 
-### Single-Form Locations (6 locations)
+Grid-backed locations include:
 
-#### 1. Death Certificate - Place of Last Residence
-**Path:** `death_certificate/place_of_last_residence/`
-**Fields:** All 16 standard geocode fields
-**Source:** validator.js x2f_ocl(), MMRIA_calculations.js geocode_dc_last_res()
+- `er_visit_and_hospital_medical_records[index]/name_and_location_facility/`
+- `other_medical_office_visits[index]/location_of_medical_care_facility/`
+- `medical_transport[index]/origin_information/address/`
+- `medical_transport[index]/destination_information/address/`
 
-#### 2. Death Certificate - Address of Injury
-**Path:** `death_certificate/address_of_injury/`
-**Fields:** `latitude`, `longitude` only (2 fields)
-**Source:** validator.js x6d_ocl()
+## Why blank test data matters
 
-#### 3. Death Certificate - Address of Death
-**Path:** `death_certificate/address_of_death/`
-**Fields:** `latitude`, `longitude` only (2 fields)
-**Source:** validator.js x82_ocl()
+Fake TAMU data creates invalid coordinates, invalid census-derived values, and misleading downstream analysis. Leaving the fields blank keeps generated cases compatible with the real geocoding workflow.
 
-#### 4. Birth Certificate - Facility of Delivery Location
-**Path:** `birth_fetal_death_certificate_parent/facility_of_delivery_location/`
-**Fields:** `latitude`, `longitude` only (2 fields)
-**Source:** validator.js xa9_ocl()
+## Related code and models
 
-#### 5. Birth Certificate - Location of Residence
-**Path:** `birth_fetal_death_certificate_parent/location_of_residence/`
-**Fields:** `latitude`, `longitude` only (2 fields)
-**Source:** validator.js xe1_ocl()
+- [geocode_response.cs](../../nccdphp-drh-mmria-common/mmria.common/texas_am/geocode_response.cs)
+- [Census_Variables.cs](../../nccdphp-drh-mmria-common/mmria.common/texas_am/Census_Variables.cs)
+- [validator.js](../../source-code/mmria/mmria-server/wwwroot/scripts/validator.js)
+- [MMRIA_calculations.js](../../source-code/mmria/mmria-server/database-scripts/MMRIA_calculations.js)
 
-#### 6. Prenatal - Location of Primary Prenatal Care Facility
-**Path:** `prenatal/location_of_primary_prenatal_care_facility/`
-**Fields:** `latitude`, `longitude` only (2 fields)
-**Source:** validator.js x19f_ocl()
 
-### Grid/Multiform Locations (4 grids)
-
-These are arrays where each item can have geocode fields.
-
-#### 7. ER Visit/Hospital Medical Records Grid
-**Path:** `er_visit_and_hospital_medical_records[index]/name_and_location_facility/`
-**Fields:** All 16 standard geocode fields
-**Grid Type:** Multiform (0-N items)
-**Source:** validator.js x289_ocl(), MMRIA_calculations.js geocode_erh_name_and_location_facility()
-
-#### 8. Other Medical Office Visits Grid
-**Path:** `other_medical_office_visits[index]/location_of_medical_care_facility/`
-**Fields:** All 16 standard geocode fields
-**Grid Type:** Multiform (0-N items)
-**Source:** validator.js x31e_ocl(), MMRIA_calculations.js geocode_omov_location_of_medical_care_facility()
-
-#### 9. Medical Transport Grid - Origin Address
-**Path:** `medical_transport[index]/origin_information/address/`
-**Fields:** All 16 standard geocode fields
-**Grid Type:** Multiform (0-N items)
-**Source:** MMRIA_calculations.js medical_transport_origin_information_address_get_coordinates()
-
-#### 10. Medical Transport Grid - Destination Address
-**Path:** `medical_transport[index]/destination_information/address/`
-**Fields:** All 16 standard geocode fields
-**Grid Type:** Multiform (0-N items)
-**Source:** MMRIA_calculations.js medical_transport_destination_information_address_get_coordinates()
-
-## Implementation in Case Generator
-
-**Method:** `PostProcessTAMU(Dictionary<string, object?> caseData)`
-**Location:** CaseDataGenerator.cs
-
-The method clears all geocode fields after case generation:
-
-1. **Single-Form Locations:** Directly access and clear fields
-2. **Grid Locations:** Iterate through each array item and clear fields
-3. **Helper Function:** `ClearGeocodeFields()` clears all 16 standard fields
-
-**Pattern:**
-```csharp
-void ClearGeocodeFields(Dictionary<string, object?> dict)
-{
-    if (dict.ContainsKey("latitude")) dict["latitude"] = "";
-    if (dict.ContainsKey("longitude")) dict["longitude"] = "";
-    // ... clear remaining 14 fields
-}
-```
-
-## Why This Matters
-
-**Problem:** Generating fake geocode data creates invalid coordinates and census data that:
-- Cannot be validated against real geographic data
-- Produces meaningless social determinant analysis
-- Causes confusion when reviewing test cases
-- Breaks geocoding workflows (users don't know fields are fake)
-
-**Solution:** Leave geocode fields empty ("") so they can be populated via the actual TAMU geocoding API when:
-- Users click "Get Coordinates" buttons in MMRIA UI
-- Address fields are changed and auto-geocoding triggers (validator.js)
-- Batch geocoding operations run (MMRIA_calculations.js)
-
-## Related Documentation
-
-- **CVS Integration:** [CVS_Community_Vital_Signs_Context.md](./CVS_Community_Vital_Signs_Context.md)
-- **Main Context:** [AI_CONTEXT.md](./AI_CONTEXT.md)
-- **Background Jobs:** [MMRIA_Background_Jobs_Documentation.md](./MMRIA_Background_Jobs_Documentation.md)
-
-## Source Files
-
-**C# Backend:**
-- `nccdphp-drh-mmria-common/mmria.common/texas_am/geocode_response.cs`
-- `nccdphp-drh-mmria-common/mmria.common/texas_am/Census_Variables.cs`
-- `nccdphp-drh-mmria-utilities/mmria-case-generator/Generators/CaseDataGenerator.cs` (PostProcessTAMU method)
-
-**JavaScript Frontend:**
-- `source-code/mmria/mmria-server/wwwroot/scripts/validator.js` (lines 1920-2100)
-- `source-code/mmria/mmria-server/database-scripts/MMRIA_calculations.js` (lines 880-2700)
-- `source-code/mmria/mmria-server/wwwroot/scripts/mmria.js` (get_geocode_info function)
-
-**API Controller:**
-- TBD - Geocoding API controller location not yet documented

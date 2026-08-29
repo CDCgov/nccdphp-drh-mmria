@@ -1,5 +1,9 @@
 const chart_function_params_map = new Map();
 const chart_start_increment_map = new Map();
+const g_pending_chart_update_paths = new Set();
+let g_chart_update_flush_timer = null;
+const chart_update_debounce_ms = 25;
+const max_chart_tick_count = 100;
 
 chart_start_increment_map.set("blood_pressure_graph", { start: 40, increment: 20});
 //chart_start_increment_map.set("prm_diast", { start: 40, increment: 20});
@@ -10,6 +14,210 @@ chart_start_increment_map.set("pulse_graph", { start: 0, increment: 10});
 chart_start_increment_map.set("respiration_graph", { start: 0, increment: 2});
 //chart_start_increment_map.set("evahmrvs_b_systo", { start: 40, increment: 20});
 //chart_start_increment_map.set("evahmrvs_b_dias", { start: 40, increment: 20});
+
+function get_finite_chart_numbers(p_values)
+{
+    return p_values
+        .map(function (number)
+        {
+            return Number.parseFloat(number);
+        })
+        .filter(function (number)
+        {
+            return Number.isFinite(number);
+        })
+        .sort(function (left, right)
+        {
+            return left - right;
+        });
+}
+
+function get_safe_chart_axis_config(p_minimum_graph_value, p_maximum_graph_value, p_increment_graph_value)
+{
+    let increment = Number.isFinite(p_increment_graph_value) && p_increment_graph_value > 0
+        ? p_increment_graph_value
+        : 1;
+
+    let minimum = Number.isFinite(p_minimum_graph_value)
+        ? p_minimum_graph_value
+        : 0;
+
+    let maximum = Number.isFinite(p_maximum_graph_value) && p_maximum_graph_value > minimum
+        ? p_maximum_graph_value
+        : minimum + increment;
+
+    const graph_range = maximum - minimum;
+    const estimated_tick_count = Math.ceil(graph_range / increment);
+
+    if(estimated_tick_count > max_chart_tick_count)
+    {
+        const scaled_increment = Math.ceil(graph_range / max_chart_tick_count);
+        increment = increment > 1
+            ? Math.ceil(scaled_increment / increment) * increment
+            : scaled_increment;
+    }
+
+    minimum = Math.floor(minimum / increment) * increment;
+    maximum = Math.ceil(maximum / increment) * increment;
+
+    if(maximum <= minimum)
+    {
+        maximum = minimum + increment;
+    }
+
+    const values = [];
+    for(let value = minimum; value < maximum && values.length < max_chart_tick_count; value += increment)
+    {
+        values.push(value);
+    }
+
+    if(values.length === 0)
+    {
+        values.push(minimum);
+    }
+
+    return {
+        values: values,
+        minimum: minimum,
+        maximum: maximum,
+        increment: increment
+    };
+}
+
+function get_chart_instance_id(p_ui_div_id)
+{
+    return `chart_${p_ui_div_id}`;
+}
+
+function destroy_chart_instance(p_chart_id)
+{
+    if(!p_chart_id)
+    {
+        return;
+    }
+
+    if
+    (
+        typeof g_chart_instances !== 'undefined' &&
+        g_chart_instances != null &&
+        typeof g_chart_instances.get === 'function'
+    )
+    {
+        const chart_instance = g_chart_instances.get(p_chart_id);
+        if(chart_instance && typeof chart_instance.destroy === 'function')
+        {
+            try
+            {
+                chart_instance.destroy();
+            }
+            catch(_ex)
+            {
+                // Best-effort cleanup only.
+            }
+        }
+
+        g_chart_instances.delete(p_chart_id);
+    }
+
+    if
+    (
+        typeof g_charts !== 'undefined' &&
+        g_charts != null &&
+        Object.prototype.hasOwnProperty.call(g_charts, p_chart_id)
+    )
+    {
+        const legacy_chart_instance = g_charts[p_chart_id];
+        if(legacy_chart_instance && typeof legacy_chart_instance.destroy === 'function')
+        {
+            try
+            {
+                legacy_chart_instance.destroy();
+            }
+            catch(_ex)
+            {
+                // Best-effort cleanup only.
+            }
+        }
+
+        delete g_charts[p_chart_id];
+    }
+}
+
+function destroy_all_chart_instances()
+{
+    if
+    (
+        typeof g_chart_instances !== 'undefined' &&
+        g_chart_instances != null &&
+        typeof g_chart_instances.entries === 'function'
+    )
+    {
+        for(const [chart_id, chart_instance] of g_chart_instances.entries())
+        {
+            if(chart_instance && typeof chart_instance.destroy === 'function')
+            {
+                try
+                {
+                    chart_instance.destroy();
+                }
+                catch(_ex)
+                {
+                    // Best-effort cleanup only.
+                }
+            }
+        }
+
+        g_chart_instances.clear();
+    }
+
+    // Clean up any legacy chart instances that were stored as object properties on the Map.
+    if(typeof g_charts !== 'undefined' && g_charts != null)
+    {
+        for(const key in g_charts)
+        {
+            if
+            (
+                Object.prototype.hasOwnProperty.call(g_charts, key) &&
+                key.indexOf('chart_') === 0
+            )
+            {
+                const legacy_chart_instance = g_charts[key];
+                if
+                (
+                    legacy_chart_instance &&
+                    typeof legacy_chart_instance.destroy === 'function'
+                )
+                {
+                    try
+                    {
+                        legacy_chart_instance.destroy();
+                    }
+                    catch(_ex)
+                    {
+                        // Best-effort cleanup only.
+                    }
+                }
+
+                delete g_charts[key];
+            }
+        }
+    }
+}
+
+function clear_chart_state()
+{
+    destroy_all_chart_instances();
+    if(g_chart_update_flush_timer != null)
+    {
+        window.clearTimeout(g_chart_update_flush_timer);
+        g_chart_update_flush_timer = null;
+    }
+
+    g_pending_chart_update_paths.clear();
+    chart_function_params_map.clear();
+    g_charts.clear();
+    g_chart_data.clear();
+}
 
 
       /*
@@ -54,12 +262,289 @@ evahmrvs_b_dias Diastolic 40 20
 
 */
 
+function mmria_vitals_is_out_of_range(fieldPath, value) {
+    if (!window.mmria_validation_rules) return false;
+    var rule = window.mmria_validation_rules[fieldPath];
+    if (!rule) {
+        // Try to find a rule by searching for a matching field path ending
+        for (var key in window.mmria_validation_rules) {
+            if (key.endsWith('/' + fieldPath) || key === fieldPath) {
+                rule = window.mmria_validation_rules[key];
+                break;
+            }
+        }
+    }
+    if (!rule) return false;
+    var v = parseFloat(value);
+    if (value === '' || value == null || isNaN(v)) return false;
+    return (v < parseFloat(rule.min_value) || v > parseFloat(rule.max_value));
+}
+
+function mmria_vitals_validate_field(inputEl)
+{
+    if (!window.mmria_validation_rules) { return; }
+    var fieldName = inputEl.name;
+    var chartFormPath = (inputEl.dataset && inputEl.dataset.chartFormPath) ? inputEl.dataset.chartFormPath : null;
+    var rule = null;
+
+    if (chartFormPath) {
+        // Form-scoped lookup: match only rules whose field_path prefix equals chartFormPath.
+        // Prevents an enabled rule on Form A from firing on Form B's same-named field (Bug #4).
+        for (var key in window.mmria_validation_rules) {
+            var kParts = key.split('/');
+            if (kParts[kParts.length - 1] !== fieldName) { continue; }
+            var kPrefix = kParts.slice(0, -1).join('/');
+            if (kPrefix === chartFormPath) { rule = window.mmria_validation_rules[key]; break; }
+        }
+    } else {
+        // No form context (e.g. called from validation-state.js focusout on a non-chart input).
+        // Non-chart saves are separately guarded by the normalized-path lookup in index.js Block 2.
+        if (window.mmria_validation_rules[fieldName]) {
+            rule = window.mmria_validation_rules[fieldName];
+        } else {
+            for (var key2 in window.mmria_validation_rules) {
+                if (key2.endsWith('/' + fieldName) || key2 === fieldName) {
+                    rule = window.mmria_validation_rules[key2];
+                    break;
+                }
+            }
+        }
+    }
+
+    if (!rule) { return; }
+    if (inputEl.value === '' || inputEl.value === null) { return; }
+    // Skip the modal if the value has not changed from the originally rendered value
+    // (i.e. this is historical invalid data — the user just tabbed through without editing).
+    if (inputEl.value === inputEl.defaultValue) { return; }
+    var value = parseFloat(inputEl.value);
+    if (isNaN(value)) { return; }
+    if (value < parseFloat(rule.min_value) || value > parseFloat(rule.max_value))
+    {
+        mmria_vitals_show_field_modal(rule, inputEl);
+    }
+}
+
+function mmria_vitals_show_field_modal(range, inputEl)
+{
+    var existingModal = document.getElementById('vitals-range-modal');
+    if (existingModal && existingModal.parentNode) { existingModal.parentNode.removeChild(existingModal); }
+    var existingBackdrop = document.getElementById('vitals-range-backdrop');
+    if (existingBackdrop && existingBackdrop.parentNode) { existingBackdrop.parentNode.removeChild(existingBackdrop); }
+
+    var modalHtml =
+        '<div id="vitals-range-modal" class="modal fade" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="vitals-range-modal-title" style="z-index: 1050;">'
+        + '<div class="modal-dialog" role="document">'
+        + '<div class="modal-content">'
+        + '<div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">'
+        + '<h4 id="vitals-range-modal-title" class="modal-title" style="margin: 0; font-weight: 600; font-size: 17px;">Out of Range</h4>'
+        + '</div>'
+        + '<div class="modal-body" style="padding: 20px;">'
+        + '<p id="vitals-range-modal-msg" style="font-size: 16px; color: #333; margin: 0;"></p>'
+        + '</div>'
+        + '<div class="modal-footer" style="padding: 15px 20px; text-align: right;">'
+        + '<button type="button" id="vitals-range-modal-ok" class="btn btn-primary" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">OK</button>'
+        + '</div>'
+        + '</div>'
+        + '</div>'
+        + '</div>'
+        + '<div id="vitals-range-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>';
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    var msgEl = document.getElementById('vitals-range-modal-msg');
+    if (msgEl)
+    {
+        msgEl.textContent = range.message
+            || ('The value entered falls outside of the permitted range.'
+                + ' Please enter a valid input between ' + range.min_value + '\u2013' + range.max_value + '.');
+    }
+
+    var modal = document.getElementById('vitals-range-modal');
+    var backdrop = document.getElementById('vitals-range-backdrop');
+
+    setTimeout(function()
+    {
+        if (modal) { modal.classList.add('show'); modal.style.display = 'block'; }
+        if (backdrop) { backdrop.classList.add('show'); }
+        var okBtn = document.getElementById('vitals-range-modal-ok');
+        if (okBtn) { okBtn.focus(); }
+    }, 10);
+
+    function closeVitalsModal()
+    {
+        if (modal) { modal.classList.remove('show'); }
+        if (backdrop) { backdrop.classList.remove('show'); }
+        setTimeout(function()
+        {
+            if (modal && modal.parentNode) { modal.parentNode.removeChild(modal); }
+            if (backdrop && backdrop.parentNode) { backdrop.parentNode.removeChild(backdrop); }
+        }, 150);
+        if (inputEl && typeof inputEl.focus === 'function') { inputEl.focus(); }
+    }
+
+    var okBtn = document.getElementById('vitals-range-modal-ok');
+    if (okBtn) { okBtn.onclick = closeVitalsModal; }
+
+    if (modal)
+    {
+        modal.addEventListener('keydown', function(e)
+        {
+            if (e.key === 'Escape') { e.preventDefault(); closeVitalsModal(); }
+        });
+    }
+}
+
+
+
+function mmria_vitals_revalidate_all()
+{
+    if (!window.mmria_validation_rules) { return false; }
+    var records = window.g_data && window.g_data.er_visit_and_hospital_medical_records;
+    if (!records || !Array.isArray(records)) { return false; }
+    var rule_keys = Object.keys(window.mmria_validation_rules);
+    for (var i = 0; i < records.length; i++)
+    {
+        var vital_signs = records[i] && records[i].vital_signs;
+        if (!vital_signs || !Array.isArray(vital_signs)) { continue; }
+        for (var j = 0; j < vital_signs.length; j++)
+        {
+            var measurement = vital_signs[j];
+            for (var k = 0; k < rule_keys.length; k++)
+            {
+                // Extract field name from the full path (e.g., "temperature" from "er_visit_and_hospital_medical_records/vital_signs/temperature")
+                var fieldName = rule_keys[k].split('/').pop();
+                if (mmria_vitals_is_out_of_range(rule_keys[k], measurement[fieldName]))
+                {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+function mmria_vitals_case_is_closed()
+{
+    if (!window.g_data) { return false; }
+    var hr = g_data.home_record;
+    if (!hr || !hr.case_status || !hr.case_status.overall_case_status) { return false; }
+    var status = Number(hr.case_status.overall_case_status);
+    return status === 4 || status === 5 || status === 6;
+}
+
+function mmria_vitals_has_hard_violations()
+{
+    if (!window.g_data || !window.mmria_validation_rules) { return false; }
+    var records = window.g_data.er_visit_and_hospital_medical_records;
+    if (!records || !Array.isArray(records)) { return false; }
+    var rule_keys = Object.keys(window.mmria_validation_rules);
+    for (var i = 0; i < records.length; i++)
+    {
+        var vital_signs = records[i] && records[i].vital_signs;
+        if (!vital_signs || !Array.isArray(vital_signs)) { continue; }
+        for (var j = 0; j < vital_signs.length; j++)
+        {
+            var measurement = vital_signs[j];
+            for (var k = 0; k < rule_keys.length; k++)
+            {
+                var rule = window.mmria_validation_rules[rule_keys[k]];
+                if (!rule || rule.severity !== 'hard') { continue; }
+                var fieldName = rule_keys[k].split('/').pop();
+                if (mmria_vitals_is_out_of_range(rule_keys[k], measurement[fieldName]))
+                {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+function mmria_vitals_show_print_gate_modal(actionLabel, isHardBlock, onConfirm)
+{
+    var existingModal = document.getElementById('vitals-print-gate-modal');
+    if (existingModal && existingModal.parentNode) { existingModal.parentNode.removeChild(existingModal); }
+    var existingBackdrop = document.getElementById('vitals-print-gate-backdrop');
+    if (existingBackdrop && existingBackdrop.parentNode) { existingBackdrop.parentNode.removeChild(existingBackdrop); }
+
+    var message = isHardBlock
+        ? 'This case contains vital sign records with values outside the permitted range. These values must be corrected before printing or viewing.'
+        : 'This case contains vital sign records with values outside the permitted range. These values are excluded from graphs, tables, print and pdf views.';
+
+    var proceedButtonHtml = isHardBlock
+        ? ''
+        : '<button type="button" id="vitals-print-gate-modal-proceed" class="btn btn-primary" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">' + actionLabel + '</button>';
+
+    var modalHtml =
+        '<div id="vitals-print-gate-modal" class="modal fade" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="vitals-print-gate-modal-title" style="z-index: 1050;">'
+        + '<div class="modal-dialog" role="document">'
+        + '<div class="modal-content">'
+        + '<div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">'
+        + '<h4 id="vitals-print-gate-modal-title" class="modal-title" style="margin: 0; font-weight: 600; font-size: 17px;">Vital Signs Out of Range</h4>'
+        + '</div>'
+        + '<div class="modal-body" style="padding: 20px;">'
+        + '<p style="font-size: 16px; color: #333; margin: 0;">' + message + '</p>'
+        + '</div>'
+        + '<div class="modal-footer" style="padding: 15px 20px; text-align: right;">'
+        + '<button type="button" id="vitals-print-gate-modal-close" class="btn btn-default" style="padding: 8px 20px; margin-right: 8px;">Close</button>'
+        + proceedButtonHtml
+        + '</div>'
+        + '</div>'
+        + '</div>'
+        + '</div>'
+        + '<div id="vitals-print-gate-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>';
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    var modal = document.getElementById('vitals-print-gate-modal');
+    var backdrop = document.getElementById('vitals-print-gate-backdrop');
+
+    setTimeout(function()
+    {
+        if (modal) { modal.classList.add('show'); modal.style.display = 'block'; }
+        if (backdrop) { backdrop.classList.add('show'); }
+        var closeBtn = document.getElementById('vitals-print-gate-modal-close');
+        if (closeBtn) { closeBtn.focus(); }
+    }, 10);
+
+    function closeGateModal()
+    {
+        if (modal) { modal.classList.remove('show'); }
+        if (backdrop) { backdrop.classList.remove('show'); }
+        setTimeout(function()
+        {
+            if (modal && modal.parentNode) { modal.parentNode.removeChild(modal); }
+            if (backdrop && backdrop.parentNode) { backdrop.parentNode.removeChild(backdrop); }
+        }, 150);
+    }
+
+    var closeBtn = document.getElementById('vitals-print-gate-modal-close');
+    if (closeBtn) { closeBtn.onclick = closeGateModal; }
+
+    var proceedBtn = document.getElementById('vitals-print-gate-modal-proceed');
+    if (proceedBtn)
+    {
+        proceedBtn.onclick = function()
+        {
+            closeGateModal();
+            if (typeof onConfirm === 'function') { onConfirm(); }
+        };
+    }
+
+    if (modal)
+    {
+        modal.addEventListener('keydown', function(e)
+        {
+            if (e.key === 'Escape') { e.preventDefault(); closeGateModal(); }
+        });
+    }
+}
+
 function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_object_path, p_dictionary_path, p_is_grid_context, p_post_html_render, p_search_ctx, p_ctx, p_is_de_identified = false)
 {
 	let style_object = g_default_ui_specification.form_design[p_dictionary_path.substring(1)];
 
   const function_params = {
-      p_result: p_result, 
       p_metadata: p_metadata, 
       p_data: p_data, 
       p_ui: p_ui, 
@@ -67,7 +552,6 @@ function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obj
       p_object_path: p_object_path, 
       p_dictionary_path: p_dictionary_path, 
       p_is_grid_context: p_is_grid_context, 
-      p_post_html_render: p_post_html_render, 
       p_search_ctx: p_search_ctx, 
       p_ctx: p_ctx, 
       p_is_de_identified: p_is_de_identified
@@ -76,6 +560,8 @@ function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obj
 
   const map_key = convert_object_path_to_jquery_id(p_object_path);
   chart_function_params_map.set(map_key, function_params);
+
+
 
 	p_result.push
 	(
@@ -98,7 +584,7 @@ function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obj
               </th>
             </tr>
             <tr align=center><td>
-			<div id='${map_key}_chart'>
+		<div id='${map_key}_chart'>
             
             </div>
             </td></tr>
@@ -125,8 +611,7 @@ function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obj
 
    const computed_height = chart_size.height - 23;
 
-	p_post_html_render.push(` g_charts['${chart_gen_name}'] = 
-	  c3.generate({
+	p_post_html_render.push(` g_chart_instances.set('${chart_gen_name}', c3.generate({
 		size: {
 		height: ${computed_height}
 		, width: ${chart_size.width}
@@ -137,8 +622,14 @@ function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obj
       bindto: '#${map_key}_chart',
       onrendered: function()
       {
-		const el = d3.select('#${map_key} svg').selectAll('g.c3-axis.c3-axis-x > g.tick > text');
-        el.attr('transform', 'rotate(325)translate(${translate_x},0)');
+        window.requestAnimationFrame(function ()
+        {
+            const el = d3.select('#${map_key} svg').selectAll('g.c3-axis.c3-axis-x > g.tick > text');
+            if(!el.empty())
+            {
+                el.attr('transform', 'rotate(325)translate(${translate_x},0)');
+            }
+        });
 
       },`);
 
@@ -191,8 +682,8 @@ function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obj
              const y_values = get_chart_y_values_from_path(p_metadata, y_axis_paths[0]);
              const y_values2 = y_axis_paths && y_axis_paths.length > 1 ? get_chart_y_values_from_path(p_metadata, (y_axis_paths[1]).trim()) : [];
 
-             const arr1 = y_values.map(function(number) {  return parseInt(number);}).sort();
-             const arr2 = y_values2.map(function(number) {  return parseInt(number);}).sort();
+             const arr1 = get_finite_chart_numbers(y_values);
+             const arr2 = get_finite_chart_numbers(y_values2);
              const arrayValues = arr1.concat(arr2);
 
              if (arrayValues.length > 0) {
@@ -217,19 +708,26 @@ function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obj
         {
             format_text_size = ".1f"
         }
+
+        const axis_config = get_safe_chart_axis_config
+        (
+            minimum_graph_value,
+            maximum_graph_value,
+            increment_graph_value
+        );
         
         let y_axis_config = `
             ,y: {
                 
                 tick: {
-                        values: d3.range(${minimum_graph_value}, ${maximum_graph_value}, ${increment_graph_value}),
+                        values: ${JSON.stringify(axis_config.values)},
                         format: d3.format('${format_text_size}'),
                         },
-                min: ${minimum_graph_value},`;
+                min: ${axis_config.minimum},`;
         
         if (has_nonzero_value) {
             y_axis_config += `
-                max: ${maximum_graph_value - increment_graph_value},`;
+                max: ${axis_config.maximum - axis_config.increment},`;
         }
         
         y_axis_config += `
@@ -368,46 +866,54 @@ function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obj
         }
     }
     
+    p_post_html_render.push("  ]");
+    p_post_html_render.push("  },");
+	p_post_html_render.push("  line: {");
+	p_post_html_render.push("     connectNull: true");
+	p_post_html_render.push("  }");
+    p_post_html_render.push("  }));");
 
-
-
+    p_post_html_render.push(
+        "(function() {" +
+        " var chartEl = document.getElementById('" + map_key + "');" +
+        " if (!chartEl) { return; }" +
+        " var parent = chartEl.parentElement;" +
+        " if (!parent) { return; }" +
+        // Compute the form path prefix for rule scoping: strip array indices so
+        // 'er_visit_and_hospital_medical_records/0/vital_signs' becomes
+        // 'er_visit_and_hospital_medical_records/vital_signs', matching the
+        // field_path prefix used in mmria_validation_rules keys (Bug #4 fix).
+        " var chartFormPath = '" + p_object_path.replace(/\/\d+/g, '') + "';" +
+        " var inputs = parent.querySelectorAll('input.number');" +
+        " for (var i = 0; i < inputs.length; i++) {" +
+        "  var inp = inputs[i];" +
+        "  if (inp.dataset.vitalsValidationAttached) { continue; }" +
+        "  inp.dataset.vitalsValidationAttached = '1';" +
+        "  inp.dataset.chartFormPath = chartFormPath;" +
+        "  inp.addEventListener('blur', function(e) { mmria_vitals_validate_field(e.target); });" +
+        "  inp.addEventListener('keydown', function(e) { if (e.key === 'Tab') { mmria_vitals_validate_field(e.target); } });" +
+        "  inp.addEventListener('paste', (function(t) { return function() { setTimeout(function() { mmria_vitals_validate_field(t); }, 0); }; })(inp));" +
+        " }" +
+        "})();"
+    );
 
 	g_chart_data.set
     (
         `${chart_gen_name}`, 
         {
             div_id: map_key,
-            p_result: p_result,
             p_metadata: p_metadata,
             p_ui: p_ui,
             p_metadata_path: p_metadata_path,
             p_object_path: p_object_path,
             p_dictionary_path: p_dictionary_path,
             p_is_grid_context: p_is_grid_context,
-            p_post_html_render: p_post_html_render,
             p_search_ctx: p_search_ctx,
             p_ctx: p_ctx,
-            style_object: style_object
+            last_render_signature: get_chart_render_signature(p_result, p_post_html_render)
     
         }
     );
-
-
-
-
-    p_post_html_render.push("  ]");
-    p_post_html_render.push("  },");
-	p_post_html_render.push("  line: {");
-	p_post_html_render.push("     connectNull: true");
-	p_post_html_render.push("  }");
-    p_post_html_render.push("  });");
-
-    p_post_html_render.push(" d3.select('#" + map_key + " svg').append('text')");
-    p_post_html_render.push("     .attr('x', d3.select('#" + map_key + " svg').node().getBoundingClientRect().width / 2)");
-    p_post_html_render.push("     .attr('y', 16)");
-    p_post_html_render.push("     .attr('text-anchor', 'middle')");
-    p_post_html_render.push("     .style('font-size', '1.4em');");
-	//p_post_html_render.push("     .text('" + p_metadata.prompt.replace(/'/g, "\\'") + "');");
 	
 }
 
@@ -516,7 +1022,15 @@ function get_chart_y_range_from_path(p_metadata, p_metadata_path, p_ui, p_label)
 			const val = array[i][field];
 			if(val)
 			{
-				result.push(parseFloat(val).toFixed(2));
+                if (mmria_vitals_is_out_of_range(field, val))
+                {
+                    result.push('null');
+                }
+                else
+                {
+                    const parsed_value = Number.parseFloat(val);
+                    result.push(Number.isFinite(parsed_value) ? parsed_value.toFixed(2) : 'null');
+                }
 			}
 			else
 			{
@@ -554,7 +1068,18 @@ function get_chart_y_values_from_path(p_metadata, p_metadata_path, p_multiform_i
 			const val = array[i][field];
 			if(val)
 			{
-				result.push(parseFloat(val).toFixed(2));
+                if (mmria_vitals_is_out_of_range(field, val))
+                {
+                    // skip out-of-range values from axis range calculation
+                }
+                else
+                {
+                    const parsed_value = Number.parseFloat(val);
+                    if(Number.isFinite(parsed_value))
+                    {
+                        result.push(parsed_value.toFixed(2));
+                    }
+                }
 			}		
 		}
 
@@ -563,9 +1088,146 @@ function get_chart_y_values_from_path(p_metadata, p_metadata_path, p_multiform_i
     return result;
 }
 
+function get_chart_render_signature(p_result, p_post_html_render)
+{
+    return `${p_result.join('')}||${p_post_html_render.join('')}`;
+}
+
+function schedule_chart_update_flush()
+{
+    if(g_chart_update_flush_timer != null)
+    {
+        return;
+    }
+
+    g_chart_update_flush_timer = window.setTimeout(function ()
+    {
+        g_chart_update_flush_timer = null;
+        flush_pending_chart_updates();
+    }, chart_update_debounce_ms);
+}
+
+function flush_pending_chart_updates()
+{
+    if(g_pending_chart_update_paths.size === 0)
+    {
+        return;
+    }
+
+    const pending_paths = Array.from(g_pending_chart_update_paths);
+    g_pending_chart_update_paths.clear();
+
+    const chart_ids_to_update = new Set();
+
+    for(const pending_path of pending_paths)
+    {
+        if
+        (
+            pending_path == null ||
+            pending_path === ''
+        )
+        {
+            continue;
+        }
+
+        const normalized_path = pending_path.startsWith('/') ? pending_path.substring(1) : pending_path;
+        if(!g_charts.has(normalized_path))
+        {
+            continue;
+        }
+
+        const chart_set = g_charts.get(normalized_path);
+        if(!chart_set)
+        {
+            continue;
+        }
+
+        for(const chart_id of chart_set)
+        {
+            chart_ids_to_update.add(chart_id);
+        }
+    }
+
+    for(const chart_id of chart_ids_to_update)
+    {
+        rerender_chart(chart_id);
+    }
+}
+
+function rerender_chart(p_chart_id)
+{
+    if(!p_chart_id)
+    {
+        return;
+    }
+
+    const existing_chart_data = g_chart_data.get(p_chart_id);
+    if(!existing_chart_data)
+    {
+        return;
+    }
+
+    const p_result = [];
+    const p_post_html_render = [];
+
+    chart_render
+    (
+        p_result, 
+        existing_chart_data.p_metadata, 
+        null, // undefined
+        existing_chart_data.p_ui, // g_ui
+        existing_chart_data.p_metadata_path, //"g_metadata.children[17].children[12]"
+        existing_chart_data.p_object_path, // "g_data.er_visit_and_hospital_medical_records[0].temperature_graph"
+        existing_chart_data.p_dictionary_path, // "/er_visit_and_hospital_medical_records/temperature_graph"
+        existing_chart_data.p_is_grid_context, // false
+        p_post_html_render, 
+        existing_chart_data.p_search_ctx, // undefined
+        existing_chart_data.p_ctx // { form_index: 0, grid_index: null }
+    );
+
+    const next_signature = get_chart_render_signature(p_result, p_post_html_render);
+    const next_chart_data = g_chart_data.get(p_chart_id);
+    const previous_signature = existing_chart_data.last_render_signature || null;
+
+    if(next_chart_data)
+    {
+        next_chart_data.last_render_signature = next_signature;
+    }
+
+    if
+    (
+        previous_signature != null &&
+        previous_signature === next_signature
+    )
+    {
+        return;
+    }
+
+    destroy_chart_instance(p_chart_id);
+
+    const chart_element = document.getElementById(existing_chart_data.div_id);
+    if(!chart_element)
+    {
+        return;
+    }
+
+    chart_element.outerHTML = p_result.join('');
+
+    if (p_post_html_render.length > 0) 
+    {
+      try
+      {
+        eval(p_post_html_render.join(''));
+      } 
+      catch (ex) 
+      {
+        console.log(ex);
+      }
+    }
+}
+
 function update_charts(p_path)
 {
-
 
     if
     (
@@ -576,48 +1238,8 @@ function update_charts(p_path)
         return;
     }
 
-    const chart_set = g_charts.get(p_path.substring(1));
-    
-    for (const chart of chart_set)
-    {
-        const chart_data = g_chart_data.get(chart);
-
-        const p_result = [];
-        const p_post_html_render = [];
-
-        chart_render
-        (
-            p_result, 
-            chart_data.p_metadata, 
-            null, // undefined
-            chart_data.p_ui, // g_ui
-            chart_data.p_metadata_path, //"g_metadata.children[17].children[12]"
-            chart_data.p_object_path, // "g_data.er_visit_and_hospital_medical_records[0].temperature_graph"
-            chart_data.p_dictionary_path, // "/er_visit_and_hospital_medical_records/temperature_graph"
-            chart_data.p_is_grid_context, // false
-            p_post_html_render, 
-            chart_data.p_search_ctx, // undefined
-            chart_data.p_ctx // { form_index: 0, grid_index: null }
-        );
-
-        document.getElementById(chart_data.div_id).outerHTML = p_result.join('');
-      
-        if (p_post_html_render.length > 0) 
-        {
-          try
-          {
-            eval(p_post_html_render.join(''));
-          } 
-          catch (ex) 
-          {
-            console.log(ex);
-          }
-        }
-
-
-           // console.log("here");
-
-    }
+    g_pending_chart_update_paths.add(p_path);
+    schedule_chart_update_flush();
 }
 
 function chart_onrendered()
@@ -632,7 +1254,19 @@ function chart_onrendered()
 function chart_switch_to_table(p_ui_div_id)
 {
     const el = document.getElementById(p_ui_div_id);
+    if(!el)
+    {
+        return;
+    }
+
+    destroy_chart_instance(get_chart_instance_id(p_ui_div_id));
+
     const params = chart_function_params_map.get(p_ui_div_id);
+    if(!params)
+    {
+        return;
+    }
+
     let style_object = g_default_ui_specification.form_design[params.p_dictionary_path.substring(1)];
 
     // Date         Systolic Diastolic
@@ -703,10 +1337,14 @@ data.forEach(row => {
   }
   data_table_body_html.push(`<tr><td style="padding-left: 5px;">${date_string.replace(",", "")}</td>`)
   y_axis.forEach(col => {
-    data_table_body_html.push(`<td style="padding-left: 5px;">${row[col.replace(graph_prefix, "")]}</td>`)
+    const fieldName = col.replace(graph_prefix, "");
+    const rawVal = row[fieldName];
+    data_table_body_html.push(`<td style="padding-left: 5px;">${mmria_vitals_is_out_of_range(fieldName, rawVal) ? '<span style="color:#b87a00;font-style:italic;font-size:small;">Out of range</span>' : rawVal}</td>`)
   });
   data_table_body_html.push(`</tr>`);
 });
+
+
 
     el.outerHTML = 	`
         <div id='${convert_object_path_to_jquery_id(params.p_object_path)}'
@@ -746,8 +1384,19 @@ function chart_switch_to_graph(p_ui_div_id)
 {
 
     var params = chart_function_params_map.get(p_ui_div_id);
+    if(!params)
+    {
+        return;
+    }
 
     const el = document.getElementById(p_ui_div_id);
+    if(!el)
+    {
+        return;
+    }
+
+    destroy_chart_instance(get_chart_instance_id(p_ui_div_id));
+
     const result = [];
     const post_html_render = [];
     chart_render

@@ -10,8 +10,11 @@ using System.Threading.Tasks;
 using System.IO;
 using Akka.Actor;
 using Microsoft.AspNetCore.Http;
+using mmria.common.utils;
 
 using  mmria.server.extension;
+using mmria.server.util;
+using mmria.common.SharedLibraries.MetadataVersion;
 namespace mmria.server.Controllers;
 
 
@@ -23,30 +26,27 @@ public sealed class broadcast_messageController : Controller
     mmria.common.couchdb.ConfigurationSet ConfigDB;
    
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IMetadataRepository _metadataRepository;
 
     public broadcast_messageController
     (
-        mmria.common.couchdb.ConfigurationSet p_config_db,
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        IMetadataRepository metadataRepository
     )
     {
-        ConfigDB = p_config_db;
+        ConfigDB = tenantRuntime.RequireConfigurationSet();
         _couchDbHttpClient = couchDbHttpClient;
-        configuration = _configuration;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        _metadataRepository = metadataRepository;
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
     }
 
     [Authorize]
@@ -60,47 +60,15 @@ public sealed class broadcast_messageController : Controller
     [HttpGet]
     public async Task<mmria.common.metadata.BroadcastMessageList> GetBroadcastMessageList()
     {
-        var result = new mmria.common.metadata.BroadcastMessageList();
-
-
-        string url = $"{db_config.url}/metadata/broadcast-message-list";
-        
-        try
-        {
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.BroadcastMessageList>(await _couchDbHttpClient.ExecuteAsync("GET", url, null, null, null));
-        }
-        catch(System.Net.WebException ex)
-        {
-            if(ex.Message.IndexOf("404") > -1)
-            {
-                // do nothing
-                result.created_by = "system";
-                result.date_created = DateTime.UtcNow;
-
-                result.last_updated_by = "system";
-                result.date_last_updated = DateTime.UtcNow;
-            }
-            else
-            {
-             Console.WriteLine(ex);
-            }
-        }
-        catch(Exception ex)
-        {
-            Console.WriteLine(ex);
-        }
-
-        return result;
+        return await LoadBroadcastMessageListAsync();
     }
 
     [Authorize(Roles  = "cdc_admin")]
     [HttpPost]
-    public async Task<JsonResult> SaveBroadcastMessageDraft
-    (
-        [FromBody] mmria.common.metadata.BroadcastMessageList request
-    )
+    public async Task<IActionResult> SaveBroadcastMessageDraft()
     {
         var result = new mmria.common.model.couchdb.document_put_response();
+        var request = await JsonRequestBodyReader.ReadAsync<mmria.common.metadata.BroadcastMessageList>(Request);
 
         var userName = "";
         if (User.Identities.Any(u => u.IsAuthenticated))
@@ -110,22 +78,20 @@ public sealed class broadcast_messageController : Controller
                 u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name)).FindFirst(System.Security.Claims.ClaimTypes.Name).Value;
         }
 
-        request.last_updated_by = userName;
-        request.date_last_updated = DateTime.UtcNow;
+        var existingRequest = await LoadBroadcastMessageListAsync();
+        var revisionHandling = CouchDbRevisionHelper.DescribeRevisionHandling(request?._rev, existingRequest?._rev);
+        var sanitizedRequest = CreateSanitizedBroadcastMessageList(request, existingRequest, userName);
+        result = await save_request(sanitizedRequest, revisionHandling: revisionHandling);
 
-        result = await save_request(request);
-
-        return Json(result);
+        return EscapedJsonResultFactory.Create(result);
     }
 
     [Authorize(Roles  = "cdc_admin")]
     [HttpPost]
-    public async Task<JsonResult> UnpublishBroadcastMessage
-    (
-        [FromBody] mmria.common.metadata.BroadcastMessageList request
-    )
+    public async Task<IActionResult> UnpublishBroadcastMessage()
     {
         var result = new mmria.common.model.couchdb.document_put_response();
+        var request = await JsonRequestBodyReader.ReadAsync<mmria.common.metadata.BroadcastMessageList>(Request);
 
         var userName = "";
         if (User.Identities.Any(u => u.IsAuthenticated))
@@ -135,22 +101,20 @@ public sealed class broadcast_messageController : Controller
                 u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name)).FindFirst(System.Security.Claims.ClaimTypes.Name).Value;
         }
 
-        request.last_updated_by = userName;
-        request.date_last_updated = DateTime.UtcNow;
+        var existingRequest = await LoadBroadcastMessageListAsync();
+        var revisionHandling = CouchDbRevisionHelper.DescribeRevisionHandling(request?._rev, existingRequest?._rev);
+        var sanitizedRequest = CreateSanitizedBroadcastMessageList(request, existingRequest, userName);
+        result = await save_request(sanitizedRequest, true, revisionHandling);
 
-        result = await save_request(request, true);
-
-        return Json(result);
+        return EscapedJsonResultFactory.Create(result);
     }
 
     [Authorize(Roles  = "cdc_admin")]
     [HttpPost]
-    public async Task<JsonResult> PublishBroadcastMessage
-    (
-        [FromBody] mmria.common.metadata.BroadcastMessageList request
-    )
+    public async Task<IActionResult> PublishBroadcastMessage()
     {
         var result = new mmria.common.model.couchdb.document_put_response();
+        var request = await JsonRequestBodyReader.ReadAsync<mmria.common.metadata.BroadcastMessageList>(Request);
 
         var userName = "";
         if (User.Identities.Any(u => u.IsAuthenticated))
@@ -160,29 +124,35 @@ public sealed class broadcast_messageController : Controller
                 u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name)).FindFirst(System.Security.Claims.ClaimTypes.Name).Value;
         }
 
-        request.last_updated_by = userName;
-        request.date_last_updated = DateTime.UtcNow;
+        var existingRequest = await LoadBroadcastMessageListAsync();
+        var revisionHandling = CouchDbRevisionHelper.DescribeRevisionHandling(request?._rev, existingRequest?._rev);
+        var sanitizedRequest = CreateSanitizedBroadcastMessageList(request, existingRequest, userName);
+        result = await save_request(sanitizedRequest, true, revisionHandling);
 
-        result = await save_request(request, true);
 
 
-
-        return Json(result);
+        return EscapedJsonResultFactory.Create(result);
     }
 
-    async Task<mmria.common.model.couchdb.document_put_response> save_request(mmria.common.metadata.BroadcastMessageList request, bool send_replication = false)
+    async Task<mmria.common.model.couchdb.document_put_response> save_request(
+        mmria.common.metadata.BroadcastMessageList request,
+        bool send_replication = false,
+        string revisionHandling = "omitted")
     {
         var result = new mmria.common.model.couchdb.document_put_response();
 
-        string url = $"{db_config.url}/metadata/broadcast-message-list";
-        
         Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
         settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
         var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(request, settings);
 
         try
         {
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(await _couchDbHttpClient.ExecuteAsync("PUT", url, object_string, null, null));
+            result = await _metadataRepository.SaveBroadcastMessageListAsync(object_string, db_config);
+            if (result == null || !result.ok)
+            {
+                Console.WriteLine(
+                    $"Broadcast message save failed for metadata/broadcast-message-list: rev={revisionHandling}; response={result?.error_description}");
+            }
         }
         catch(Exception ex)
         {
@@ -202,11 +172,15 @@ public sealed class broadcast_messageController : Controller
 
         var base_url = $"{config_url}/api/broadcastMessage/ReplicateMessage";
 
-        var headers = new Dictionary<string, string> { { "vital-service-key", ConfigDB.name_value["vital_service_key"] } };
+        var requestOptions = new mmria.common.getset.CouchDbRequestOptions
+        {
+            VitalServiceKey = ConfigDB.name_value["vital_service_key"]
+        };
 
         try
         {
-            var responseContent = await _couchDbHttpClient.ExecuteAsync("POST", base_url, object_json, null, null, "application/json", headers);
+            // Service endpoint call — not a direct CouchDB write. No repository routing needed.
+            var responseContent = await _couchDbHttpClient.ExecuteAsync("POST", base_url, object_json, "application/json", requestOptions);
 
            var response = System.Text.Json.JsonSerializer.Deserialize<mmria.common.model.couchdb.document_put_response>(responseContent);
         }
@@ -214,6 +188,89 @@ public sealed class broadcast_messageController : Controller
         {
             System.Console.WriteLine(ex);
         }
+    }
+
+    private async Task<mmria.common.metadata.BroadcastMessageList> LoadBroadcastMessageListAsync()
+    {
+        var result = new mmria.common.metadata.BroadcastMessageList();
+        
+        try
+        {
+            result = await _metadataRepository.GetBroadcastMessageListAsync(db_config)
+                ?? new mmria.common.metadata.BroadcastMessageList();
+        }
+        catch(System.Net.WebException ex)
+        {
+            if(ex.Message.IndexOf("404") > -1)
+            {
+                result.created_by = "system";
+                result.date_created = DateTime.UtcNow;
+
+                result.last_updated_by = "system";
+                result.date_last_updated = DateTime.UtcNow;
+            }
+            else
+            {
+             Console.WriteLine(ex);
+            }
+        }
+        catch(Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+
+        return result;
+    }
+
+    private static mmria.common.metadata.BroadcastMessageList CreateSanitizedBroadcastMessageList(
+        mmria.common.metadata.BroadcastMessageList request,
+        mmria.common.metadata.BroadcastMessageList existing,
+        string userName)
+    {
+        existing ??= new mmria.common.metadata.BroadcastMessageList();
+        request ??= new mmria.common.metadata.BroadcastMessageList();
+
+        return new mmria.common.metadata.BroadcastMessageList
+        {
+            _rev = CouchDbRevisionHelper.ResolveServerOwnedRevision(request._rev, existing._rev),
+            date_created = existing.date_created ?? request.date_created ?? DateTime.UtcNow,
+            created_by = !string.IsNullOrWhiteSpace(existing.created_by) ? existing.created_by : (request.created_by ?? userName),
+            date_last_updated = DateTime.UtcNow,
+            last_updated_by = userName,
+            data_type = string.IsNullOrWhiteSpace(existing.data_type) ? request.data_type : existing.data_type,
+            message_one = CreateSanitizedBroadcastMessage(request.message_one, existing.message_one),
+            message_two = CreateSanitizedBroadcastMessage(request.message_two, existing.message_two)
+        };
+    }
+
+    private static mmria.common.metadata.BroadcastMessage CreateSanitizedBroadcastMessage(
+        mmria.common.metadata.BroadcastMessage request,
+        mmria.common.metadata.BroadcastMessage existing)
+    {
+        request ??= new mmria.common.metadata.BroadcastMessage();
+        existing ??= new mmria.common.metadata.BroadcastMessage();
+
+        return new mmria.common.metadata.BroadcastMessage
+        {
+            draft = CreateSanitizedBroadcastMessageItem(request.draft, existing.draft),
+            published = CreateSanitizedBroadcastMessageItem(request.published, existing.published),
+            publish_status = request.publish_status
+        };
+    }
+
+    private static mmria.common.metadata.BroadcastMessageItem CreateSanitizedBroadcastMessageItem(
+        mmria.common.metadata.BroadcastMessageItem request,
+        mmria.common.metadata.BroadcastMessageItem existing)
+    {
+        request ??= new mmria.common.metadata.BroadcastMessageItem();
+        existing ??= new mmria.common.metadata.BroadcastMessageItem();
+
+        return new mmria.common.metadata.BroadcastMessageItem
+        {
+            title = request.title ?? existing.title ?? string.Empty,
+            body = request.body ?? existing.body ?? string.Empty,
+            type = request.type ?? existing.type ?? "information"
+        };
     }
     
 }

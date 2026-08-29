@@ -9,7 +9,7 @@
     
     // Configuration - will be set from server-side ViewBag
     let isLoggingEnabled = false;
-    let isConsoleOutputEnabled = true; // Always output to console for development
+    let isConsoleOutputEnabled = false; // Always output to console for development
 
     // IndexedDB configuration
     const DB_NAME = 'mmria_offline_logs';
@@ -555,6 +555,14 @@ const offlineLog = {
     syncToServer: async function() {
         if (!isLoggingEnabled || !db) {
             return { success: false, message: 'Logging not enabled or database not available' };
+        }
+
+        if (
+            window.OfflineStatus &&
+            window.OfflineStatus.isOfflineModeServerSession &&
+            window.OfflineStatus.isOfflineModeServerSession()
+        ) {
+            return { success: false, message: 'Skipped log sync while browser is authenticated with the offline SaveOfflineCases token' };
         }
         
         try {

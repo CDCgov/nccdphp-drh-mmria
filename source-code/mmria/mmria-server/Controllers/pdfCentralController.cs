@@ -13,6 +13,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 
 using  mmria.server.extension; 
+using mmria.server.util;
 namespace mmria.server.Controllers;
 
 [Authorize(Roles = "cdc_admin,steve_mmria")]
@@ -22,8 +23,6 @@ public sealed class pdfCentralController : Controller
 
 
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     mmria.common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     ActorSystem _actorSystem;
@@ -47,18 +46,15 @@ public sealed class pdfCentralController : Controller
         ActorSystem actorSystem,
         ILogger<pdfCentralController> logger,
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        mmria.server.util.RequestTenantRuntime tenantRuntime
     )
     {
         _actorSystem = actorSystem;
         _logger = logger;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
     }
 
     string userName
@@ -75,8 +71,10 @@ public sealed class pdfCentralController : Controller
                         u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name)
                     )
                     .FindFirst(System.Security.Claims.ClaimTypes.Name)
-                    .Value.Replace("@","-").Replace("'","-");
+                    .Value;
                 }
+
+                _userName = ContainedPathHelper.CreateSafeContainedName(_userName, "user");
             }
             return _userName;
         }
@@ -88,8 +86,9 @@ public sealed class pdfCentralController : Controller
         {
             if (_download_directory == null)
             {
-
-                _download_directory = System.IO.Path.Combine(configuration.GetString("export_directory", host_prefix), userName);
+                _download_directory = ContainedPathHelper.ResolveContainedDirectoryPath(
+                    configuration.GetString("export_directory", host_prefix),
+                    userName);
             }
             return _download_directory;
         }
@@ -201,42 +200,23 @@ public sealed class pdfCentralController : Controller
     public  async Task<FileResult> GetFileResult(string FileName)
     {
         var queue_Result = new mmria.common.steve.QueueResult();
-        var path = System.IO.Path.Combine (download_directory, FileName);
-
-        byte[] fileBytes = GetFile(path);
-        return File(fileBytes, System.Net.Mime.MediaTypeNames.Application.Octet, FileName);
+        var safeFileName = ContainedPathHelper.ValidateContainedName(FileName, nameof(FileName));
+        byte[] fileBytes = await ContainedPathHelper.ReadContainedFileAsync(download_directory, safeFileName);
+        return SafeFileDownloadResultFactory.Create(
+            fileBytes,
+            System.Net.Mime.MediaTypeNames.Application.Octet,
+            safeFileName,
+            "pdf-download.bin");
 
     }
 
     [HttpGet]
     public  async Task<JsonResult> DeleteFileResult(string FileName)
     {
-        var path = System.IO.Path.Combine (download_directory, FileName);
-
-        if(System.IO.File.Exists(path))
-        {
-            System.IO.File.Delete(path);
-        }
+        var safeFileName = ContainedPathHelper.ValidateContainedName(FileName, nameof(FileName));
+        ContainedPathHelper.DeleteContainedFile(download_directory, safeFileName);
 
         return await GetQueueResult();
-    }
-
-
-    byte[] GetFile(string s)
-    {
-        byte[] data;
-        int br;
-        int fs_length;
-
-        using(FileStream fs = new FileStream (s, FileMode.Open, FileAccess.Read))
-        {
-            fs_length = (int) fs.Length;
-            data = new byte[fs.Length];
-            br = fs.Read(data, 0, data.Length);
-        }
-        if (br != (int) fs_length)
-            throw new System.IO.IOException(s);
-        return data;
     }
 
     string GetFileName(string p_file_name)

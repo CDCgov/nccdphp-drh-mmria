@@ -10,9 +10,10 @@ using System.Dynamic;
 using mmria.common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Configuration;
-using Microsoft.AspNetCore.Http;
 
-using  mmria.server.extension; 
+using  mmria.server.extension;
+using mmria.common.SharedLibraries.Jurisdiction;
+
 namespace mmria.server;
 
 [Authorize(Roles  = "committee_member")]
@@ -20,30 +21,26 @@ namespace mmria.server;
 public sealed class de_id_viewController: ControllerBase
 {
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IJurisdictionRepository _jurisdictionRepository;
 
     string host_prefix = null;
 
     public de_id_viewController
     (
-        IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        IJurisdictionRepository jurisdictionRepository
     )
     {
-        configuration = _configuration;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
         _couchDbHttpClient = couchDbHttpClient;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
+        _jurisdictionRepository = jurisdictionRepository;
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
 
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
     }
 
     [HttpGet]
@@ -68,7 +65,8 @@ public sealed class de_id_viewController: ControllerBase
             User,
             is_identefied_case,
             false,
-            _couchDbHttpClient
+            _couchDbHttpClient,
+            _jurisdictionRepository
         );
         
 

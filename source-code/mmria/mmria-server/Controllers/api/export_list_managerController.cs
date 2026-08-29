@@ -6,7 +6,7 @@ using System.Dynamic;
 using mmria.common.model;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
-
+using mmria.common.SharedLibraries.MetadataVersion;
 using  mmria.server.extension; 
 
 namespace mmria.server;
@@ -15,27 +15,22 @@ namespace mmria.server;
 public sealed class export_list_managerController: ControllerBase 
 { 
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IMetadataRepository _metadataRepository;
     public export_list_managerController
     (
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        IMetadataRepository metadataRepository
     )
     {
-        configuration = _configuration;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
-        _couchDbHttpClient = couchDbHttpClient;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        _metadataRepository = metadataRepository;
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
     }
 
     [HttpGet]
@@ -43,22 +38,7 @@ public sealed class export_list_managerController: ControllerBase
     { 
         try
         {
-            string request_string = $"{db_config.url}/metadata/export-standard-list";
-
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                "GET",
-                request_string,
-                null,
-                db_config.user_name,
-                db_config.user_value,
-                "text/*"
-            );
-
-
-            var result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (responseFromServer);
-
-            return result;
-
+            return await _metadataRepository.GetExportStandardListAsync(db_config);
         }
         catch(Exception ex)
         {
@@ -79,24 +59,12 @@ public sealed class export_list_managerController: ControllerBase
 
         try
         {
-
             System.IO.Stream dataStream0 = this.Request.Body;
             System.IO.StreamReader reader0 = new System.IO.StreamReader (dataStream0);
 
             string document_json = await reader0.ReadToEndAsync ();
 
-            string metadata_url = $"{db_config.url}/metadata/export-standard-list";
-
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                "PUT",
-                metadata_url,
-                document_json,
-                db_config.user_name,
-                db_config.user_value,
-                "text/*"
-            );
-
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
+            result = await _metadataRepository.SaveExportStandardListAsync(document_json, db_config);
         }
         catch(Exception ex)
         {
@@ -106,5 +74,4 @@ public sealed class export_list_managerController: ControllerBase
         return result;
     } 
 } 
-
 

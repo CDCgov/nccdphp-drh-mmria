@@ -6,65 +6,76 @@ using System.Threading.Tasks;
 using mmria.common.couchdb;
 using mmria.common.getset;
 using mmria.common.Model.AggregateReport;
+using mmria.common.SharedLibraries.Report;
 
 namespace mmria.common.Manager;
 
 public sealed class AggregateReportManager
 {
-    private readonly CouchDbHttpClient _couchDbHttpClient;
+    private readonly IReportRepository _reportRepository;
 
-    public AggregateReportManager(CouchDbHttpClient couchDbHttpClient)
+    public AggregateReportManager(IReportRepository reportRepository)
     {
-        _couchDbHttpClient = couchDbHttpClient;
+        _reportRepository = reportRepository;
     }
 
     /// <summary>
     /// Retrieves all aggregate reports from CouchDB and filters for valid entries.
     /// </summary>
+    /// <remarks>
+    /// Streams the CouchDB response straight into <see cref="JsonDocument"/> rather than
+    /// reading it as a string first — this avoids a multi-megabyte LOH allocation for
+    /// the raw response. Filter on <c>year_of_death</c> / <c>year_of_case_review</c> is
+    /// applied per-row BEFORE invoking <see cref="Convert"/>, so discarded rows do not
+    /// allocate a <see cref="c_report_object"/> + nested struct/dictionary graph.
+    /// </remarks>
     public async Task<IList<c_report_object>> GetReportsAsync(DBConfigurationDetail dbConfig)
     {
         var result = new List<c_report_object>();
 
-        string request_string = dbConfig.Get_Prefix_DB_Url("report/_all_docs?include_docs=true");
+        string responseFromServer = await _reportRepository.GetAllReportDocumentsAsync(dbConfig);
 
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                "GET",
-                request_string,
-                null,
-                dbConfig.user_name,
-                dbConfig.user_value
-            );
+        using JsonDocument doc = JsonDocument.Parse(responseFromServer);
 
-            // Parse the JSON response
-            using (JsonDocument doc = JsonDocument.Parse(responseFromServer))
+        var root = doc.RootElement;
+
+        if (!root.TryGetProperty("rows", out JsonElement rowsElement) ||
+            rowsElement.ValueKind != JsonValueKind.Array)
+        {
+            return result;
+        }
+
+        foreach (var rowItem in rowsElement.EnumerateArray())
+        {
+            if (!rowItem.TryGetProperty("doc", out JsonElement docElement))
             {
-                var root = doc.RootElement;
-                
-                if (root.TryGetProperty("rows", out JsonElement rowsElement) &&
-                    rowsElement.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (var rowItem in rowsElement.EnumerateArray())
-                    {
-                        if (rowItem.TryGetProperty("doc", out JsonElement docElement))
-                        {
-                            var convert_result = Convert(docElement);
-
-                            if (convert_result.Key)
-                            {
-                                var item = convert_result.Value;
-
-                                // Filter: year_of_death != 9999 and year_of_case_review is present
-                                if (item.year_of_death.HasValue &&
-                                    item.year_of_death.Value != 9999 &&
-                                    item.year_of_case_review.HasValue)
-                                {
-                                    result.Add(item);
-                                }
-                            }
-                        }
-                    }
-                }
+                continue;
             }
+
+            // Pre-filter cheaply on the two integer fields BEFORE the expensive
+            // Convert() that allocates a c_report_object + multiple structs/dictionaries.
+            // Most rows that fail this filter have no case-review entry yet and would
+            // otherwise be allocated and immediately discarded.
+            if (!docElement.TryGetProperty("year_of_death", out JsonElement yodEl) ||
+                !yodEl.TryGetInt32(out int yod) ||
+                yod == 9999)
+            {
+                continue;
+            }
+
+            if (!docElement.TryGetProperty("year_of_case_review", out JsonElement yocrEl) ||
+                yocrEl.ValueKind != JsonValueKind.Number)
+            {
+                continue;
+            }
+
+            var convert_result = Convert(docElement);
+
+            if (convert_result.Key)
+            {
+                result.Add(convert_result.Value);
+            }
+        }
 
         return result;
     }

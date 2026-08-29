@@ -2,10 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
-using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using mmria.common.couchdb;
+using mmria.common.getset;
 using mmria.common.model.couchdb;
 using mmria.common.SharedLibraries.ManageUsers.DAL;
 using mmria.common.SharedLibraries.ManageUsers.Model;
@@ -22,10 +22,12 @@ namespace mmria.common.SharedLibraries.ManageUsers.Manager;
 public class ManageUsersManager
 {
     private readonly ManageUsersDAL _dal;
+    private readonly CouchDbHttpClient _couchDbHttpClient;
 
-    public ManageUsersManager(ManageUsersDAL dal)
+    public ManageUsersManager(ManageUsersDAL dal, CouchDbHttpClient couchDbHttpClient)
     {
         _dal = dal;
+        _couchDbHttpClient = couchDbHttpClient;
     }
 
     /// <summary>
@@ -191,7 +193,19 @@ public class ManageUsersManager
             return null;
         }
 
-        return await _dal.GetUserAsync($"org.couchdb.user:{userName}", db_config);
+        var userResult = await _dal.GetUserAsync($"org.couchdb.user:{userName}", db_config);
+        ScrubUserSecrets(userResult);
+        return userResult;
+    }
+
+    private static void ScrubUserSecrets(user u)
+    {
+        if (u == null) return;
+        u.password = null;
+        u.password_scheme = null;
+        u.iterations = null;
+        u.derived_key = null;
+        u.salt = null;
     }
 
     public async Task<get_response_header<user>> GetUsersAsync(
@@ -200,8 +214,8 @@ public class ManageUsersManager
         ClaimsPrincipal user,
         DBConfigurationDetail db_config)
     {
-        var jurisdiction_hashset = authorization.get_current_jurisdiction_id_set_for(db_config, user);
-        var jurisdiction_username_hashset = mmria.common.utils.authorization_case.get_user_jurisdiction_set(db_config);
+        var jurisdiction_hashset = authorization.get_current_jurisdiction_id_set_for(db_config, user, _couchDbHttpClient);
+        var jurisdiction_username_hashset = mmria.common.utils.authorization_case.get_user_jurisdiction_set(db_config, _couchDbHttpClient);
         var user_alldocs_response = await _dal.GetAllUsersAsync(skip, take, db_config);
 
         get_response_header<user> result = new get_response_header<user>();
@@ -255,6 +269,7 @@ public class ManageUsersManager
 
             if (is_jurisdiction_ok && is_app_prefix_ok)
             {
+                ScrubUserSecrets(uai.doc);
                 temp_list.Add(uai);
             }
         }
@@ -264,6 +279,20 @@ public class ManageUsersManager
     }
 
     public async Task<user> GetUserAsync(string id, DBConfigurationDetail db_config)
+    {
+        var u = await _dal.GetUserAsync(id, db_config);
+        ScrubUserSecrets(u);
+        return u;
+    }
+
+    /// <summary>
+    /// Returns the raw user document including credential fields
+    /// (password_scheme, iterations, derived_key, salt). Use ONLY for server-side
+    /// flows that must preserve credential material when round-tripping the
+    /// document back to CouchDB (e.g. the user save path). Do NOT return the
+    /// result of this method to clients.
+    /// </summary>
+    public async Task<user> GetUserRawAsync(string id, DBConfigurationDetail db_config)
     {
         return await _dal.GetUserAsync(id, db_config);
     }
@@ -278,10 +307,9 @@ public class ManageUsersManager
             return false;
         }
 
-        var jurisdiction_hashset = authorization.get_current_jurisdiction_id_set_for(db_config, claimsPrincipal);
-        var user_role_response = await _dal.GetUserRoleJurisdictionSortableViewAsync(
-            $"{db_config.url}/{db_config.prefix}jurisdiction/_design/sortable/_view/by_user_id?{user.name}",
-            db_config);
+        var jurisdiction_hashset = authorization.get_current_jurisdiction_id_set_for(db_config, claimsPrincipal, _couchDbHttpClient);
+        var user_role_response = await _dal.GetUserRoleJurisdictionSortableViewByParamsAsync(
+            skip: 0, take: -1, sortView: "by_user_id", hasSearchKey: false, descending: false, db_config);
 
         foreach (get_sortable_view_response_item<user_role_jurisdiction> cvi in user_role_response.rows)
         {
@@ -309,7 +337,7 @@ public class ManageUsersManager
         DBConfigurationDetail db_config)
     {
         var result = new List<user_role_jurisdiction>();
-        var jurisdiction_hashset = authorization.get_current_jurisdiction_id_set_for(db_config, user);
+        var jurisdiction_hashset = authorization.get_current_jurisdiction_id_set_for(db_config, user, _couchDbHttpClient);
 
         if (string.IsNullOrWhiteSpace(p_urj_id))
         {
@@ -320,7 +348,8 @@ public class ManageUsersManager
                 if
                 (
                     item.data_type != null &&
-                    item.data_type == user_role_jurisdiction.user_role_jursidiction_const &&
+                    (item.data_type == user_role_jurisdiction.user_role_jursidiction_const ||
+                     item.data_type == "user_role_jurisdiction") &&
                     authorization.is_authorized_to_handle_jurisdiction_id(jurisdiction_hashset, ResourceRightEnum.ReadUser, item)
                 )
                 {
@@ -334,7 +363,8 @@ public class ManageUsersManager
             if
             (
                 item.data_type != null &&
-                item.data_type == user_role_jurisdiction.user_role_jursidiction_const &&
+                (item.data_type == user_role_jurisdiction.user_role_jursidiction_const ||
+                 item.data_type == "user_role_jurisdiction") &&
                 authorization.is_authorized_to_handle_jurisdiction_id(jurisdiction_hashset, ResourceRightEnum.ReadUser, item)
             )
             {
@@ -372,9 +402,8 @@ public class ManageUsersManager
         DBConfigurationDetail db_config)
     {
         string search_key = GetCurrentUserName(user);
-        string request_string = $"{db_config.url}/{db_config.prefix}jurisdiction/_design/sortable/_view/by_date_created?skip=0";
-
-        var case_view_response = await _dal.GetUserRoleJurisdictionSortableViewAsync(request_string, db_config);
+        var case_view_response = await _dal.GetUserRoleJurisdictionSortableViewByParamsAsync(
+            skip: 0, take: -1, sortView: "by_date_created", hasSearchKey: false, descending: false, db_config);
 
         var result = new get_sortable_view_reponse_header<user_role_jurisdiction>();
         result.offset = case_view_response.offset;
@@ -448,41 +477,13 @@ public class ManageUsersManager
                 break;
         }
 
-        var request_builder = new StringBuilder();
-        request_builder.Append(db_config.url);
-        request_builder.Append($"/{db_config.prefix}jurisdiction/_design/sortable/_view/{sort_view}?");
-
-        if (string.IsNullOrWhiteSpace(search_key))
-        {
-            if (skip > -1)
-            {
-                request_builder.Append($"?skip={skip}");
-            }
-            else
-            {
-                request_builder.Append("skip=0");
-            }
-
-            if (take > -1)
-            {
-                request_builder.Append($"?&limit={take}");
-            }
-
-            if (descending)
-            {
-                request_builder.Append("?&descending=true");
-            }
-        }
-        else
-        {
-            request_builder.Append("?skip=0");
-            if (descending)
-            {
-                request_builder.Append("?&descending=true");
-            }
-        }
-
-        var case_view_response = await _dal.GetUserRoleJurisdictionSortableViewAsync(request_builder.ToString(), db_config);
+        var case_view_response = await _dal.GetUserRoleJurisdictionSortableViewByParamsAsync(
+            skip: skip,
+            take: take,
+            sortView: sort_view,
+            hasSearchKey: !string.IsNullOrWhiteSpace(search_key),
+            descending: descending,
+            db_config);
 
         if (string.IsNullOrWhiteSpace(search_key))
         {
@@ -676,9 +677,8 @@ public class ManageUsersManager
         }
 
         var user_name = claimsPrincipal.Claims.Where(c => c.Type == ClaimTypes.Name).FirstOrDefault().Value;
-        var jurisdiction_view_response = await _dal.GetUserRoleJurisdictionSortableViewAsync(
-            $"{db_config.url}/{db_config.prefix}jurisdiction/_design/sortable/_view/by_user_id?{user_name}",
-            db_config);
+        var jurisdiction_view_response = await _dal.GetUserRoleJurisdictionSortableViewByParamsAsync(
+            skip: 0, take: -1, sortView: "by_user_id", hasSearchKey: false, descending: false, db_config);
 
         var now = DateTime.Now;
         foreach (get_sortable_view_response_item<user_role_jurisdiction> jvi in jurisdiction_view_response.rows)

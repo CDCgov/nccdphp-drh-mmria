@@ -25,6 +25,7 @@ function print_version_render
   switch (p_metadata.type.toLowerCase()) 
   {
     case 'group':
+      if (p_metadata.name == 'gender_identity') break;
       result.push('<fieldset>');
       //result.push(p_path)
       result.push('<legend><strong>');
@@ -81,8 +82,11 @@ function print_version_render
       }
       result.push('</tr>');
 
+      let is_vitals_grid = window.mmria_validation_rules && (p_metadata.name === 'vital_signs' || p_metadata.name === 'transport_vital_signs');
+
       for (let i = 0; i < p_data.length; i++) 
       {
+        let row_oor_notice = is_vitals_grid ? mmria_vitals_build_out_of_range_notice(p_metadata.children, p_data[i]) : '';
         result.push('<tr>');
         for (let j = 0; j < p_metadata.children.length; j++) 
         {
@@ -91,13 +95,17 @@ function print_version_render
 
           if (p_data[i][child.name] != null)
           {
+              var cell_data = p_data[i][child.name];
+              if (is_vitals_grid && j === p_metadata.children.length - 1 && row_oor_notice) {
+                  cell_data = cell_data ? cell_data + ' ' + row_oor_notice : row_oor_notice;
+              }
               Array.prototype.push.apply
               (
                   result,
                   print_version_render
                   (
                       child,
-                      p_data[i][child.name],
+                      cell_data,
                       p_path + '.' + child.name,
                       p_ui,
                       p_metadata_path,
@@ -766,7 +774,7 @@ d3.select('#chart svg').append('text')
         result.push('</p>');
         result.push('</h9>');
         result.push('<div>');
-        result.push(p_data);
+        result.push(mmria_vitals_is_out_of_range(p_metadata.name, p_data) ? '' : p_data);
         result.push('</div>');
       }
       else//if (p_metadata.name == 'case_opening_overview') 
@@ -884,7 +892,14 @@ function get_chart_y_range_from_path(p_metadata, p_metadata_path, p_multiform_in
 			const val = array[i][field];
 			if(val)
 			{
-				result.push(parseFloat(val).toFixed(2));
+                if (mmria_vitals_is_out_of_range(field, val))
+                {
+                    result.push('null');
+                }
+                else
+                {
+				    result.push(parseFloat(val).toFixed(2));
+                }
 			}
 			else
 			{
@@ -922,7 +937,10 @@ function get_chart_y_values_from_path(p_metadata, p_metadata_path, p_multiform_i
 			const val = array[i][field];
 			if(val)
 			{
-				result.push(parseFloat(val).toFixed(2));
+                if (!mmria_vitals_is_out_of_range(field, val))
+                {
+			        result.push(parseFloat(val).toFixed(2));
+                }
 			}		
 		}
 
@@ -1065,7 +1083,54 @@ function print_version_textarea_replace_return_with_br(p_value)
     if(p_value!= null)
     {
         result = p_value.replace(crlf_regex, "<br/>");
+        // The raw stored narrative HTML has \n at the start/end of every <p> and
+        // between </p> and <p> section separators. After \n→<br/> those become
+        // leading/trailing blank lines inside each paragraph and extra blank lines
+        // between sections. CSS <p> margins provide sufficient paragraph spacing
+        // without any of these extra <br> elements.
+        // 1. Strip leading <br> from paragraph start:  <p><br>text → <p>text
+        result = result.replace(/<p>(\s*<br\s*\/?>\s*)+/gi, '<p>');
+        // 2. Strip trailing <br> before paragraph close:  text<br></p> → text</p>
+        result = result.replace(/(\s*<br\s*\/?>\s*)+<\/p>/gi, '</p>');
+        // 3. Strip all body-level <br> separators between paragraphs:  </p><br>+<p> → </p><p>
+        result = result.replace(/<\/p>(\s*)(?:<br\s*\/?>\s*)+(?=<p)/gi, '</p>$1');
     }
 
     return result
+}
+
+// Returns true if fieldName is in the vital sign range config and value is out of range (AC #1, #5)
+function mmria_vitals_is_out_of_range(fieldPath, value) {
+    if (!window.mmria_validation_rules) return false;
+    var rule = window.mmria_validation_rules[fieldPath];
+    if (!rule) {
+        // Try to find a rule by searching for a matching field path ending
+        for (var key in window.mmria_validation_rules) {
+            if (key.endsWith('/' + fieldPath) || key === fieldPath) {
+                rule = window.mmria_validation_rules[key];
+                break;
+            }
+        }
+    }
+    if (!rule) return false;
+    var v = parseFloat(value);
+    if (value === '' || value == null || isNaN(v)) return false;
+    return (v < parseFloat(rule.min_value) || v > parseFloat(rule.max_value));
+}
+
+// Builds the out-of-range notice string for a vitals record row.
+// p_meta_children: the metadata children array for the vitals grid
+// p_data_row: the data object for one vitals record
+// Returns '' if no values are out of range or if mmria_validation_rules is null.
+function mmria_vitals_build_out_of_range_notice(p_meta_children, p_data_row) {
+    if (!window.mmria_validation_rules) return '';
+    var clauses = '';
+    for (var i = 1; i < p_meta_children.length - 1; i++) {
+        var child = p_meta_children[i];
+        if (mmria_vitals_is_out_of_range(child.name, p_data_row[child.name])) {
+            clauses += child.prompt + ' removed. ';
+        }
+    }
+    if (!clauses) return '';
+    return '** Out of range. ' + clauses.trim();
 }

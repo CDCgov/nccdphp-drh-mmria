@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 using mmria.common.util;
 
 namespace mmria.common.couchdb;
@@ -54,10 +55,13 @@ public sealed class SteveAPIConfigurationDetail
 
 public sealed class ConfigurationSet
 {
+    private Dictionary<string, string> _name_value;
+    private Dictionary<string, DBConfigurationDetail> _detail_list;
+
     public ConfigurationSet()
     {
-        detail_list = new Dictionary<string, DBConfigurationDetail>(StringComparer.OrdinalIgnoreCase);
-        name_value = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        _detail_list = new Dictionary<string, DBConfigurationDetail>(StringComparer.OrdinalIgnoreCase);
+        _name_value = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
     }
     public string _id { get; set;}
     public string _rev { get; set; }
@@ -65,9 +69,21 @@ public sealed class ConfigurationSet
 
     public string data_type { get; } = "configuration-set";
 
-    public Dictionary<string, string> name_value { get;set; }
+    public Dictionary<string, string> name_value
+    {
+        get => _name_value;
+        set => _name_value = value == null
+            ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, string>(value, StringComparer.OrdinalIgnoreCase);
+    }
 
-    public Dictionary<string, DBConfigurationDetail> detail_list { get;set; }
+    public Dictionary<string, DBConfigurationDetail> detail_list
+    {
+        get => _detail_list;
+        set => _detail_list = value == null
+            ? new Dictionary<string, DBConfigurationDetail>(StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, DBConfigurationDetail>(value, StringComparer.OrdinalIgnoreCase);
+    }
 
     public DateTime date_created { get; set; } 
     public string created_by { get; set; } 
@@ -127,6 +143,7 @@ public sealed class OverridableConfiguration
     public string data_type { get; } = "configuration-master";
 
     public Dictionary<string, Dictionary<string, bool>> boolean_keys { get;set; }
+    [JsonConverter(typeof(NestedStringDictionaryConverter))]
     public Dictionary<string, Dictionary<string, string>> string_keys { get;set; }
     public Dictionary<string, Dictionary<string, int>> integer_keys { get;set; }
     public bool? GetBoolean(string key, string prefix)

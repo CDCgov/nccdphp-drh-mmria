@@ -1,10 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Configuration;
+using mmria.common.utils;
 using mmria.server.extension;
+using mmria.server.util;
 using Microsoft.AspNetCore.Http;
 
 namespace mmria.server.Controllers;
@@ -20,25 +23,23 @@ public sealed class _configController : Controller
     mmria.common.couchdb.OverridableConfiguration overridable_configuration;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
-
+    private readonly mmria.common.SharedLibraries.SystemConfig.IConfigurationRepository _configRepository;
     string shared_config_id = null;
     public _configController
     (
         IConfiguration p_configuration, 
-        mmria.common.couchdb.ConfigurationSet p_config_db,
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        mmria.common.SharedLibraries.SystemConfig.IConfigurationRepository configRepository
     )
     {
         configuration = p_configuration;
-        config_set = p_config_db;
-        _couchDbHttpClient = couchDbHttpClient;
+        _configRepository = configRepository;
 
-        overridable_configuration = _configuration;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        db_config = overridable_configuration.GetDBConfig(host_prefix);
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+        overridable_configuration = tenantRuntime.RequireConfiguration();
+        config_set = tenantRuntime.RequireConfigurationSet();
+        db_config = tenantRuntime.RequireDbConfig();
 
         shared_config_id = configuration["mmria_settings:shared_config_id"];
         if(string.IsNullOrWhiteSpace(shared_config_id))
@@ -82,29 +83,18 @@ public sealed class _configController : Controller
 
         try
         {
+            System.Console.WriteLine($"GetConfiguration: configId={shared_config_id}");
 
-            
-            string request_string = $"{db_config.url}/configuration/{shared_config_id}";
+            string responseFromServer = await _configRepository.GetConfigurationJsonAsync(shared_config_id, db_config);
 
-
-            System.Console.WriteLine($"GetConfiguration: request_string {request_string}");
-
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                "GET",
-                request_string,
-                null,
-                db_config.user_name,
-                db_config.user_value
-            );
-
-            app_config = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.couchdb.Configuration> (responseFromServer);
+            app_config = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.couchdb.Configuration>(responseFromServer);
 
         }
         catch(System.Exception ex)
         {
             System.Console.WriteLine (ex);
         } 
-        return Json(app_config);
+        return EscapedJsonResultFactory.Create(app_config);
     }
 
 
@@ -115,60 +105,64 @@ public sealed class _configController : Controller
 
         try
         {
-            string request_string = $"{db_config.url}/configuration/{shared_config_id}";
+            System.Console.WriteLine($"GetConfigurationMaster: configId={shared_config_id}");
 
-            System.Console.WriteLine($"GetConfigurationMaster: request_string {request_string}");
+            string responseFromServer = await _configRepository.GetConfigurationJsonAsync(shared_config_id, db_config);
 
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                "GET",
-                request_string,
-                null,
-                db_config.user_name,
-                db_config.user_value
-            );
-
-            app_config = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.couchdb.OverridableConfiguration> (responseFromServer);
+            app_config = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.couchdb.OverridableConfiguration>(responseFromServer);
         }
         catch(System.Exception ex)
         {
             System.Console.WriteLine (ex);
         } 
 
-        return Json(app_config);
+        return EscapedJsonResultFactory.Create(app_config);
     }
 
 
     [HttpPost]
-    public async Task<IActionResult> SetConfigurationMaster
-    (
-        [FromBody] mmria.common.couchdb.OverridableConfiguration app_config
-    )
+    public async Task<IActionResult> SetConfigurationMaster()
     {
+        var app_config = await JsonRequestBodyReader.ReadAsync<mmria.common.couchdb.OverridableConfiguration>(Request);
         mmria.common.model.couchdb.document_put_response result = new();
+        var revisionHandling = CouchDbRevisionHelper.DescribeRevisionHandling(
+            app_config?._rev,
+            overridable_configuration?._rev);
+        var sanitizedConfiguration = DocumentPayloadCloneHelper.CloneOverridableConfiguration(
+            app_config,
+            shared_config_id,
+            overridable_configuration?._rev,
+            overridable_configuration.date_created ?? app_config?.date_created,
+            overridable_configuration.created_by,
+            GetCurrentUserName() ?? app_config?.last_updated_by ?? overridable_configuration.last_updated_by);
+
+        if (sanitizedConfiguration == null)
+        {
+            result.error_description = "Invalid configuration payload.";
+            return EscapedJsonResultFactory.Create(result);
+        }
+
         try
         {
             Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
             settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-            var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(app_config, settings);
+            var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(sanitizedConfiguration, settings);
 
-            string request_string = $"{db_config.url}/configuration/{shared_config_id}";
-            
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                "PUT",
-                request_string,
-                object_string,
-                db_config.user_name,
-                db_config.user_value
-            );
+            string responseFromServer = await _configRepository.PutConfigurationAsync(shared_config_id, object_string, db_config);
 
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response> (responseFromServer);
+            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
+            if (result == null || !result.ok)
+            {
+                System.Console.WriteLine(
+                    $"Configuration save failed for {shared_config_id}: rev={revisionHandling}; response={responseFromServer}");
+            }
         }
         catch(System.Exception ex)
         {
             System.Console.WriteLine (ex);
         } 
 
-        return Json(result);
+        return EscapedJsonResultFactory.Create(result);
     }
 
 
@@ -179,6 +173,20 @@ public sealed class _configController : Controller
 
         try
         {
+            bool config_is_environment_based = false;
+            string isEnvStr = configuration["mmria_settings:is_environment_based"] ?? System.Environment.GetEnvironmentVariable("is_environment_based");
+            if(!string.IsNullOrWhiteSpace(isEnvStr))
+            {
+                config_is_environment_based = isEnvStr.Equals("true", StringComparison.OrdinalIgnoreCase) || isEnvStr == "1";
+            }
+
+            string GetModeAwareMmriaSetting(string key)
+            {
+                return config_is_environment_based
+                    ? System.Environment.GetEnvironmentVariable(key)
+                    : configuration[$"mmria_settings:{key}"];
+            }
+
             result._id = configuration["mmria_settings:shared_config_id"];
 
             result.boolean_keys.Add("shared", new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase));
@@ -218,6 +226,8 @@ public sealed class _configController : Controller
 
             bool is_schedule_enabled = true;
             configuration["mmria_settings:is_schedule_enabled"].SetIfIsNotNullOrWhiteSpace(ref is_schedule_enabled);
+            bool multi_tenant_db_rebuild = true;
+            configuration["mmria_settings:multi_tenant_db_rebuild"].SetIfIsNotNullOrWhiteSpace(ref multi_tenant_db_rebuild, true);
             bool is_db_check_enabled = false;
             configuration["mmria_settings:is_db_check_enabled"].SetIfIsNotNullOrWhiteSpace(ref is_db_check_enabled);
             bool is_environment_based = true;
@@ -230,6 +240,7 @@ public sealed class _configController : Controller
             configuration["mmria_settings:sams:is_enabled"].SetIfIsNotNullOrWhiteSpace(ref sams_is_enabled);
 
             result.boolean_keys["shared"].Add("is_schedule_enabled ", is_schedule_enabled);
+            result.boolean_keys["shared"].Add("multi_tenant_db_rebuild", multi_tenant_db_rebuild);
             result.boolean_keys["shared"].Add("is_db_check_enabled", is_db_check_enabled);
             result.boolean_keys["shared"].Add("is_environment_based", is_environment_based);
             result.boolean_keys["shared"].Add("is_development", is_development);
@@ -253,6 +264,8 @@ public sealed class _configController : Controller
             configuration["authentication_settings:unsuccessful_login_attempts_within_number_of_minutes"].SetIfIsNotNullOrWhiteSpace(ref unsuccessful_login_attempts_within_number_of_minutes);
             int unsuccessful_login_attempts_lockout_number_of_minutes = 120;
             configuration["authentication_settings:unsuccessful_login_attempts_lockout_number_of_minutes"].SetIfIsNotNullOrWhiteSpace(ref unsuccessful_login_attempts_lockout_number_of_minutes);
+            int tenant_database_counts_mmrds_watch_threshold = 800;
+            GetModeAwareMmriaSetting("tenant_database_counts_mmrds_watch_threshold").SetIfIsNotNullOrWhiteSpace(ref tenant_database_counts_mmrds_watch_threshold);
 
 
 
@@ -264,13 +277,30 @@ public sealed class _configController : Controller
             result.integer_keys["shared"].Add("unsuccessful_login_attempts_number_before_lockout", unsuccessful_login_attempts_number_before_lockout);
             result.integer_keys["shared"].Add("unsuccessful_login_attempts_within_number_of_minutes", unsuccessful_login_attempts_within_number_of_minutes);
             result.integer_keys["shared"].Add("unsuccessful_login_attempts_lockout_number_of_minutes", unsuccessful_login_attempts_lockout_number_of_minutes);
+            result.integer_keys["shared"].Add("tenant_database_counts_mmrds_watch_threshold", tenant_database_counts_mmrds_watch_threshold);
+            result.integer_keys["shared"].Add("CVS_MAX_ATTEMPTS", 10);
+            result.integer_keys["shared"].Add("CVS_RETRY_DELAY_SECONDS", 60);
 
         }
         catch(System.Exception ex)
         {
             System.Console.WriteLine (ex);
-        } 
-        return Json(result);
+        }
+        return EscapedJsonResultFactory.Create(result);
+    }
+
+    private string GetCurrentUserName()
+    {
+        if (User?.Identities?.Any(u => u.IsAuthenticated) == true)
+        {
+            return User.Identities.First(
+                u => u.IsAuthenticated &&
+                u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name))
+                .FindFirst(System.Security.Claims.ClaimTypes.Name)
+                .Value;
+        }
+
+        return null;
     }
 
 }

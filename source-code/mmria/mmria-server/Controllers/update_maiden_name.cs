@@ -7,40 +7,38 @@ using System.Linq;
 using Microsoft.AspNetCore.Http;
 
 using  mmria.server.extension; 
+using mmria.server.util;
 namespace mmria.server.Controllers;
 
 [Authorize(Roles  = "cdc_admin")]
 public sealed class update_maiden_nameController : Controller
 {
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     mmria.common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.couchdb.ConfigurationSet _dbConfigSet;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.Audit.IAuditRepository _auditRepository;
 
 
     private System.Collections.Generic.Dictionary<string, string> MaidenNameToDisplay;
     public update_maiden_nameController
     (
-        mmria.common.couchdb.ConfigurationSet DbConfigurationSet,
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.Audit.IAuditRepository auditRepository
     )
     {
 
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
         _couchDbHttpClient = couchDbHttpClient;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        _auditRepository = auditRepository;
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
 
-        _dbConfigSet = DbConfigurationSet;
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
+        _dbConfigSet = tenantRuntime.RequireConfigurationSet();
 
         if(_dbConfigSet.detail_list.ContainsKey("vital_import"))
         {
@@ -62,20 +60,26 @@ public sealed class update_maiden_nameController : Controller
         return View(_dbConfigSet);
     }
 
-
-    public async Task<IActionResult> FindRecord(mmria.server.model.maiden_name.MaidenNameRequest Model)
+    [HttpPost]
+    public async Task<IActionResult> FindRecord(
+        [Bind(
+            nameof(mmria.server.model.maiden_name.MaidenNameRequest.StateDatabase) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameRequest.RecordId))]
+        mmria.server.model.maiden_name.MaidenNameRequest Model)
     {
+        Model ??= new mmria.server.model.maiden_name.MaidenNameRequest();
         var model = new mmria.server.model.maiden_name.MaidenNameRequestResponse();
         model.SearchText = Model.RecordId;
         TempData["MaidenNameSearchRecordId"] = model.SearchText;
         try
         {
-            var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient);
+            var effectiveStateDatabase = AuthorizedWorkflowScopeHelper.ResolveAuthorizedStateDatabase(User, Model.StateDatabase, host_prefix, _dbConfigSet);
+            var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient, new mmria.common.SharedLibraries.Case.DAL.CaseDAL(_couchDbHttpClient), _auditRepository);
 
             var items = await caseManager.FindYearOfDeathRecordsAsync(
                 Model.RecordId,
-                Model.Role,
-                Model.StateDatabase,
+                "cdc_admin",
+                effectiveStateDatabase,
                 db_config,
                 _dbConfigSet
             );
@@ -104,11 +108,11 @@ public sealed class update_maiden_nameController : Controller
 
                         // YearOfDeath = item.value.date_of_death_year,
 
-                        StateDatabase = Model.StateDatabase,
+                        StateDatabase = effectiveStateDatabase,
 
                         CaseStatus = item.value.case_status,
 
-                        Role = Model.Role
+                        Role = "cdc_admin"
                     };
 
                     model.MaidenNameDetail.Add(x);
@@ -128,33 +132,52 @@ public sealed class update_maiden_nameController : Controller
 
         return View(model);
     }
-
-    public IActionResult ConfirmUpdateMaidenNameRequest(mmria.server.model.maiden_name.MaidenNameDetail Model)
+    [HttpPost]
+    public IActionResult ConfirmUpdateMaidenNameRequest(
+        [Bind(
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail._id) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.RecordId) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.FirstName) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.LastName) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.MiddleName) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.LastUpdatedBy) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.DateLastUpdated) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.MaidenName) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.CaseStatus) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.CaseStatusDisplay) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.StateDatabase))]
+        mmria.server.model.maiden_name.MaidenNameDetail Model)
     {
-        var model = Model;
-        string server_url = db_config.url;
-        string user_name = db_config.user_name;
-        string user_value = db_config.user_value;
-        string prefix = "";
-
-        if(Model.Role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase))
-        {
-            var db_info = _dbConfigSet.detail_list[Model.StateDatabase];
-            server_url = db_info.url;
-            prefix = db_info.prefix;
-            user_name = db_info.user_name;
-            user_value = db_info.user_value;
-        }
+        var model = Model ?? new mmria.server.model.maiden_name.MaidenNameDetail();
+        model.Role = "cdc_admin";
+        model.StateDatabase = AuthorizedWorkflowScopeHelper.ResolveAuthorizedStateDatabase(User, model.StateDatabase, host_prefix, _dbConfigSet);
         return View(model);
     }
 
-    
-    public async Task<IActionResult> UpdateMaidenName(mmria.server.model.maiden_name.MaidenNameDetail Model)
+    [HttpPost]
+    public async Task<IActionResult> UpdateMaidenName(
+        [Bind(
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail._id) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.RecordId) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.FirstName) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.LastName) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.MiddleName) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.LastUpdatedBy) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.DateLastUpdated) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.MaidenName) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.MaidenNameReplacement) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.CaseStatus) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.CaseStatusDisplay) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.StateDatabase))]
+        mmria.server.model.maiden_name.MaidenNameDetail Model)
     {
-        var model = Model;
+        var model = Model ?? new mmria.server.model.maiden_name.MaidenNameDetail();
+        var effectiveStateDatabase = AuthorizedWorkflowScopeHelper.ResolveAuthorizedStateDatabase(User, model.StateDatabase, host_prefix, _dbConfigSet);
+        model.Role = "cdc_admin";
+        model.StateDatabase = effectiveStateDatabase;
         try
         {
-            var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient);
+            var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient, new mmria.common.SharedLibraries.Case.DAL.CaseDAL(_couchDbHttpClient), _auditRepository);
 
             // Best-effort: tab id is generated client-side per browser tab and posted
             // with the confirmation form. Used to enforce same-user/different-tab locks.
@@ -165,10 +188,10 @@ public sealed class update_maiden_nameController : Controller
             }
 
             var updateResult = await caseManager.UpdateMaidenNameAsync(
-                Model._id,
-                Model.Role,
-                Model.StateDatabase,
-                Model.MaidenNameReplacement,
+                model._id,
+                "cdc_admin",
+                effectiveStateDatabase,
+                model.MaidenNameReplacement,
                 User,
                 db_config,
                 _dbConfigSet,
@@ -194,15 +217,8 @@ public sealed class update_maiden_nameController : Controller
                         var dal = new mmria.common.SharedLibraries.Case.DAL.CaseDAL(_couchDbHttpClient);
                         string caseJson;
 
-                        if (Model.Role != null && Model.Role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase))
-                        {
-                            var db_info = _dbConfigSet.detail_list[Model.StateDatabase];
-                            caseJson = await dal.GetCaseDocumentJsonAsync(Model._id, db_info);
-                        }
-                        else
-                        {
-                            caseJson = await dal.GetCaseDocumentJsonAsync(Model._id, db_config);
-                        }
+                        var effectiveDbConfig = AuthorizedWorkflowScopeHelper.ResolveAuthorizedDbConfig(User, effectiveStateDatabase, host_prefix, db_config, _dbConfigSet);
+                        caseJson = await dal.GetCaseDocumentJsonAsync(model._id, effectiveDbConfig);
 
                         var doc = Newtonsoft.Json.Linq.JObject.Parse(caseJson);
                         lockedBy = doc.Value<string>("last_checked_out_by");
@@ -226,9 +242,9 @@ public sealed class update_maiden_nameController : Controller
             // Only overwrite display fields on success.
             if (updateResult != null && updateResult.IsSuccessful)
             {
-                Model.MaidenName = updateResult.MaidenName;
-                Model.LastUpdatedBy = updateResult.LastUpdatedBy;
-                Model.DateLastUpdated = updateResult.DateLastUpdated;
+                model.MaidenName = updateResult.MaidenName;
+                model.LastUpdatedBy = updateResult.LastUpdatedBy;
+                model.DateLastUpdated = updateResult.DateLastUpdated;
             }
 
             model.StatusText = updateResult?.StatusText;
@@ -244,7 +260,7 @@ public sealed class update_maiden_nameController : Controller
 
     public async Task<HashSet<string>> GetExistingRecordIds(string p_server_url, string user_name,  string user_value, string p_prefix = "")
     {
-        var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient);
+        var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient, new mmria.common.SharedLibraries.Case.DAL.CaseDAL(_couchDbHttpClient), _auditRepository);
 
         var dbInfo = new mmria.common.couchdb.DBConfigurationDetail
         {

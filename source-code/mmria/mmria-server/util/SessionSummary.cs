@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using Microsoft.Extensions.Configuration;
+using mmria.common.SharedLibraries.Session;
 
 namespace mmria.server.utils;
 
@@ -92,11 +93,13 @@ public sealed class SessionSummary
 
     mmria.common.couchdb.ConfigurationSet ConfigDB;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly ISessionRepository _sessionRepository;
 
-    public SessionSummary(mmria.common.couchdb.ConfigurationSet p_config_db, mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+    public SessionSummary(mmria.common.couchdb.ConfigurationSet p_config_db, mmria.common.getset.CouchDbHttpClient couchDbHttpClient, ISessionRepository sessionRepository)
     {
         ConfigDB = p_config_db;
         _couchDbHttpClient = couchDbHttpClient;
+        _sessionRepository = sessionRepository;
     }
 
     public async Task<List<SessionSummaryItem>> execute(System.Threading.CancellationToken cancellationToken)
@@ -105,7 +108,10 @@ public sealed class SessionSummary
         var result = new List<SessionSummaryItem>();
         
         var record_count_result = new Dictionary<string, SessionSummaryItem>(System.StringComparer.OrdinalIgnoreCase);
-        var record_count_task_list = new List<Task>();
+        // Defer task creation so the bounded Parallel.ForEachAsync below can cap
+        // real concurrency. Previously every detail_list entry started its CouchDB
+        // call immediately during the foreach.
+        var record_count_task_list = new List<Func<Task>>();
         //var jurisdiction_count_task_list = new List<Task>();
 
         var current_date = System.DateTime.Now;
@@ -123,12 +129,19 @@ public sealed class SessionSummary
             sessionSummaryItem.host_name = prefix;
             record_count_result.Add(prefix, sessionSummaryItem);
             
-            record_count_task_list.Add(GetSessionCount(cancellationToken, prefix, config.Value, sessionSummaryItem, _couchDbHttpClient));
+            record_count_task_list.Add(() => GetSessionCount(cancellationToken, prefix, config.Value, sessionSummaryItem, _couchDbHttpClient));
             
         }
 
 
-        await Task.WhenAll(record_count_task_list);
+        var parallelOptions = new ParallelOptions
+        {
+            MaxDegreeOfParallelism = 6,
+            CancellationToken = cancellationToken
+        };
+
+        await Parallel.ForEachAsync(record_count_task_list, parallelOptions,
+            async (factory, ct) => { await factory(); });
         cancellationToken.ThrowIfCancellationRequested();
         //var user_count_call_results = user_count_responses.Where(r => !string.IsNullOrWhiteSpace(r)); //filter out any null values
 
@@ -152,15 +165,10 @@ public sealed class SessionSummary
     { 
         try
         {
-            string request_string = $"{p_config_detail.url}/{p_config_detail.prefix}session/_design/session_sortable/_view/by_date_created?descending=true&limit=500";
-
+            cancellationToken.ThrowIfCancellationRequested();
+            var case_view_response = await _sessionRepository.GetSessionByDateCreatedViewAsync(true, 500, p_config_detail);
 
             cancellationToken.ThrowIfCancellationRequested();
-            string responseFromServer = await couchDbHttpClient.ExecuteAsync("GET", request_string, null, p_config_detail.user_name, p_config_detail.user_value, "application/json");
-
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.view_response<SessionItem>>(responseFromServer);
 
             var current_day = System.DateTime.Now.Day;
 

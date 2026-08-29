@@ -1,5 +1,6 @@
 # ----- Stage 1: Build -----
-FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-90:9.0.112-1764681922@sha256:ec784f172735873a5893504e07c57dcbd56b7b049a395c5629c6058dbfac21a3 AS build
+# https://catalog.redhat.com/en/software/containers/ubi8/dotnet-90/672bc9015e6e9c0c6f7d2ff7
+FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100:9.8-1786438823@sha256:5e17d5b16b55828defad53f99e85cdec6ec90e6821c5f4f1a731c669a8509bce AS build
 WORKDIR /src
 
 # Copy only the csproj for dependency caching
@@ -14,25 +15,30 @@ USER root
 WORKDIR /src/source-code/mmria/mmria-server
 RUN dotnet restore mmria-server.csproj
 
-RUN dotnet build mmria-server.csproj -c Release -f net9.0 -o /app/build
+RUN dotnet build mmria-server.csproj -c Release -f net10.0 -o /app/build
 USER 1001
 
 # ----- Stage 2: Publish -----
 FROM build AS publish
 USER root
 WORKDIR /src/source-code/mmria/mmria-server
-RUN dotnet publish mmria-server.csproj -c Release -f net9.0 -o /app/publish
+RUN dotnet publish mmria-server.csproj -c Release -f net10.0 -o /app/publish
 USER 1001
 
 # ----- Stage 3: Runtime -----
-FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-90-runtime:9.0-1765385235@sha256:43920d10408205a379519e16530d5181db65a79df3c2725b3cbad26798d09037 AS runtime
+# https://console-openshift-console.apps.ecpaas-dev.cdc.gov/k8s/ns/trusted-images/imagestreamtags/dotnet-100-aspnet%3A9.8-1786442384
+FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100-aspnet:9.8-1786442384@sha256:4c6dc7a25515d540eb5672287078d0c042075c8963ba9306f770032277ee8206 AS runtime
 
-# Switch to root temporarily to create directories
+# Switch to root temporarily to create directories and patch OS packages
 USER root
+
+# Update libacl to address CVE-2026-54369 (symlink traversal privilege escalation;
+# fixed in libacl-2.4.0-1.el9_8). Fall back to microdnf for UBI-minimal variants.
+RUN (dnf update -y libacl && dnf clean all) || (microdnf update -y libacl && microdnf clean all)
 
 WORKDIR /app
 COPY --from=publish /app/publish .
-RUN rm -f ./wwwroot/test.html ./wwwroot/test2.html || true
+RUN rm -f ./wwwroot/test*.html ./wwwroot/test.js ./wwwroot/pdf-version/test*.html ./wwwroot/print-version/test*.html || true
 COPY --from=build /src/source-code/mmria/mmria-server/database-scripts ./database-scripts
 
 # Create the expected directory structure for legacy code compatibility

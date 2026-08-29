@@ -16,8 +16,10 @@ using Akka.Actor;
 using  mmria.server.extension;
 using mmria.common.SharedLibraries.Account.Manager;
 using mmria.common.SharedLibraries.Account.Model;
+using mmria.common.SharedLibraries.Session;
 using mmria.common.SharedLibraries.Session.Model;
 using mmria.common.SharedLibraries.Session.Manager;
+using mmria.common.SharedLibraries.SystemOffline.Manager;
 //https://github.com/blowdart/AspNetAuthorizationWorkshop
 //https://digitalmccullough.com/posts/aspnetcore-auth-system-demystified.html
 //https://gitlab.com/free-time-programmer/tutorials/demystify-aspnetcore-auth/tree/master
@@ -29,16 +31,17 @@ namespace mmria.server.Controllers;
 
 public sealed partial class AccountController : Controller
 {
+    private const string OfflineExitPendingCookieName = "mmria_offline_exit_pending";
 
     IHttpContextAccessor _accessor;
     mmria.common.SharedLibraries.Session.Manager.SessionManager _sessionManager;
+    private readonly ISessionRepository _sessionRepository;
 
     mmria.common.couchdb.OverridableConfiguration _configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     mmria.common.couchdb.DBConfigurationDetail db_config;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly AccountManager _accountManager;
+    private readonly SystemOfflineManager _systemOfflineManager;
 
     string host_prefix = null;
     bool? use_sams = null;
@@ -47,48 +50,35 @@ public AccountController
 (
     IHttpContextAccessor httpContextAccessor, 
     mmria.common.SharedLibraries.Session.Manager.SessionManager sessionManager,
-    mmria.common.couchdb.OverridableConfiguration configuration,
-    List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-    List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+    ISessionRepository sessionRepository,
+    mmria.server.util.RequestTenantRuntime tenantRuntime,
     mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
-    AccountManager accountManager
+    AccountManager accountManager,
+    SystemOfflineManager systemOfflineManager
 )
 {
     _accessor = httpContextAccessor;
     _sessionManager = sessionManager;
-    _configuration = configuration;
-    _overridableConfigSets = overridableConfigSets;
-    _dbConfigSets = dbConfigSets;
+    _sessionRepository = sessionRepository;
+    _configuration = tenantRuntime.RequireConfiguration();
+    db_config = tenantRuntime.RequireDbConfig();
     _couchDbHttpClient = couchDbHttpClient;
     _accountManager = accountManager;
-    
-    host_prefix = _accessor.HttpContext.Request.Host.GetPrefix();
-    Console.WriteLine(host_prefix);
-    
-    // Use the helper method
-    _configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(
-        _overridableConfigSets,
-        configuration,
-        host_prefix
-    );
-    
-    db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(
-        _dbConfigSets,
-        configuration,
-        host_prefix
-    );
+    _systemOfflineManager = systemOfflineManager;
+
+    host_prefix = tenantRuntime.EffectiveHostPrefix;
 
     //db_config = _configuration.GetDBConfig(host_prefix);
     use_sams = _configuration.GetBoolean("sams:is_enabled", host_prefix);
 }
-/*
-    public List<ApplicationUser> Users => new List<ApplicationUser>() 
-    {
-        new ApplicationUser { UserName = "user1", Value = "password" },
-        new ApplicationUser{ UserName = "user2", Value = "password" }
-    };
-*/
 
+    private bool HasPendingOfflineExitCleanup()
+    {
+        return string.Equals(
+            Request.Cookies[OfflineExitPendingCookieName],
+            "true",
+            StringComparison.OrdinalIgnoreCase);
+    }
     [AllowAnonymous] 
     public IActionResult Locked(string user_name, DateTime grace_period_date)
     {
@@ -108,25 +98,56 @@ public AccountController
         {
             return RedirectToAction("SignIn", new { returnUrl });
         }
-        
-        return RedirectToAction("Login", new { returnUrl });
+
+        var loginUrl = string.IsNullOrWhiteSpace(returnUrl)
+            ? "/Account/Login"
+            : $"/Account/Login?returnUrl={Uri.EscapeDataString(returnUrl)}";
+
+        return Redirect(loginUrl);
+    }
+
+    [AllowAnonymous]
+    public async Task<IActionResult> AppOffline()
+    {
+        var offlineConfig = await LoadSystemOfflineConfigAsync();
+        if (!IsJurisdictionAffected(offlineConfig, host_prefix) || !IsSystemOffline(offlineConfig.offline_date))
+            return RedirectToAction("AutoLogin");
+        ViewData["OfflinePageMessage"] = _systemOfflineManager.SubstituteMessage(
+            offlineConfig.offline_page_message, offlineConfig.warn_date, offlineConfig.offline_date, offlineConfig.restoration_hours);
+        return View();
+    }
+
+    [AllowAnonymous]
+    [HttpGet]
+    [Route("~/api/account/offline-status")]
+    public async Task<IActionResult> OfflineStatus()
+    {
+        var offlineConfig = await LoadSystemOfflineConfigAsync();
+        var isOffline = IsJurisdictionAffected(offlineConfig, host_prefix) && IsSystemOffline(offlineConfig.offline_date);
+        return Json(new { is_offline = isOffline });
     }
 
     [AllowAnonymous] 
-    public IActionResult Login(string returnUrl = null)
-    {
+    public async Task<IActionResult> Login(string returnUrl = null)
+    { 
+        var offlineConfig = await LoadSystemOfflineConfigAsync();
+        if (IsJurisdictionAffected(offlineConfig, host_prefix) && IsSystemOffline(offlineConfig.offline_date))
+            return RedirectToAction("AppOffline");
+
+        if (use_sams.HasValue && use_sams.Value)
+            return RedirectToAction("SignIn");
+
         TempData["returnUrl"] = returnUrl;
         ViewBag.is_offline_mode_enabled = _configuration.GetBoolean("is_offline_mode_enabled", host_prefix) ?? false;
         ViewBag.is_offline_logging_enabled = _configuration.GetBoolean("is_offline_logging_enabled", host_prefix) ?? false;
         ViewBag.offline_logging_max_logs = _configuration.GetInteger("offline_logging_max_logs", host_prefix) ?? 10000;
-
         return View();
     }
 
 
     [AllowAnonymous]
     [HttpPost]
-    public async Task<IActionResult> Login(ApplicationUser user, string returnUrl = null)
+    public async Task<IActionResult> Login([Bind(nameof(ApplicationUser.UserName), nameof(ApplicationUser.Value))] ApplicationUser user, string returnUrl = null)
     {
         const string badUserNameOrValueMessage = "Username or password is incorrect.";
         
@@ -135,6 +156,11 @@ public AccountController
         {
             return RedirectToAction("SignIn");
         }
+
+        // Block login if system is offline for this tenant
+        var postOfflineConfig = await LoadSystemOfflineConfigAsync();
+        if (IsJurisdictionAffected(postOfflineConfig, host_prefix) && IsSystemOffline(postOfflineConfig.offline_date))
+            return RedirectToAction("AppOffline");
 
         // Validate basic input
         if (user == null || string.IsNullOrWhiteSpace(user.UserName) || string.IsNullOrWhiteSpace(user.Value))
@@ -164,9 +190,10 @@ public AccountController
             var loginRequest = new LoginRequest { UserName = user.UserName, Password = user.Value };
 
             // Get session idle timeout from configuration
-            var session_idle_timeout_minutes = 30;
-            _configuration.GetInteger("session_idle_timeout_minutes", host_prefix)
-                .SetIfIsNotNullOrWhiteSpace(ref session_idle_timeout_minutes);
+            var session_idle_timeout_minutes = mmria.server.util.SessionTimeoutHelper.GetSessionIdleTimeoutMinutes(
+                _configuration,
+                _configuration,
+                host_prefix);
 
             // Delegate ALL business logic to AccountManager
             var loginResult = await _accountManager.ProcessLoginAsync(
@@ -195,11 +222,14 @@ public AccountController
 
             // Success - set up authentication context using data from manager
             var sessionInfo = loginResult.SessionInfo;
+            var canonicalUserName = string.IsNullOrWhiteSpace(sessionInfo?.UserId)
+                ? NormalizeUserName(user.UserName)
+                : sessionInfo.UserId;
             
             // Build claims from manager-provided roles
             const string Issuer = "https://contoso.com";
             var claims = new List<Claim>();
-            claims.Add(new Claim(ClaimTypes.Name, user.UserName, ClaimValueTypes.String, Issuer));
+            claims.Add(new Claim(ClaimTypes.Name, canonicalUserName, ClaimValueTypes.String, Issuer));
 
             foreach (var role in sessionInfo.Roles ?? new List<string>())
             {
@@ -217,7 +247,7 @@ public AccountController
             var Session_Event_Message = new Session_Event_Message
             (
                 DateTime.Now,
-                user.UserName,
+                canonicalUserName,
                 this.GetRequestIP(),
                 mmria.common.SharedLibraries.Session.Model.Session_Event_Message.Session_Event_Message_Action_Enum.successful_login
             );
@@ -225,14 +255,12 @@ public AccountController
 
             // Set session/authentication cookie
             var session_expiration_datetime = sessionInfo.ExpirationDateTime;
-            Response.Cookies.Append("sid", sessionInfo.SessionId, new CookieOptions 
-            { 
-                HttpOnly = true, 
-                Expires = session_expiration_datetime, 
-                SameSite = SameSiteMode.Strict,
-                Path = "/",
-                Secure = Request.IsHttps
-            });
+            mmria.server.util.AppSessionCookieHelper.AppendAppSessionCookies(
+                Response,
+                sessionInfo.SessionId,
+                session_expiration_datetime,
+                Request.IsHttps,
+                sessionScope: mmria.server.util.AppSessionCookieHelper.StandardSessionScopeValue);
 
             // Post session via Akka actor (notification pattern)
             var session_data = new System.Collections.Generic.Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase);
@@ -244,7 +272,7 @@ public AccountController
                 DateTime.Now,
                 session_expiration_datetime,
                 true,
-                user.UserName,
+                canonicalUserName,
                 this.GetRequestIP(),
                 sessionInfo.SessionEventId,
                 sessionInfo.Roles,
@@ -255,7 +283,9 @@ public AccountController
             // Handle offline mode redirect detection
             if ((_configuration.GetBoolean("is_offline_mode_enabled", host_prefix) ?? false) == true)
             {
-                if (priorUserName == user.UserName && priorRole == "offline_mode")
+                var hasPendingOfflineExitCleanup = HasPendingOfflineExitCleanup();
+
+                if (!hasPendingOfflineExitCleanup && string.Equals(priorUserName, canonicalUserName, StringComparison.OrdinalIgnoreCase) && priorRole == "offline_mode")
                 {
                     // Force a full logout to clear offline_mode role if user is switching from offline to online login
                     return Redirect("/case");
@@ -264,21 +294,24 @@ public AccountController
                 // Check for active offline sessions and redirect if found         
                 try
                 {
-                    var offlineCaseManager = (mmria.common.SharedLibraries.OfflineCase.Manager.IOfflineCaseManager)
-                        HttpContext.RequestServices.GetService(typeof(mmria.common.SharedLibraries.OfflineCase.Manager.IOfflineCaseManager));
-                    if (offlineCaseManager != null)
+                    if (!hasPendingOfflineExitCleanup)
                     {
-                        var shouldRedirect = await offlineCaseManager.ShouldRedirectToCaseSummaryAsync(user.UserName, db_config);
-                        if (shouldRedirect)
+                        var offlineCaseManager = (mmria.common.SharedLibraries.OfflineCase.Manager.IOfflineCaseManager)
+                            HttpContext.RequestServices.GetService(typeof(mmria.common.SharedLibraries.OfflineCase.Manager.IOfflineCaseManager));
+                        if (offlineCaseManager != null)
                         {
-                            Console.WriteLine($"User {user.UserName} has active offline session, redirecting to /Case#/summary");
-                            return Redirect("/Case#/summary");
+                            var shouldRedirect = await offlineCaseManager.ShouldRedirectToCaseSummaryAsync(canonicalUserName, db_config);
+                            if (shouldRedirect)
+                            {
+                                Console.WriteLine($"User {canonicalUserName} has active offline session, redirecting to /Case#/summary");
+                                return Redirect("/Case#/summary");
+                            }
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error checking offline session for user {user.UserName}: {ex}");
+                    Console.WriteLine($"Error checking offline session for user {canonicalUserName}: {ex}");
                     // Continue with normal login flow if check fails
                 }
             }
@@ -291,20 +324,21 @@ public AccountController
 
             if (returnUrl != null)
             {
-                return Redirect(returnUrl);
+                return RedirectToLocal(returnUrl);
             }
 
             return RedirectToAction(nameof(HomeController.Index), "Home");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Login error for user {user?.UserName}: {ex}");
+            var canonicalUserName = NormalizeUserName(user?.UserName);
+            Console.WriteLine($"Login error for user {(string.IsNullOrWhiteSpace(canonicalUserName) ? user?.UserName : canonicalUserName)}: {ex}");
 
             // Log failed login event via Akka actor
             var Session_Event_Message = new Session_Event_Message
             (
                 DateTime.Now,
-                user?.UserName ?? "unknown",
+                string.IsNullOrWhiteSpace(canonicalUserName) ? user?.UserName ?? "unknown" : canonicalUserName,
                 this.GetRequestIP(),
                 mmria.common.SharedLibraries.Session.Model.Session_Event_Message.Session_Event_Message_Action_Enum.failed_login
             );
@@ -329,19 +363,10 @@ public AccountController
             Session_MessageDTO session_message = null;
             try
             {
-                string request_string = $"{config_couchdb_url}/{config_db_prefix}session/{Request.Cookies["sid"]}";
-                System.Console.WriteLine($"Connection Refused on method: Get url: {request_string}");
-            
-                
-                var responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                    "GET",
-                    request_string,
-                    null,
-                    config_timer_user_name,
-                    config_timer_password
-                );
+                var sessionId = Request.Cookies["sid"];
+                var rawJson = await _sessionRepository.GetSessionDocumentRawAsync(sessionId, db_config);
 
-                session_message = Newtonsoft.Json.JsonConvert.DeserializeObject<Session_MessageDTO>(responseFromServer);
+                session_message = Newtonsoft.Json.JsonConvert.DeserializeObject<Session_MessageDTO>(rawJson);
 
             }
             catch(System.Exception ex)
@@ -369,8 +394,7 @@ public AccountController
             );
 
 
-            Response.Cookies.Append("sid", "", new CookieOptions{ HttpOnly = true, Expires = DateTime.Now });
-            Response.Cookies.Append("expires_at", "", new CookieOptions{ HttpOnly = true, Expires = DateTime.Now });
+            mmria.server.util.AppSessionCookieHelper.ClearSessionCookies(Response, Request.IsHttps);
 
             System.Threading.Thread.CurrentPrincipal = null;
 
@@ -382,6 +406,9 @@ public AccountController
             use_sams.Value 
         )
         {
+            var logoutOfflineConfig = await LoadSystemOfflineConfigAsync();
+            if (IsJurisdictionAffected(logoutOfflineConfig, host_prefix) && IsSystemOffline(logoutOfflineConfig.offline_date))
+                return RedirectToAction("AppOffline");
 
             return Redirect(_configuration.GetSharedString("sams:logout_url"));
         }
@@ -399,9 +426,7 @@ public AccountController
                     AllowRefresh = true,
                 }
             );*/
-
-
-            return RedirectToAction(nameof(HomeController.Index), "Home");
+            return RedirectToAction(nameof(AutoLogin));
         }
         
         //Response.Cookies.Delete("uid");
@@ -420,7 +445,7 @@ public AccountController
 
     [AllowAnonymous]
     [HttpPost]
-    public IActionResult OfflineLogin(OfflineApplicationUser user, string returnUrl = null)
+    public IActionResult OfflineLogin([Bind(nameof(OfflineApplicationUser.OfflineKey))] OfflineApplicationUser user, string returnUrl = null)
     {
         // For offline mode, we don't validate server-side
         // The client-side JavaScript will handle validation against cached service worker data
@@ -442,7 +467,7 @@ public AccountController
 
         if (returnUrl != null)
         {
-            return Redirect(returnUrl);
+            return RedirectToLocal(returnUrl);
         }
 
         return RedirectToAction(nameof(HomeController.Index), "Home");
@@ -452,9 +477,9 @@ public AccountController
 
     private IActionResult RedirectToLocal(string returnUrl)
     {
-        if (Url.IsLocalUrl(returnUrl))
+        if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
         {
-            return Redirect(returnUrl);
+            return LocalRedirect(returnUrl);
         }
         else
         {
@@ -488,18 +513,7 @@ public AccountController
                     u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
 
                 
-                var session_event_request_url = db_config.Get_Prefix_DB_Url($"session/_design/session_event_sortable/_view/by_user_id?startkey=\"{userName}\"&endkey=\"{userName}\"");
-
-                string response_from_server = await _couchDbHttpClient.ExecuteAsync(
-                    "GET",
-                    session_event_request_url,
-                    null,
-                    db_config.user_name,
-                    db_config.user_value
-                );
-
-                //var session_event_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_object_key_header<mmria.common.model.couchdb.session_event>>(response_from_server);
-                var session_event_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.session_event>>(response_from_server);
+                var session_event_response = await _sessionRepository.GetSessionEventsByUserIdAsync(userName, db_config);
 
                 DateTime first_item_date = DateTime.Now;
                 DateTime last_item_date = DateTime.Now;
@@ -608,14 +622,14 @@ public AccountController
         }
 
         #if !IS_PMSS_ENHANCED
-        foreach(var role in mmria.common.SharedLibraries.Other.authorization.get_current_user_role_jurisdiction_set_for(db_config, p_user_name).Select( jr => jr.role_name).Distinct())
+        foreach(var role in mmria.common.SharedLibraries.Other.authorization.get_current_user_role_jurisdiction_set_for(db_config, p_user_name, _couchDbHttpClient).Select( jr => jr.role_name).Distinct())
         {
 
             claims.Add(new Claim(ClaimTypes.Role, role, ClaimValueTypes.String, Issuer));
         }
         #endif
         #if IS_PMSS_ENHANCED
-        foreach(var role in mmria.pmss.server.utils.authorization.get_current_user_role_jurisdiction_set_for(db_config, p_user_name).Select( jr => jr.role_name).Distinct())
+        foreach(var role in mmria.pmss.server.utils.authorization.get_current_user_role_jurisdiction_set_for(db_config, p_user_name, _couchDbHttpClient).Select( jr => jr.role_name).Distinct())
         {
 
             claims.Add(new Claim(ClaimTypes.Role, role, ClaimValueTypes.String, Issuer));
@@ -630,9 +644,10 @@ public AccountController
         var userPrincipal = new ClaimsPrincipal(userIdentity);
 
 
-        int session_idle_timeout_minutes = 10;
-        
-        _configuration.GetInteger("session_idle_timeout_minutes", host_prefix).SetIfIsNotNullOrWhiteSpace(ref session_idle_timeout_minutes);
+        var session_idle_timeout_minutes = mmria.server.util.SessionTimeoutHelper.GetSessionIdleTimeoutMinutes(
+            _configuration,
+            _configuration,
+            host_prefix);
         await HttpContext.SignInAsync(
             CookieAuthenticationDefaults.AuthenticationScheme,
             userPrincipal,
@@ -643,6 +658,58 @@ public AccountController
                 AllowRefresh = true,
             });
 
+    }
+
+    private static string NormalizeUserName(string? userName)
+    {
+        return (userName ?? string.Empty).Trim().ToLowerInvariant();
+    }
+
+    private async Task<mmria.common.metadata.SystemOfflineConfig> LoadSystemOfflineConfigAsync()
+    {
+        var result = new mmria.common.metadata.SystemOfflineConfig();
+        try
+        {
+            var vitalsUrl = _configuration.GetString("vitals_url", host_prefix)
+                ?.Replace("/api/Message/IJESet", string.Empty);
+            if (string.IsNullOrWhiteSpace(vitalsUrl))
+                return result;
+
+            var getUrl = $"{vitalsUrl}/api/systemOffline/GetSystemOfflineConfig";
+            var requestOptions = new mmria.common.getset.CouchDbRequestOptions
+            {
+                VitalServiceKey = _configuration.GetString("vital_service_key", host_prefix)
+            };
+            // Service endpoint call — not a CouchDB direct access. No repository routing needed.
+            var responseBody = await _couchDbHttpClient.ExecuteAsync(
+                "GET", getUrl, null, "application/json", requestOptions);
+            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.SystemOfflineConfig>(responseBody)
+                ?? new mmria.common.metadata.SystemOfflineConfig();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"AccountController.LoadSystemOfflineConfigAsync error: {ex}");
+        }
+        return result;
+    }
+
+    private static bool IsSystemOffline(string offlineDateStr)
+    {
+        if (string.IsNullOrWhiteSpace(offlineDateStr))
+            return false;
+        // Dates are stored as UTC ISO strings (with Z) via the admin UI.
+        // RoundtripKind correctly parses the Z suffix and sets Kind=Utc.
+        if (!DateTime.TryParse(offlineDateStr, null, System.Globalization.DateTimeStyles.RoundtripKind, out var offlineDate))
+            return false;
+        return DateTime.UtcNow >= offlineDate.ToUniversalTime();
+    }
+
+    private static bool IsJurisdictionAffected(mmria.common.metadata.SystemOfflineConfig config, string hostPrefix)
+    {
+        if (config.apply_to_all_jurisdictions)
+            return true;
+        var selected = config.selected_jurisdictions ?? new System.Collections.Generic.List<string>();
+        return selected.Contains(hostPrefix, StringComparer.OrdinalIgnoreCase);
     }
 
 }

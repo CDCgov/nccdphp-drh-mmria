@@ -189,7 +189,10 @@ public sealed class backupController : Controller
 
         if(!string.IsNullOrWhiteSpace(id))
         {
-            root_folder = System.IO.Path.Combine(root_folder, id);
+            var safeName = ValidateContainedName(id, nameof(id));
+            var normalizedRoot = NormalizeTrustedDirectoryRoot(root_folder, nameof(root_folder));
+            root_folder = System.IO.Path.GetFullPath(System.IO.Path.Combine(normalizedRoot, safeName));
+            EnsureContainedPath(normalizedRoot, root_folder, nameof(id));
         }
 
         var result = new List<string>();
@@ -280,7 +283,10 @@ public sealed class backupController : Controller
     public async Task<IActionResult> GetFile(string id)
     {
         string root_folder = Program.DbConfigSet.name_value["backup_storage_root_folder"];
-        var file_path = System.IO.Path.Combine(root_folder, id);
+        var safeName = ValidateContainedName(id, nameof(id));
+        var normalizedRoot = NormalizeTrustedDirectoryRoot(root_folder, nameof(root_folder));
+        var file_path = System.IO.Path.GetFullPath(System.IO.Path.Combine(normalizedRoot, safeName));
+        EnsureContainedPath(normalizedRoot, file_path, nameof(id));
 
         if(System.IO.File.Exists(file_path))
         {
@@ -290,7 +296,7 @@ public sealed class backupController : Controller
                 "application/octet-stream"
             ) 
             { 
-                FileDownloadName = id 
+                FileDownloadName = safeName 
             };
         }
         else
@@ -306,7 +312,11 @@ public sealed class backupController : Controller
     public async Task<IActionResult> GetSubFolderFile(string folder, string file_name)
     {
         string root_folder = Program.DbConfigSet.name_value["backup_storage_root_folder"];
-        var file_path = System.IO.Path.Combine(root_folder, folder, file_name);
+        var safeFolder = ValidateContainedName(folder, nameof(folder));
+        var safeFileName = ValidateContainedName(file_name, nameof(file_name));
+        var normalizedRoot = NormalizeTrustedDirectoryRoot(root_folder, nameof(root_folder));
+        var file_path = System.IO.Path.GetFullPath(System.IO.Path.Combine(normalizedRoot, safeFolder, safeFileName));
+        EnsureContainedPath(normalizedRoot, file_path, nameof(file_name));
 
         if(System.IO.File.Exists(file_path))
         {
@@ -316,7 +326,7 @@ public sealed class backupController : Controller
                 "application/octet-stream"
             ) 
             { 
-                FileDownloadName = file_name 
+                FileDownloadName = safeFileName 
             };
         }
         else
@@ -614,5 +624,57 @@ public sealed class backupController : Controller
 
         return encodedCharArray;
     }
+
+    #region Path containment helpers
+
+    private static string NormalizeTrustedDirectoryRoot(string rootPath, string paramName)
+    {
+        if (!System.IO.Path.IsPathFullyQualified(rootPath))
+        {
+            throw new ArgumentException("Base directory must be fully qualified.", paramName);
+        }
+
+        return System.IO.Path.EndsInDirectorySeparator(rootPath)
+            ? rootPath
+            : rootPath + System.IO.Path.DirectorySeparatorChar;
+    }
+
+    private static string ValidateContainedName(string value, string paramName)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new ArgumentException("A non-empty path segment is required.", paramName);
+        }
+
+        var trimmedValue = value.Trim();
+        if (trimmedValue is "." or "..")
+        {
+            throw new ArgumentException("Relative path operators are not allowed.", paramName);
+        }
+
+        if (System.IO.Path.IsPathRooted(trimmedValue) ||
+            trimmedValue.Contains(System.IO.Path.DirectorySeparatorChar) ||
+            trimmedValue.Contains(System.IO.Path.AltDirectorySeparatorChar))
+        {
+            throw new ArgumentException("Only a single file name is allowed.", paramName);
+        }
+
+        if (trimmedValue.IndexOfAny(System.IO.Path.GetInvalidFileNameChars()) >= 0)
+        {
+            throw new ArgumentException("Path segment contains invalid filename characters.", paramName);
+        }
+
+        return trimmedValue;
+    }
+
+    private static void EnsureContainedPath(string trustedBaseDirectory, string resolvedPath, string paramName)
+    {
+        if (!resolvedPath.StartsWith(trustedBaseDirectory, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException("Resolved path escaped the configured base directory.", paramName);
+        }
+    }
+
+    #endregion
 
 }

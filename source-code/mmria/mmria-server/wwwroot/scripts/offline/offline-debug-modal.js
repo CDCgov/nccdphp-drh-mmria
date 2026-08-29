@@ -126,7 +126,7 @@
                     </div>
                 </div>
             </div>
-            <div id="offline-debug-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+            <div id="offline-debug-backdrop" class="modal-backdrop fade" style="z-index: 1040; display: none;"></div>
         `;
         
         // Inject custom CSS for log level badges

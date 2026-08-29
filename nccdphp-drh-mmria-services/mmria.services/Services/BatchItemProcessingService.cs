@@ -8,6 +8,9 @@ using mmria.common.SharedLibraries.MMRIAServices.Manager;
 using mmria.common.SharedLibraries.MMRIAServices.DAL;
 using mmria.common.SharedLibraries.MMRIAServices.Helper;
 using static mmria.common.SharedLibraries.MMRIAServices.Helper.MMRIAServicesHelper;
+using mmria.common.SharedLibraries.Case;
+using mmria.common.SharedLibraries.Case.DAL;
+using mmria.common.SharedLibraries.MetadataVersion.DAL;
 
 namespace RecordsProcessor_Worker.Services;
 
@@ -247,7 +250,7 @@ public sealed class BatchItemProcessingService
         {"FDOB_YR","birth_fetal_death_certificate_parent/demographic_of_father/date_of_birth/year"},
         {"FDOB_MO","birth_fetal_death_certificate_parent/demographic_of_father/date_of_birth/month"},
         {"MARN","birth_fetal_death_certificate_parent/demographic_of_mother/mother_married"},
-        {"ACKN","birth_fetal_death_certificate_parent/demographic_of_mother/If_mother_not_married_has_paternity_acknowledgement_been_signed_in_the_hospital"},
+        {"ACKN","birth_fetal_death_certificate_parent/demographic_of_mother/if_mother_not_married_has_paternity_acknowledgement_been_signed_in_the_hospital"},
         {"MEDUC","birth_fetal_death_certificate_parent/demographic_of_mother/education_level"},
         {"FEDUC","birth_fetal_death_certificate_parent/demographic_of_father/education_level"},
         {"ATTEND","birth_fetal_death_certificate_parent/facility_of_delivery_demographics/attendant_type"},
@@ -756,10 +759,24 @@ public sealed class BatchItemProcessingService
     private mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private System.Net.Http.HttpClient _externalHttpClient;
     private MMRIAServicesManager _mmriaServicesManager;
+    private ICaseRepository _caseRepository;
+    private readonly mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository _metadataRepository;
+    private readonly mmria.common.SharedLibraries.Audit.IAuditRepository _auditRepository;
+    private readonly mmria.common.SharedLibraries.Case.Manager.CaseManager _caseManager;
+    private readonly mmria.common.SharedLibraries.Geocoding.Manager.GeocodingManager _geocodingManager;
+    private readonly mmria.common.SharedLibraries.Case.Manager.CaseGeocodingManager _caseGeocodingManager;
+    private readonly mmria.services.SharedLibraries.VitalImport.Manager.VitalImportCaseWriter _vitalImportCaseWriter;
     public BatchItemProcessingService(mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
         _couchDbHttpClient = couchDbHttpClient;
-        _mmriaServicesManager = new MMRIAServicesManager(new MMRIAServicesDAL(_couchDbHttpClient), _couchDbHttpClient);
+        _mmriaServicesManager = new MMRIAServicesManager(new MMRIAServicesDAL(_couchDbHttpClient, new mmria.common.SharedLibraries.SystemConfig.DAL.SystemConfigDAL(_couchDbHttpClient), new MetadataVersionDAL(_couchDbHttpClient), new mmria.common.SharedLibraries.VitalImport.DAL.VitalImportDAL(_couchDbHttpClient, new mmria.common.SharedLibraries.Case.DAL.CaseDAL(_couchDbHttpClient))), _couchDbHttpClient);
+        _caseRepository = new CaseDAL(_couchDbHttpClient);
+        _metadataRepository = new MetadataVersionDAL(_couchDbHttpClient);
+        _auditRepository = new mmria.common.SharedLibraries.Audit.DAL.AuditDAL(_couchDbHttpClient);
+        _caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient, _caseRepository, _auditRepository);
+        _vitalImportCaseWriter = new mmria.services.SharedLibraries.VitalImport.Manager.VitalImportCaseWriter(_caseRepository, _caseManager, _auditRepository);
+        _geocodingManager = new mmria.common.SharedLibraries.Geocoding.Manager.GeocodingManager();
+        _caseGeocodingManager = new mmria.common.SharedLibraries.Case.Manager.CaseGeocodingManager();
         var httpClientFactory = new mmria.common.SimpleHttpClientFactory();
         _externalHttpClient = httpClientFactory.CreateClient("external");
     }
@@ -783,9 +800,13 @@ public sealed class BatchItemProcessingService
         var fet_field_set = fet_get_header(message.fet);
 
 
-        string metadata_url = $"{mmria.services.vitalsimport.Program.couchdb_url}/metadata/version_specification-{db_config_set.name_value["metadata_version"]}/metadata";
-        string metadata_response = await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, config_timer_user_name, config_timer_value);
-        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_response);
+        var metadata_db_config = new mmria.common.couchdb.DBConfigurationDetail
+        {
+            url = mmria.services.vitalsimport.Program.couchdb_url,
+            user_name = config_timer_user_name,
+            user_value = config_timer_value
+        };
+        mmria.common.metadata.app metadata = await _metadataRepository.GetAppDocumentAsync(db_config_set.name_value["metadata_version"], metadata_db_config);
 
         lookup = get_look_up(metadata);
 
@@ -833,6 +854,14 @@ public sealed class BatchItemProcessingService
                 mmria_id = mmria_id,
                 StatusDetail = "matching case found in database"
             };
+
+            // Story 38.1 (AC-4): structured log for per-case duplicate skip.
+            // Emitted through Console because Akka Props creation of the actor
+            // pipeline does not thread ILogger; the key/value shape below is the
+            // observability contract the AC requires.
+            Console.WriteLine(
+                $"[VitalImport:ExistingCaseSkipped] CDCUniqueID={result.CDCUniqueID} mmria_record_id={result.mmria_record_id} ImportFileName={result.ImportFileName}");
+
             // Notify BatchProcessor of completion
             var completion = new mmria.common.ije.BatchItemComplete()
             {
@@ -1121,24 +1150,27 @@ public sealed class BatchItemProcessingService
             gs.set_value(IJE_to_MMRIA_Path["ZIP9_D"], mor_field_set["ZIP9_D"], new_case);
             gs.set_value(IJE_to_MMRIA_Path["COUNTYTEXT_D"], mor_field_set["COUNTYTEXT_D"], new_case);
 
-            Set_address_of_death_Gecocode
-            (
-                gs, 
-                get_geocode_info
+            {
+                var geo_result = _geocodingManager.FetchGeocode
                 (
-                ADDRESS_OF_DEATH_street_Rule
-                (
-                    mor_field_set["STNUM_D"],
-                    mor_field_set["PREDIR_D"],
-                    mor_field_set["STNAME_D"],
-                    mor_field_set["STDESIG_D"],
-                    mor_field_set["POSTDIR_D"]
-                ), 
-                mor_field_set["CITYTEXT_D"],
-                STATETEXT_D_Rule(mor_field_set["STATETEXT_D"]),
-                mor_field_set["ZIP9_D"]), 
-                new_case
-            );
+                    geocode_api_key,
+                    ADDRESS_OF_DEATH_street_Rule
+                    (
+                        mor_field_set["STNUM_D"],
+                        mor_field_set["PREDIR_D"],
+                        mor_field_set["STNAME_D"],
+                        mor_field_set["STDESIG_D"],
+                        mor_field_set["POSTDIR_D"]
+                    ),
+                    mor_field_set["CITYTEXT_D"],
+                    STATETEXT_D_Rule(mor_field_set["STATETEXT_D"]),
+                    mor_field_set["ZIP9_D"],
+                    mor_field_set["DOD_YR"]
+                );
+                death_certificate_address_of_death_latitude = geo_result.Latitude;
+                death_certificate_address_of_death_longitude = geo_result.Longitude;
+                _caseGeocodingManager.Apply(new_case, "dc_address_of_death", geo_result);
+            }
 
             gs.set_value
             (
@@ -1159,25 +1191,27 @@ public sealed class BatchItemProcessingService
             gs.set_value(IJE_to_MMRIA_Path["ZIP9_R"], mor_field_set["ZIP9_R"], new_case);
             gs.set_value(IJE_to_MMRIA_Path["COUNTYTEXT_R"], mor_field_set["COUNTYTEXT_R"], new_case);
 
-            Set_place_of_last_residence_Gecocode
-            (
-                gs,
-                get_geocode_info
+            {
+                var geo_result = _geocodingManager.FetchGeocode
                 (
+                    geocode_api_key,
                     PLACE_OF_LAST_RESIDENCE_street_Rule
                     (
-                        mor_field_set["STNUM_R"], 
+                        mor_field_set["STNUM_R"],
                         mor_field_set["PREDIR_R"],
                         mor_field_set["STNAME_R"],
                         mor_field_set["STDESIG_R"],
                         mor_field_set["POSTDIR_R"]
-                    ), 
+                    ),
                     mor_field_set["CITYTEXT_R"],
                     mor_field_set["STATEC"],
-                    mor_field_set["ZIP9_R"]
-                ), 
-                new_case
-            );
+                    mor_field_set["ZIP9_R"],
+                    mor_field_set["DOD_YR"]
+                );
+                death_certificate_place_of_last_residence_latitude = geo_result.Latitude;
+                death_certificate_place_of_last_residence_longitude = geo_result.Longitude;
+                _caseGeocodingManager.Apply(new_case, "dc_place_of_last_residence", geo_result);
+            }
 
             var new_case_dictionary = new_case as IDictionary<string, object>;
 
@@ -1472,8 +1506,14 @@ public sealed class BatchItemProcessingService
                     gs.set_value(Parent_NAT_IJE_to_MMRIA_Path["MDOB_DY"], TryPaseToIntOr_DefaultBlank(field_set["MDOB_DY"]), new_case);
                     gs.set_value(Parent_NAT_IJE_to_MMRIA_Path["FDOB_YR"], field_set["FDOB_YR"], new_case);
                     gs.set_value(Parent_NAT_IJE_to_MMRIA_Path["FDOB_MO"], TryPaseToIntOr_DefaultBlank(field_set["FDOB_MO"]), new_case);
-                    gs.set_value(Parent_NAT_IJE_to_MMRIA_Path["MARN"], field_set["MARN"], new_case);
-                    gs.set_value(Parent_NAT_IJE_to_MMRIA_Path["ACKN"], field_set["ACKN"], new_case);
+                    if (int.TryParse(field_set["MARN"], out int nat_marn_val) && field_set["MARN"] != "9999")
+                        gs.set_objectvalue(Parent_NAT_IJE_to_MMRIA_Path["MARN"], nat_marn_val, new_case);
+                    else
+                        gs.set_value(Parent_NAT_IJE_to_MMRIA_Path["MARN"], field_set["MARN"], new_case);
+                    if (int.TryParse(field_set["ACKN"], out int nat_ackn_val) && field_set["ACKN"] != "9999")
+                        gs.set_objectvalue(Parent_NAT_IJE_to_MMRIA_Path["ACKN"], nat_ackn_val, new_case);
+                    else
+                        gs.set_value(Parent_NAT_IJE_to_MMRIA_Path["ACKN"], field_set["ACKN"], new_case);
                     gs.set_value(Parent_NAT_IJE_to_MMRIA_Path["MEDUC"], field_set["MEDUC"], new_case);
                     gs.set_value(Parent_NAT_IJE_to_MMRIA_Path["FEDUC"], FEDUC_Rule(field_set["FEDUC"]), new_case);
                     gs.set_value(Parent_NAT_IJE_to_MMRIA_Path["ATTEND"], field_set["ATTEND"], new_case);
@@ -1536,25 +1576,27 @@ public sealed class BatchItemProcessingService
                     gs.set_value(Parent_NAT_IJE_to_MMRIA_Path["FETHNIC5"], field_set["FETHNIC5"], new_case);
 
 
-                    Set_location_of_residence_Gecocode
-                    (
-                        gs, 
-                        get_geocode_info
+                    {
+                        var geo_result = _geocodingManager.FetchGeocode
                         (
+                            geocode_api_key,
                             LOCATION_OF_RESIDENCE_street_Rule
                             (
                                 field_set["STNUM"],
-                                field_set["PREDIR"], 
+                                field_set["PREDIR"],
                                 field_set["STNAME"],
                                 field_set["STDESIG"],
                                 field_set["POSTDIR"]
                             ),
                             field_set["CITYTEXT"],
                             field_set["STATEC"],
-                            field_set["ZIPCODE"]
-                        ), 
-                        new_case
-                    );
+                            field_set["ZIPCODE"],
+                            mor_field_set["DOD_YR"]
+                        );
+                        location_of_residence_latitude = geo_result.Latitude;
+                        location_of_residence_longitude = geo_result.Longitude;
+                        _caseGeocodingManager.Apply(new_case, "bc_location_of_residence", geo_result);
+                    }
 
 
                     birth_2_death(gs, new_case, field_set["IDOB_YR"], field_set["IDOB_MO"], field_set["IDOB_DY"]
@@ -1647,7 +1689,7 @@ public sealed class BatchItemProcessingService
                         field_set["FRACE14"],
                         field_set["FRACE15"]));
 
-                    gs.set_value(Parent_NAT_IJE_to_MMRIA_Path["FRACE16_17"], FRACE16_17_NAT_Rule(field_set["FRACE16"], field_set["FRACE16"]), new_case);
+                    gs.set_value(Parent_NAT_IJE_to_MMRIA_Path["FRACE16_17"], FRACE16_17_NAT_Rule(field_set["FRACE16"], field_set["FRACE17"]), new_case);
                     gs.set_value(Parent_NAT_IJE_to_MMRIA_Path["FRACE18_19"], FRACE18_19_NAT_Rule(field_set["FRACE18"], field_set["FRACE19"]), new_case);
                     gs.set_value(Parent_NAT_IJE_to_MMRIA_Path["FRACE20_21"], FRACE20_21_NAT_Rule(field_set["FRACE20"], field_set["FRACE21"]), new_case);
                     gs.set_value(Parent_NAT_IJE_to_MMRIA_Path["FRACE22_23"], FRACE22_23_NAT_Rule(field_set["FRACE22"], field_set["FRACE23"]), new_case);
@@ -1788,7 +1830,10 @@ public sealed class BatchItemProcessingService
                     gs.set_value(Parent_FET_IJE_to_MMRIA_Path["MDOB_DY"], TryPaseToIntOr_DefaultBlank(field_set["MDOB_DY"]), new_case);
                     gs.set_value(Parent_FET_IJE_to_MMRIA_Path["FDOB_YR"], field_set["FDOB_YR"], new_case);
                     gs.set_value(Parent_FET_IJE_to_MMRIA_Path["FDOB_MO"], TryPaseToIntOr_DefaultBlank(field_set["FDOB_MO"]), new_case);
-                    gs.set_value(Parent_FET_IJE_to_MMRIA_Path["MARN"], field_set["MARN"], new_case);
+                    if (int.TryParse(field_set["MARN"], out int fet_marn_val) && field_set["MARN"] != "9999")
+                        gs.set_objectvalue(Parent_FET_IJE_to_MMRIA_Path["MARN"], fet_marn_val, new_case);
+                    else
+                        gs.set_value(Parent_FET_IJE_to_MMRIA_Path["MARN"], field_set["MARN"], new_case);
                     gs.set_value(Parent_FET_IJE_to_MMRIA_Path["MEDUC"], field_set["MEDUC"], new_case);
                     gs.set_value(Parent_FET_IJE_to_MMRIA_Path["ATTEND"], field_set["ATTEND"], new_case);
                     gs.set_value(Parent_FET_IJE_to_MMRIA_Path["TRAN"], field_set["TRAN"], new_case);
@@ -1847,11 +1892,10 @@ public sealed class BatchItemProcessingService
                         new_case
                     );
 
-                    Set_location_of_residence_Gecocode
-                    (
-                        gs,
-                        get_geocode_info
+                    {
+                        var geo_result = _geocodingManager.FetchGeocode
                         (
+                            geocode_api_key,
                             FET_LOCATION_OF_RESIDENCE_street_Rule
                             (
                                 field_set["STNUM"],
@@ -1862,23 +1906,28 @@ public sealed class BatchItemProcessingService
                             ),
                             field_set["CITYTXT"],
                             field_set["STATEC"],
-                            field_set["ZIPCODE"]
-                        ), 
-                        new_case
-                    );
+                            field_set["ZIPCODE"],
+                            mor_field_set["DOD_YR"]
+                        );
+                        location_of_residence_latitude = geo_result.Latitude;
+                        location_of_residence_longitude = geo_result.Longitude;
+                        _caseGeocodingManager.Apply(new_case, "bc_location_of_residence", geo_result);
+                    }
 
-                    Set_facility_of_delivery_location_Gecocode
-                    (
-                        gs, 
-                        get_geocode_info
+                    {
+                        var geo_result = _geocodingManager.FetchGeocode
                         (
+                            geocode_api_key,
                             field_set["ADDRESS_D"],
                             field_set["CITY_D"],
                             "", //field_set["STATEC"],
-                            field_set["ZIPCODE_D"]
-                        ), 
-                        new_case
-                    );
+                            field_set["ZIPCODE_D"],
+                            mor_field_set["DOD_YR"]
+                        );
+                        facility_of_delivery_location_latitude = geo_result.Latitude;
+                        facility_of_delivery_location_longitude = geo_result.Longitude;
+                        _caseGeocodingManager.Apply(new_case, "bc_facility_of_delivery", geo_result);
+                    }
 
                     birth_2_death
                     (
@@ -1982,7 +2031,7 @@ public sealed class BatchItemProcessingService
                         field_set["FRACE14"],
                         field_set["FRACE15"]));
 
-                    gs.set_value(Parent_FET_IJE_to_MMRIA_Path["FRACE16_17"], FRACE16_17_FET_Rule(field_set["FRACE16"], field_set["FRACE16"]), new_case);
+                    gs.set_value(Parent_FET_IJE_to_MMRIA_Path["FRACE16_17"], FRACE16_17_FET_Rule(field_set["FRACE16"], field_set["FRACE17"]), new_case);
                     gs.set_value(Parent_FET_IJE_to_MMRIA_Path["FRACE18_19"], FRACE18_19_FET_Rule(field_set["FRACE18"], field_set["FRACE19"]), new_case);
                     gs.set_value(Parent_FET_IJE_to_MMRIA_Path["FRACE20_21"], FRACE20_21_FET_Rule(field_set["FRACE20"], field_set["FRACE21"]), new_case);
                     gs.set_value(Parent_FET_IJE_to_MMRIA_Path["FRACE22_23"], FRACE22_23_FET_Rule(field_set["FRACE22"], field_set["FRACE23"]), new_case);
@@ -2577,41 +2626,77 @@ if
 
             var case_dictionary = new_case as IDictionary<string, object>;
 
-            var finished = new mmria.common.ije.BatchItem()
-            {
-                Status = mmria.common.ije.BatchItem.StatusEnum.NewCaseAdded,
-                CDCUniqueID = mor_field_set["SSN"],
-                ImportDate = message.ImportDate,
-                ImportFileName = message.ImportFileName,
-                ReportingState = message.host_state,
-
-                StateOfDeathRecord = mor_field_set["DSTATE"],
-                DateOfDeath = $"{mor_field_set["DOD_YR"]}-{mor_field_set["DOD_MO"]}-{mor_field_set["DOD_DY"]}",
-                DateOfBirth = $"{mor_field_set["DOB_YR"]}-{mor_field_set["DOB_MO"]}-{mor_field_set["DOB_DY"]}",
-                LastName = mor_field_set["LNAME"],
-                FirstName = mor_field_set["GNAME"],
-                
-                mmria_record_id = message.record_id,
-                mmria_id = mmria_id,
-                StatusDetail = "Added new case"
-            };
+            // Story 29.8: finished is populated after the save call below with the
+            // post-retry record_id and the appropriate NewCaseAdded / ImportFailed status.
+            mmria.common.ije.BatchItem finished;
 
 
             var _dbConfigSet = mmria.services.vitalsimport.Program.DbConfigSet;
             var db_info = _dbConfigSet.detail_list[message.host_state];
-            string request_string = $"{db_info.url}/{db_info.prefix}mmrds/{mmria_id}";
 
             Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings();
             settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
             var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(new_case, settings);
 
-            var document_put_response = new mmria.common.model.couchdb.document_put_response();
+            // Story 29.8: batch writes go through VitalImportCaseWriter instead of
+            // CaseManager.SaveCaseAsync so the user-request authorization check does
+            // not fire against the synthetic vital-import identity. The writer
+            // preserves the Story 29.1 record_id format/uniqueness guards and owns
+            // the Story 29.4 collision-retry loop internally (5-attempt cap).
+            var final_record_id = message.record_id;
+            var save_ok = false;
+            string save_failure_detail = null;
+
             try
             {
-                var responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", request_string, object_string, db_info.user_name, db_info.user_value);
-                document_put_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
+                var case_data = mmria.common.utils.CaseJsonSerialization.DeserializeMmriaCase(object_string);
+                var change_stack = BuildVitalImportChangeStack(case_data);
+                var save_configuration = BuildVitalImportConfiguration(_dbConfigSet, message.host_state);
+
+                var save_result = await _vitalImportCaseWriter.SaveNewVitalImportCaseAsync(
+                    case_data,
+                    change_stack,
+                    db_info,
+                    save_configuration,
+                    message.host_state);
+
+                if (save_result?.Response != null && save_result.Response.ok)
+                {
+                    save_ok = true;
+                    final_record_id = case_data.home_record?.record_id ?? final_record_id;
+                }
+                else
+                {
+                    save_failure_detail = save_result?.Response?.error_description ?? "unknown save failure";
+                }
             }
             catch (Exception ex)
+            {
+                save_ok = false;
+                save_failure_detail = "Error\n" + ex.ToString();
+            }
+
+            if (save_ok)
+            {
+                finished = new mmria.common.ije.BatchItem()
+                {
+                    Status = mmria.common.ije.BatchItem.StatusEnum.NewCaseAdded,
+                    CDCUniqueID = mor_field_set["SSN"],
+                    ImportDate = message.ImportDate,
+                    ImportFileName = message.ImportFileName,
+                    ReportingState = message.host_state,
+
+                    StateOfDeathRecord = mor_field_set["DSTATE"],
+                    DateOfDeath = $"{mor_field_set["DOD_YR"]}-{mor_field_set["DOD_MO"]}-{mor_field_set["DOD_DY"]}",
+                    DateOfBirth = $"{mor_field_set["DOB_YR"]}-{mor_field_set["DOB_MO"]}-{mor_field_set["DOB_DY"]}",
+                    LastName = mor_field_set["LNAME"],
+                    FirstName = mor_field_set["GNAME"],
+                    mmria_record_id = final_record_id,
+                    mmria_id = mmria_id,
+                    StatusDetail = "Added new case"
+                };
+            }
+            else
             {
                 finished = new mmria.common.ije.BatchItem()
                 {
@@ -2626,9 +2711,9 @@ if
                     DateOfBirth = $"{mor_field_set["DOB_YR"]}-{mor_field_set["DOB_MO"]}-{mor_field_set["DOB_DY"]}",
                     LastName = mor_field_set["LNAME"],
                     FirstName = mor_field_set["GNAME"],
-                    mmria_record_id = message.record_id,
+                    mmria_record_id = final_record_id,
                     mmria_id = mmria_id,
-                    StatusDetail = "Error\n" + ex.ToString()
+                    StatusDetail = save_failure_detail
                 };
             }
             // Notify BatchProcessor of completion
@@ -2668,6 +2753,55 @@ if
     }
 
     
+
+    // Story 29.8 — minimal OverridableConfiguration for VitalImportCaseWriter. Only
+    // metadata_version is semantically consumed (written to the audit Change_Stack).
+    private static mmria.common.couchdb.OverridableConfiguration BuildVitalImportConfiguration(
+        mmria.common.couchdb.ConfigurationSet dbConfigSet,
+        string hostPrefix)
+    {
+        var configuration = new mmria.common.couchdb.OverridableConfiguration();
+        if (dbConfigSet?.name_value != null &&
+            dbConfigSet.name_value.TryGetValue("metadata_version", out var metadata_version) &&
+            !string.IsNullOrWhiteSpace(metadata_version))
+        {
+            configuration.SetString(hostPrefix, "metadata_version", metadata_version);
+            configuration.SetString("shared", "metadata_version", metadata_version);
+        }
+        return configuration;
+    }
+
+    // Story 29.8 — Change_Stack scaffold for the new-case audit entry. The writer
+    // stamps user_name = "vital-import" on the stack and its items.
+    private static mmria.common.model.couchdb.Change_Stack BuildVitalImportChangeStack(
+        mmria.case_version.v260615.mmria_case case_data)
+    {
+        var now = DateTime.UtcNow;
+        return new mmria.common.model.couchdb.Change_Stack
+        {
+            _id = Guid.NewGuid().ToString(),
+            case_id = case_data._id,
+            case_rev = case_data._rev,
+            date_created = now,
+            note = "Vital Import: new case added by batch importer",
+            items = new List<mmria.common.model.couchdb.Change_Stack_Item>
+            {
+                new()
+                {
+                    _id = case_data._id,
+                    _rev = case_data._rev,
+                    object_path = "vital_import",
+                    metadata_path = "/vital_import",
+                    old_value = null,
+                    new_value = "new_case_added",
+                    dictionary_path = "/vital_import",
+                    metadata_type = "vital_import",
+                    prompt = "Vital Import",
+                    date_created = now
+                }
+            }
+        };
+    }
 
     private void omb_mrace_recode(migrate.C_Get_Set_Value gs, System.Dynamic.ExpandoObject new_case, string[] race)
     {
@@ -2920,511 +3054,6 @@ if
             }
 
             gs.set_value("birth_fetal_death_certificate_parent/length_between_child_birth_and_death_of_mother", length_between_child_birth_and_death_of_mother?.ToString(), new_case);
-    }
-
-    private void Set_facility_of_delivery_location_Gecocode(migrate.C_Get_Set_Value gs, GeocodeTuple geocode_data, System.Dynamic.ExpandoObject new_case)
-    {
-        string urban_status = null;
-        string state_county_fips = null;
-
-        string feature_matching_geography_type = "Unmatchable";
-        string latitude = "";
-        string longitude = "";
-        string naaccr_gis_coordinate_quality_code = "";
-        string naaccr_gis_coordinate_quality_type = "";
-        string naaccr_census_tract_certainty_code = "";
-        string naaccr_census_tract_certainty_type = "";
-        string census_state_fips = "";
-        string census_county_fips = "";
-        string census_tract_fips = "";
-        string census_cbsa_fips = "";
-        string census_cbsa_micro = "";
-        string census_met_div_fips = "";
-        urban_status = "";
-        state_county_fips = "";
-
-        var outputGeocode_data = geocode_data.OutputGeocode;
-        var censusValues_data = geocode_data.Census_Value;
-        
-        if
-        (
-            outputGeocode_data != null && 
-            outputGeocode_data.FeatureMatchingResultType != null &&
-            !outputGeocode_data.FeatureMatchingResultType.Equals("Unmatchable", StringComparison.OrdinalIgnoreCase)
-        )
-        {
-            latitude = outputGeocode_data.Latitude;
-            longitude = outputGeocode_data.Longitude;
-            feature_matching_geography_type = outputGeocode_data.FeatureMatchingGeographyType;
-            naaccr_gis_coordinate_quality_code = outputGeocode_data.NAACCRGISCoordinateQualityCode;
-            naaccr_gis_coordinate_quality_type = outputGeocode_data.NAACCRGISCoordinateQualityType;
-            naaccr_census_tract_certainty_code = censusValues_data?.NAACCRCensusTractCertaintyCode;
-            naaccr_census_tract_certainty_type = censusValues_data?.NAACCRCensusTractCertaintyType;
-            census_state_fips = censusValues_data?.CensusStateFips;
-            census_county_fips = censusValues_data?.CensusCountyFips;
-            census_tract_fips = censusValues_data?.CensusTract;
-            census_cbsa_fips = censusValues_data?.CensusCbsaFips;
-            census_cbsa_micro = censusValues_data?.CensusCbsaMicro;
-            census_met_div_fips = censusValues_data?.CensusMetDivFips;
-            // calculate urban_status
-            if (censusValues_data != null)
-            {
-                if
-                        (
-                            int.Parse(censusValues_data?.NAACCRCensusTractCertaintyCode) > 0 &&
-                            int.Parse(censusValues_data?.NAACCRCensusTractCertaintyCode) < 7 &&
-                            censusValues_data?.CensusCbsaFips == ""
-                        )
-                {
-                    urban_status = "Rural";
-                }
-                else if
-                (
-                    int.Parse(censusValues_data?.NAACCRCensusTractCertaintyCode) > 0 &&
-                    int.Parse(censusValues_data?.NAACCRCensusTractCertaintyCode) < 7 &&
-                    int.Parse(censusValues_data?.CensusCbsaFips) > 0
-                )
-                {
-                    if (!string.IsNullOrEmpty(censusValues_data?.CensusMetDivFips))
-                    {
-                        urban_status = "Metropolitan Division";
-                    }
-                    else if (int.Parse(censusValues_data?.CensusCbsaMicro) == 0)
-                    {
-                        urban_status = "Metropolitan";
-                    }
-                    else if (int.Parse(censusValues_data?.CensusCbsaMicro) == 1)
-                    {
-                        urban_status = "Micropolitan";
-                    }
-                }
-                else
-                {
-                    urban_status = "Undetermined";
-                } 
-            }
-
-            // calculate state_county_fips
-            if (!String.IsNullOrEmpty(censusValues_data?.CensusStateFips) && !String.IsNullOrEmpty(censusValues_data?.CensusCountyFips))
-            {
-                state_county_fips = censusValues_data?.CensusStateFips + censusValues_data?.CensusCountyFips;
-            }
-
-            facility_of_delivery_location_latitude = latitude;
-            facility_of_delivery_location_longitude = longitude;
-        }
-
-        gs.set_value("birth_fetal_death_certificate_parent/facility_of_delivery_location/feature_matching_geography_type", feature_matching_geography_type, new_case);
-        gs.set_value("birth_fetal_death_certificate_parent/facility_of_delivery_location/latitude", latitude, new_case);
-        gs.set_value("birth_fetal_death_certificate_parent/facility_of_delivery_location/longitude", longitude, new_case);
-        gs.set_value("birth_fetal_death_certificate_parent/facility_of_delivery_location/naaccr_gis_coordinate_quality_code", naaccr_gis_coordinate_quality_code, new_case);
-        gs.set_value("birth_fetal_death_certificate_parent/facility_of_delivery_location/naaccr_gis_coordinate_quality_type", naaccr_gis_coordinate_quality_type, new_case);
-        gs.set_value("birth_fetal_death_certificate_parent/facility_of_delivery_location/naaccr_census_tract_certainty_code", naaccr_census_tract_certainty_code, new_case);
-        gs.set_value("birth_fetal_death_certificate_parent/facility_of_delivery_location/naaccr_census_tract_certainty_type", naaccr_census_tract_certainty_type, new_case);
-        gs.set_value("birth_fetal_death_certificate_parent/facility_of_delivery_location/census_state_fips", census_state_fips, new_case);
-        gs.set_value("birth_fetal_death_certificate_parent/facility_of_delivery_location/census_county_fips", census_county_fips, new_case);
-        gs.set_value("birth_fetal_death_certificate_parent/facility_of_delivery_location/census_tract_fips", census_tract_fips, new_case);
-        gs.set_value("birth_fetal_death_certificate_parent/facility_of_delivery_location/census_cbsa_fips", census_cbsa_fips, new_case);
-        gs.set_value("birth_fetal_death_certificate_parent/facility_of_delivery_location/census_cbsa_micro", census_cbsa_micro, new_case);
-        gs.set_value("birth_fetal_death_certificate_parent/facility_of_delivery_location/census_met_div_fips", census_met_div_fips, new_case);
-        gs.set_value("birth_fetal_death_certificate_parent/facility_of_delivery_location/urban_status", urban_status, new_case);
-        gs.set_value("birth_fetal_death_certificate_parent/facility_of_delivery_location/state_county_fips", state_county_fips, new_case);
-        
-    }
-
-    private void Set_location_of_residence_Gecocode(migrate.C_Get_Set_Value gs, GeocodeTuple geocode_data, System.Dynamic.ExpandoObject new_case)
-    {
-        
-        string urban_status = null;
-        string state_county_fips = null;
-
-        string feature_matching_geography_type = "Unmatchable";
-        string latitude = "";
-        string longitude = "";
-        string naaccr_gis_coordinate_quality_code = "";
-        string naaccr_gis_coordinate_quality_type = "";
-        string naaccr_census_tract_certainty_code = "";
-        string naaccr_census_tract_certainty_type = "";
-        string census_state_fips = "";
-        string census_county_fips = "";
-        string census_tract_fips = "";
-        string census_cbsa_fips = "";
-        string census_cbsa_micro = "";
-        string census_met_div_fips = "";
-
-
-        var outputGeocode_data = geocode_data.OutputGeocode;
-        var censusValues_data = geocode_data.Census_Value;
-
-        if 
-        (
-            outputGeocode_data != null && 
-            outputGeocode_data.FeatureMatchingResultType != null &&
-            !outputGeocode_data.FeatureMatchingResultType.Equals("Unmatchable", StringComparison.OrdinalIgnoreCase)
-        )
-        {
-            latitude = outputGeocode_data.Latitude;
-            longitude = outputGeocode_data.Longitude;
-            feature_matching_geography_type = outputGeocode_data.FeatureMatchingGeographyType;
-            naaccr_gis_coordinate_quality_code = outputGeocode_data.NAACCRGISCoordinateQualityCode;
-            naaccr_gis_coordinate_quality_type = outputGeocode_data.NAACCRGISCoordinateQualityType;
-            naaccr_census_tract_certainty_code = censusValues_data?.NAACCRCensusTractCertaintyCode;
-            naaccr_census_tract_certainty_type = censusValues_data?.NAACCRCensusTractCertaintyType;
-            census_state_fips = censusValues_data?.CensusStateFips;
-            census_county_fips = censusValues_data?.CensusCountyFips;
-            census_tract_fips = censusValues_data?.CensusTract;
-            census_cbsa_fips = censusValues_data?.CensusCbsaFips;
-            census_cbsa_micro = censusValues_data?.CensusCbsaMicro;
-            census_met_div_fips = censusValues_data?.CensusMetDivFips;
-
-            // calculate urban_status
-            if (censusValues_data != null)
-            {
-                if
-                        (
-                            int.Parse(censusValues_data?.NAACCRCensusTractCertaintyCode) > 0 &&
-                            int.Parse(censusValues_data?.NAACCRCensusTractCertaintyCode) < 7 &&
-                            censusValues_data?.CensusCbsaFips == ""
-                        )
-                {
-                    urban_status = "Rural";
-                }
-                else if
-                (
-                    int.Parse(censusValues_data?.NAACCRCensusTractCertaintyCode) > 0 &&
-                    int.Parse(censusValues_data?.NAACCRCensusTractCertaintyCode) < 7 &&
-                    int.Parse(censusValues_data?.CensusCbsaFips) > 0
-                )
-                {
-                    if (!string.IsNullOrEmpty(censusValues_data?.CensusMetDivFips))
-                    {
-                        urban_status = "Metropolitan Division";
-                    }
-                    else if (int.Parse(censusValues_data?.CensusCbsaMicro) == 0)
-                    {
-                        urban_status = "Metropolitan";
-                    }
-                    else if (int.Parse(censusValues_data?.CensusCbsaMicro) == 1)
-                    {
-                        urban_status = "Micropolitan";
-                    }
-                }
-                else
-                {
-                    urban_status = "Undetermined";
-                } 
-            }
-
-            // calculate state_county_fips
-            if (!String.IsNullOrEmpty(censusValues_data?.CensusStateFips) && !String.IsNullOrEmpty(censusValues_data?.CensusCountyFips))
-            {
-                state_county_fips = censusValues_data?.CensusStateFips + censusValues_data?.CensusCountyFips;
-            }
-
-            location_of_residence_latitude = latitude;
-            location_of_residence_longitude = longitude;
-        }
-        else
-        {
-
-            urban_status = "";
-            state_county_fips = "";
-
-
-        }
-
-
-        gs.set_value("birth_fetal_death_certificate_parent/location_of_residence/feature_matching_geography_type", feature_matching_geography_type, new_case);
-        gs.set_value("birth_fetal_death_certificate_parent/location_of_residence/latitude", latitude, new_case);
-        gs.set_value("birth_fetal_death_certificate_parent/location_of_residence/longitude", longitude, new_case);
-        gs.set_value("birth_fetal_death_certificate_parent/location_of_residence/naaccr_gis_coordinate_quality_code", naaccr_gis_coordinate_quality_code, new_case);
-        gs.set_value("birth_fetal_death_certificate_parent/location_of_residence/naaccr_gis_coordinate_quality_type", naaccr_gis_coordinate_quality_type, new_case);
-        gs.set_value("birth_fetal_death_certificate_parent/location_of_residence/naaccr_census_tract_certainty_code", naaccr_census_tract_certainty_code, new_case);
-        gs.set_value("birth_fetal_death_certificate_parent/location_of_residence/naaccr_census_tract_certainty_type", naaccr_census_tract_certainty_type, new_case);
-        gs.set_value("birth_fetal_death_certificate_parent/location_of_residence/census_state_fips", census_state_fips, new_case);
-        gs.set_value("birth_fetal_death_certificate_parent/location_of_residence/census_county_fips", census_county_fips, new_case);
-        gs.set_value("birth_fetal_death_certificate_parent/location_of_residence/census_tract_fips", census_tract_fips, new_case);
-        gs.set_value("birth_fetal_death_certificate_parent/location_of_residence/census_cbsa_fips", census_cbsa_fips, new_case);
-        gs.set_value("birth_fetal_death_certificate_parent/location_of_residence/census_cbsa_micro", census_cbsa_micro, new_case);
-        gs.set_value("birth_fetal_death_certificate_parent/location_of_residence/census_met_div_fips", census_met_div_fips, new_case);
-        gs.set_value("birth_fetal_death_certificate_parent/location_of_residence/urban_status", urban_status, new_case);
-        gs.set_value("birth_fetal_death_certificate_parent/location_of_residence/state_county_fips", state_county_fips, new_case);
-
-    }
-
-    private void Set_place_of_last_residence_Gecocode(migrate.C_Get_Set_Value gs, GeocodeTuple geocode_data, System.Dynamic.ExpandoObject new_case)
-    {
-
-        string urban_status = null;
-        string state_county_fips = null;
-
-        string feature_matching_geography_type = "Unmatchable";
-        string latitude = "";
-        string longitude = "";
-        string naaccr_gis_coordinate_quality_code = "";
-        string naaccr_gis_coordinate_quality_type = "";
-        string naaccr_census_tract_certainty_code = "";
-        string naaccr_census_tract_certainty_type = "";
-        string census_state_fips = "";
-        string census_county_fips = "";
-        string census_tract_fips = "";
-        string census_cbsa_fips = "";
-        string census_cbsa_micro = "";
-        string census_met_div_fips = "";
-        urban_status = "";
-        state_county_fips = "";
-
-        var outputGeocode_data = geocode_data.OutputGeocode;
-        var censusValues_data = geocode_data.Census_Value;
-        
-        if
-        (
-            outputGeocode_data != null && 
-            outputGeocode_data.FeatureMatchingResultType != null &&
-            !outputGeocode_data.FeatureMatchingResultType.Equals("Unmatchable", StringComparison.OrdinalIgnoreCase)
-        )
-        {
-
-            latitude = outputGeocode_data.Latitude;
-            longitude = outputGeocode_data.Longitude;
-            feature_matching_geography_type = outputGeocode_data.FeatureMatchingGeographyType;
-            naaccr_gis_coordinate_quality_code = outputGeocode_data.NAACCRGISCoordinateQualityCode;
-            naaccr_gis_coordinate_quality_type = outputGeocode_data.NAACCRGISCoordinateQualityType;
-            naaccr_census_tract_certainty_code = censusValues_data?.NAACCRCensusTractCertaintyCode;
-            naaccr_census_tract_certainty_type = censusValues_data?.NAACCRCensusTractCertaintyType;
-            census_state_fips = censusValues_data?.CensusStateFips;
-            census_county_fips = censusValues_data?.CensusCountyFips;
-            census_tract_fips = censusValues_data?.CensusTract;
-            census_cbsa_fips = censusValues_data?.CensusCbsaFips;
-            census_cbsa_micro = censusValues_data?.CensusCbsaMicro;
-            census_met_div_fips = censusValues_data?.CensusMetDivFips;
-
-            // calculate urban_status
-
-            if (censusValues_data != null)
-            {
-                if
-                        (
-                            int.Parse(censusValues_data?.NAACCRCensusTractCertaintyCode) > 0 &&
-                            int.Parse(censusValues_data?.NAACCRCensusTractCertaintyCode) < 7 &&
-                            censusValues_data?.CensusCbsaFips == ""
-                        )
-                {
-                    urban_status = "Rural";
-                }
-                else if
-                (
-                    int.Parse(censusValues_data?.NAACCRCensusTractCertaintyCode) > 0 &&
-                    int.Parse(censusValues_data?.NAACCRCensusTractCertaintyCode) < 7 &&
-                    int.Parse(censusValues_data?.CensusCbsaFips) > 0
-                )
-                {
-                    if (!string.IsNullOrEmpty(censusValues_data?.CensusMetDivFips))
-                    {
-                        urban_status = "Metropolitan Division";
-                    }
-                    else if (int.Parse(censusValues_data?.CensusCbsaMicro) == 0)
-                    {
-                        urban_status = "Metropolitan";
-                    }
-                    else if (int.Parse(censusValues_data?.CensusCbsaMicro) == 1)
-                    {
-                        urban_status = "Micropolitan";
-                    }
-                }
-                else
-                {
-                    urban_status = "Undetermined";
-                } 
-            }
-
-            // calculate state_county_fips
-            if (!String.IsNullOrEmpty(censusValues_data?.CensusStateFips) && !String.IsNullOrEmpty(censusValues_data?.CensusCountyFips))
-            {
-                state_county_fips = censusValues_data?.CensusStateFips + censusValues_data?.CensusCountyFips;
-            }
-
-
-            death_certificate_place_of_last_residence_latitude = latitude;
-            death_certificate_place_of_last_residence_longitude = longitude;
-        }
-
-        gs.set_value("death_certificate/place_of_last_residence/feature_matching_geography_type", feature_matching_geography_type, new_case);
-        gs.set_value("death_certificate/place_of_last_residence/latitude", latitude, new_case);
-        gs.set_value("death_certificate/place_of_last_residence/longitude", longitude, new_case);
-        gs.set_value("death_certificate/place_of_last_residence/naaccr_gis_coordinate_quality_code", naaccr_gis_coordinate_quality_code, new_case);
-        gs.set_value("death_certificate/place_of_last_residence/naaccr_gis_coordinate_quality_type", naaccr_gis_coordinate_quality_type, new_case);
-        gs.set_value("death_certificate/place_of_last_residence/naaccr_census_tract_certainty_code", naaccr_census_tract_certainty_code, new_case);
-        gs.set_value("death_certificate/place_of_last_residence/naaccr_census_tract_certainty_type", naaccr_census_tract_certainty_type, new_case);
-        gs.set_value("death_certificate/place_of_last_residence/census_state_fips", census_state_fips, new_case);
-        gs.set_value("death_certificate/place_of_last_residence/census_county_fips", census_county_fips, new_case);
-        gs.set_value("death_certificate/place_of_last_residence/census_tract_fips", census_tract_fips, new_case);
-        gs.set_value("death_certificate/place_of_last_residence/census_cbsa_fips", census_cbsa_fips, new_case);
-        gs.set_value("death_certificate/place_of_last_residence/census_cbsa_micro", census_cbsa_micro, new_case);
-        gs.set_value("death_certificate/place_of_last_residence/census_met_div_fips", census_met_div_fips, new_case);
-        gs.set_value("death_certificate/place_of_last_residence/urban_status", urban_status, new_case);
-        gs.set_value("death_certificate/place_of_last_residence/state_county_fips", state_county_fips, new_case);
-
-        
-    }
-
-    private void Set_address_of_death_Gecocode(migrate.C_Get_Set_Value gs, GeocodeTuple geocode_data, System.Dynamic.ExpandoObject new_case)
-    {
-        
-        string urban_status = null;
-        string state_county_fips = null;
-
-        string feature_matching_geography_type = "Unmatchable";
-        string latitude = "";
-        string longitude = "";
-        string naaccr_gis_coordinate_quality_code = "";
-        string naaccr_gis_coordinate_quality_type = "";
-        string naaccr_census_tract_certainty_code = "";
-        string naaccr_census_tract_certainty_type = "";
-        string census_state_fips = "";
-        string census_county_fips = "";
-        string census_tract_fips = "";
-        string census_cbsa_fips = "";
-        string census_cbsa_micro = "";
-        string census_met_div_fips = "";
-
-        var outputGeocode_data = geocode_data.OutputGeocode;
-        var censusValues_data = geocode_data.Census_Value;
-        
-
-        if 
-        (
-            outputGeocode_data != null && 
-            outputGeocode_data.FeatureMatchingResultType != null &&
-            !outputGeocode_data.FeatureMatchingResultType.Equals("Unmatchable", StringComparison.OrdinalIgnoreCase)
-        )
-        {
-            latitude = outputGeocode_data.Latitude;
-            longitude = outputGeocode_data.Longitude;
-            feature_matching_geography_type = outputGeocode_data.FeatureMatchingGeographyType;
-            naaccr_gis_coordinate_quality_code = outputGeocode_data.NAACCRGISCoordinateQualityCode;
-            naaccr_gis_coordinate_quality_type = outputGeocode_data.NAACCRGISCoordinateQualityType;
-            naaccr_census_tract_certainty_code = censusValues_data?.NAACCRCensusTractCertaintyCode;
-            naaccr_census_tract_certainty_type = censusValues_data?.NAACCRCensusTractCertaintyType;
-            census_state_fips = censusValues_data?.CensusStateFips;
-            census_county_fips = censusValues_data?.CensusCountyFips;
-            census_tract_fips = censusValues_data?.CensusTract;
-            census_cbsa_fips = censusValues_data?.CensusCbsaFips;
-            census_cbsa_micro = censusValues_data?.CensusCbsaMicro;
-            census_met_div_fips = censusValues_data?.CensusMetDivFips;
-
-            // calculate urban_status
-            if (censusValues_data != null)
-            {
-                if
-                        (
-                            int.Parse(censusValues_data?.NAACCRCensusTractCertaintyCode) > 0 &&
-                            int.Parse(censusValues_data?.NAACCRCensusTractCertaintyCode) < 7 &&
-                            censusValues_data?.CensusCbsaFips == ""
-                        )
-                {
-                    urban_status = "Rural";
-                }
-                else if
-                (
-                    int.Parse(censusValues_data?.NAACCRCensusTractCertaintyCode) > 0 &&
-                    int.Parse(censusValues_data?.NAACCRCensusTractCertaintyCode) < 7 &&
-                    int.Parse(censusValues_data?.CensusCbsaFips) > 0
-                )
-                {
-                    if (!string.IsNullOrEmpty(censusValues_data?.CensusMetDivFips))
-                    {
-                        urban_status = "Metropolitan Division";
-                    }
-                    else if (int.Parse(censusValues_data?.CensusCbsaMicro) == 0)
-                    {
-                        urban_status = "Metropolitan";
-                    }
-                    else if (int.Parse(censusValues_data?.CensusCbsaMicro) == 1)
-                    {
-                        urban_status = "Micropolitan";
-                    }
-                }
-                else
-                {
-                    urban_status = "Undetermined";
-                } 
-            }
-
-            // calculate state_county_fips
-            if (!String.IsNullOrEmpty(censusValues_data?.CensusStateFips) && !String.IsNullOrEmpty(censusValues_data?.CensusCountyFips))
-            {
-                state_county_fips = censusValues_data?.CensusStateFips + censusValues_data?.CensusCountyFips;
-            }
-
-            death_certificate_address_of_death_latitude = latitude;
-            death_certificate_address_of_death_longitude = longitude;
-        }
-        else
-        {
-
-            urban_status = "";
-            state_county_fips = "";
-
-        }
-
-        gs.set_value("death_certificate/address_of_death/feature_matching_geography_type", feature_matching_geography_type, new_case);
-        gs.set_value("death_certificate/address_of_death/latitude", latitude, new_case);
-        gs.set_value("death_certificate/address_of_death/longitude", longitude, new_case);
-        gs.set_value("death_certificate/address_of_death/naaccr_gis_coordinate_quality_code", naaccr_gis_coordinate_quality_code, new_case);
-        gs.set_value("death_certificate/address_of_death/naaccr_gis_coordinate_quality_type", naaccr_gis_coordinate_quality_type, new_case);
-        gs.set_value("death_certificate/address_of_death/naaccr_census_tract_certainty_code", naaccr_census_tract_certainty_code, new_case);
-        gs.set_value("death_certificate/address_of_death/naaccr_census_tract_certainty_type", naaccr_census_tract_certainty_type, new_case);
-        gs.set_value("death_certificate/address_of_death/census_state_fips", census_state_fips, new_case);
-        gs.set_value("death_certificate/address_of_death/census_county_fips", census_county_fips, new_case);
-        gs.set_value("death_certificate/address_of_death/census_tract_fips", census_tract_fips, new_case);
-        gs.set_value("death_certificate/address_of_death/census_cbsa_fips", census_cbsa_fips, new_case);
-        gs.set_value("death_certificate/address_of_death/census_cbsa_micro", census_cbsa_micro, new_case);
-        gs.set_value("death_certificate/address_of_death/census_met_div_fips", census_met_div_fips, new_case);
-        gs.set_value("death_certificate/address_of_death/urban_status", urban_status, new_case);
-        gs.set_value("death_certificate/address_of_death/state_county_fips", state_county_fips, new_case);
-
-    }
-
-    public sealed class GeocodeTuple
-    {
-        public GeocodeTuple(){}
-
-        public mmria.common.texas_am.OutputGeocode OutputGeocode {get;set;}
-        public mmria.common.texas_am.CensusValue Census_Value {get;set;}
-
-    }
-
-    private GeocodeTuple get_geocode_info(string street, string city, string state, string zip)
-    {
-
-        var result = new GeocodeTuple();
-
-        if (!string.IsNullOrEmpty(state))
-        {
-            var check_state = state.Split("-");
-            state = check_state[0];
-        }
-
-        var TAMUGeocoder = new mmria.services.vitalsimport.Utilities.TAMUGeoCode();
-
-        var response = TAMUGeocoder.execute(geocode_api_key, street, city, state, zip);
-        
-        if(response!= null && response.OutputGeocodes?.Length > 0)
-        {
-            result.OutputGeocode = response.OutputGeocodes[0].OutputGeocode;
-
-            if(response.OutputGeocodes[0].CensusValues.Count > 0)
-            {
-                if(response.OutputGeocodes[0].CensusValues[0].ContainsKey("CensusValue1"))
-                {
-                    result.Census_Value = response.OutputGeocodes[0].CensusValues[0]["CensusValue1"];
-                }
-                
-            }
-        }
-
-        return result;
     }
 
     private Dictionary<string, mmria.common.metadata.value_node[]> get_look_up(mmria.common.metadata.app p_metadata)

@@ -78,6 +78,7 @@ function attachment_render(
     p_result.push("<section id='attachment_id' class='construct' ");
     p_result.push(" style='' class='construct'>");
     p_result.push("<div data-header='single-form' class='construct__header'>");
+    const attachment_title_id = `${convert_object_path_to_jquery_id(p_object_path)}_single_form_title`;
 
     render_validation_error_summary(
         p_result,
@@ -97,7 +98,7 @@ function attachment_render(
     p_result.push("<div class='col-4 position-static'>");
     if (g_data) 
     {
-        p_result.push("<p class='construct__title h1 text-primary single-form-title' tabindex='-1'>");
+        p_result.push(`<p id='${attachment_title_id}' class='construct__title h1 text-primary single-form-title' tabindex='-1' role='heading' aria-level='1'>`);
         p_result.push(get_header_name(g_data.tracking.admin_info.jurisdiction));
         p_result.push(`</p>`);
     }
@@ -203,8 +204,8 @@ function attachment_render(
         p_result.push(
             `${currently_locked_by_html}
             <input type="button" class="btn btn-primary ml-3" value="Enable Edit" onclick="init_inline_loader(function() { enable_edit_click() })" ${enable_edit_disable_attribute} />
-            <input type="button" class="btn btn-primary ml-3" value="Save & Continue" onclick="init_inline_loader(function() { save_form_click() })" ${save_and_continue_disable_attribute} />
-            <input type="button" class="btn btn-primary ml-3" value="Save & Finish" onclick="init_inline_loader(function() { save_and_finish_click() })" ${save_and_finish_disable_attribute} />`
+            <input type="button" class="btn btn-primary ml-3" value="Save & Continue" onclick="save_form_click()" ${save_and_continue_disable_attribute} />
+            <input type="button" class="btn btn-primary ml-3" value="Save & Finish" onclick="save_and_finish_click()" ${save_and_finish_disable_attribute} />`
         );
     }
     p_result.push("</div>");
@@ -232,7 +233,7 @@ function attachment_render(
         </span>`
     );
 
-    p_result.push("<div class='construct__body' tabindex='-1'>");
+    p_result.push(`<div class='construct__body' tabindex='0' role='region' aria-labelledby='${attachment_title_id}'>`);
 
     p_result.push(
         `<div class='construct-output' style='height:800px'>`
@@ -261,8 +262,8 @@ function attachment_render(
     );
     if (!(g_is_data_analyst_mode || case_is_locked)) {
         p_result.push(
-            `<input type='button' class='btn btn-primary ml-3' value='Save & Continue' onclick='init_inline_loader(save_form_click)' ${save_and_continue_disable_attribute} />
-            <input type='button' class='btn btn-primary ml-3' value='Save & Finish' onclick='init_inline_loader(save_and_finish_click)' ${save_and_finish_disable_attribute} />
+            `<input type='button' class='btn btn-primary ml-3' value='Save & Continue' onclick='save_form_click()' ${save_and_continue_disable_attribute} />
+            <input type='button' class='btn btn-primary ml-3' value='Save & Finish' onclick='save_and_finish_click()' ${save_and_finish_disable_attribute} />
             <input type='button' class='btn btn-primary ml-3' value='Undo' onclick='init_inline_loader(undo_click)' ${undo_disable_attribute} />`
         );
     }

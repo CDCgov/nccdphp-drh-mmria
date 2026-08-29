@@ -3,6 +3,14 @@
  * Handles offline session data retrieval, active session checking, and session validation
  */
 
+function redirectToOfflineLoginForReauth() {
+  const offlineLoginUrl = window.OfflineStatus && typeof window.OfflineStatus.getOfflineLoginUrl === 'function'
+    ? window.OfflineStatus.getOfflineLoginUrl()
+    : '/Account/OfflineLogin';
+
+  window.location.href = offlineLoginUrl;
+}
+
 window.OfflineSessionManager = {
   /**
    * Load offline session data for the current user
@@ -101,6 +109,28 @@ window.OfflineSessionManager = {
   },
 
   /**
+   * Story 29.6: returns the next per-offline-session case sequence as a
+   * 2-digit zero-padded string. Counter is scoped to the current offline
+   * session and persisted to localStorage so it survives tab reload but
+   * resets when a new offline session starts.
+   * @returns {string} Zero-padded 2-digit sequence (e.g. "01").
+   */
+  getNextOfflineCaseSequence: function() {
+    const sessionId = (window.OfflineStatus && typeof window.OfflineStatus.getOfflineSessionId === 'function'
+      ? window.OfflineStatus.getOfflineSessionId()
+      : null) || localStorage.getItem('offline_session_id') || 'no-session';
+
+    const storageKey = 'offline_case_sequence:' + sessionId;
+    let current = parseInt(localStorage.getItem(storageKey) || '0', 10);
+    if (isNaN(current) || current < 0) {
+      current = 0;
+    }
+    const next = current + 1;
+    localStorage.setItem(storageKey, next.toString());
+    return next.toString().padStart(2, '0');
+  },
+
+  /**
    * Load offline record IDs from cached case data
    * @param {Object} g_ui - Global UI object with offline case lists
    * @returns {Set<string>} Set of record IDs
@@ -143,6 +173,14 @@ window.OfflineSessionManager = {
       await ensureInitCallback();
     }
 
+    const validationContext = {
+      checkPoint: 'case_list_load'
+    };
+
+    if (window.OfflineIntegrityValidator) {
+      await window.OfflineIntegrityValidator.validateCurrentState(validationContext);
+    }
+
     const result = {
       offline_mode_case_view_list: [],
       case_view_list: [],
@@ -153,6 +191,19 @@ window.OfflineSessionManager = {
       const response = await fetch('/api/case_view/offline-documents');
 
       if (!response.ok) {
+        if (response.status === 401) {
+          try {
+            const errorData = await response.json();
+            if (errorData && errorData.error === 'offline_key_required') {
+              offlineLog.warn('OfflineSessionManager', 'Offline key re-entry required before loading cached case list');
+              redirectToOfflineLoginForReauth();
+              return result;
+            }
+          } catch (parseError) {
+            offlineLog.warn('OfflineSessionManager', 'Could not parse offline case-list auth failure response', parseError);
+          }
+        }
+
         offlineLog.error('OfflineSessionManager', 'Failed to load offline cases:', response.status);
         return result;
       }
@@ -173,11 +224,30 @@ window.OfflineSessionManager = {
         result.case_view_list = mappedRows;
         result.total_rows = offlineData.total_rows || offlineData.rows.length;
 
-        offlineLog.log('OfflineSessionManager', 'Loaded offline cases:', result.case_view_list.length);
+        offlineLog.info('OfflineSessionManager', 'Loaded offline cases successfully', {
+          loadedCaseCount: result.case_view_list.length,
+          loadedCaseIds: result.case_view_list.map(item => item.id)
+        });
+
+        if (
+          window.OfflineCaseManager &&
+          typeof window.OfflineCaseManager.reconcileOfflineRemovedCaseState === 'function'
+        ) {
+          await window.OfflineCaseManager.reconcileOfflineRemovedCaseState(
+            result.case_view_list.map(item => item.id)
+          );
+        }
 
         // Update the offline case index map with the loaded cases
         if (updateIndexMapCallback) {
           updateIndexMapCallback();
+        }
+
+        if (window.OfflineIntegrityValidator) {
+          await window.OfflineIntegrityValidator.validateCurrentState({
+            checkPoint: 'case_list_load',
+            expectedOfflineIds: result.case_view_list.map(item => item.id)
+          });
         }
       } else {
         offlineLog.warn('OfflineSessionManager', 'No offline cases found');

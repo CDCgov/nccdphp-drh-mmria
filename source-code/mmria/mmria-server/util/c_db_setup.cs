@@ -7,7 +7,7 @@ using Akka.Actor;
 
 namespace mmria.server.utils;
 
-public sealed class c_db_setup
+public sealed class c_db_setup : mmria.server.IDatabaseLifecycleService
 {
     ActorSystem _actorSystem;
     string metadata_version;
@@ -16,13 +16,15 @@ public sealed class c_db_setup
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.MMRIARebuild.Manager.MMRIARebuildManager _mmriaRebuildManager;
 
     public c_db_setup
     (
         ActorSystem actorSystem,
         mmria.common.couchdb.OverridableConfiguration _configuration,
         string p_host_prefix,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.MMRIARebuild.Manager.MMRIARebuildManager mmriaRebuildManager = null
     )
     {
         _actorSystem = actorSystem;
@@ -31,10 +33,14 @@ public sealed class c_db_setup
         db_config = configuration.GetDBConfig(host_prefix);
         metadata_version = configuration.GetString("metadata_version", host_prefix);
         _couchDbHttpClient = couchDbHttpClient;
+        _mmriaRebuildManager = mmriaRebuildManager;
     }
 
 
-    public async Task Setup()
+    public async Task Setup(
+        bool triggerStartupRebuild = true,
+        List<string> configuredStartupTenants = null,
+        string summaryHostPrefix = null)
     {
 
         System.Console.WriteLine("c_db_setup.setup");
@@ -311,8 +317,19 @@ public sealed class c_db_setup
                     }
             }
 
+            if (!await url_endpoint_exists (db_config.url + $"/{db_config.prefix}db_rebuild", db_config.user_name, db_config.user_value)) 
+            {
+                Log.Information ("Creating db_rebuild db.");
+                string db_rebuild_result = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}db_rebuild", null, db_config.user_name, db_config.user_value);
+                Log.Information("db_rebuild_curl\n{0}", db_rebuild_result);
+
+                await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}db_rebuild/_security", "{\"admins\":{\"names\":[],\"roles\":[\"form_designer\"]},\"members\":{\"names\":[],\"roles\":[\"abstractor\",\"data_analyst\",\"timer\"]}}", db_config.user_name, db_config.user_value);
+                Log.Information ("db_rebuild/_security completed successfully");
+            }
+
             if
             (
+                triggerStartupRebuild &&
                 await url_endpoint_exists (db_config.url + "/metadata", db_config.user_name, db_config.user_value) &&
                 await url_endpoint_exists (db_config.url + $"/{db_config.prefix}mmrds", db_config.user_name, db_config.user_value)
             ) 
@@ -322,17 +339,41 @@ public sealed class c_db_setup
 
 
 
-                Program.Last_Change_Sequence = latest_change_set.last_seq;
+                Program.GetTenantChangeSequenceState(
+                    mmria.server.model.TenantChangeSequenceState.KeyFor(db_config)).LastChangeSequence = latest_change_set.last_seq;
 
 
                 #if !IS_PMSS_ENHANCED
-                var Sync_All_Documents_Message = new mmria.server.model.actor.Sync_All_Documents_Message
-                (
-                    DateTime.Now,
-                    metadata_version
-                );
+                if(_mmriaRebuildManager != null)
+                {
+                    string rebuildServiceUrl = mmria.common.SharedLibraries.MMRIARebuild.Manager.MMRIARebuildManager.BuildServiceUrl(
+                        configuration.GetString("vitals_url", host_prefix));
 
-                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(Sync_All_Documents_Message);
+                    if(!string.IsNullOrWhiteSpace(rebuildServiceUrl))
+                    {
+                        List<string> startupRequestTenants = mmria.server.util.DbRebuildSettings.NormalizeTenantListPreservingOrder(configuredStartupTenants);
+                        string startupRequestSummaryHostPrefix = mmria.server.util.DbRebuildSettings.ResolveStartupSummaryHostPrefix(
+                            summaryHostPrefix,
+                            startupRequestTenants,
+                            host_prefix);
+
+                        var rebuildResponse = await _mmriaRebuildManager.QueueRebuildOnServiceAsync(
+                            new mmria.common.SharedLibraries.MMRIARebuild.Model.MMRIARebuildRequest
+                            {
+                                tenant = host_prefix,
+                                source = "startup",
+                                configured_tenants = startupRequestTenants,
+                                summary_host_prefix = startupRequestSummaryHostPrefix
+                            },
+                            rebuildServiceUrl,
+                            configuration.GetString("vital_service_key", host_prefix));
+
+                        if(!rebuildResponse.success)
+                        {
+                            Log.Warning("Failed to queue startup rebuild for tenant {Tenant}: {Message} {Error}", host_prefix, rebuildResponse.message, rebuildResponse.error);
+                        }
+                    }
+                }
                 #endif
                 #if IS_PMSS_ENHANCED
                 var Sync_All_Documents_Message = new mmria.pmss.server.model.actor.Sync_All_Documents_Message
@@ -460,12 +501,17 @@ public sealed class c_db_setup
                     using (var  sr1 = new System.IO.StreamReader(System.IO.Path.Combine (current_directory, "database-scripts/MMRIA_calculations.js")))
                     {
                         string metadata_attachment = await sr1.ReadToEndAsync ();
-                        var ifMatchHeaders = new System.Collections.Generic.Dictionary<string, string>
-                        {
-                            { "If-Match", metadata_result.rev }
-                        };
-
-                        metadata_result_string = await couchDbHttpClient.ExecuteAsync("PUT", db_config.url + "/metadata/2016-06-12T13:49:24.759Z/mmria-check-code.js", metadata_attachment, db_config.user_name, db_config.user_value, "application/json", ifMatchHeaders);
+                        metadata_result_string = await couchDbHttpClient.ExecuteAsync(
+                            "PUT",
+                            db_config.url + "/metadata/2016-06-12T13:49:24.759Z/mmria-check-code.js",
+                            metadata_attachment,
+                            "application/json",
+                            new mmria.common.getset.CouchDbRequestOptions
+                            {
+                                UserName = db_config.user_name,
+                                Password = db_config.user_value,
+                                IfMatch = metadata_result.rev
+                            });
                         metadata_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(metadata_result_string);
     
                     }
@@ -473,11 +519,18 @@ public sealed class c_db_setup
                     using (var  sr1 = new System.IO.StreamReader(System.IO.Path.Combine (current_directory, "database-scripts/validator.js")))
                     {
                         var metadata_attachment = await sr1.ReadToEndAsync (); 
-                        var ifMatchHeaders2 = new System.Collections.Generic.Dictionary<string, string>
-                        {
-                            { "If-Match", metadata_result.rev }
-                        };
-                        Log.Information($"{await couchDbHttpClient.ExecuteAsync("PUT", db_config.url + "/metadata/2016-06-12T13:49:24.759Z/validator.js", metadata_attachment, db_config.user_name, db_config.user_value, "application/json", ifMatchHeaders2)}");
+                        Log.Information(
+                            $"{await couchDbHttpClient.ExecuteAsync(
+                                "PUT",
+                                db_config.url + "/metadata/2016-06-12T13:49:24.759Z/validator.js",
+                                metadata_attachment,
+                                "application/json",
+                                new mmria.common.getset.CouchDbRequestOptions
+                                {
+                                    UserName = db_config.user_name,
+                                    Password = db_config.user_value,
+                                    IfMatch = metadata_result.rev
+                                })}");
 
                     }
                 }
@@ -580,8 +633,8 @@ public sealed class c_db_setup
     {
         try
         {
-            await _couchDbHttpClient.ExecuteAsync(p_method, p_target_server, null, p_user_name, p_value);
-            return true;
+            var response = await _couchDbHttpClient.ExecuteForResponseAsync(p_method, p_target_server, null, p_user_name, p_value);
+            return response.StatusCode >= 200 && response.StatusCode < 300;
         }
         catch (Exception) 
         {
@@ -593,8 +646,8 @@ public sealed class c_db_setup
     {
         try
         {
-            await couchDbHttpClient.ExecuteAsync(p_method, p_target_server, null, p_user_name, p_value);
-            return true;
+            var response = await couchDbHttpClient.ExecuteForResponseAsync(p_method, p_target_server, null, p_user_name, p_value);
+            return response.StatusCode >= 200 && response.StatusCode < 300;
         }
         catch (Exception) 
         {

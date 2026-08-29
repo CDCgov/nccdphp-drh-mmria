@@ -11,8 +11,191 @@ var $mmria = function()
             .replace(/'/g, "&#039;");
     };
 
+    const requestVerificationHeaderName = "RequestVerificationToken";
+
+    const getRequestVerificationToken = () => {
+        const tokenElement = document.querySelector('meta[name="request-verification-token"]');
+        return tokenElement ? tokenElement.getAttribute("content") : "";
+    };
+
+    const isUnsafeHttpMethod = (method) => {
+        const normalizedMethod = String(method || "GET").toUpperCase();
+        return !["GET", "HEAD", "OPTIONS", "TRACE"].includes(normalizedMethod);
+    };
+
+    const isSameOriginUrl = (url) => {
+        try {
+            const requestUrl = new URL(url || window.location.href, window.location.href);
+            return requestUrl.origin === window.location.origin;
+        } catch {
+            return false;
+        }
+    };
+
+    const addRequestVerificationHeader = (headers) => {
+        const token = getRequestVerificationToken();
+
+        if (!token) {
+            return headers || {};
+        }
+
+        if (typeof Headers !== "undefined" && headers instanceof Headers) {
+            const nextHeaders = new Headers(headers);
+            if (!nextHeaders.has(requestVerificationHeaderName)) {
+                nextHeaders.set(requestVerificationHeaderName, token);
+            }
+            return nextHeaders;
+        }
+
+        if (Array.isArray(headers)) {
+            const nextHeaders = headers.slice();
+            const hasHeader = nextHeaders.some((header) =>
+                header.length > 0 &&
+                String(header[0]).toLowerCase() === requestVerificationHeaderName.toLowerCase());
+
+            if (!hasHeader) {
+                nextHeaders.push([requestVerificationHeaderName, token]);
+            }
+            return nextHeaders;
+        }
+
+        const nextHeaders = Object.assign({}, headers || {});
+        const hasHeader = Object.keys(nextHeaders).some((headerName) =>
+            headerName.toLowerCase() === requestVerificationHeaderName.toLowerCase());
+
+        if (!hasHeader) {
+            nextHeaders[requestVerificationHeaderName] = token;
+        }
+
+        return nextHeaders;
+    };
+
+    const setupAntiforgery = () => {
+        if (typeof window === "undefined" || window.__mmriaAntiforgeryConfigured) {
+            return;
+        }
+
+        window.__mmriaAntiforgeryConfigured = true;
+
+        if (window.jQuery) {
+            window.jQuery(document).ajaxSend((event, xhr, settings) => {
+                const method = settings.type || settings.method || "GET";
+
+                if (isUnsafeHttpMethod(method) && isSameOriginUrl(settings.url)) {
+                    const token = getRequestVerificationToken();
+                    if (token) {
+                        xhr.setRequestHeader(requestVerificationHeaderName, token);
+                    }
+                }
+            });
+        }
+
+        if (window.fetch) {
+            const originalFetch = window.fetch.bind(window);
+            window.fetch = (input, init) => {
+                const request = typeof Request !== "undefined" && input instanceof Request ? input : null;
+                const method = init?.method || request?.method || "GET";
+                const url = request ? request.url : input;
+
+                if (!isUnsafeHttpMethod(method) || !isSameOriginUrl(url)) {
+                    return originalFetch(input, init);
+                }
+
+                const nextInit = Object.assign({}, init || {});
+                nextInit.headers = addRequestVerificationHeader(nextInit.headers || request?.headers);
+
+                return originalFetch(input, nextInit);
+            };
+        }
+    };
+
+    const generatedMarkupBlockedTags = new Set(['SCRIPT', 'IFRAME', 'OBJECT', 'EMBED', 'LINK', 'META', 'STYLE']);
+    const generatedMarkupUrlPattern = /^(?:https?:|mailto:|tel:|\/|#|\.{1,2}\/)/i;
+    const generatedMarkupInlineHandlerPattern = /^[A-Za-z0-9_.$\s,'"()[\]{}:=!?+\-*/%|&\\/]+$/;
+    const generatedMarkupBlockedHandlerPattern = /\b(?:alert|confirm|prompt|eval|Function|javascript:|document\.write|srcdoc)\b/i;
+    const generatedMarkupBlockedStylePattern = /expression\s*\(|javascript:|url\s*\(\s*javascript:/i;
+
+    const createSanitizedFragment = (markup) => {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(String(markup ?? ''), 'text/html');
+        const elements = Array.from(doc.body.querySelectorAll('*'));
+
+        elements.forEach((element) => {
+            if (generatedMarkupBlockedTags.has(element.tagName)) {
+                element.remove();
+                return;
+            }
+
+            Array.from(element.attributes).forEach((attribute) => {
+                const name = attribute.name.toLowerCase();
+                const value = attribute.value ?? '';
+                const trimmedValue = value.trim();
+
+                if (name === 'srcdoc') {
+                    element.removeAttribute(attribute.name);
+                    return;
+                }
+
+                if (name.startsWith('on')) {
+                    if (
+                        !generatedMarkupInlineHandlerPattern.test(value) ||
+                        generatedMarkupBlockedHandlerPattern.test(value) ||
+                        value.includes('<') ||
+                        value.includes('>') ||
+                        value.includes('`')
+                    ) {
+                        element.removeAttribute(attribute.name);
+                    }
+                    return;
+                }
+
+                if (
+                    (name === 'href' || name === 'src' || name === 'action' || name === 'formaction') &&
+                    trimmedValue.length > 0 &&
+                    !generatedMarkupUrlPattern.test(trimmedValue)
+                ) {
+                    element.removeAttribute(attribute.name);
+                    return;
+                }
+
+                if (name === 'style' && generatedMarkupBlockedStylePattern.test(value)) {
+                    element.removeAttribute(attribute.name);
+                }
+            });
+        });
+
+        const fragment = document.createDocumentFragment();
+        while (doc.body.firstChild) {
+            fragment.appendChild(doc.body.firstChild);
+        }
+
+        return fragment;
+    };
+
+    const setSanitizedHtml = (element, markup) => {
+        if (!element) {
+            return null;
+        }
+
+        element.replaceChildren(createSanitizedFragment(markup));
+        return element;
+    };
+
+    const formatServerResponseDetail = (error, note) => {
+        const status = error?.status === 0 ? "Unsent" : String(error?.status ?? '');
+        const action = note == null ? '' : String(note);
+        const responseText = error?.responseText == undefined ? "offline" : String(error.responseText);
+        return `Status: ${status}\nAction: ${action}\nServer Response:\n${responseText}`;
+    };
+
+    setupAntiforgery();
+
     return {
         escapeHtml: escapeHtml,
+        get_request_verification_token: getRequestVerificationToken,
+        add_request_verification_header: addRequestVerificationHeader,
+        create_sanitized_fragment: createSanitizedFragment,
+        set_sanitized_html: setSanitizedHtml,
         get_object_value_by_full_path: function(obj, path) {
             if (!obj || !path) return undefined;
             // Convert bracket notation to dot notation
@@ -69,7 +252,8 @@ var $mmria = function()
                     lat,
                     lon,
                     year,
-                    record_id
+                    record_id,
+                    p_control
                 );
 
             }
@@ -128,7 +312,8 @@ var $mmria = function()
                             lat,
                             lon,
                             year,
-                            record_id
+                            record_id,
+                            p_control
                         );
                     }
                 }
@@ -150,7 +335,8 @@ var $mmria = function()
                     lat,
                     lon,
                     year,
-                    record_id
+                    record_id,
+                    p_control
                 );
 
             }
@@ -192,7 +378,8 @@ var $mmria = function()
                             lat,
                             lon,
                             year,
-                            record_id
+                            record_id,
+                            p_control
                         );
                     }
                 }
@@ -503,18 +690,20 @@ var $mmria = function()
             lon, 
             year,
             id,
+            p_control,
             p_success_call_back,
             p_error_call_back
         )
         {           
-            
-            http://localhost:12345/community-vital-signs?lat=33.880577&lon=-84.29106&year=2012&id=GA-2012-1234
+            const query = new URLSearchParams({
+                lat: lat ?? "",
+                lon: lon ?? "",
+                year: year ?? "",
+                id: id ?? ""
+            });
+            const base_url = `${location.protocol}//${location.host}/community-vital-signs?${query.toString()}`;
 
-
-
-            var base_url = `${location.protocol}//${location.host}/community-vital-signs?lat=${lat}&lon=${lon}&year=${year}&id=${id}`
-
-            window.open(base_url, target=id)
+            window.open(base_url, id);
 /*
             fetch
             (
@@ -959,6 +1148,10 @@ var $mmria = function()
                 {
                     g_data._rev = case_response.rev;
                     set_local_case(g_data);
+                    // Sync rev polling so the new _rev is the baseline for stale-tab detection.
+                    // Without this, the interval started by the preceding save (e.g. enable_edit)
+                    // would keep running with the old loadedRev and falsely show the stale-case banner.
+                    if (typeof mmria_sync_case_rev_polling === 'function') mmria_sync_case_rev_polling();
                     //console.log('set_value save finished');
                 }
         
@@ -1130,10 +1323,10 @@ var $mmria = function()
             html.push(`
                 ${get_header()}
                 <div id="mmria_dialog2" style="width: auto; min-height: 101px; max-height: none; height: auto;" class="ui-dialog-content ui-widget-content">
-                    <div class="modal-body">
-                        <p><strong>${escapeHtml(p_header)}</strong></p>
-                        ${p_inner_html}
-                    </div>
+                        <div class="modal-body">
+                            <p><strong>${escapeHtml(p_header)}</strong></p>
+                            <div id="info-dialog-body"></div>
+                        </div>
                     <footer class="modal-footer">
                         <button id="mmria_dialog2_close" class="btn primary-button mr-1">OK</button>
                     </footer>
@@ -1143,7 +1336,20 @@ var $mmria = function()
             // html.push(`<p><strong>${p_header}</p>`);
             // html.push(`${p_inner_html}`);
             // html.push('<button class="btn btn-primary mr-1" onclick="$mmria.info_dialog_click()">OK</button>');
-            element.innerHTML = html.join("");
+            setSanitizedHtml(element, html.join(""));
+
+            const info_dialog_body = document.getElementById("info-dialog-body");
+            if (info_dialog_body != null)
+            {
+                if (p_inner_html instanceof Node)
+                {
+                    info_dialog_body.replaceChildren(p_inner_html);
+                }
+                else
+                {
+                    setSanitizedHtml(info_dialog_body, p_inner_html);
+                }
+            }
             
             document.getElementById("mmria_dialog2_close").onclick = () => $mmria.info_dialog_click();
             
@@ -1203,7 +1409,17 @@ var $mmria = function()
                 </div>
             `);
             
-            element.innerHTML = html.join("");
+            setSanitizedHtml(element, html.join(""));
+
+            let confirm_dialog_body = document.getElementById("confirm-dialog-body");
+            if (typeof Node !== 'undefined' && p_inner_html instanceof Node)
+            {
+                confirm_dialog_body.replaceChildren(p_inner_html);
+            }
+            else
+            {
+                setSanitizedHtml(confirm_dialog_body, p_inner_html);
+            }
 
             let confirm_button = document.getElementById("confirm-dialog-id-confirm-button");
             let canel_button = document.getElementById("confirm-dialog-id-cancel-button");
@@ -1269,7 +1485,7 @@ var $mmria = function()
                 </div>
             `);
             
-            element.innerHTML = html.join("");
+            setSanitizedHtml(element, html.join(""));
 
             element.style.top = ((window.innerHeight/2) - (element.offsetHeight/2))+'px';
             //element.style.left = ((window.innerWidth/2) - (element.offsetWidth/2))+'px';
@@ -1341,7 +1557,7 @@ var $mmria = function()
                 </div>
             `);
             
-            element.innerHTML = html.join("");
+            setSanitizedHtml(element, html.join(""));
 
             element.style.top = ((window.innerHeight/2) - (element.offsetHeight/2))+'px';
             //element.style.left = ((window.innerWidth/2) - (element.offsetWidth/2))+'px';
@@ -1458,7 +1674,7 @@ var $mmria = function()
                     </div>
                 `);
     
-                element.innerHTML = html.join("");
+                setSanitizedHtml(element, html.join(""));
                 
                 // Attach event listeners
                 document.getElementById("data_dictionary_dialog_close_button").onclick = () => $mmria.data_dictionary_dialog_click();
@@ -1519,7 +1735,7 @@ var $mmria = function()
                     </div>
                 `);
     
-                element.innerHTML = html.join("");
+                setSanitizedHtml(element, html.join(""));
                 
                 // Attach event listeners
                 document.getElementById("committee_description_dialog_click").onclick = () => $mmria.data_dictionary_dialog_click();
@@ -1636,7 +1852,7 @@ var $mmria = function()
                     </div-->
                 `);
     
-                element.innerHTML = html.join("");
+                setSanitizedHtml(element, html.join(""));
 
                 mmria_pre_modal("converter-calculater-id");
 
@@ -1759,7 +1975,7 @@ var $mmria = function()
 
                 `);
     
-                element.innerHTML = html.join("");
+                setSanitizedHtml(element, html.join(""));
 
                 // Attach event listeners after innerHTML
                 const btn1 = document.getElementById("pin_for_everyone_button");
@@ -1863,38 +2079,32 @@ Please update the duplicate record as applicable.
                         <span id="ui-id-1" class="ui-dialog-title">${escapeHtml(Title_Text[0])}</span>
                         <button id="duplicate_dialog_close_btn" type="button" class="ui-button ui-corner-all ui-widget ui-button-icon-only ui-dialog-titlebar-close" title="×"><span class="ui-button-icon ui-icon ui-icon-closethick"></span><span class="ui-button-icon-space"> </span>×</button>
                     </div>
-                    <div id="mmria_dialog7" style="width: 300; height: 260px;" class="ui-dialog-content ui-widget-content" role="dialog">
+                    <div id="mmria_dialog7" style="width: auto; min-height: 101px; max-height: none; height: auto; overflow: visible;" class="ui-dialog-content ui-widget-content" role="dialog">
                         <div class="modal-body">
-                                <div >
-                       ${Description_Text[0]}
-                       <br/><br/>
-                                    <div style="text-align:right;padding-right: 8px;">
-                                        <button id="confirm-dialog-id-cancel-button"  class="btn modal-cancel btn-outline-secondary  mr-1" onclick="$mmria.duplicate_multiform_dialog_click()">Cancel</button>
-                                        <input id="duplicate_dialog_choice" class="btn-primary" type="button" value="${Button_Text[0]}" onclick="${Button_Event[0]}" style="height: 38px;
-                                        padding-left: 12px;
-                                        padding-right: 12px;
-                                        border-radius: 4px;
-                                        border: 1px solid #712177;
-                                        background-color: #712177;
-                                        box-sizing: border-box;
-                                        font-family: 'Open Sans', sans-serif;
-                                        color: rgba(255, 255, 255, 1);
-                                        text-align: center;
-                                        line-height: normal;
-                                        cursor: pointer;"/>
-                                        
-            
-                                    </div>
-
-                                </div>
-                        
+                            <div>
+                                ${Description_Text[0]}
+                            </div>
                         </div>
-
+                        <footer class="modal-footer">
+                            <button id="confirm-dialog-id-cancel-button"  class="btn modal-cancel btn-outline-secondary  mr-1">Cancel</button>
+                            <input id="duplicate_dialog_choice" class="btn-primary" type="button" value="${Button_Text[0]}" style="height: 38px;
+                            padding-left: 12px;
+                            padding-right: 12px;
+                            border-radius: 4px;
+                            border: 1px solid #712177;
+                            background-color: #712177;
+                            box-sizing: border-box;
+                            font-family: 'Open Sans', sans-serif;
+                            color: rgba(255, 255, 255, 1);
+                            text-align: center;
+                            line-height: normal;
+                            cursor: pointer;"/>
+                        </footer>
                     </div>
 
                 `);
     
-                element.innerHTML = html.join("");
+                setSanitizedHtml(element, html.join(""));
 
                 // Attach event listeners after innerHTML
                 const duplicateBtn = document.getElementById("duplicate_dialog_choice");
@@ -1967,12 +2177,7 @@ Please update the duplicate record as applicable.
                          <a href="javascript:$mmria.server_response_detail_div_show()">Show Error Detail</a> | <a href="javascript:$mmria.server_response_detail_div_hide()">Hide Error Detail</a>
                          <div id="server_response_detail_div" style="display:none">
                          <br/>
-                         <textarea id=server_response_textarea rows=7 cols=55 readonly>
-Status: ${escapeHtml(p_error.status === 0 ? "Unsent" : String(p_error.status))}
-Action: ${escapeHtml(p_note)}
-Server Response:
-${escapeHtml(p_error.responseText== undefined ? "offline" : p_error.responseText)}
-                         </textarea>
+                         <textarea id="server_response_textarea" rows="7" cols="55" readonly></textarea>
                          <button id="unstable_network_copy_btn" class="btn btn-primary mr-1" style="font-family: 'Open-Sans';">Copy Details to Clipboard</button>
                          </div>
                         </div>
@@ -1985,7 +2190,13 @@ ${escapeHtml(p_error.responseText== undefined ? "offline" : p_error.responseText
                     </div>
                 `);
     
-                element.innerHTML = html.join("");
+                setSanitizedHtml(element, html.join(""));
+
+                const unstableNetworkTextarea = document.getElementById("server_response_textarea");
+                if (unstableNetworkTextarea != null)
+                {
+                    unstableNetworkTextarea.value = formatServerResponseDetail(p_error, p_note);
+                }
 
                 // Attach event listeners
                 document.getElementById("unstable_network_dialog_close_button").onclick = () => $mmria.unstable_network_dialog_click();
@@ -2044,7 +2255,7 @@ ${escapeHtml(p_error.responseText== undefined ? "offline" : p_error.responseText
                     <div id="mmria_dialog5" class="ui-dialog-content ui-widget-content">
                         <div class="modal-body">
                          <p>An error occured while saving.</p>
-                         <p>Error Summary: ${escapeHtml(p_note)}</p>
+                         <p id="save_error_500_summary"></p>
                          <p>1. Press "Save and Continue" and confirm that you see a green "Case information has been saved." message.</p>
                          <p>
                             2. If no confirmation message try navigating back to <b>MMRIA Home</b> and then to <b>View or Modify Data</b> and select your case again.<br/>
@@ -2053,12 +2264,7 @@ ${escapeHtml(p_error.responseText== undefined ? "offline" : p_error.responseText
                          </p>
                        
                          <br/>
-                         <textarea id=server_response_textarea2 rows=7 cols=55 readonly>
-Status: ${escapeHtml(p_error.status === 0 ? "Unsent" : String(p_error.status))}
-Action: ${escapeHtml(p_note)}
-Server Response:
-${escapeHtml(p_error.responseText== undefined ? "offline" : p_error.responseText)}
-                         </textarea>
+                         <textarea id="save_error_500_textarea" rows="7" cols="55" readonly></textarea>
                         </div>
 
                     </div>
@@ -2069,7 +2275,19 @@ ${escapeHtml(p_error.responseText== undefined ? "offline" : p_error.responseText
                     </div>
                 `);
     
-                element.innerHTML = html.join("");
+                setSanitizedHtml(element, html.join(""));
+
+                const saveErrorSummary = document.getElementById("save_error_500_summary");
+                if (saveErrorSummary != null)
+                {
+                    saveErrorSummary.textContent = `Error Summary: ${p_note ?? ''}`;
+                }
+
+                const saveErrorTextarea = document.getElementById("save_error_500_textarea");
+                if (saveErrorTextarea != null)
+                {
+                    saveErrorTextarea.value = formatServerResponseDetail(p_error, p_note);
+                }
 
                 // Attach event listener
                 document.getElementById("save_error_500_dialog_close_button").onclick = () => $mmria.save_error_500_dialog_click();
@@ -2132,18 +2350,13 @@ ${escapeHtml(p_error.responseText== undefined ? "offline" : p_error.responseText
                     <div id="mmria_dialog6" class="ui-dialog-content ui-widget-content">
                         <div class="modal-body">
                          <p>Unable to save field data</p><br/>
-                         <p>Error Summary: ${escapeHtml(p_note)}</p>
+                         <p id="field_save_error_summary"></p>
                          <br/>
                          If the problem persists, send an email to MMRIA Support  <a href="mailto:mmriasupport@cdc.gov">mmriasupport@cdc.gov</a>
                          </p>
                        
                          <br/>
-                         <textarea id=server_response_textarea2 rows=7 cols=55 readonly>
-Status: ${escapeHtml(p_error.status === 0 ? "Unsent" : String(p_error.status))}
-Action: ${escapeHtml(p_note)}
-Server Response:
-${escapeHtml(p_error.responseText== undefined ? "offline" : p_error.responseText)}
-                         </textarea>
+                         <textarea id="field_save_error_textarea" rows="7" cols="55" readonly></textarea>
                         </div>
 
                     </div>
@@ -2154,7 +2367,19 @@ ${escapeHtml(p_error.responseText== undefined ? "offline" : p_error.responseText
                     </div>
                 `);
     
-                element.innerHTML = html.join("");
+                setSanitizedHtml(element, html.join(""));
+
+                const fieldSaveErrorSummary = document.getElementById("field_save_error_summary");
+                if (fieldSaveErrorSummary != null)
+                {
+                    fieldSaveErrorSummary.textContent = `Error Summary: ${p_note ?? ''}`;
+                }
+
+                const fieldSaveErrorTextarea = document.getElementById("field_save_error_textarea");
+                if (fieldSaveErrorTextarea != null)
+                {
+                    fieldSaveErrorTextarea.value = formatServerResponseDetail(p_error, p_note);
+                }
 
                 // Attach event listener
                 document.getElementById("field_save_error_dialog_close_button").onclick = () => $mmria.field_save_error_dialog_click();
@@ -2184,7 +2409,7 @@ ${escapeHtml(p_error.responseText== undefined ? "offline" : p_error.responseText
         },
         download_informant_interview_summary_template_docx: function()
         {
-            window.location.href = '/pdfs/informant_interview_summary_template_draft_12-23-25.docx';
+            window.location.href = '/pdfs/MMRIA_Informant_Interview_Summary_Template.docx';
         },
         view_mmria_abstractor_manual_pdf: function()
         {
@@ -2250,17 +2475,21 @@ async function mmria_pin_case_click(p_id, p_is_everyone)
     }
  
     const post_html_call_back = [];
-    document.getElementById('form_content_id').innerHTML = page_render
+    setSanitizedHtml
     (
-        g_metadata,
-        g_data,
-        g_ui,
-        'g_metadata',
-        'g_data',
-        '',
-        false,
-        post_html_call_back
-    ).join('');
+        document.getElementById('form_content_id'),
+        page_render
+        (
+            g_metadata,
+            g_data,
+            g_ui,
+            'g_metadata',
+            'g_data',
+            '',
+            false,
+            post_html_call_back
+        ).join('')
+    );
 
     if (post_html_call_back.length > 0) 
     {
@@ -2331,17 +2560,21 @@ async function mmria_un_pin_case_click(p_id, p_is_everyone)
     }
 
     const post_html_call_back = [];
-    document.getElementById('form_content_id').innerHTML = page_render
+    setSanitizedHtml
     (
-        g_metadata,
-        g_data,
-        g_ui,
-        'g_metadata',
-        'g_data',
-        '',
-        false,
-        post_html_call_back
-    ).join('');
+        document.getElementById('form_content_id'),
+        page_render
+        (
+            g_metadata,
+            g_data,
+            g_ui,
+            'g_metadata',
+            'g_data',
+            '',
+            false,
+            post_html_call_back
+        ).join('')
+    );
 
 
     if (post_html_call_back.length > 0) 
@@ -2512,8 +2745,8 @@ function info_dialog_show(p_title, p_header, p_inner_html, p_message_type = "def
             ${get_header()}
             <div id="mmria_dialog2" style="width: auto; min-height: 101px; max-height: none; height: auto;" class="ui-dialog-content ui-widget-content">
                 <div class="modal-body">
-                    <p><strong>${p_header}</strong></p>
-                    ${p_inner_html}
+                    <p><strong>${escapeHtml(p_header)}</strong></p>
+                    <div id="standalone-info-dialog-body"></div>
                 </div>
                 <footer class="modal-footer">
                     <button id="mmria_dialog2_close" class="btn primary-button mr-1" onclick="$mmria.info_dialog_click()">OK</button>
@@ -2524,7 +2757,20 @@ function info_dialog_show(p_title, p_header, p_inner_html, p_message_type = "def
         // html.push(`<p><strong>${p_header}</p>`);
         // html.push(`${p_inner_html}`);
         // html.push('<button class="btn btn-primary mr-1" onclick="$mmria.info_dialog_click()">OK</button>');
-        element.innerHTML = html.join("");
+        setSanitizedHtml(element, html.join(""));
+
+        const standalone_info_dialog_body = document.getElementById("standalone-info-dialog-body");
+        if (standalone_info_dialog_body != null)
+        {
+            if (p_inner_html instanceof Node)
+            {
+                standalone_info_dialog_body.replaceChildren(p_inner_html);
+            }
+            else
+            {
+                setSanitizedHtml(standalone_info_dialog_body, p_inner_html);
+            }
+        }
         mmria_pre_modal("case-progress-info-id");
         element.showModal();
     }
@@ -2638,6 +2884,9 @@ async function mmria_check_session()
 
 function mmria_check_if_need_to_redirect(p_input)
 {
+    // Story 40.1: global 401 interceptor in _LayoutBase.cshtml handles session-expiry redirects.
+    if (p_input && p_input.status === 401) return;
+
     if 
     (
         p_input.ok &&
@@ -2663,3 +2912,86 @@ function set_character_limit(p_string_to_limit, p_limit)
     }
     return p_string_to_limit;
 }
+
+function show_mmria_save_busy_indicator_modal()
+{
+    const existing_modal = document.getElementById('save-busy-indicator-modal');
+    const existing_backdrop = document.getElementById('save-busy-indicator-backdrop');
+
+    if (existing_modal && existing_backdrop)
+    {
+        existing_modal.classList.add('show');
+        existing_modal.style.display = 'block';
+        existing_backdrop.classList.add('show');
+        return;
+    }
+
+    const modal_html = `
+        <div id="save-busy-indicator-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+            <div class="modal-dialog modal-dialog-centered" role="document">
+                <div class="modal-content" style="background: white; border: 1px solid orange; box-shadow: none; width: 290px; display: flex; justify-content: center; align-items: center;">
+                    <div class="modal-body" style="text-align: center; padding: 20px;">
+                        <span class="spinner-container spinner-content spinner-active" style="margin-top: 15px; margin-bottom: 15px;">
+                            <span class="spinner-body text-primary">
+                                <span class="spinner"></span>
+                                <span class="spinner-info">Saving...</span>
+                            </span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="save-busy-indicator-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modal_html);
+
+    window.setTimeout(() => {
+        const modal = document.getElementById('save-busy-indicator-modal');
+        const backdrop = document.getElementById('save-busy-indicator-backdrop');
+
+        if (modal && backdrop)
+        {
+            modal.classList.add('show');
+            modal.style.display = 'block';
+            backdrop.classList.add('show');
+        }
+    }, 10);
+}
+
+function close_mmria_save_busy_indicator_modal()
+{
+    const modal = document.getElementById('save-busy-indicator-modal');
+    const backdrop = document.getElementById('save-busy-indicator-backdrop');
+
+    if (!modal && !backdrop)
+    {
+        return;
+    }
+
+    if (modal)
+    {
+        modal.classList.remove('show');
+    }
+
+    if (backdrop)
+    {
+        backdrop.classList.remove('show');
+    }
+
+    window.setTimeout(() => {
+        if (modal && modal.parentNode)
+        {
+            modal.parentNode.removeChild(modal);
+        }
+
+        if (backdrop && backdrop.parentNode)
+        {
+            backdrop.parentNode.removeChild(backdrop);
+        }
+    }, 150);
+}
+
+window.MMRIAModals = window.MMRIAModals || {};
+window.MMRIAModals.showSaveBusyIndicator = show_mmria_save_busy_indicator_modal;
+window.MMRIAModals.closeSaveBusyIndicator = close_mmria_save_busy_indicator_modal;

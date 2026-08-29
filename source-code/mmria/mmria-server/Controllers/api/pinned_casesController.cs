@@ -7,6 +7,7 @@ using mmria.common.model;
 using System.Net.Http;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
+using mmria.common.SharedLibraries.Jurisdiction;
 
 using  mmria.server.extension;  
 
@@ -17,26 +18,23 @@ public sealed class pinned_casesController : ControllerBase
 {
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly IJurisdictionRepository _jurisdictionRepository;
     public pinned_casesController
     (
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        IJurisdictionRepository jurisdictionRepository
     )
     {
         _couchDbHttpClient = couchDbHttpClient;
-        configuration = _configuration;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        _jurisdictionRepository = jurisdictionRepository;
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
     }
 
     [Authorize(Roles = "abstractor")]
@@ -48,7 +46,8 @@ public sealed class pinned_casesController : ControllerBase
             User,
             true,
             false,
-            _couchDbHttpClient
+            _couchDbHttpClient,
+            _jurisdictionRepository
         );
         mmria.common.model.couchdb.pinned_case_set result = await caseViewManager.GetOrCreatePinnedCaseSetAsync();
         return result;
@@ -80,7 +79,8 @@ public sealed class pinned_casesController : ControllerBase
                 User,
                 true,
                 false,
-                _couchDbHttpClient
+                _couchDbHttpClient,
+                _jurisdictionRepository
             );
             result = await caseViewManager.ApplyPinnedCaseMessageAsync(pin_case_message);
 
@@ -126,7 +126,8 @@ public sealed class pinned_casesController : ControllerBase
                     User,
                     true,
                     false,
-                    _couchDbHttpClient
+                    _couchDbHttpClient,
+                    _jurisdictionRepository
                 );
                 result = await caseViewManager.ApplyPinnedCaseMessageAsync(pin_case_message);
 

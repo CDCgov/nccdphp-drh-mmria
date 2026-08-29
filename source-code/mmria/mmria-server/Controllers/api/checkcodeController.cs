@@ -13,27 +13,22 @@ namespace mmria.pmss.server;
 public sealed class checkcodeController: ControllerBase 
 { 
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.SharedLibraries.MetadataVersion.Manager.MetadataVersionManager _metadataVersionManager;
     public checkcodeController
     (
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.common.SharedLibraries.MetadataVersion.Manager.MetadataVersionManager metadataVersionManager
     )
     {
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
         _metadataVersionManager = metadataVersionManager;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
 
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
     }
 
     [AllowAnonymous] 
@@ -66,13 +61,17 @@ public sealed class checkcodeController: ControllerBase
     [Authorize(Roles  = "form_designer")]
     [HttpPost]
     public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Put
-    (
-        [FromBody] PutCheckCodeRequest CheckCodeRequest
-    ) 
-    { 
+    ()
+    {
+        var CheckCodeRequest = await mmria.server.util.JsonRequestBodyReader.ReadAsync<PutCheckCodeRequest>(Request);
         //string check_code_json;
-        string check_code_json = CheckCodeRequest.data;
+        string check_code_json = GetSanitizedCheckCodeJson(CheckCodeRequest);
         mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response ();
+
+            if (string.IsNullOrWhiteSpace(check_code_json))
+            {
+                return result;
+            }
 
             try
             {
@@ -101,6 +100,11 @@ public sealed class checkcodeController: ControllerBase
             
         return result;
     } 
+
+    private static string GetSanitizedCheckCodeJson(PutCheckCodeRequest request)
+    {
+        return request?.data;
+    }
 } 
 
 

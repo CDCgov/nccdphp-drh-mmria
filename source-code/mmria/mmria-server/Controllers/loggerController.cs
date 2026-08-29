@@ -2,196 +2,260 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using mmria.server.extension;
+using mmria.server.util;
 
 namespace mmria.server.Controllers;
 
 
 public sealed class loggerController : Controller
 {
+    private const string LoggerViewerRoles = "form_designer, installation_admin, cdc_admin, offline_mode";
+    private static readonly string[] FullLogViewerRoles = { "form_designer", "installation_admin", "cdc_admin" };
+
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     mmria.common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.OfflineCase.IOfflineCaseRepository _offlineCaseRepository;
+    private readonly mmria.common.SharedLibraries.Logging.ILoggingRepository _loggingRepository;
 
     public loggerController
     (
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.OfflineCase.IOfflineCaseRepository offlineCaseRepository,
+        mmria.common.SharedLibraries.Logging.ILoggingRepository loggingRepository
     )
     {
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
         _couchDbHttpClient = couchDbHttpClient;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        _offlineCaseRepository = offlineCaseRepository;
+        _loggingRepository = loggingRepository;
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
     }
 
-    [Authorize(Roles = "form_designer, installation_admin, cdc_admin")]
-    [AllowAnonymous]
+    [Authorize(Roles = LoggerViewerRoles)]
     public IActionResult Index()
     {
         return View();
     }
 
-    [Authorize(Roles = "form_designer, installation_admin, cdc_admin")]
+    [Authorize(Roles = LoggerViewerRoles)]
     [HttpGet("api/logger/metadata")]    
     public async Task<IActionResult> GetMetadata()
     {
         try
         {
-            string dbUrl = $"{db_config.url}/{db_config.prefix}logging";
-         
-            // Get distinct modules/contexts using by-context view with group=true
-            var modulesUrl = $"{dbUrl}/_design/sortable/_view/by-offline-session";
-            var modulesResponse = await _couchDbHttpClient.ExecuteAsync("GET", modulesUrl, null, db_config.user_name, db_config.user_value);
-            var modulesData = Newtonsoft.Json.JsonConvert.DeserializeObject<dynamic>(modulesResponse);
-            
-            var modules = new HashSet<string>();
-            if (modulesData?.rows != null)
+            var restrictToCurrentUser = IsOfflineModeRestricted();
+            var currentUserName = GetCurrentUserName();
+            if (restrictToCurrentUser && string.IsNullOrWhiteSpace(currentUserName))
             {
-                foreach (var row in modulesData.rows)
-                {
-                    if (row.value.context != null && !string.IsNullOrWhiteSpace(row.value.context.ToString()))
-                    {
-                        modules.Add(row.value.context.ToString());
-                    }
-                }
-            }
-            
-
-            string offlineSessionsUrl = db_config.Get_Prefix_DB_Url("offline_cases/_design/sortable/_view/lightweight-status-only");
-            var offlineSessionsResponse = await _couchDbHttpClient.ExecuteAsync("GET", offlineSessionsUrl, null, db_config.user_name, db_config.user_value);
-            var offlineSessionsData = Newtonsoft.Json.JsonConvert.DeserializeObject<dynamic>(offlineSessionsResponse);
-
-            var offlineSessions = new List<object>();
-            if (offlineSessionsData?.rows != null)
-            {
-                foreach (var row in offlineSessionsData.rows)
-                {
-                    if (row?.value != null)
-                    {
-                        var sessionId = row.value._id?.ToString();
-                        var createdBy = row.value.created_by?.ToString() ?? "Unknown";
-                        var dateCreated = row.value.date_created?.ToString();
-                        var dateLastUpdated = row.value.date_last_updated?.ToString();
-                        var offlineState = row.value.offline_state?.ToString() ?? "0";
-                        
-                        if (!string.IsNullOrWhiteSpace(sessionId))
-                        {
-                            DateTime createdDate = DateTime.MinValue;
-                            DateTime.TryParse(dateCreated, out createdDate);
-                            
-                            var displayName = $"{sessionId.Substring(0, Math.Min(8, sessionId.Length))}... ({createdBy}) {createdDate:yyyy-MM-dd HH:mm}";
-                            var offlineStateText = GetOfflineStateText(offlineState);
-                            offlineSessions.Add(new 
-                            { 
-                                name = displayName,
-                                value = sessionId,
-                                createdBy = createdBy,
-                                dateCreated = createdDate,
-                                dateLastUpdated = dateLastUpdated,
-                                offlineState = offlineStateText,
-                                // 0 = created, 1 = going back online, 2 = completed, 3 = error
-                            });
-                        }
-                    }
-                }
-            }
-            
-            // Get distinct session IDs and their oldest timestamps from by-offline-session view 
-            // var sessionIdsDict = new Dictionary<string, DateTime>();
-            // if (modulesData?.rows != null)
-            // {
-            //     foreach (var row in modulesData.rows)
-            //     {
-            //         if (row.key != null && !string.IsNullOrWhiteSpace(row.key.ToString()))
-            //         {
-            //             var key = row.key.ToString();
-            //             var doc = row.doc ?? row.value;
-            //              DateTime timestamp=DateTime.MinValue;
-            //             if (row.value.offline_session_id != null)
-            //             {
-            //                 if (!row.value.offline_session_id.ContainsKey(key))
-            //                 {
-            //                     sessionIdsDict[key] = row.value.offline_session_id;
-            //                 }
-            //             }
-            //         }
-            //     }
-            // }
-
-            var sessionIdsDict = new HashSet<string>();
-            if (modulesData?.rows != null)
-            {
-                foreach (var row in modulesData.rows)
-                {
-                    if (row.value.offline_session_id != null && !string.IsNullOrWhiteSpace(row.value.offline_session_id.ToString()))
-                    {
-                        sessionIdsDict.Add(row.value.offline_session_id.ToString());
-                    }
-                }
+                return Forbid();
             }
 
+            var modulesData = await LoadLoggingByOfflineSessionAsync();
+            var offlineSessionsData = await LoadOfflineSessionsAsync();
 
-        
-            // Update offline sessions with hasLogData property
-            offlineSessions = offlineSessions.Select(session => 
+            HashSet<string> modules = ExtractModules(modulesData, restrictToCurrentUser, currentUserName);
+            List<object> offlineSessions = ExtractOfflineSessions(offlineSessionsData, restrictToCurrentUser, currentUserName);
+            HashSet<string> sessionIdsWithLogs = ExtractOfflineSessionIds(modulesData, restrictToCurrentUser, currentUserName);
+            HashSet<string> userNames = ExtractUserNames(modulesData, restrictToCurrentUser, currentUserName);
+
+            offlineSessions = AnnotateOfflineSessionsWithLogPresence(offlineSessions, sessionIdsWithLogs);
+
+            if (restrictToCurrentUser && !string.IsNullOrWhiteSpace(currentUserName))
             {
-                var sessionObj = (dynamic)session;
-                string sessionValue = sessionObj.value;
-                
-                return new 
-                {
-                    name = (string)sessionObj.name,
-                    value = sessionValue,
-                    createdBy = (string)sessionObj.createdBy,
-                    dateCreated = (DateTime)sessionObj.dateCreated,
-                    dateLastUpdated = (string)sessionObj.dateLastUpdated,
-                    offlineState = (string)sessionObj.offlineState,
-                    hasLogData = sessionIdsDict.Contains(sessionValue)
-                };
-            }).OrderByDescending(s => s.dateCreated).ToList<object>();
-           
-
-
-            var userNames = new HashSet<string>();
-            if (modulesData?.rows != null)
-            {
-                foreach (var row in modulesData.rows)
-                {
-                    if (row.value.user_name != null && !string.IsNullOrWhiteSpace(row.value.user_name.ToString()))
-                    {
-                        userNames.Add(row.value.user_name.ToString());
-                    }
-                }
+                userNames.Clear();
+                userNames.Add(currentUserName);
             }
-            
-            return Json(new
-            {               
-                modules = modules.OrderBy(m => m).ToList(),           
-                sessionIds = offlineSessions.OrderByDescending(s => ((DateTime)s.GetType().GetProperty("dateCreated").GetValue(s))).ToList(),
+
+            return EscapedJsonResultFactory.Create(new
+            {
+                modules = modules.OrderBy(m => m).ToList(),
+                sessionIds = offlineSessions
+                    .OrderByDescending(s => ((DateTime)s.GetType().GetProperty("dateCreated").GetValue(s)))
+                    .ToList(),
                 userNames = userNames.OrderBy(u => u).ToList()
             });
         }
         catch (Exception ex)
         {
             System.Console.WriteLine($"GetMetadata error: {ex}");
-            return StatusCode(500, new { error = "Failed to retrieve metadata", details = ex.Message });
+            return StatusCode(500, new { error = "Failed to retrieve metadata", details = "An unexpected error occurred while retrieving metadata." });
         }
     }
 
+    private async Task<dynamic> LoadLoggingByOfflineSessionAsync()
+    {
+        return await _loggingRepository.GetLoggingModulesAsync(db_config);
+    }
+
+    private async Task<dynamic> LoadOfflineSessionsAsync()
+    {
+        return await _offlineCaseRepository.GetAllLightweightOfflineCasesAsync(db_config);
+    }
+
+    private static HashSet<string> ExtractModules(dynamic modulesData, bool restrictToCurrentUser, string currentUserName)
+    {
+        var modules = new HashSet<string>();
+        if (modulesData?.rows == null)
+        {
+            return modules;
+        }
+
+        foreach (var row in modulesData.rows)
+        {
+            if (restrictToCurrentUser && !IsDynamicValueEqual(row.value.user_name, currentUserName))
+            {
+                continue;
+            }
+
+            if (row.value.context != null && !string.IsNullOrWhiteSpace(row.value.context.ToString()))
+            {
+                modules.Add(row.value.context.ToString());
+            }
+        }
+
+        return modules;
+    }
+
+    private static List<object> ExtractOfflineSessions(dynamic offlineSessionsData, bool restrictToCurrentUser, string currentUserName)
+    {
+        var offlineSessions = new List<object>();
+        if (offlineSessionsData?.rows == null)
+        {
+            return offlineSessions;
+        }
+
+        foreach (var row in offlineSessionsData.rows)
+        {
+            var sessionItem = TryBuildOfflineSession(row, restrictToCurrentUser, currentUserName);
+            if (sessionItem != null)
+            {
+                offlineSessions.Add(sessionItem);
+            }
+        }
+
+        return offlineSessions;
+    }
+
+    private static object TryBuildOfflineSession(dynamic row, bool restrictToCurrentUser, string currentUserName)
+    {
+        if (row?.value == null)
+        {
+            return null;
+        }
+
+        if (restrictToCurrentUser && !IsDynamicValueEqual(row.value.created_by, currentUserName))
+        {
+            return null;
+        }
+
+        var sessionId = row.value._id?.ToString();
+        if (string.IsNullOrWhiteSpace(sessionId))
+        {
+            return null;
+        }
+
+        var dateCreated = row.value.date_created?.ToString();
+        var dateLastUpdated = row.value.date_last_updated?.ToString();
+        var offlineState = row.value.offline_state?.ToString() ?? "0";
+
+        DateTime createdDate = DateTime.MinValue;
+        DateTime.TryParse(dateCreated, out createdDate);
+
+        var displayName = $"{sessionId.Substring(0, Math.Min(8, sessionId.Length))}... {createdDate:yyyy-MM-dd HH:mm}";
+        var offlineStateText = GetOfflineStateText(offlineState);
+
+        return new
+        {
+            name = displayName,
+            value = sessionId,
+            dateCreated = createdDate,
+            dateLastUpdated = dateLastUpdated,
+            offlineState = offlineStateText,
+            // 0 = created, 1 = going back online, 2 = completed, 3 = error
+        };
+    }
+
+    private static HashSet<string> ExtractOfflineSessionIds(dynamic modulesData, bool restrictToCurrentUser, string currentUserName)
+    {
+        var sessionIds = new HashSet<string>();
+        if (modulesData?.rows == null)
+        {
+            return sessionIds;
+        }
+
+        foreach (var row in modulesData.rows)
+        {
+            if (restrictToCurrentUser && !IsDynamicValueEqual(row.value.user_name, currentUserName))
+            {
+                continue;
+            }
+
+            if (row.value.offline_session_id != null && !string.IsNullOrWhiteSpace(row.value.offline_session_id.ToString()))
+            {
+                sessionIds.Add(row.value.offline_session_id.ToString());
+            }
+        }
+
+        return sessionIds;
+    }
+
+    private static HashSet<string> ExtractUserNames(dynamic modulesData, bool restrictToCurrentUser, string currentUserName)
+    {
+        var userNames = new HashSet<string>();
+        if (modulesData?.rows == null)
+        {
+            return userNames;
+        }
+
+        foreach (var row in modulesData.rows)
+        {
+            if (restrictToCurrentUser && !IsDynamicValueEqual(row.value.user_name, currentUserName))
+            {
+                continue;
+            }
+
+            if (row.value.user_name != null && !string.IsNullOrWhiteSpace(row.value.user_name.ToString()))
+            {
+                userNames.Add(row.value.user_name.ToString());
+            }
+        }
+
+        return userNames;
+    }
+
+    private static List<object> AnnotateOfflineSessionsWithLogPresence(List<object> offlineSessions, HashSet<string> sessionIdsWithLogs)
+    {
+        return offlineSessions.Select(session =>
+        {
+            var sessionObj = (dynamic)session;
+            string sessionValue = sessionObj.value;
+
+            return new
+            {
+                name = (string)sessionObj.name,
+                value = sessionValue,
+                dateCreated = (DateTime)sessionObj.dateCreated,
+                dateLastUpdated = (string)sessionObj.dateLastUpdated,
+                offlineState = (string)sessionObj.offlineState,
+                hasLogData = sessionIdsWithLogs.Contains(sessionValue)
+            };
+        }).OrderByDescending(s => s.dateCreated).ToList<object>();
+    }
+
     [HttpGet("api/logger/get-logs")]
-    [Authorize(Roles = "form_designer, installation_admin, cdc_admin")]
+    [Authorize(Roles = LoggerViewerRoles)]
     public async Task<IActionResult> GetLogs(
         [FromQuery] string level = null,
         [FromQuery] string context = null,
@@ -206,8 +270,18 @@ public sealed class loggerController : Controller
         int limit = 100000;
         try
         {
-            string dbUrl = $"{db_config.url}/{db_config.prefix}logging";
-            string viewUrl;
+            var restrictToCurrentUser = IsOfflineModeRestricted();
+            var effectiveUserName = userName;
+            if (restrictToCurrentUser)
+            {
+                effectiveUserName = GetCurrentUserName();
+                if (string.IsNullOrWhiteSpace(effectiveUserName))
+                {
+                    return Forbid();
+                }
+            }
+
+            string viewPath;
             
             // Select the most appropriate view based on filters (priority order for performance)
             // If date range is provided, prefer the by-timestamp view (most appropriate for date queries)
@@ -254,40 +328,40 @@ public sealed class loggerController : Controller
                 var encodedEnd = System.Web.HttpUtility.UrlEncode($"\"{endKeyIso}\"");
 
                 // Query by-timestamp with startkey/endkey (descending=true) and limit
-                viewUrl = $"{dbUrl}/_design/sortable/_view/by-timestamp?include_docs=true&startkey={encodedStart}&endkey={encodedEnd}&descending=true&limit={limit}";
+                viewPath = $"_design/sortable/_view/by-timestamp?include_docs=true&startkey={encodedStart}&endkey={encodedEnd}&descending=true&limit={limit}";
             }
             // Query the most selective filter first to minimize data transfer
             else if (!string.IsNullOrWhiteSpace(sessionId) && sessionId.ToLower() != "all")
             {
                 // Use by-offline-session view - most selective, returns exact session
                 var encodedKey = System.Web.HttpUtility.UrlEncode($"\"{sessionId}\"");
-                viewUrl = $"{dbUrl}/_design/sortable/_view/by-offline-session?key={encodedKey}&include_docs=true&descending=true";
+                viewPath = $"_design/sortable/_view/by-offline-session?key={encodedKey}&include_docs=true&descending=true";
             }
-            else if (!string.IsNullOrWhiteSpace(userName) && userName.ToLower() != "all")
+            else if (!restrictToCurrentUser && !string.IsNullOrWhiteSpace(userName) && userName.ToLower() != "all")
             {
                 // Use by-user view - selective by user
                 var encodedKey = System.Web.HttpUtility.UrlEncode($"\"{userName}\"");
-                viewUrl = $"{dbUrl}/_design/sortable/_view/by-user?key={encodedKey}&include_docs=true&descending=true";
+                viewPath = $"_design/sortable/_view/by-user?key={encodedKey}&include_docs=true&descending=true";
             }
             else if (!string.IsNullOrWhiteSpace(context) && context.ToLower() != "all")
             {
                 // Use by-context view - selective by module
                 var encodedKey = System.Web.HttpUtility.UrlEncode($"\"{context}\"");
-                viewUrl = $"{dbUrl}/_design/sortable/_view/by-context?key={encodedKey}&include_docs=true&descending=true";
+                viewPath = $"_design/sortable/_view/by-context?key={encodedKey}&include_docs=true&descending=true";
             }
             else if (!string.IsNullOrWhiteSpace(level) && level.ToLower() != "all")
             {
                 // Use by-level view - selective by log level
                 var encodedKey = System.Web.HttpUtility.UrlEncode($"\"{level.ToLower()}\"");
-                viewUrl = $"{dbUrl}/_design/sortable/_view/by-level?key={encodedKey}&include_docs=true&descending=true";
+                viewPath = $"_design/sortable/_view/by-level?key={encodedKey}&include_docs=true&descending=true";
             }
             else
             {
                 // No specific filter - use all-fields view with limit
-                viewUrl = $"{dbUrl}/_design/sortable/_view/all-fields?include_docs=true&limit={limit}&skip={skip}&descending=true";
+                viewPath = $"_design/sortable/_view/all-fields?include_docs=true&limit={limit}&skip={skip}&descending=true";
             }
             
-            var response = await _couchDbHttpClient.ExecuteAsync("GET", viewUrl, null, db_config.user_name, db_config.user_value);
+            var response = await _loggingRepository.GetFilteredLoggingAsync(viewPath, db_config);
             var data = Newtonsoft.Json.JsonConvert.DeserializeObject<dynamic>(response);
             
             var logs = new List<object>();
@@ -318,9 +392,10 @@ public sealed class loggerController : Controller
                             continue;
                     }
                     
-                    if (!string.IsNullOrWhiteSpace(userName) && userName.ToLower() != "all")
+                    if (!string.IsNullOrWhiteSpace(effectiveUserName) && effectiveUserName.ToLower() != "all")
                     {
-                        if (doc.user_name == null || doc.user_name.ToString() != userName)
+                        if (doc.user_name == null ||
+                            !string.Equals(doc.user_name.ToString(), effectiveUserName, StringComparison.OrdinalIgnoreCase))
                             continue;
                     }
                     
@@ -373,7 +448,7 @@ public sealed class loggerController : Controller
                 }
             }
             
-            return Json(new
+            return EscapedJsonResultFactory.Create(new
             {
                 logs = logs.OrderBy(l => 
                     {
@@ -395,11 +470,11 @@ public sealed class loggerController : Controller
         catch (Exception ex)
         {
             System.Console.WriteLine($"GetLogs error: {ex}");
-            return StatusCode(500, new { error = "Failed to retrieve logs", details = ex.Message });
+            return StatusCode(500, new { error = "Failed to retrieve logs", details = "An unexpected error occurred while retrieving logs." });
         }
     }
     // Add this helper method to convert offline state to text
-    string GetOfflineStateText(string offlineState)
+    private static string GetOfflineStateText(string offlineState)
     {
         return offlineState switch
         {
@@ -411,12 +486,58 @@ public sealed class loggerController : Controller
         };
     }
 
+    private bool IsOfflineModeRestricted()
+    {
+        return User.IsInRole("offline_mode") &&
+            !FullLogViewerRoles.Any(role => User.IsInRole(role));
+    }
+
+    private string GetCurrentUserName()
+    {
+        return User.Identities.FirstOrDefault(
+                identity => identity.IsAuthenticated &&
+                    identity.HasClaim(claim => claim.Type == ClaimTypes.Name))
+            ?.FindFirst(ClaimTypes.Name)
+            ?.Value;
+    }
+
+    private static bool IsDynamicValueEqual(dynamic value, string expected)
+    {
+        if (string.IsNullOrWhiteSpace(expected))
+        {
+            return false;
+        }
+
+        var actual = DynamicValueToString(value);
+        return string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string DynamicValueToString(dynamic value)
+    {
+        if (value == null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var text = value.ToString();
+            return string.IsNullOrWhiteSpace(text) ? null : text;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
 [Route("api/logger/save-offline-log-data")]
 [HttpPost("save-offline-log-data")]
 [Authorize(Roles = "abstractor, data_analyst")]      
-public IActionResult Post([FromBody] mmria.server.model.LogEntryBatch batch)
+public async Task<IActionResult> Post()
 {
-    if (batch == null || batch.logs == null || batch.logs.Length == 0)
+    var batch = await JsonRequestBodyReader.ReadAsync<mmria.server.model.LogEntryBatch>(Request);
+    var sanitizedBatch = CreateSanitizedLogBatch(batch);
+    if (sanitizedBatch == null || sanitizedBatch.logs == null || sanitizedBatch.logs.Length == 0)
     {
         return BadRequest(new { error = "No logs provided" });
     }
@@ -436,7 +557,7 @@ public IActionResult Post([FromBody] mmria.server.model.LogEntryBatch batch)
     {
         try
         {
-            foreach (var logEntry in batch.logs)
+            foreach (var logEntry in sanitizedBatch.logs)
             {
                 try
                 {
@@ -464,9 +585,64 @@ public IActionResult Post([FromBody] mmria.server.model.LogEntryBatch batch)
     {
         accepted = true,
         message = "Logs accepted for processing",
-        total = batch.logs.Length
+        total = sanitizedBatch.logs.Length
     });
 }
+
+    private static mmria.server.model.LogEntryBatch CreateSanitizedLogBatch(mmria.server.model.LogEntryBatch batch)
+    {
+        if (batch?.logs == null || batch.logs.Length == 0)
+        {
+            return null;
+        }
+
+        var logs = batch.logs
+            .Where(log => log != null)
+            .Select(CreateSanitizedLogEntry)
+            .Where(log => log != null)
+            .ToArray();
+
+        if (logs.Length == 0)
+        {
+            return null;
+        }
+
+        return new mmria.server.model.LogEntryBatch
+        {
+            logs = logs
+        };
+    }
+
+    private static mmria.server.model.LogEntry CreateSanitizedLogEntry(mmria.server.model.LogEntry request)
+    {
+        if (request == null)
+        {
+            return null;
+        }
+
+        return new mmria.server.model.LogEntry
+        {
+            data_type = "log_entry",
+            timestamp = request.timestamp,
+            level = NormalizeOptionalString(request.level),
+            context = NormalizeOptionalString(request.context),
+            message = request.message,
+            fileName = request.fileName,
+            lineNumber = request.lineNumber,
+            columnNumber = request.columnNumber,
+            functionName = request.functionName,
+            stackTrace = request.stackTrace,
+            errorType = NormalizeOptionalString(request.errorType),
+            is_offline = NormalizeOptionalString(request.is_offline),
+            process_offline_cases = NormalizeOptionalString(request.process_offline_cases),
+            offline_session_id = NormalizeOptionalString(request.offline_session_id)
+        };
+    }
+
+    private static string NormalizeOptionalString(string value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
 
     private async Task<mmria.common.model.couchdb.document_put_response> SaveLog(mmria.server.model.LogEntry logEntry)
     {
@@ -474,21 +650,17 @@ public IActionResult Post([FromBody] mmria.server.model.LogEntryBatch batch)
 
         try
         {
-            string url = $"{db_config.url}/{db_config.prefix}logging";
-            
             var settings = new Newtonsoft.Json.JsonSerializerSettings();
             settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
             var json = Newtonsoft.Json.JsonConvert.SerializeObject(logEntry, settings);
 
-            string response = await _couchDbHttpClient.ExecuteAsync("POST", url, json, db_config.user_name, db_config.user_value);
-            result = Newtonsoft.Json.JsonConvert
-                .DeserializeObject<mmria.common.model.couchdb.document_put_response>(response);
+            result = await _loggingRepository.PostLoggingDocumentAsync(json, db_config);
         }
         catch (Exception ex)
         {
             System.Console.WriteLine($"SaveLog error: {ex}");
             result.ok = false;
-            result.error_description = ex.Message;
+            result.error_description = "Failed to save log entry.";
         }
 
         return result;

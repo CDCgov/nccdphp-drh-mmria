@@ -24,27 +24,21 @@ public sealed class sessionDBController: ControllerBase
 {
 
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.SharedLibraries.Session.Manager.SessionManager _sessionManager;
     public sessionDBController 
     (
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.common.SharedLibraries.Session.Manager.SessionManager sessionManager
     )
     {
         _sessionManager = sessionManager;
-        configuration = _configuration;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
     }
 
 
@@ -69,44 +63,12 @@ public sealed class sessionDBController: ControllerBase
     //[Authorize(Roles  = "abstractor")]
     [HttpPut]
     [HttpPost]
-    public async System.Threading.Tasks.Task<IEnumerable<login_response>> Post
-    (
-        [FromBody] Post_Request_Struct post_request_struct 
-    ) 
+    public async System.Threading.Tasks.Task<IEnumerable<login_response>> Post()
     {
-        
+        var post_request_struct = await mmria.server.util.JsonRequestBodyReader.ReadAsync<Post_Request_Struct>(Request);
+        var sanitizedRequest = NormalizeLoginRequest(post_request_struct);
+        _ = sanitizedRequest;
 
-        /*
-        post_request_struct.userid = null;
-        //post_request_struct.password = null;
-
-        try 
-        {
-
-            System.IO.Stream dataStream0 = await this.Request.Content.ReadAsStreamAsync ();
-            // Open the stream using a StreamReader for easy access.
-            //dataStream0.Seek(0, System.IO.SeekOrigin.Begin);
-            System.IO.StreamReader reader0 = new System.IO.StreamReader (dataStream0);
-            // Read the content.
-            string temp = reader0.ReadToEnd ();
-            //System.Console.Write ($"temp {temp}");
-            post_request_struct = Newtonsoft.Json.JsonConvert.DeserializeObject<Post_Request_Struct> (temp);
-
-            //mmria.server.utilsLuceneSearchIndexer.RunIndex(new List<mmria.common.model.home_record> { mmria.common.model.home_record.convert(queue_request)});
-            //System.Dynamic.ExpandoObject json_result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(result, new  Newtonsoft.Json.Converters.ExpandoObjectConverter());
-
-
-
-            //string metadata = DecodeUrlString(temp);
-        } catch (Exception ex) {
-            Console.WriteLine (ex);
-        }
-*/
-
-        /*
-HOST="http://127.0.0.1:5984"
-> curl -vX POST $HOST/_session -H 'Content-Type: application/x-www-form-urlencoded' -d 'name=anna&password=secret'
-        */
         try
         {
             return await _sessionManager.LoginToCouchDbSessionAsync(db_config);
@@ -118,6 +80,15 @@ HOST="http://127.0.0.1:5984"
         } 
 
         return null;
+    }
+
+    private static Post_Request_Struct NormalizeLoginRequest(Post_Request_Struct request)
+    {
+        return new Post_Request_Struct
+        {
+            name = request.name?.Trim(),
+            value = request.value
+        };
     }
 }
 

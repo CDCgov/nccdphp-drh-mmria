@@ -10,8 +10,11 @@ using Serilog.Configuration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
+using mmria.common.utils;
+using Newtonsoft.Json.Linq;
 
 using  mmria.server.extension; 
+using mmria.server.util;
 namespace mmria.server;
 
 [Route("api/[controller]")]
@@ -19,31 +22,29 @@ public sealed class versionController: ControllerBase
 { 
 
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.SharedLibraries.MetadataVersion.Manager.MetadataVersionManager _metadataVersionManager;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository _metadataRepository;
     public Dictionary<string, string> formName = new Dictionary<string, string>();
     public versionController
 (
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
-        mmria.common.SharedLibraries.MetadataVersion.Manager.MetadataVersionManager metadataVersionManager
+        mmria.common.SharedLibraries.MetadataVersion.Manager.MetadataVersionManager metadataVersionManager,
+        mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository metadataRepository
     )
     {
         _couchDbHttpClient = couchDbHttpClient;
         _metadataVersionManager = metadataVersionManager;
-        configuration = _configuration;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        _metadataRepository = metadataRepository;
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
         formName.Add("(none)", "(none)");
         formName.Add("home_record", "Home Record");
         formName.Add("death_certificate", "Death Certificate");
@@ -142,7 +143,7 @@ public sealed class versionController: ControllerBase
     )
     {
 
-        var export_all_generate_name_map = new mmria.server.utils.export_all_generate_name_map(db_config, _couchDbHttpClient);
+        var export_all_generate_name_map = new mmria.server.utils.export_all_generate_name_map(db_config, _metadataRepository);
 
         var result = await export_all_generate_name_map.ExecuteAsync(version_specification_id, type);
 
@@ -164,6 +165,10 @@ public sealed class versionController: ControllerBase
         try
         {
             string responseString = await _metadataVersionManager.GetVersionDocumentAsync(version_specification_id, document_name, db_config);
+            if (string.Equals(document_name, "metadata", StringComparison.OrdinalIgnoreCase))
+            {
+                responseString = ApplyOmbExpirationDateToMetadata(responseString);
+            }
 
             string type="javascript";
             if(!string.IsNullOrWhiteSpace(document_name))
@@ -190,6 +195,57 @@ public sealed class versionController: ControllerBase
         return result;
     } 
 
+    private string ApplyOmbExpirationDateToMetadata(string metadataJson)
+    {
+        if (string.IsNullOrWhiteSpace(metadataJson))
+        {
+            return metadataJson;
+        }
+
+        try
+        {
+            var metadata = JToken.Parse(metadataJson);
+            ApplyOmbExpirationDateToMetadataToken(metadata, GetOmbExpirationDate());
+            return metadata.ToString(Newtonsoft.Json.Formatting.None);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error applying OMB expiration date to version metadata: {ex}");
+            return metadataJson;
+        }
+    }
+
+    private void ApplyOmbExpirationDateToMetadataToken(JToken token, string ombExpirationDate)
+    {
+        if (token is JObject metadataObject)
+        {
+            if (string.Equals(
+                metadataObject.Value<string>("name"),
+                "omb_expiration_label",
+                StringComparison.OrdinalIgnoreCase))
+            {
+                metadataObject["prompt"] = $"Exp. Date {ombExpirationDate}";
+            }
+
+            foreach (var property in metadataObject.Properties().ToList())
+            {
+                ApplyOmbExpirationDateToMetadataToken(property.Value, ombExpirationDate);
+            }
+        }
+        else if (token is JArray metadataArray)
+        {
+            foreach (var item in metadataArray)
+            {
+                ApplyOmbExpirationDateToMetadataToken(item, ombExpirationDate);
+            }
+        }
+    }
+
+    private string GetOmbExpirationDate()
+    {
+        return configuration.GetString("omb_expiration_date", host_prefix) ?? "05/31/2026";
+    }
+
     public static byte[] ReadFully(System.IO.Stream input)
     {
         byte[] buffer = new byte[16*1024];
@@ -208,12 +264,11 @@ public sealed class versionController: ControllerBase
     [Route("save")]
     [HttpPost]
     [HttpPut]
-    public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post
-    (
-        [FromBody] mmria.common.metadata.Version_Specification p_Version_Specification
-    ) 
+    public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post() 
     { 
+        var p_Version_Specification = await JsonRequestBodyReader.ReadAsync<mmria.common.metadata.Version_Specification>(Request);
         mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response ();
+        var sanitizedVersionSpecification = DocumentPayloadCloneHelper.CloneVersionSpecification(p_Version_Specification, GetCurrentUserName());
 
 /*
         System.IO.Stream dataStream0 = this.Request.Body;
@@ -229,7 +284,18 @@ public sealed class versionController: ControllerBase
         //if(!string.IsNullOrWhiteSpace(json))
         try
         {
-            result = await _metadataVersionManager.SaveVersionSpecificationAsync(p_Version_Specification, db_config);
+            if (sanitizedVersionSpecification == null)
+            {
+                return result;
+            }
+
+            result = await _metadataVersionManager.SaveVersionSpecificationAsync(sanitizedVersionSpecification, db_config);
+            if (result == null || !result.ok)
+            {
+                var revisionHandling = CouchDbRevisionHelper.DescribeRevisionHandling(p_Version_Specification?._rev, null);
+                Console.WriteLine(
+                    $"Version specification save failed for {sanitizedVersionSpecification._id}: rev={revisionHandling}; response={result?.error_description}");
+            }
         }
         catch(Exception ex)
         {
@@ -341,7 +407,19 @@ public sealed class versionController: ControllerBase
 
                 var document_content = await reader0.ReadToEndAsync ();
                 add_attachement = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.Add_Attachement>(document_content);
-                result = await _metadataVersionManager.SaveVersionAttachmentAsync(add_attachement, db_config, false);
+                var sanitizedAttachment = DocumentPayloadCloneHelper.CloneAddAttachment(add_attachement);
+                if (sanitizedAttachment == null)
+                {
+                    return result;
+                }
+
+                result = await _metadataVersionManager.SaveVersionAttachmentAsync(sanitizedAttachment, db_config, false);
+                if (result == null || !result.ok)
+                {
+                    var revisionHandling = CouchDbRevisionHelper.DescribeRevisionHandling(add_attachement?._rev, null);
+                    Console.WriteLine(
+                        $"Version attachment save failed for {sanitizedAttachment._id}: rev={revisionHandling}; response={result?.error_description}");
+                }
 
                 if (!result.ok) 
                 {
@@ -356,6 +434,20 @@ public sealed class versionController: ControllerBase
             
         return result;
     } 
+
+    private string GetCurrentUserName()
+    {
+        if (User?.Identities?.Any(u => u.IsAuthenticated) == true)
+        {
+            return User.Identities.First(
+                u => u.IsAuthenticated &&
+                u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name))
+                .FindFirst(System.Security.Claims.ClaimTypes.Name)
+                .Value;
+        }
+
+        return null;
+    }
 
 
 } 

@@ -3,6 +3,7 @@
 
 // Import offline logger first to ensure logging is available throughout
 importScripts('/scripts/offline/offline-logger.js');
+importScripts('/scripts/offline/offline-cache-manifest.js');
 
 // Initialize offline logger for service worker context
 if (typeof self.offlineLog !== 'undefined') {
@@ -295,14 +296,34 @@ async function cacheStaticFilesForSession() {
         const staticCache = await caches.open(STATIC_CACHE_NAME);
         
         const cachedFiles = [];
-        
-        // Cache files individually to identify any failures
-        const cachePromises = STATIC_FILES.map(async (url) => {
-            await staticCache.add(url);
-            cachedFiles.push(url);
-        });
-        
-        await Promise.all(cachePromises);
+        const requiredFailures = [];
+
+        for (const expectation of REQUIRED_STATIC_EXPECTATIONS) {
+            const response = await fetch(expectation.path);
+            const validation = await validateManifestResponse(response, expectation, expectation.path);
+            if (!validation.valid) {
+                const reason = `Required static asset validation failed for ${expectation.path}: ${validation.reason}`;
+                self.offlineLog.error('ServiceWorker', reason);
+                requiredFailures.push(reason);
+                continue;
+            }
+
+            await staticCache.put(expectation.path, response.clone());
+            cachedFiles.push(expectation.path);
+        }
+
+        for (const url of OPTIONAL_STATIC_FILES) {
+            try {
+                await staticCache.add(url);
+                cachedFiles.push(url);
+            } catch (error) {
+                self.offlineLog.warn('ServiceWorker', `Optional static asset failed to cache: ${url}`, error);
+            }
+        }
+
+        if (requiredFailures.length > 0) {
+            throw new Error(requiredFailures.join(' | '));
+        }
         
         // Log all successfully cached files in one consolidated message
         if (cachedFiles.length > 0) {
@@ -326,68 +347,56 @@ async function cacheApiRoutesForSession() {
         const apiCache = await caches.open(API_CACHE_NAME);
         
         const cachedRoutes = [];
-        
-        // Cache the Case route
-        const caseResponse = await fetch('/Case');
-        if (caseResponse.ok) {
-            await Promise.all([
-                apiCache.put('/Case', caseResponse.clone()),
-                apiCache.put('/case', caseResponse.clone())
-            ]);
-            cachedRoutes.push('/Case', '/case');
-        } else {
-            self.offlineLog.warn('ServiceWorker', 'Case route returned non-OK status:', caseResponse.status);
-        }
-        
-        // Cache the Home/Index route and root route
-        const homeResponse = await fetch('/Home/Index');
-        if (homeResponse.ok) {
-            await Promise.all([
-                apiCache.put('/Home/Index', homeResponse.clone()),
-                apiCache.put('/', homeResponse.clone())
-            ]);
-            cachedRoutes.push('/Home/Index', '/');
-        } else {
-            self.offlineLog.warn('ServiceWorker', 'Home/Index route returned non-OK status:', homeResponse.status);
-        }
-        
-        // Cache the Offline Login route
-        const offlineLoginResponse = await fetch('/Account/Offlinelogin');
-        if (offlineLoginResponse.ok) {
-            await apiCache.put('/Account/Offlinelogin', offlineLoginResponse.clone());
-            cachedRoutes.push('/Account/Offlinelogin');
-        } else {
-            self.offlineLog.warn('ServiceWorker', '/Account/Offlinelogin route returned non-OK status:', offlineLoginResponse.status);
+        const requiredFailures = [];
+
+        const routeCachePlan = [
+            { fetchPath: '/Case', cachePaths: ['/Case', '/case'] },
+            { fetchPath: '/Home/Index', cachePaths: ['/Home/Index', '/'] },
+            { fetchPath: '/Account/OfflineLogin', cachePaths: ['/Account/OfflineLogin', '/Account/OfflineLogin/'] },
+            { fetchPath: '/pdf-version/', cachePaths: ['/pdf-version', '/pdf-version/'], fetchOptions: { redirect: 'follow' } },
+            { fetchPath: '/pdf-version/index.html', cachePaths: ['/pdf-version/index.html'] }
+        ];
+
+        for (const route of routeCachePlan) {
+            const result = await cacheValidatedResponse(
+                apiCache,
+                route.fetchPath,
+                route.cachePaths,
+                REQUIRED_ROUTE_EXPECTATIONS,
+                { fetchOptions: route.fetchOptions || {} }
+            );
+
+            if (!result.cached) {
+                const reason = `Required route validation failed for ${route.fetchPath}: ${result.reason}`;
+                if (result.blocked) {
+                    self.offlineLog.error('ServiceWorker', reason);
+                    requiredFailures.push(reason);
+                } else {
+                    self.offlineLog.warn('ServiceWorker', reason);
+                }
+                continue;
+            }
+
+            cachedRoutes.push(...route.cachePaths);
         }
 
-        // Cache the PDF version route (with and without trailing slash)
-        const pdfVersionResponse = await fetch('/pdf-version/', { redirect: 'follow' });
-        if (pdfVersionResponse.ok) {
-            await Promise.all([
-                apiCache.put('/pdf-version', pdfVersionResponse.clone()),
-                apiCache.put('/pdf-version/', pdfVersionResponse.clone())
-            ]);
-            cachedRoutes.push('/pdf-version', '/pdf-version/');
+        const cacheVersionPath = '/api/OfflineCase/cache-version';
+        const cacheVersionResult = await cacheValidatedResponse(
+            apiCache,
+            cacheVersionPath,
+            [cacheVersionPath],
+            REQUIRED_API_EXPECTATIONS
+        );
+        if (!cacheVersionResult.cached) {
+            const reason = `Required API route validation failed for ${cacheVersionPath}: ${cacheVersionResult.reason}`;
+            self.offlineLog.error('ServiceWorker', reason);
+            requiredFailures.push(reason);
         } else {
-            self.offlineLog.warn('ServiceWorker', '/pdf-version/ route returned non-OK status:', pdfVersionResponse.status);
-        }
-        
-        // Cache the PDF version HTML file explicitly
-        const pdfVersionHtmlResponse = await fetch('/pdf-version/index.html');
-        if (pdfVersionHtmlResponse.ok) {
-            await apiCache.put('/pdf-version/index.html', pdfVersionHtmlResponse.clone());
-            cachedRoutes.push('/pdf-version/index.html');
-        } else {
-            self.offlineLog.warn('ServiceWorker', '/pdf-version/index.html returned non-OK status:', pdfVersionHtmlResponse.status);
+            cachedRoutes.push(cacheVersionPath);
         }
 
-        // Cache the cache-version endpoint (required for offline mode)
-        const cacheVersionResponse = await fetch('/api/OfflineCase/cache-version');
-        if (cacheVersionResponse.ok) {
-            await apiCache.put('/api/OfflineCase/cache-version', cacheVersionResponse.clone());
-            cachedRoutes.push('/api/OfflineCase/cache-version');
-        } else {
-            self.offlineLog.warn('ServiceWorker', 'cache-version endpoint returned non-OK status:', cacheVersionResponse.status);
+        if (requiredFailures.length > 0) {
+            throw new Error(requiredFailures.join(' | '));
         }
         
         // Log all successfully cached routes in one consolidated message
@@ -399,13 +408,14 @@ async function cacheApiRoutesForSession() {
 
     } catch (error) {
         self.offlineLog.error('ServiceWorker', 'Failed to cache API routes for session:', error.message);
+        throw error;
     }
-
-
 }
 
 async function caseInsensitiveCacheMatch(request, cache) {
     const reqUrl = new URL(request.url);
+    const shouldIgnoreSearchForOfflineLogin = reqUrl.pathname.toLowerCase() === '/account/offlinelogin' ||
+        reqUrl.pathname.toLowerCase() === '/account/offlinelogin/';
     const cacheKeys = await cache.keys();
     for (const cachedRequest of cacheKeys) {
         const cachedUrl = new URL(cachedRequest.url);
@@ -415,8 +425,46 @@ async function caseInsensitiveCacheMatch(request, cache) {
         ) {
             return cache.match(cachedRequest);
         }
+
+        if (
+            shouldIgnoreSearchForOfflineLogin &&
+            cachedUrl.pathname.toLowerCase() === reqUrl.pathname.toLowerCase() &&
+            cachedUrl.search.length === 0
+        ) {
+            return cache.match(cachedRequest);
+        }
     }
     return undefined;
+}
+
+function createOfflineKeyRequiredResponse(message = 'Encrypted offline case data is locked. Please re-enter your offline key.') {
+    return new Response(
+        JSON.stringify({
+            error: 'offline_key_required',
+            message: message
+        }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+    );
+}
+
+function createOfflineDocumentsErrorResponse(message = 'Unable to load offline case list from cache.') {
+    return new Response(
+        JSON.stringify({
+            error: 'offline_documents_unavailable',
+            message: message
+        }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
+}
+
+function buildOfflineLoginRedirectUrl(returnPath = '/Home/Index') {
+    return `/Account/OfflineLogin?returnUrl=${encodeURIComponent(returnPath)}`;
+}
+
+async function getCachedCaseResponseFromActiveSession(request) {
+    const activeCacheName = await getActiveApiCacheName();
+    const cache = await caches.open(activeCacheName);
+    return await caseInsensitiveCacheMatch(request, cache);
 }
 
 // Function to clear all non-current session caches
@@ -499,7 +547,6 @@ async function getActiveApiCacheName() {
         // If CURRENT_SESSION_ID is set, use the session-specific cache name
         if (self.OFFLINE_CACHE_ID && CACHE_VERSION_BASE) {
             const sessionCacheName = `mmria-api-${CACHE_VERSION_BASE}-session-${self.OFFLINE_CACHE_ID}`;
-            self.offlineLog.log('ServiceWorker', 'Using active session cache:', sessionCacheName);
             return sessionCacheName;
         }
         
@@ -509,7 +556,6 @@ async function getActiveApiCacheName() {
         // Check again after initialization attempt
         if (self.OFFLINE_CACHE_ID && CACHE_VERSION_BASE) {
             const sessionCacheName = `mmria-api-${CACHE_VERSION_BASE}-session-${self.OFFLINE_CACHE_ID}`;
-            self.offlineLog.log('ServiceWorker', 'Using session cache after initialization:', sessionCacheName);
             return sessionCacheName;
         }
         
@@ -553,228 +599,178 @@ async function getActiveApiCacheName() {
 
 
 
-// Static files to cache
+const offlineCacheManifest = self.OfflineCacheManifest || {};
+const REQUIRED_STATIC_EXPECTATIONS = offlineCacheManifest.requiredStaticExpectations || [];
+const OPTIONAL_STATIC_FILES = offlineCacheManifest.optionalStaticFiles || [];
+const REQUIRED_ROUTE_EXPECTATIONS = offlineCacheManifest.requiredRouteExpectations || [];
+const REQUIRED_API_EXPECTATIONS = offlineCacheManifest.requiredApiExpectations || [];
 const STATIC_FILES = [
-    // Core CSS files
-    '/css/index.css',
-    '/css/bootstrap.min.css',
-    '/css/animate.css',
-    '/TemplatePackage/4.0/assets/css/app.min.css',
-    '/TemplatePackage/4.0/assets/css/print.css',
-    '/TemplatePackage/4.0/assets/vendor/css/bootstrap.css',
-    '/styles/mmria-custom.css',
-    '/styles/template-package-override.css',
-    '/styles/mmria.css',
-    '/styles/d3/c3.min.css',
-    '/styles/jquery/jquery.timepicker.css',
-    '/styles/jquery/jquery.datetimepicker.css',
-    '/styles/bootstrap/bootstrap-datetimepicker.min.css',
-    '/styles/bootstrap/jquery.bootstrap-touchspin.min.css',
-    '/styles/bootstrap/bootstrap-timepicker.css',
-    '/styles/flatpickr/flatpickr.min.css',
-    '/styles/d3/c3/0.7.20/c3.min.css',
-    '/styles/trumbowyg/trumbowyg.min.css',
-    
-    // Fonts (only include files that actually exist)
-    '/TemplatePackage/4.0/assets/fonts/open-sans-v15-latin-regular.woff2',
-    '/TemplatePackage/4.0/assets/fonts/merriweather-v19-latin-regular.woff2',
-    '/TemplatePackage/4.0/assets/fonts/cdciconfont.woff2',
-    '/TemplatePackage/4.0/assets/fonts/cdciconfont.woff',
-    '/TemplatePackage/4.0/assets/fonts/cdciconfont.ttf',
-    '/TemplatePackage/4.0/assets/fonts/cdciconfont.eot',
-    '/TemplatePackage/4.0/assets/fonts/fontawesome-webfont.woff',
-    '/TemplatePackage/4.0/assets/fonts/fontawesome-webfont.ttf',
-    '/TemplatePackage/4.0/assets/fonts/fontawesome-webfont.eot',
-    '/TemplatePackage/4.0/assets/fonts/glyphicons-halflings-regular.woff',
-    '/TemplatePackage/4.0/assets/fonts/glyphicons-halflings-regular.ttf',
-    '/TemplatePackage/4.0/assets/fonts/glyphicons-halflings-regular.eot',
-    '/TemplatePackage/4.0/assets/fonts/lato-regular-webfont.woff',
-    '/TemplatePackage/4.0/assets/fonts/lato-regular-webfont.ttf',
-    '/TemplatePackage/4.0/assets/fonts/lato-regular-webfont.eot',
-    // Common cache-busting variants for CDC icon font
-    '/TemplatePackage/4.0/assets/fonts/cdciconfont.woff2?2747808d2c4ae8c1059745ae5eddb65e',
-    '/TemplatePackage/4.0/assets/fonts/cdciconfont.woff?2747808d2c4ae8c1059745ae5eddb65e',
-    '/TemplatePackage/4.0/assets/fonts/cdciconfont.ttf?2747808d2c4ae8c1059745ae5eddb65e',
-    
-    // Core JavaScript libraries
-    '/js/jquery.min.js',
-    '/js/bootstrap.min.js',
-    '/js/jquery.easing.min.js',
-    '/js/wow.js',
-    '/js/jquery.bxslider.min.js',
-    '/TemplatePackage/4.0/assets/vendor/js/jquery.min.js',
-    '/TemplatePackage/4.0/assets/vendor/js/bootstrap.min.js',
-    
-    // jQuery UI and extensions
-    '/scripts/jquery-3.1.1.min.js',
-    '/scripts/jquery-ui.min.js',
-    '/scripts/jquery/moment.js',
-    '/scripts/jquery/jquery.timepicker.js',
-    '/scripts/jquery/jquery.numeric.min.js',
-    '/scripts/jquery/jquery.datetimepicker.js',
-    
-    // Bootstrap extensions
-    '/scripts/bootstrap/bootstrap-datetimepicker.min.js',
-    '/scripts/bootstrap/jquery.bootstrap-touchspin.min.js',
-    '/scripts/bootstrap/bootstrap-timepicker.js',
-    
-    // Utility libraries
-    '/scripts/esprima.js',
-    '/scripts/escodegen.browser.js',
-    '/scripts/peg.js/0.10.0/peg.js',
-    '/scripts/rxjs/7.5.5/rxjs.umd.min.js',
-    
-    // D3 and charting
-    '/scripts/d3/d3.min.js',
-    '/scripts/d3/c3.min.js',
-    '/scripts/d3/d3/v5/d3.v5.min.js',
-    '/scripts/d3/c3/0.7.20/c3.min.js',
-    
-    // Rich text editor
-    '/scripts/trumbowyg/trumbowyg.min.js',
-    '/scripts/trumbowyg/trumbowyg.colors.min.js',
-    '/scripts/trumbowyg/trumbowyg.fontsize.min.js',
-    
-    // MMRIA core scripts
-    '/scripts/mmria.js',
-    '/scripts/mmria-custom.js',
-    '/scripts/metadata_summary.js', 
-    
-    // Editor and page renderer
-    '/scripts/editor/page_renderer/app.mmria.js',
-    '/scripts/editor/page_renderer/string.js',
-    '/scripts/editor/page_renderer.js',
-    '/scripts/editor/page_renderer/number.js',
-    '/scripts/editor/page_renderer/textarea.js',
-    '/scripts/editor/page_renderer/html_area.js',
-    '/scripts/editor/page_renderer/time.js',
-    '/scripts/editor/page_renderer/boolean.js',
-    '/scripts/editor/page_renderer/chart.js',
-    '/scripts/editor/page_renderer/date.mmria.js',
-    '/scripts/editor/page_renderer/datetime.js',
-    '/scripts/editor/page_renderer/form.mmria.js',
-    '/scripts/editor/page_renderer/form.pmss.attachment.js',
-    '/scripts/editor/page_renderer/grid.js',
-    '/scripts/editor/page_renderer/group.js',
-    '/scripts/editor/page_renderer/hidden.js',
-    '/scripts/editor/page_renderer/jurisdiction.js',
-    '/scripts/editor/page_renderer/label.js',
-    '/scripts/editor/page_renderer/list.js',
-    '/scripts/editor/navigation_renderer.js',
-    '/scripts/editor/apply_sort.js',
-    
-    // Case-specific scripts
-    '/scripts/case/tab-id.js',
-    '/scripts/case/index.js',
-    '/scripts/case/index.mmria.js',
-    '/scripts/case/search_view.js',
-    '/scripts/case/conversion-calculator.js',
-    
-    // PDF version scripts
-    '/scripts/pdf-version/pdfmake.min.js',
-    '/scripts/pdf-version/vfs_fonts.js',
-    '/scripts/pdf-version/chart.min.js',
-    '/scripts/pdf-version/index.js',
-    
-    // Utility scripts
-    '/scripts/data_access.js',
-    '/scripts/create_default_object.js',
-    '/scripts/url_monitor.js',
-    
-    // Flatpickr date picker library
-    '/scripts/flatpickr/flatpickr.js',
-    
-    // Offline mode modules
-    '/scripts/offline/offline-utils.js',
-    '/scripts/offline/offline-session-validator.js',
-    '/scripts/offline/offline-network-monitor.js',
-    '/scripts/offline/offline-change-tracker.js',
-    '/scripts/offline/offline-sync-manager.js',
-    '/scripts/offline/offline-case-manager.js',
-    '/scripts/offline/offline-session-manager.js',
-    '/scripts/offline/offline-navigation-manager.js',
-    '/scripts/offline/offline-status-manager.js',
-    '/scripts/offline/offline-ui-renderer.js',
-    '/scripts/offline/offline-modals.js',
-    '/scripts/offline/offline-transition-manager.js',
-    '/scripts/offline/offline-logout-button.js',
-    '/scripts/offline/offline-home-page.js',
-    '/scripts/offline/service-worker-manager.js',
-    '/scripts/offline/offline-logger.js',
-    '/scripts/offline/offline-debug-modal.js',
-
-    // Home page scripts
-    '/scripts/Home/index.js',
-    
-    // Icons and images
-    '/favicon.ico',
-    '/TemplatePackage/4.0/assets/imgs/favicon.ico',
-    '/img/icon_pin.png',
-    '/img/icon_unpin.png',
-    '/img/online-go.svg',
-    '/img/offline-info.svg',
-    '/img/offline-index.svg',
-    '/img/icon_error.svg',
-    '/images/mmria-secondary.svg',
-    '/images/mmria-secondary.png',
-    // Offline login view and required scripts
-    //'/Account/OfflineLogin',
-    '/scripts/Account/offline_key_login.js',
-    '/scripts/shared/logout-handler.js'
+    ...REQUIRED_STATIC_EXPECTATIONS.map(item => item.path),
+    ...OPTIONAL_STATIC_FILES
 ];
+const CACHED_ROUTES = offlineCacheManifest.cachedRoutes || [];
+const CACHED_API_ROUTES = offlineCacheManifest.cachedApiRoutes || [];
 
-// Routes that should be cached for offline access
-const CACHED_ROUTES = [
-    // Home page routes (root and explicit)
-    /^\/$/,
-    /^\/Home\/Index\/?$/,
-    // Case index route
-    /^\/Case\/?$/,
-    // Case summary routes (for specific case IDs)
-    /^\/Account\/OfflineLogin\/?$/i,
-    /^\/Account\/Login\/?$/i,
-    /^\/Case\/([^\/]+)\/summary$/,
-    // Case form routes 
-    /^\/Case\/([^\/]+)\/0\/home_record$/,
-    /^\/Case\/([^\/]+)\/0\/death_certificate$/,
-    /^\/Case\/([^\/]+)\/0\/birth_fetal_death_certificate_parent$/,
-    /^\/Case\/([^\/]+)\/0\/birth_certificate_infant_fetal_section$/,
-    /^\/Case\/([^\/]+)\/0\/cvs$/,
-    /^\/Case\/([^\/]+)\/0\/social_and_environmental_profile$/,
-    /^\/Case\/([^\/]+)\/0\/autopsy_report$/,
-    /^\/Case\/([^\/]+)\/0\/prenatal$/,
-    /^\/Case\/([^\/]+)\/0\/er_visit_and_hospital_medical_records$/,
-    /^\/Case\/([^\/]+)\/0\/other_medical_office_visits$/,
-    /^\/Case\/([^\/]+)\/0\/medical_transport$/,
-    /^\/Case\/([^\/]+)\/0\/mental_health_profile$/,
-    /^\/Case\/([^\/]+)\/0\/informant_interviews$/,
-    /^\/Case\/([^\/]+)\/0\/case_narrative$/,
-    /^\/Case\/([^\/]+)\/0\/committee_review$/,
-    // PDF version route
-    /^\/pdf-version\/?$/
-];
+function getNormalizedContentType(response) {
+    return ((response && response.headers && response.headers.get('content-type')) || '').toLowerCase();
+}
 
-// API routes that should be cached
-const CACHED_API_ROUTES = [
-    /^\/api\/case\?case_id=/,
-    /^\/api\/case_view\/record-id-list/,
-    /^\/api\/case_view\/offline-documents/,
-    /^\/api\/case_view$/,
-    /^\/api\/OfflineCase\/cache-version/,
-    /^\/api\/version\/.*\/validation$/,
-    /^\/api\/version\/.*\/ui_specification$/,
-    /^\/api\/version\/.*\/metadata$/,
-    /^\/api\/version\/release-version$/,
-    /^\/api\/metadata$/,
-    /^\/api\/metadata\/version_specification$/,
-    /^\/api\/user_role_jurisdiction_view\/my-roles/,
-    /^\/api\/user\/my-user$/,
-    /^\/api\/jurisdiction_tree$/,
-    /^\/api\/cvsAPI$/,
-    /^\/_users\/GetFormAccess/,
-    /^\/Case\/GetDuplicateMultiFormList/,
-    /^\/broadcast-message\/GetBroadcastMessageList/
-];
+function contentTypeMatches(contentType, expectedContentType) {
+    if (!expectedContentType) {
+        return true;
+    }
+
+    if (!contentType) {
+        return false;
+    }
+
+    return contentType.indexOf(expectedContentType.toLowerCase()) >= 0;
+}
+
+function findManifestExpectation(pathname, expectations) {
+    let normalizedPath = pathname;
+
+    try {
+        if (normalizedPath.indexOf('http://') === 0 || normalizedPath.indexOf('https://') === 0) {
+            const url = new URL(normalizedPath);
+            normalizedPath = url.pathname + url.search;
+        }
+    } catch (_error) {
+        normalizedPath = pathname;
+    }
+
+    return (expectations || []).find(expectation => expectation.pattern.test(normalizedPath)) || null;
+}
+
+async function validateManifestResponse(response, expectation, requestPath) {
+    if (!expectation) {
+        return { valid: true };
+    }
+
+    if (!response) {
+        return { valid: false, reason: `${requestPath} returned no response` };
+    }
+
+    if (typeof expectation.expectedStatus === 'number' && response.status !== expectation.expectedStatus) {
+        return {
+            valid: false,
+            reason: `${requestPath} returned status ${response.status}; expected ${expectation.expectedStatus}`
+        };
+    }
+
+    const contentType = getNormalizedContentType(response);
+    if (!contentTypeMatches(contentType, expectation.expectedContentType)) {
+        return {
+            valid: false,
+            reason: `${requestPath} returned content-type "${contentType || 'unknown'}"; expected ${expectation.expectedContentType}`
+        };
+    }
+
+    const validation = expectation.validation || 'exists';
+    try {
+        switch (validation) {
+            case 'asset_non_empty':
+            case 'javascript_non_empty': {
+                const bodyText = await response.clone().text();
+                return bodyText.trim().length > 0
+                    ? { valid: true }
+                    : { valid: false, reason: `${requestPath} returned an empty response body` };
+            }
+            case 'html_shell': {
+                const bodyText = (await response.clone().text()).toLowerCase();
+                const hasHtmlShell = bodyText.indexOf('<html') >= 0 || bodyText.indexOf('<!doctype') >= 0;
+                return hasHtmlShell
+                    ? { valid: true }
+                    : { valid: false, reason: `${requestPath} did not contain an HTML shell` };
+            }
+            case 'json_has_base_version': {
+                const payload = await response.clone().json();
+                return payload && typeof payload === 'object' && typeof payload.baseVersion === 'string' && payload.baseVersion.length > 0
+                    ? { valid: true }
+                    : { valid: false, reason: `${requestPath} did not include a baseVersion value` };
+            }
+            case 'json_has_form_design': {
+                const payload = await response.clone().json();
+                return payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'form_design')
+                    ? { valid: true }
+                    : { valid: false, reason: `${requestPath} did not include form_design` };
+            }
+            case 'json_has_children': {
+                const payload = await response.clone().json();
+                return payload && typeof payload === 'object' && Array.isArray(payload.children)
+                    ? { valid: true }
+                    : { valid: false, reason: `${requestPath} did not include a children array` };
+            }
+            case 'json_array_or_object': {
+                const payload = await response.clone().json();
+                const isValid = Array.isArray(payload) || (!!payload && typeof payload === 'object');
+                return isValid
+                    ? { valid: true }
+                    : { valid: false, reason: `${requestPath} did not return a JSON object or array` };
+            }
+            case 'json_object': {
+                const payload = await response.clone().json();
+                return payload && typeof payload === 'object' && !Array.isArray(payload)
+                    ? { valid: true }
+                    : { valid: false, reason: `${requestPath} did not return a JSON object` };
+            }
+            case 'json_version_value': {
+                const bodyText = (await response.clone().text()).trim();
+                let payload = bodyText;
+
+                try {
+                    payload = JSON.parse(bodyText);
+                } catch (_error) {
+                    payload = bodyText;
+                }
+
+                const isValid =
+                    (typeof payload === 'string' && payload.length > 0) ||
+                    typeof payload === 'number' ||
+                    (payload && typeof payload === 'object' && (
+                        typeof payload.version === 'string' ||
+                        typeof payload.release_version === 'string' ||
+                        typeof payload.baseVersion === 'string'
+                    ));
+                return isValid
+                    ? { valid: true }
+                    : { valid: false, reason: `${requestPath} did not return a usable release version value` };
+            }
+            default:
+                return { valid: true };
+        }
+    } catch (error) {
+        return {
+            valid: false,
+            reason: `${requestPath} failed ${validation} validation: ${error.message}`
+        };
+    }
+}
+
+async function cacheValidatedResponse(cache, fetchPath, cachePaths, expectations, options = {}) {
+    const response = await fetch(fetchPath, options.fetchOptions || {});
+    const expectation = findManifestExpectation(fetchPath, expectations);
+    const validation = await validateManifestResponse(response, expectation, fetchPath);
+
+    if (!validation.valid) {
+        return {
+            cached: false,
+            blocked: !expectation || expectation.blockOnFailure !== false,
+            reason: validation.reason
+        };
+    }
+
+    for (const cachePath of cachePaths) {
+        await cache.put(cachePath, response.clone());
+    }
+
+    return {
+        cached: true,
+        blocked: false,
+        response: response,
+        expectation: expectation
+    };
+}
 
 // Routes to exclude from caching
 const EXCLUDED_ROUTES = [
@@ -866,22 +862,44 @@ self.addEventListener('message', event => {
                 cachedActiveOfflineSession = event.data.activeOfflineSession;
             }
             lastStatusCheckTime = Date.now();
-            self.offlineLog.log('ServiceWorker', 'Initial status cached:', {
-                offlineStatus: self.cachedOfflineStatus,
-                activeOfflineSession: cachedActiveOfflineSession
-            });
             break;
 
         case 'CACHE_CASE_DATA':
-            self.offlineLog.log('ServiceWorker', 'Caching case data for:', data.caseId);
-            cacheCaseData(data.caseId, data.caseData);
+            (async () => {
+                const success = await cacheCaseData(data.caseId, data.caseData);
+                if (event.ports && event.ports[0]) {
+                    event.ports[0].postMessage({
+                        success: success,
+                        caseId: data.caseId
+                    });
+                }
+            })();
             break;
             
         case 'CACHE_METADATA':
         case 'CACHE_METADATA_RESOURCES':
             const version = data?.version || event.data.version;
             self.offlineLog.log('ServiceWorker', 'Caching metadata resources for version:', version);
-            cacheMetadataResources(version);
+            (async () => {
+                try {
+                    const result = await cacheMetadataResources(version);
+                    if (event.ports && event.ports[0]) {
+                        event.ports[0].postMessage({
+                            success: true,
+                            version: version,
+                            result: result
+                        });
+                    }
+                } catch (error) {
+                    if (event.ports && event.ports[0]) {
+                        event.ports[0].postMessage({
+                            success: false,
+                            version: version,
+                            error: error.message
+                        });
+                    }
+                }
+            })();
             break;
             
         case 'CHECK_CRITICAL_RESOURCES':
@@ -964,9 +982,69 @@ self.addEventListener('message', event => {
             self.offlineLog.log('ServiceWorker', 'Received GET_OFFLINE_SESSION_DATA message');
             getOfflineSessionDataFromServiceWorker(event);
             break;
+
+        case 'GET_OFFLINE_REMOVED_CASES_STATE':
+            self.offlineLog.log('ServiceWorker', 'Received GET_OFFLINE_REMOVED_CASES_STATE message');
+            (async () => {
+                try {
+                    const sessionId = data && data.sessionId ? data.sessionId : null;
+                    const state = await getOfflineRemovedCasesState(sessionId);
+                    if (event.ports && event.ports[0]) {
+                        event.ports[0].postMessage({
+                            type: 'OFFLINE_REMOVED_CASES_STATE_RESPONSE',
+                            success: true,
+                            state: state
+                        });
+                    }
+                } catch (error) {
+                    if (event.ports && event.ports[0]) {
+                        event.ports[0].postMessage({
+                            type: 'OFFLINE_REMOVED_CASES_STATE_RESPONSE',
+                            success: false,
+                            error: error.message
+                        });
+                    }
+                }
+            })();
+            break;
+
+        case 'SET_OFFLINE_REMOVED_CASES_STATE':
+            self.offlineLog.log('ServiceWorker', 'Received SET_OFFLINE_REMOVED_CASES_STATE message');
+            (async () => {
+                try {
+                    const state = await saveOfflineRemovedCasesState(data && data.state ? data.state : null);
+                    if (event.ports && event.ports[0]) {
+                        event.ports[0].postMessage({
+                            type: 'OFFLINE_REMOVED_CASES_STATE_RESPONSE',
+                            success: true,
+                            state: state
+                        });
+                    }
+                } catch (error) {
+                    if (event.ports && event.ports[0]) {
+                        event.ports[0].postMessage({
+                            type: 'OFFLINE_REMOVED_CASES_STATE_RESPONSE',
+                            success: false,
+                            error: error.message
+                        });
+                    }
+                }
+            })();
+            break;
+
+        case 'GET_OFFLINE_AUTH_STATE':
+            if (event.ports && event.ports[0]) {
+                event.ports[0].postMessage({
+                    type: 'OFFLINE_AUTH_STATE_RESPONSE',
+                    hasCryptoKey: !!offlineCryptoKey,
+                    hasActiveOfflineSession: cachedActiveOfflineSession === true,
+                    isOfflineMode: self.cachedOfflineStatus === true
+                });
+            }
+            break;
             
         case 'SET_OFFLINE_ENCRYPTION_KEY':
-            // Main thread sends pre-derived key (password never transmitted)
+            // Main thread sends a pre-derived key (raw secret never transmitted)
             self.offlineLog.log('ServiceWorker', 'Received SET_OFFLINE_ENCRYPTION_KEY');
             (async () => {
                 try {
@@ -1458,10 +1536,36 @@ async function handleApiRequest(request) {
     const url = new URL(request.url);
     const fullUrl = request.url;
     const pathWithQuery = url.pathname + url.search;
-    
-    self.offlineLog.log('ServiceWorker', `🔍 Service Worker: handleApiRequest called for: ${pathWithQuery}`);
-    self.offlineLog.log('ServiceWorker', `🔍 Service Worker: Full URL: ${fullUrl}`);
-    self.offlineLog.log('ServiceWorker', `🔍 Service Worker: Request method: ${request.method}`);
+    const isCaseRequest = url.pathname === '/api/case' && url.searchParams.has('case_id');
+    const isOffline = await isUserInOfflineMode();
+    const hasActiveSession = await hasActiveOfflineSession();
+    const isSteadyStateOffline = isOffline && hasActiveSession;
+
+    // During Go Offline setup, case requests must come from network only.
+    if (isCaseRequest && !isSteadyStateOffline) {
+        const response = await fetch(request);
+
+        // While preparing to go offline, only write case data into the active session cache.
+        if (response.ok && request.method === 'GET' && offlineCryptoKey) {
+            try {
+                const activeCacheName = await getActiveApiCacheName();
+                const cache = await caches.open(activeCacheName);
+                let responseToCache = response.clone();
+
+                try {
+                    responseToCache = await encryptResponseBody(responseToCache);
+                } catch (err) {
+                    self.offlineLog.error('ServiceWorker', 'Failed to encrypt case response from network during setup, caching plaintext:', err);
+                }
+
+                await cache.put(request, responseToCache.clone());
+            } catch (cacheError) {
+                self.offlineLog.error('ServiceWorker', 'Failed to persist case response during offline setup:', cacheError);
+            }
+        }
+
+        return response;
+    }
     
     // FAST PATH: Immediately check if this request should use cache-first strategy
     const shouldUseCache = CACHED_API_ROUTES.some(pattern => {
@@ -1471,10 +1575,6 @@ async function handleApiRequest(request) {
             return pattern.test(pathWithQuery);
         }
     });
-    
-    if (shouldUseCache) {
-        self.offlineLog.log('ServiceWorker', `✅ Cache-first strategy for: ${pathWithQuery}`);
-    }
     
     // If should use cache, try cache FIRST before any expensive async operations
     if (shouldUseCache) {
@@ -1487,19 +1587,8 @@ async function handleApiRequest(request) {
             } catch (error) {
                 self.offlineLog.error('ServiceWorker', 'Error getting cached offline documents:', error);
                 self.offlineLog.error('ServiceWorker', 'Error stack:', error.stack);
-                
-                // Return empty list as fallback with proper structure
-                return new Response(
-                    JSON.stringify({
-                        total_rows: 0,
-                        offset: 0,
-                        rows: []
-                    }),
-                    {
-                        status: 200,
-                        headers: { 'Content-Type': 'application/json' }
-                    }
-                );
+
+                return createOfflineDocumentsErrorResponse();
             }
         }
         
@@ -1508,10 +1597,11 @@ async function handleApiRequest(request) {
             self.offlineLog.error('ServiceWorker', '🚨 SW RESTART: Cache names NULL - encryption key lost!');
         }
         
-        const cachedResponse = await caches.match(request);
+        const cachedResponse = isCaseRequest
+            ? await getCachedCaseResponseFromActiveSession(request)
+            : await caches.match(request);
         
         if (cachedResponse) {
-            self.offlineLog.log(`ServiceWorker`, `✅ Cache hit: ${url.pathname}`);
 
             const urlPath = new URL(request.url).pathname;
 
@@ -1521,18 +1611,15 @@ async function handleApiRequest(request) {
                     self.offlineLog.error('ServiceWorker', '🚨 ENCRYPTION KEY MISSING: offlineCryptoKey is NULL - cannot decrypt cached case');
                     self.offlineLog.error('ServiceWorker', '🔐 This typically means the service worker restarted and lost the in-memory encryption key');
                     self.offlineLog.warn('ServiceWorker', 'Returning 401 to trigger re-login and key re-establishment');
-                    return new Response(
-                        JSON.stringify({
-                            error: 'offline_key_required',
-                            message: 'Encrypted offline case data is locked. Please re-enter your offline key.'
-                        }),
-                        { status: 401, headers: { 'Content-Type': 'application/json' } }
-                    );
+                    return createOfflineKeyRequiredResponse();
                 }
                 try {
                     return await decryptResponseBody(cachedResponse);
                 } catch (err) {
                     self.offlineLog.error('ServiceWorker', 'Failed to decrypt cached case response', err);
+                    if (!isSteadyStateOffline) {
+                        return await fetch(request);
+                    }
                     return new Response(
                         JSON.stringify({
                             error: 'offline_decrypt_failed',
@@ -1548,13 +1635,9 @@ async function handleApiRequest(request) {
         }
         
         // SLOW PATH: Cache miss - now do expensive async operations
-        const isOffline = await isUserInOfflineMode();
-        const hasActiveSession = await hasActiveOfflineSession();
-        
         // Cache miss, try network only if online
         if (!isOffline) {
             try {
-                self.offlineLog.log(`ServiceWorker`, `Cache miss, trying network: ${url.pathname}`);
                 const response = await fetch(request);
                 
                 // Cache successful responses for future use (only GET requests can be cached)
@@ -1576,7 +1659,6 @@ async function handleApiRequest(request) {
                     }
 
                     cache.put(request, responseToCache.clone());
-                    self.offlineLog.log(`ServiceWorker`, `✅ Cached response from network: ${request.url}`);
                 }
                 
                 return response;
@@ -1585,19 +1667,12 @@ async function handleApiRequest(request) {
                 self.offlineLog.log(`ServiceWorker`, `Network failed for cached route: ${request.url}`, error);
                 // Fall through to fallback handling below
             }
-        } else {
-            self.offlineLog.log(`ServiceWorker`, `🔌 OFFLINE - skipping network request for: ${request.url}`);
-            // Fall through to fallback handling below
         }
     } else {
         // For non-cached routes, we need to check online status
-        const isOffline = await isUserInOfflineMode();
-        const hasActiveSession = await hasActiveOfflineSession();
-        
         // Use network-first strategy only if online
         if (!isOffline) {
             try {
-                self.offlineLog.log(`ServiceWorker`, `Online - using network-first strategy for: ${request.url}`);
                 const response = await fetch(request);
                 return response;
                 
@@ -1615,7 +1690,9 @@ async function handleApiRequest(request) {
                 }
                 
                 // Network failed, try cache
-                const cachedResponse = await caches.match(request);
+                const cachedResponse = isCaseRequest
+                    ? await getCachedCaseResponseFromActiveSession(request)
+                    : await caches.match(request);
                 if (cachedResponse) {
                     return cachedResponse;
                 }
@@ -1623,12 +1700,11 @@ async function handleApiRequest(request) {
                 // Fall through to fallback handling below
             }
         } else {
-            self.offlineLog.log(`ServiceWorker`, `🔌 OFFLINE - trying cache for non-cached route: ${request.url}`);
-            
             // When offline, try cache first for all routes
-            const cachedResponse = await caches.match(request);
+            const cachedResponse = isCaseRequest
+                ? await getCachedCaseResponseFromActiveSession(request)
+                : await caches.match(request);
             if (cachedResponse) {
-                self.offlineLog.log(`ServiceWorker`, `✅ Serving from cache (offline): ${request.url}`);
                 return cachedResponse;
             }
             
@@ -1643,7 +1719,6 @@ async function handleApiRequest(request) {
         const cache = await caches.open(activeCacheName);
         const cachedResponse = await cache.match(request);
         if (cachedResponse) {
-            self.offlineLog.log('ServiceWorker', 'Serving cached cache-version from cache');
             return cachedResponse;
         }
         
@@ -1670,7 +1745,6 @@ async function handleApiRequest(request) {
         const cache = await caches.open(activeCacheName);
         const cachedResponse = await cache.match(request);
         if (cachedResponse) {
-            self.offlineLog.log('ServiceWorker', 'Serving cached jurisdiction_tree from cache');
             return cachedResponse;
         }
         
@@ -1722,7 +1796,6 @@ async function handleApiRequest(request) {
         const cache = await caches.open(activeCacheName);
         const cachedResponse = await cache.match(request);
         if (cachedResponse) {
-            self.offlineLog.log('ServiceWorker', 'Serving cached release-version from cache');
             return cachedResponse;
         }
         
@@ -1752,7 +1825,6 @@ async function handleApiRequest(request) {
         }
         
         if (cachedResponse) {
-            self.offlineLog.log('ServiceWorker', 'Serving cached ui_specification from cache');
             return cachedResponse;
         }
         
@@ -1795,7 +1867,6 @@ async function handleApiRequest(request) {
         }
         
         if (cachedResponse) {
-            self.offlineLog.log('ServiceWorker', '✅ Serving cached metadata');
             return cachedResponse;
         }
         
@@ -1844,7 +1915,6 @@ async function handleApiRequest(request) {
         }
         
         if (cachedResponse) {
-            self.offlineLog.log('ServiceWorker', 'Serving cached validation script from cache');
             return cachedResponse;
         }
         
@@ -1877,7 +1947,6 @@ async function handleApiRequest(request) {
         }
         
         if (cachedResponse) {
-            self.offlineLog.log('ServiceWorker', 'Serving cached version specification script from cache');
             return cachedResponse;
         }
         
@@ -1909,7 +1978,6 @@ async function handleApiRequest(request) {
         }
         
         if (cachedResponse) {
-            self.offlineLog.log('ServiceWorker', 'Serving cached GetFormAccess from cache');
             return cachedResponse;
         }
         
@@ -1957,7 +2025,6 @@ async function handleApiRequest(request) {
         }
         
         if (cachedResponse) {
-            self.offlineLog.log('ServiceWorker', 'Serving cached my-user from cache');
             return cachedResponse;
         }
         
@@ -1995,7 +2062,6 @@ async function handleApiRequest(request) {
         }
         
         if (cachedResponse) {
-            self.offlineLog.log('ServiceWorker', 'Serving cached my-roles from cache');
             return cachedResponse;
         }
         
@@ -2103,7 +2169,6 @@ async function isUserInOfflineMode() {
         // Return cached status if it's still fresh (within cache duration)
         if (self.cachedOfflineStatus !== null && 
             (currentTime - lastStatusCheckTime) < STATUS_CACHE_DURATION) {
-            self.offlineLog.log('ServiceWorker', 'Using cached offline status:', self.cachedOfflineStatus);
             return self.cachedOfflineStatus;
         }
         
@@ -2112,15 +2177,12 @@ async function isUserInOfflineMode() {
         const clients = await self.clients.matchAll();
         
         if (clients.length === 0) {
-            self.offlineLog.log('ServiceWorker', 'No clients available to check offline status');
             // If we have a previous cached value, use it as fallback
             if (self.cachedOfflineStatus !== null) {
-                self.offlineLog.log('ServiceWorker', 'Using previous cached offline status as fallback:', self.cachedOfflineStatus);
                 return self.cachedOfflineStatus;
             }
             // Check if offline session data exists in cache (user previously went offline)
             const hasOfflineSession = await hasOfflineSessionInCache();
-            self.offlineLog.log('ServiceWorker', 'No clients - checking cache for offline session:', hasOfflineSession);
             self.cachedOfflineStatus = hasOfflineSession;
             lastStatusCheckTime = currentTime;
             return hasOfflineSession;
@@ -2133,15 +2195,12 @@ async function isUserInOfflineMode() {
             messageChannel.port1.onmessage = (event) => {
                 if (event.data && event.data.type === 'OFFLINE_STATUS_RESPONSE') {
                     const isOfflineMode = event.data.isOffline === true;
-                    self.offlineLog.log('ServiceWorker', 'Received offline status from client:', isOfflineMode);
-                    
                     // Cache the result
                     self.cachedOfflineStatus = isOfflineMode;
                     lastStatusCheckTime = currentTime;
                     
                     resolve(isOfflineMode);
                 } else {
-                    self.offlineLog.log('ServiceWorker', 'Invalid response from client, using cached or default value');
                     // Use cached value if available, otherwise default to false
                     const fallbackStatus = self.cachedOfflineStatus !== null ? self.cachedOfflineStatus : false;
                     resolve(fallbackStatus);
@@ -2155,19 +2214,14 @@ async function isUserInOfflineMode() {
             
             // Timeout after 1 second, with intelligent fallback
             setTimeout(async () => {
-                self.offlineLog.log('ServiceWorker', 'Timeout checking offline status from client');
-                
                 // Use cached value if available
                 if (self.cachedOfflineStatus !== null) {
-                    self.offlineLog.log('ServiceWorker', 'Using cached offline status:', self.cachedOfflineStatus);
                     resolve(self.cachedOfflineStatus);
                     return;
                 }
                 
                 // Otherwise, check if offline session data exists in cache
                 const hasOfflineSession = await hasOfflineSessionInCache();
-                self.offlineLog.log('ServiceWorker', 'Offline session in cache:', hasOfflineSession);
-                
                 // Cache the detected status
                 self.cachedOfflineStatus = hasOfflineSession;
                 lastStatusCheckTime = currentTime;
@@ -2179,15 +2233,11 @@ async function isUserInOfflineMode() {
         self.offlineLog.error('ServiceWorker', 'Error checking offline session status:', error);
         // Try to use cache check as fallback on error
         try {
-            const hasOfflineSession = await hasOfflineSessionInCache();
-            self.offlineLog.log('ServiceWorker', 'Error fallback - offline session in cache:', hasOfflineSession);
-            return hasOfflineSession;
+            return await hasOfflineSessionInCache();
         } catch (cacheError) {
             self.offlineLog.error('ServiceWorker', 'Error fallback also failed:', cacheError);
             // Last resort: use cached value if available, otherwise default to false
-            const fallbackStatus = self.cachedOfflineStatus !== null ? self.cachedOfflineStatus : false;
-            self.offlineLog.log('ServiceWorker', 'Final fallback offline status:', fallbackStatus);
-            return fallbackStatus;
+            return self.cachedOfflineStatus !== null ? self.cachedOfflineStatus : false;
         }
     }
 }
@@ -2200,7 +2250,6 @@ async function hasActiveOfflineSession() {
         // Return cached status if it's still fresh (within cache duration)
         if (cachedActiveOfflineSession !== null && 
             (currentTime - lastStatusCheckTime) < STATUS_CACHE_DURATION) {
-            self.offlineLog.log('ServiceWorker', 'Using cached active offline session status:', cachedActiveOfflineSession);
             return cachedActiveOfflineSession;
         }
         
@@ -2209,13 +2258,11 @@ async function hasActiveOfflineSession() {
         const clients = await self.clients.matchAll();
         
         if (clients.length === 0) {
-            self.offlineLog.log('ServiceWorker', 'No clients available to check active offline session');
             // If we have a previous cached value, use it as fallback
             if (cachedActiveOfflineSession !== null) {
-                self.offlineLog.log('ServiceWorker', 'Using previous cached active offline session as fallback:', cachedActiveOfflineSession);
                 return cachedActiveOfflineSession;
             }
-            // Otherwise default to false
+            // Without a live client, cached session data is not proof of an active logged-in session.
             return false;
         }
         
@@ -2226,15 +2273,12 @@ async function hasActiveOfflineSession() {
             messageChannel.port1.onmessage = (event) => {
                 if (event.data && event.data.type === 'ACTIVE_OFFLINE_SESSION_RESPONSE') {
                     const hasActiveSession = event.data.hasActiveSession === true;
-                    self.offlineLog.log('ServiceWorker', 'Received active offline session status from client:', hasActiveSession);
-                    
                     // Cache the result
                     cachedActiveOfflineSession = hasActiveSession;
                     lastStatusCheckTime = currentTime;
                     
                     resolve(hasActiveSession);
                 } else {
-                    self.offlineLog.log('ServiceWorker', 'Invalid response from client, using cached or default value');
                     // Use cached value if available, otherwise default to false
                     const fallbackStatus = cachedActiveOfflineSession !== null ? cachedActiveOfflineSession : false;
                     resolve(fallbackStatus);
@@ -2246,50 +2290,28 @@ async function hasActiveOfflineSession() {
                 type: 'GET_ACTIVE_OFFLINE_SESSION'
             }, [messageChannel.port2]);
             
-            // Timeout after 1 second, with intelligent fallback
-            setTimeout(async () => {
-                self.offlineLog.log('ServiceWorker', 'Timeout checking active offline session from client');
-                
+            // Timeout after 1 second and default to the last known active-session state only.
+            setTimeout(() => {
                 // Use cached value if available
                 if (cachedActiveOfflineSession !== null) {
-                    self.offlineLog.log('ServiceWorker', 'Using cached active offline session status:', cachedActiveOfflineSession);
                     resolve(cachedActiveOfflineSession);
                     return;
                 }
-                
-                // Otherwise, check if offline session data exists in cache
-                const hasOfflineSession = await hasOfflineSessionInCache();
-                self.offlineLog.log('ServiceWorker', 'Active offline session in cache:', hasOfflineSession);
-                
-                // Cache the detected status
-                cachedActiveOfflineSession = hasOfflineSession;
-                lastStatusCheckTime = currentTime;
-                
-                resolve(hasOfflineSession);
+
+                resolve(false);
             }, 1000);
         });
     } catch (error) {
         self.offlineLog.error('ServiceWorker', 'Error checking active offline session:', error);
-        // Try to use cache check as fallback on error
-        try {
-            const hasOfflineSession = await hasOfflineSessionInCache();
-            self.offlineLog.log('ServiceWorker', 'Error fallback - offline session in cache:', hasOfflineSession);
-            return hasOfflineSession;
-        } catch (cacheError) {
-            self.offlineLog.error('ServiceWorker', 'Error fallback also failed:', cacheError);
-            // Last resort: use cached value if available, otherwise default to false
-            const fallbackStatus = cachedActiveOfflineSession !== null ? cachedActiveOfflineSession : false;
-            self.offlineLog.log('ServiceWorker', 'Final fallback active offline session status:', fallbackStatus);
-            return fallbackStatus;
-        }
+        const fallbackStatus = cachedActiveOfflineSession !== null ? cachedActiveOfflineSession : false;
+        self.offlineLog.log('ServiceWorker', 'Final fallback active offline session status:', fallbackStatus);
+        return fallbackStatus;
     }
 }
 
 // Handle page requests with cache-first strategy when offline
 async function handlePageRequest(request) {
     const url = new URL(request.url);
-    self.offlineLog.log('ServiceWorker', 'Handling page request for:', url.pathname);
-    
     // Check if we're completely offline first
     const isOffline = await isUserInOfflineMode();//!navigator.onLine;
     
@@ -2312,7 +2334,7 @@ async function handlePageRequest(request) {
         // Check if user has active offline session
         if (!hasActiveSession) {
             self.offlineLog.log('ServiceWorker', 'Protected route access denied - no active session, redirecting to offline login');
-            return Response.redirect('/Account/OfflineLogin', 302);
+            return Response.redirect(buildOfflineLoginRedirectUrl(`${url.pathname}${url.search}`), 302);
         }
         
         // Check if crypto key exists (required for accessing encrypted case data)
@@ -2321,7 +2343,7 @@ async function handlePageRequest(request) {
             // Invalidate the session since key is lost
             cachedActiveOfflineSession = false;
             self.cachedOfflineStatus = false;
-            return Response.redirect('/Account/OfflineLogin', 302);
+            return Response.redirect(buildOfflineLoginRedirectUrl(`${url.pathname}${url.search}`), 302);
         }
         
         self.offlineLog.log('ServiceWorker', 'Protected route access granted - valid session and crypto key');
@@ -2329,15 +2351,12 @@ async function handlePageRequest(request) {
     
     // For offline mode, try cache first
     if (isOffline) {
-        self.offlineLog.log('ServiceWorker', 'Offline detected, trying cache first for:', url.pathname);
-        
         // Try current cache first
         try {
             const activeCacheName = await getActiveApiCacheName();
             const currentCache = await caches.open(activeCacheName);
             let cachedResponse = await caseInsensitiveCacheMatch(request, currentCache);
             if (cachedResponse) {
-                self.offlineLog.log('ServiceWorker', '✅ Serving cached page from current cache:', url.pathname);
                 return cachedResponse;
             }
         } catch (error) {
@@ -2347,14 +2366,12 @@ async function handlePageRequest(request) {
         // Try any available versioned cache
         try {
             const allCacheNames = await caches.keys();
-            self.offlineLog.log('ServiceWorker', 'Searching all available caches:', allCacheNames);
             
             for (const cacheName of allCacheNames) {
                 if (cacheName.startsWith('mmria-api-') || cacheName.startsWith('mmria-static-')) {
                     const cache = await caches.open(cacheName);
                     const cachedResponse = await caseInsensitiveCacheMatch(request, cache);
                     if (cachedResponse) {
-                        self.offlineLog.log('ServiceWorker', '✅ Serving cached page from cache:', cacheName, url.pathname);
                         return cachedResponse;
                     }
                 }
@@ -2379,8 +2396,6 @@ async function handlePageRequest(request) {
     
     // When online, try network first
     try {
-        self.offlineLog.log('ServiceWorker', 'Online detected, trying network first for:', url.pathname);
-        
         // Use redirect: 'follow' for routes that may redirect (like /pdf-version)
         const response = await fetch(request, { redirect: 'follow' });
         
@@ -2402,8 +2417,6 @@ async function handlePageRequest(request) {
         self.offlineLog.error('ServiceWorker', 'Network failed for page:', request.url, error);
         
         // Network failed, try to serve from cache as fallback
-        self.offlineLog.log('ServiceWorker', 'Attempting cache fallback after network error for:', url.pathname);
-        
         try {
             // Try current cache first
             const activeCacheName = await getActiveApiCacheName();
@@ -2494,7 +2507,7 @@ async function deriveAesKeyFromPassword(password, saltHex) {
         saltHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16))
     );
     
-    // Import password as base key material
+    // Import the user-provided secret as base key material
     const baseKey = await crypto.subtle.importKey(
         'raw',
         passwordBytes,
@@ -2503,7 +2516,7 @@ async function deriveAesKeyFromPassword(password, saltHex) {
         ['deriveKey']
     );
     
-    // Derive AES-GCM key from password using PBKDF2
+    // Derive the AES-GCM key from the user-provided secret using PBKDF2
     return await crypto.subtle.deriveKey(
         {
             name: 'PBKDF2',
@@ -2598,7 +2611,6 @@ async function decryptResponseBody(res) {
 // Cache case data
 async function cacheCaseData(caseId, caseData) {
     try {
-        self.offlineLog.log(`ServiceWorker`, `Starting to cache case ${caseId}`);
         //self.offlineLog.log('ServiceWorker', 'Case data:', caseData);
         
         const activeCacheName = await getActiveApiCacheName();
@@ -2623,18 +2635,19 @@ async function cacheCaseData(caseId, caseData) {
         }
         
         await cache.put(cacheUrl, response);
-        self.offlineLog.log(`ServiceWorker`, `Successfully cached case data for: ${caseId} at URL: ${cacheUrl}`);
         
         // Verify the cache was successful
         const verification = await cache.match(cacheUrl);
-        if (verification) {
-            self.offlineLog.log(`ServiceWorker`, `Verification successful - case ${caseId} is in cache (encrypted=${verification.headers.get(OFFLINE_ENCRYPTION_HEADER) === '1'})`);
-        } else {
+        if (!verification) {
             self.offlineLog.error(`ServiceWorker`, `Verification failed - case ${caseId} not found in cache after put`);
+            return false;
         }
+
+        return true;
         
     } catch (error) {
         self.offlineLog.error('ServiceWorker', 'Error caching case data:', error);
+        return false;
     }
 }
 
@@ -2670,6 +2683,7 @@ async function cacheMetadataResources(version) {
         
         let cachedCount = 0;
         let failedCount = 0;
+        const blockingFailures = [];
         
         self.offlineLog.log(`ServiceWorker`, `Will attempt to cache ${endpoints.length} metadata endpoints`);
         
@@ -2678,37 +2692,41 @@ async function cacheMetadataResources(version) {
                 const fullUrl = `${baseUrl}${endpoint}`;
                 self.offlineLog.log(`ServiceWorker`, `Fetching and caching: ${fullUrl}`);
                 
-                const response = await fetch(fullUrl);
-                
-                if (response.ok) {
-                    // Clone the response to cache it
-                    const responseToCache = response.clone();
-                    
-                    // Store using both the full URL and the relative path for better matching
-                    await cache.put(fullUrl, responseToCache.clone());
-                    await cache.put(endpoint, responseToCache.clone());
-                    
-                    self.offlineLog.log(`ServiceWorker`, `✅ Successfully cached: ${endpoint}`);
-                    
-                    // Extra debugging for metadata specifically (but not version_specification which is JavaScript)
-                    if (endpoint.includes('metadata') && !endpoint.includes('version_specification')) {
-                        try {
-                            const testData = await responseToCache.clone().json();
-                            self.offlineLog.log(`ServiceWorker`, `Cached metadata has ${testData.children ? testData.children.length : 'N/A'} children`);
-                            self.offlineLog.log(`ServiceWorker`, `Cached metadata _id: ${testData._id}`);
-                            self.offlineLog.log(`ServiceWorker`, `Cached metadata name: ${testData.name}`);
-                        } catch (e) {
-                            self.offlineLog.warn(`ServiceWorker`, `Could not parse cached metadata:`, e);
-                        }
-                    } else if (endpoint.includes('version_specification')) {
-                        self.offlineLog.log(`ServiceWorker`, `Cached version specification (JavaScript content)`);
+                const result = await cacheValidatedResponse(
+                    cache,
+                    fullUrl,
+                    [fullUrl, endpoint],
+                    REQUIRED_API_EXPECTATIONS
+                );
+
+                if (!result.cached) {
+                    const reason = `Failed validation for ${endpoint}: ${result.reason}`;
+                    if (result.blocked) {
+                        self.offlineLog.error('ServiceWorker', reason);
+                        blockingFailures.push(reason);
+                    } else {
+                        self.offlineLog.warn('ServiceWorker', reason);
                     }
-                    
-                    cachedCount++;
-                } else {
-                    self.offlineLog.warn(`ServiceWorker`, `❌ Failed to fetch ${endpoint}: ${response.status} ${response.statusText}`);
                     failedCount++;
+                    continue;
                 }
+
+                self.offlineLog.log(`ServiceWorker`, `✅ Successfully cached: ${endpoint}`);
+                
+                if (endpoint.includes('metadata') && !endpoint.includes('version_specification')) {
+                    try {
+                        const testData = await result.response.clone().json();
+                        self.offlineLog.log(`ServiceWorker`, `Cached metadata has ${testData.children ? testData.children.length : 'N/A'} children`);
+                        self.offlineLog.log(`ServiceWorker`, `Cached metadata _id: ${testData._id}`);
+                        self.offlineLog.log(`ServiceWorker`, `Cached metadata name: ${testData.name}`);
+                    } catch (e) {
+                        self.offlineLog.warn(`ServiceWorker`, `Could not parse cached metadata:`, e);
+                    }
+                } else if (endpoint.includes('version_specification')) {
+                    self.offlineLog.log(`ServiceWorker`, `Cached version specification (JavaScript content)`);
+                }
+                
+                cachedCount++;
                 
             } catch (error) {
                 self.offlineLog.error(`ServiceWorker`, `❌ Error caching ${endpoint}:`, error);
@@ -2754,21 +2772,27 @@ async function cacheMetadataResources(version) {
             try {
                 const fullUrl = `${baseUrl}${endpoint}`;
                 self.offlineLog.log(`ServiceWorker`, `Fetching and caching additional endpoint: ${fullUrl}`);
-                const response = await fetch(fullUrl);
-                
-                if (response.ok) {
-                    const responseToCache = response.clone();
-                    
-                    // Store using both the full URL and the relative path for better matching
-                    await cache.put(fullUrl, responseToCache.clone());
-                    await cache.put(endpoint, responseToCache.clone());
-                    
-                    self.offlineLog.log(`ServiceWorker`, `✅ Successfully cached additional endpoint: ${endpoint}`);
-                    additionalCachedCount++;
-                } else {
-                    self.offlineLog.warn(`ServiceWorker`, `❌ Failed to fetch additional endpoint ${endpoint}: ${response.status}`);
+                const result = await cacheValidatedResponse(
+                    cache,
+                    fullUrl,
+                    [fullUrl, endpoint],
+                    REQUIRED_API_EXPECTATIONS
+                );
+
+                if (!result.cached) {
+                    const reason = `Failed validation for additional endpoint ${endpoint}: ${result.reason}`;
+                    if (result.blocked) {
+                        self.offlineLog.error('ServiceWorker', reason);
+                        blockingFailures.push(reason);
+                    } else {
+                        self.offlineLog.warn('ServiceWorker', reason);
+                    }
                     additionalFailedCount++;
+                    continue;
                 }
+
+                self.offlineLog.log(`ServiceWorker`, `✅ Successfully cached additional endpoint: ${endpoint}`);
+                additionalCachedCount++;
             } catch (error) {
                 self.offlineLog.error(`ServiceWorker`, `❌ Error caching additional endpoint ${endpoint}:`, error);
                 additionalFailedCount++;
@@ -2777,7 +2801,20 @@ async function cacheMetadataResources(version) {
         
         self.offlineLog.log(`ServiceWorker`, `Additional endpoints caching complete. ✅ Cached: ${additionalCachedCount}, ❌ Failed: ${additionalFailedCount}`);
         self.offlineLog.log(`ServiceWorker`, `🎉 Total metadata caching process completed - Core: ${cachedCount}/${endpoints.length}, Additional: ${additionalCachedCount}/${additionalEndpoints.length}`);
-        
+
+        if (blockingFailures.length > 0) {
+            throw new Error(blockingFailures.join(' | '));
+        }
+
+        return {
+            success: true,
+            cachedCount: cachedCount,
+            failedCount: failedCount,
+            additionalCachedCount: additionalCachedCount,
+            additionalFailedCount: additionalFailedCount,
+            blockingFailures: blockingFailures
+        };
+
     } catch (error) {
         self.offlineLog.error('ServiceWorker', '❌ Error in cacheMetadataResources:', error);
         throw error;
@@ -3033,6 +3070,11 @@ async function getCachedOfflineCaseList() {
                     const response = await cache.match(request);
                     if (!response) continue;
 
+                    if (response.headers.get(OFFLINE_ENCRYPTION_HEADER) === '1' && !offlineCryptoKey) {
+                        self.offlineLog.warn('ServiceWorker', 'Offline-documents requires offline key re-entry before cached cases can be decrypted');
+                        return createOfflineKeyRequiredResponse();
+                    }
+
                     let caseData;
                     try {
                         // 🔐 Use helper that understands encrypted/plain
@@ -3040,7 +3082,11 @@ async function getCachedOfflineCaseList() {
                     } catch (decryptErr) {
                         self.offlineLog.error('ServiceWorker', 'Failed to load/decrypt case for offline-documents list', decryptErr);
                         // If we can’t decrypt, skip this case in the list
-                        continue;
+                        if (!offlineCryptoKey) {
+                            return createOfflineKeyRequiredResponse();
+                        }
+
+                        throw decryptErr;
                     }                   
                     
                     
@@ -3105,19 +3151,8 @@ async function getCachedOfflineCaseList() {
         
     } catch (error) {
         self.offlineLog.error('ServiceWorker', 'Error getting cached offline case list:', error);
-        
-        // Return empty list on error
-        return new Response(
-            JSON.stringify({
-                total_rows: 0,
-                offset: 0,
-                rows: []
-            }),
-            {
-                status: 200,
-                headers: { 'Content-Type': 'application/json' }
-            }
-        );
+
+        return createOfflineDocumentsErrorResponse();
     }
 }
 
@@ -3204,6 +3239,112 @@ async function decryptAllOfflineCasesInCache() {
 const MAX_LOGIN_ATTEMPTS = 3;
 const LOCKOUT_DURATION_MS = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
 const ATTEMPT_COUNTER_CACHE_KEY_PREFIX = '/offline-login-attempts/';
+const OFFLINE_REMOVED_CASES_CACHE_KEY_PREFIX = '/offline-removed-cases/';
+
+function createEmptyLoginAttemptCounter(sessionId) {
+    return {
+        attempts: 0,
+        firstAttemptTime: null,
+        lockoutUntil: null,
+        sessionId: sessionId
+    };
+}
+
+function normalizeRemovedCaseIds(caseIds) {
+    if (!Array.isArray(caseIds)) {
+        return [];
+    }
+
+    return Array.from(new Set(
+        caseIds
+            .filter(caseId => typeof caseId === 'string')
+            .map(caseId => caseId.trim())
+            .filter(caseId => caseId.length > 0)
+    ));
+}
+
+function normalizeOfflineRemovedCaseKind(kind) {
+    return kind === 'new' ? 'new' : 'existing';
+}
+
+function normalizeOfflinePendingRemovalEntries(entries) {
+    if (!Array.isArray(entries)) {
+        return [];
+    }
+
+    const seenEntries = new Set();
+    const normalizedEntries = [];
+
+    entries.forEach(entry => {
+        if (!entry) {
+            return;
+        }
+
+        let caseId = null;
+        let kind = 'existing';
+
+        if (typeof entry === 'string') {
+            caseId = entry.trim();
+        } else if (typeof entry === 'object') {
+            if (typeof entry.caseId === 'string') {
+                caseId = entry.caseId.trim();
+            }
+
+            kind = normalizeOfflineRemovedCaseKind(entry.kind);
+        }
+
+        if (!caseId) {
+            return;
+        }
+
+        const dedupeKey = `${kind}:${caseId}`;
+        if (seenEntries.has(dedupeKey)) {
+            return;
+        }
+
+        seenEntries.add(dedupeKey);
+        normalizedEntries.push({
+            caseId: caseId,
+            kind: kind
+        });
+    });
+
+    return normalizedEntries;
+}
+
+function createEmptyOfflineRemovedCasesState(sessionId) {
+    return {
+        sessionId: sessionId || null,
+        pendingRemovals: [],
+        hiddenExistingCaseIds: [],
+        deletedNewCaseIds: [],
+        updatedAt: new Date().toISOString()
+    };
+}
+
+function normalizeOfflineRemovedCasesState(state, sessionId) {
+    const effectiveSessionId =
+        sessionId ||
+        (state && typeof state.sessionId === 'string' ? state.sessionId : null);
+    const normalized = createEmptyOfflineRemovedCasesState(effectiveSessionId);
+
+    const legacyPendingRemovalCaseIds = normalizeRemovedCaseIds(state && state.pendingRemovalCaseIds);
+    const legacyRemovedCaseIds = normalizeRemovedCaseIds(state && state.removedCaseIds);
+
+    normalized.pendingRemovals = normalizeOfflinePendingRemovalEntries(
+        (state && state.pendingRemovals) || legacyPendingRemovalCaseIds
+    );
+    normalized.hiddenExistingCaseIds = normalizeRemovedCaseIds(
+        (state && state.hiddenExistingCaseIds) || legacyRemovedCaseIds
+    );
+    normalized.deletedNewCaseIds = normalizeRemovedCaseIds(state && state.deletedNewCaseIds);
+    normalized.updatedAt =
+        state && typeof state.updatedAt === 'string' && state.updatedAt.length > 0
+            ? state.updatedAt
+            : new Date().toISOString();
+
+    return normalized;
+}
 
 // Helper function to get attempt counter from cache
 async function getLoginAttemptCounter(sessionId) {
@@ -3215,24 +3356,23 @@ async function getLoginAttemptCounter(sessionId) {
         
         if (response) {
             const counterData = await response.json();
+
+            // Once the lockout window has expired, start the user over with a fresh counter.
+            if (counterData.lockoutUntil && Date.now() >= counterData.lockoutUntil) {
+                const resetCounterData = createEmptyLoginAttemptCounter(counterData.sessionId || sessionId);
+                await saveLoginAttemptCounter(resetCounterData);
+                self.offlineLog.log('ServiceWorker', 'Expired lockout detected; attempt counter reset for session:', resetCounterData.sessionId);
+                return resetCounterData;
+            }
+
             return counterData;
         }
         
         // Return new counter if none exists
-        return {
-            attempts: 0,
-            firstAttemptTime: null,
-            lockoutUntil: null,
-            sessionId: sessionId
-        };
+        return createEmptyLoginAttemptCounter(sessionId);
     } catch (error) {
         self.offlineLog.error('ServiceWorker', 'Error getting attempt counter:', error);
-        return {
-            attempts: 0,
-            firstAttemptTime: null,
-            lockoutUntil: null,
-            sessionId: sessionId
-        };
+        return createEmptyLoginAttemptCounter(sessionId);
     }
 }
 
@@ -3258,12 +3398,7 @@ async function saveLoginAttemptCounter(counterData) {
 // Helper function to reset attempt counter
 async function resetLoginAttemptCounter(sessionId) {
     try {
-        const counterData = {
-            attempts: 0,
-            firstAttemptTime: null,
-            lockoutUntil: null,
-            sessionId: sessionId
-        };
+        const counterData = createEmptyLoginAttemptCounter(sessionId);
         await saveLoginAttemptCounter(counterData);
         self.offlineLog.log('ServiceWorker', 'Attempt counter reset for session:', sessionId);
     } catch (error) {
@@ -3308,36 +3443,77 @@ async function incrementFailedAttempts(sessionId) {
     }
 }
 
+async function getOfflineRemovedCasesState(sessionId) {
+    const normalizedEmptyState = createEmptyOfflineRemovedCasesState(sessionId);
+
+    try {
+        if (!sessionId) {
+            return normalizedEmptyState;
+        }
+
+        const activeCacheName = await getActiveApiCacheName();
+        const cache = await caches.open(activeCacheName);
+        const cacheKey = `${OFFLINE_REMOVED_CASES_CACHE_KEY_PREFIX}${sessionId}`;
+        const response = await cache.match(cacheKey);
+
+        if (!response) {
+            return normalizedEmptyState;
+        }
+
+        const state = await response.json();
+        return normalizeOfflineRemovedCasesState(state, sessionId);
+    } catch (error) {
+        self.offlineLog.error('ServiceWorker', 'Error getting offline removed cases state:', error);
+        return normalizedEmptyState;
+    }
+}
+
+async function saveOfflineRemovedCasesState(state) {
+    const normalizedState = normalizeOfflineRemovedCasesState(state, state && state.sessionId);
+
+    try {
+        if (!normalizedState.sessionId) {
+            throw new Error('Cannot save removed cases state without a session id');
+        }
+
+        const activeCacheName = await getActiveApiCacheName();
+        const cache = await caches.open(activeCacheName);
+        const cacheKey = `${OFFLINE_REMOVED_CASES_CACHE_KEY_PREFIX}${normalizedState.sessionId}`;
+
+        if (
+            normalizedState.pendingRemovals.length === 0 &&
+            normalizedState.hiddenExistingCaseIds.length === 0 &&
+            normalizedState.deletedNewCaseIds.length === 0
+        ) {
+            await cache.delete(cacheKey);
+            return normalizedState;
+        }
+
+        normalizedState.updatedAt = new Date().toISOString();
+
+        const response = new Response(JSON.stringify(normalizedState), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        await cache.put(cacheKey, response);
+        return normalizedState;
+    } catch (error) {
+        self.offlineLog.error('ServiceWorker', 'Error saving offline removed cases state:', error);
+        throw error;
+    }
+}
+
 // Function to validate derived key hash against cached session data
 async function validateOfflineKeyInServiceWorker(derivedKeyHash, sessionId, messageEvent) {
     try {
         self.offlineLog.log('ServiceWorker', 'Validating derived key hash...');
-        
-        // First, check if account is locked out
-        const counterData = await getLoginAttemptCounter(sessionId);
-        
-        if (isLockedOut(counterData)) {
-            const now = Date.now();
-            const remainingMs = counterData.lockoutUntil - now;
-            const remainingMinutes = Math.ceil(remainingMs / (60 * 1000));
-            
-            self.offlineLog.log(`ServiceWorker`, `Account locked out. ${remainingMinutes} minutes remaining.`);
-            messageEvent.ports[0].postMessage({
-                type: 'OFFLINE_KEY_VALIDATION_RESPONSE',
-                isValid: false,
-                isLockedOut: true,
-                lockoutUntil: counterData.lockoutUntil,
-                remainingMinutes: remainingMinutes,
-                attemptsRemaining: 0
-            });
-            return;
-        }
-        
+
         // Get the active API cache
         const activeCacheName = await getActiveApiCacheName();
         const cache = await caches.open(activeCacheName);
         const cachedRequests = await cache.keys();
-        
+
         // Search for cached offline session data
         for (const request of cachedRequests) {
             const url = new URL(request.url);
@@ -3350,11 +3526,12 @@ async function validateOfflineKeyInServiceWorker(derivedKeyHash, sessionId, mess
                     const response = await cache.match(request);
                     if (response) {
                         const sessionData = await response.json();
+                        const effectiveSessionId = sessionId || sessionData.offlineSessionId || sessionData.sessionId;
                         self.offlineLog.log('ServiceWorker', 'Found cached offline session data', {
                             hasKeySalt: !!sessionData.keySalt,
                             hasDerivedKeyHash: !!sessionData.derivedKeyHash,
                             hasOfflineKey: !!sessionData.offlineKey,
-                            sessionId: sessionData.offlineSessionId
+                            sessionId: effectiveSessionId
                         });
                         
                         // Validate session ID matches (if provided)
@@ -3362,13 +3539,32 @@ async function validateOfflineKeyInServiceWorker(derivedKeyHash, sessionId, mess
                             self.offlineLog.log('ServiceWorker', 'Session ID mismatch, skipping this session data');
                             continue;
                         }
+
+                        // First, check if account is locked out for this session
+                        const counterData = await getLoginAttemptCounter(effectiveSessionId);
+                        if (isLockedOut(counterData)) {
+                            const now = Date.now();
+                            const remainingMs = counterData.lockoutUntil - now;
+                            const remainingMinutes = Math.ceil(remainingMs / (60 * 1000));
+
+                            self.offlineLog.log(`ServiceWorker`, `Account locked out. ${remainingMinutes} minutes remaining.`);
+                            messageEvent.ports[0].postMessage({
+                                type: 'OFFLINE_KEY_VALIDATION_RESPONSE',
+                                isValid: false,
+                                isLockedOut: true,
+                                lockoutUntil: counterData.lockoutUntil,
+                                remainingMinutes: remainingMinutes,
+                                attemptsRemaining: 0
+                            });
+                            return;
+                        }
                         
                         // Check if derived key hash matches stored hash
                         if (sessionData.derivedKeyHash && sessionData.derivedKeyHash === derivedKeyHash) {
                             self.offlineLog.log('ServiceWorker', 'Derived key validation successful');
                             
                             // Reset attempt counter on successful login
-                            await resetLoginAttemptCounter(sessionId);
+                            await resetLoginAttemptCounter(effectiveSessionId);
                             
                             messageEvent.ports[0].postMessage({
                                 type: 'OFFLINE_KEY_VALIDATION_RESPONSE',
@@ -3539,12 +3735,20 @@ async function getOfflineSessionDataFromServiceWorker(messageEvent) {
                     const response = await cache.match(request);
                     if (response) {
                         const sessionData = await response.json();
+                        const sessionId = sessionData.offlineSessionId || sessionData.sessionId || null;
+                        const counterData = sessionId ? await getLoginAttemptCounter(sessionId) : null;
+                        const accountIsLockedOut = !!counterData && isLockedOut(counterData);
+                        const remainingMinutes = accountIsLockedOut
+                            ? Math.ceil((counterData.lockoutUntil - Date.now()) / (60 * 1000))
+                            : 0;
                         self.offlineLog.log('ServiceWorker', 'Found cached offline session data');
                         
                         messageEvent.ports[0].postMessage({
                             type: 'OFFLINE_SESSION_DATA_RESPONSE',
                             success: true,
-                            sessionData: sessionData
+                            sessionData: sessionData,
+                            isLockedOut: accountIsLockedOut,
+                            remainingMinutes: remainingMinutes
                         });
                         return;
                     }

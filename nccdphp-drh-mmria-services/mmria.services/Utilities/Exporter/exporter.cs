@@ -2,6 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using mmria.common.getset;
+using mmria.common.SharedLibraries.Case;
+using mmria.common.SharedLibraries.Case.DAL;
+using mmria.common.SharedLibraries.ExportQueue;
+using mmria.common.SharedLibraries.Jurisdiction;
+using mmria.common.SharedLibraries.Jurisdiction.DAL;
+using mmria.common.SharedLibraries.MetadataVersion;
+using mmria.common.SharedLibraries.MetadataVersion.DAL;
 using mmria.services.Models;
 
 namespace mmria.services.Utilities.Exporter;
@@ -61,13 +68,20 @@ private ScheduleInfoMessage Configuration;
 
 mmria.common.couchdb.DBConfigurationDetail db_config;
 private mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+private readonly IMetadataRepository _metadataRepository;
+private ICaseRepository _caseRepository;
+    private readonly IJurisdictionRepository _jurisdictionRepository;
+    private IExportQueueRepository _exportQueueRepository;
 
-public exporter(ScheduleInfoMessage configuration, mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+public exporter(ScheduleInfoMessage configuration, mmria.common.getset.CouchDbHttpClient couchDbHttpClient, IExportQueueRepository exportQueueRepository)
 {
     this.Configuration = configuration;
     _couchDbHttpClient = couchDbHttpClient;
-
-    db_config = new()
+    _exportQueueRepository = exportQueueRepository;
+    _caseRepository = new CaseDAL(_couchDbHttpClient);
+    _metadataRepository = new MetadataVersionDAL(_couchDbHttpClient);
+    _jurisdictionRepository = new JurisdictionDAL(_couchDbHttpClient);
+    db_config = new mmria.common.couchdb.DBConfigurationDetail
     {
         url = configuration.couch_db_url,
         prefix = configuration.db_prefix,
@@ -85,8 +99,9 @@ public async System.Threading.Tasks.Task<bool> Execute(export_queue_item queue_i
     this.user_name = this.Configuration.user_name;
     this.value_string = this.Configuration.user_value;
 
-    this.item_file_name = queue_item.file_name;
-    this.item_directory_name = queue_item.file_name.Substring(0, queue_item.file_name.IndexOf("."));
+    var validated_file_name = PathSanitizer.ValidatePathSegment(queue_item.file_name, nameof(queue_item.file_name));
+    this.item_file_name = validated_file_name;
+    this.item_directory_name = System.IO.Path.GetFileNameWithoutExtension(validated_file_name);
     this.item_id = queue_item._id;
 
     this.is_excel_file_type = queue_item.case_file_type == "xlsx" ? true : false;
@@ -149,14 +164,7 @@ public async System.Threading.Tasks.Task<bool> Execute(export_queue_item queue_i
     this.qualitativeStreamWriter[2] = new System.IO.StreamWriter(System.IO.Path.Combine(export_directory, "informant-interview.txt"), true);
 
 
-/*
-    string URL = this.database_url + $"/{db_config.prefix}mmrds/_all_docs";
-    string urlParameters = "?include_docs=true";
-    cURL document_curl = new cURL("GET", null, URL + urlParameters, null, this.user_name, this.value_string);
-    object all_cases = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(document_curl.execute());
-*/
-    string metadata_url = this.database_url + $"/metadata/version_specification-{this.Configuration.version_number}/metadata";
-    mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, this.user_name, this.value_string));
+    mmria.common.metadata.app metadata = await _metadataRepository.GetAppDocumentAsync(this.Configuration.version_number, db_config);
     this.current_metadata = metadata;
 
 
@@ -360,6 +368,11 @@ if(multiform_field_list.Count > 0)
     grantee_column.DefaultValue = queue_item.grantee_name;
     path_to_csv_writer[mmria_custom_export_file_name].Table.Columns.Add(grantee_column);
 
+    if(! is_excel_file_type)
+    {
+        path_to_csv_writer[mmria_custom_export_file_name].WriteHeadersToStream();
+    }
+
     de_identified_set = new HashSet<string>();
 
     if (queue_item.de_identified_field_set != null)
@@ -379,53 +392,156 @@ if(multiform_field_list.Count > 0)
     {
         this.clearTextStreamWriter[1] = new System.IO.StreamWriter(System.IO.Path.Combine(export_root_directory, "informant-interview-plaintext.txt"), true);
     }
-
-
-    HashSet<string> Custom_Case_Id_List = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-    foreach (var id in queue_item.case_set)
-    {
-        Custom_Case_Id_List.Add(id);
-    }
-
-    List<System.Dynamic.ExpandoObject> cases_to_process = new List<System.Dynamic.ExpandoObject>();
-
     #if !IS_PMSS_ENHANCED
-    var jurisdiction_hashset = await mmria.services.authorization.get_current_jurisdiction_id_set_for(db_config, this.juris_user_name, _couchDbHttpClient);
+    var jurisdiction_hashset = await mmria.services.authorization.get_current_jurisdiction_id_set_for(db_config, this.juris_user_name, _jurisdictionRepository);
     #endif
     #if IS_PMSS_ENHANCED
     var jurisdiction_hashset = await mmria.pmss.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, this.juris_user_name, _couchDbHttpClient);
     #endif
 
-    if (queue_item.case_filter_type != "custom")
+    async IAsyncEnumerable<string> get_case_ids_to_process()
     {
-        try
+        if (string.Equals(queue_item.case_filter_type, "custom", StringComparison.OrdinalIgnoreCase))
         {
-            string request_string = $"{db_config.url}/{db_config.prefix}mmrds/_design/sortable/_view/by_date_created?skip=0&take=250000";
-
-            string case_view_responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
-
-            mmria.common.model.couchdb.case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(case_view_responseFromServer);
-
-            foreach (mmria.common.model.couchdb.case_view_item cvi in case_view_response.rows)
+            foreach (var caseId in PagedCaseIdLoader.GetRequestedCaseIds(queue_item.case_set))
             {
-                Custom_Case_Id_List.Add(cvi.id);
+                yield return caseId;
+            }
 
+            yield break;
+        }
+
+        await foreach (var caseId in PagedCaseIdLoader.GetCaseIdsAsync(db_config, _caseRepository))
+        {
+            yield return caseId;
+        }
+    }
+
+    void write_export_row(System.Data.DataRow output_row)
+    {
+        if(is_excel_file_type)
+        {
+            path_to_csv_writer[mmria_custom_export_file_name].Table.Rows.Add(output_row);
+        }
+        else
+        {
+            path_to_csv_writer[mmria_custom_export_file_name].WriteToStream(output_row);
+        }
+    }
+
+    void flush_case_output_rows()
+    {
+        if(is_using_grid && is_using_multiform)
+        {
+            foreach(System.Data.DataRow gr in grid_table.Rows)
+            {
+                if(gr["_parent_record_index"] == System.DBNull.Value)
+                {
+                    continue;
+                }
+
+                System.Data.DataRow output_row = path_to_csv_writer[mmria_custom_export_file_name].Table.NewRow();
+                
+                var fr = flat_table.Select($"_id='{gr["_id"]}'");
+                if(fr.Length > 0)
+                {
+                    foreach(System.Data.DataColumn c in flat_table.Columns)
+                    {
+                        output_row[c.ColumnName] = fr[0][c.ColumnName];
+                    }
+                }
+
+                var mr = multiform_table.Select($"_id='{gr["_id"]}' and _record_index = {gr["_parent_record_index"]}");
+                if(mr.Length > 0)
+                {
+                    foreach(System.Data.DataColumn c in multiform_table.Columns)
+                    {
+                        output_row[c.ColumnName] = mr[0][c.ColumnName];
+                    }
+                }
+
+                foreach(System.Data.DataColumn c in grid_table.Columns)
+                {
+                    output_row[c.ColumnName] = gr[c.ColumnName];
+                }
+
+                write_export_row(output_row);
             }
         }
-        catch (Exception ex)
+        else if(is_using_grid)
         {
-            Console.WriteLine(ex);
+            foreach(System.Data.DataRow gr in grid_table.Rows)
+            {
+                System.Data.DataRow output_row = path_to_csv_writer[mmria_custom_export_file_name].Table.NewRow();
+                
+                var fr = flat_table.Select($"_id='{gr["_id"]}'");
+                if(flat_table.Columns.Count > 0 && fr.Length > 0)
+                {
+                    foreach(System.Data.DataColumn c in flat_table.Columns)
+                    {
+                        output_row[c.ColumnName] = fr[0][c.ColumnName];
+                    }
+                }
+
+                foreach(System.Data.DataColumn c in grid_table.Columns)
+                {
+                    output_row[c.ColumnName] = gr[c.ColumnName];
+                }
+
+                write_export_row(output_row);
+            }
+        }
+        else if(is_using_multiform)
+        {
+            foreach(System.Data.DataRow mr in multiform_table.Rows)
+            {
+                System.Data.DataRow output_row = path_to_csv_writer[mmria_custom_export_file_name].Table.NewRow();
+                
+                if(flat_table.Columns.Count > 0)
+                {
+                    var fr = flat_table.Select($"_id='{mr["_id"]}'");
+                    if(fr.Length > 0)
+                    {
+                        foreach(System.Data.DataColumn c in flat_table.Columns)
+                        {
+                            output_row[c.ColumnName] = fr[0][c.ColumnName];
+                        }
+                    }
+                }
+
+                foreach(System.Data.DataColumn c in multiform_table.Columns)
+                {
+                    output_row[c.ColumnName] = mr[c.ColumnName];
+                }
+
+                write_export_row(output_row);
+            }
+        }
+        else
+        {
+            foreach(System.Data.DataRow fr in flat_table.Rows)
+            {
+                var output_row = path_to_csv_writer[mmria_custom_export_file_name].Table.NewRow();
+                
+                foreach(System.Data.DataColumn c in flat_table.Columns)
+                {
+                    output_row[c.ColumnName] = fr[c.ColumnName];
+                }
+
+                write_export_row(output_row);
+            }
         }
 
+        flat_table.Clear();
+        grid_table.Clear();
+        multiform_table.Clear();
     }
 
 
-    foreach(string case_id in Custom_Case_Id_List)
+    var _utcSettings = new Newtonsoft.Json.JsonSerializerSettings { DateTimeZoneHandling = Newtonsoft.Json.DateTimeZoneHandling.RoundtripKind };
+    await foreach(string case_id in get_case_ids_to_process())
     {
-        string URL = $"{this.database_url}/{db_config.prefix}mmrds/{case_id}";
-
-        System.Dynamic.ExpandoObject case_row = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(await _couchDbHttpClient.ExecuteAsync("GET", URL, null, this.user_name, this.value_string));
+        System.Dynamic.ExpandoObject case_row = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(await _caseRepository.GetCaseDocumentJsonAsync(case_id, db_config), _utcSettings);
 
         IDictionary<string, object> case_doc = case_row as IDictionary<string, object>;
 
@@ -795,7 +911,7 @@ if(multiform_field_list.Count > 0)
                 }
 
                 string file_field_name = MetaDataNode_Dictionary[path].sass_export_name;
-                row[file_field_name] = val;
+                row[file_field_name] = val is System.DateTime dt ? dt.ToString("MM/dd/yyyy HH:mm:ss") : val;
 
                 }
                 break;
@@ -976,117 +1092,8 @@ if(multiform_field_list.Count > 0)
                 }
             }
         }// end of multiform
+        flush_case_output_rows();
     } // end of foreach
-
-
-    if(is_using_grid && is_using_multiform)
-    {
-        foreach(System.Data.DataRow gr in grid_table.Rows)
-        {
-            System.Data.DataRow output_row = path_to_csv_writer[mmria_custom_export_file_name].Table.NewRow();
-            
-            var fr = flat_table.Select($"_id='{gr["_id"]}'");
-            if(fr.Length > 0)
-            {
-                foreach(System.Data.DataColumn c in flat_table.Columns)
-                {
-                    
-                    output_row[c.ColumnName] = fr[0][c.ColumnName];
-                }
-            }
-            else
-            {
-
-            }
-
-            if(gr["_parent_record_index"] == System.DBNull.Value)
-            {
-                continue;
-            }
-
-            var mr = multiform_table.Select($"_id='{gr["_id"]}' and _record_index = {gr["_parent_record_index"]}");
-            if(fr.Length > 0)
-            {
-                foreach(System.Data.DataColumn c in multiform_table.Columns)
-                {
-                    output_row[c.ColumnName] = mr[0][c.ColumnName];
-                }
-            }
-            else
-            {
-
-            }
-
-            foreach(System.Data.DataColumn c in grid_table.Columns)
-            {
-                output_row[c.ColumnName] = gr[c.ColumnName];
-            }
-        
-            path_to_csv_writer[mmria_custom_export_file_name].Table.Rows.Add(output_row);
-        }
-    }
-    else if(is_using_grid)
-    {
-        foreach(System.Data.DataRow gr in grid_table.Rows)
-        {
-            System.Data.DataRow output_row = path_to_csv_writer[mmria_custom_export_file_name].Table.NewRow();
-            
-            var fr = flat_table.Select($"_id='{gr["_id"]}'");
-            if(flat_table.Columns.Count > 0)
-            {
-                foreach(System.Data.DataColumn c in flat_table.Columns)
-                {
-                    output_row[c.ColumnName] = fr[0][c.ColumnName];
-                }
-            }
-
-            foreach(System.Data.DataColumn c in grid_table.Columns)
-            {
-                output_row[c.ColumnName] = gr[c.ColumnName];
-            }
-
-                path_to_csv_writer[mmria_custom_export_file_name].Table.Rows.Add(output_row);
-        }
-    }
-    else if(is_using_multiform)
-    {
-        foreach(System.Data.DataRow mr in multiform_table.Rows)
-        {
-            System.Data.DataRow output_row = path_to_csv_writer[mmria_custom_export_file_name].Table.NewRow();
-            
-            if(flat_table.Columns.Count > 0)
-            {
-                var fr = flat_table.Select($"_id='{mr["_id"]}'");
-                foreach(System.Data.DataColumn c in flat_table.Columns)
-                {
-                    output_row[c.ColumnName] = fr[0][c.ColumnName];
-                }
-            }
-
-            foreach(System.Data.DataColumn c in multiform_table.Columns)
-            {
-                output_row[c.ColumnName] = mr[c.ColumnName];
-            }
-
-            path_to_csv_writer[mmria_custom_export_file_name].Table.Rows.Add(output_row);
-        }
-    }
-    else
-    {
-        foreach(System.Data.DataRow fr in flat_table.Rows)
-        {
-            var output_row = path_to_csv_writer[mmria_custom_export_file_name].Table.NewRow();
-            
-            foreach(System.Data.DataColumn c in flat_table.Columns)
-            {
-                output_row[c.ColumnName] = fr[c.ColumnName];
-            }
-
-            path_to_csv_writer[mmria_custom_export_file_name].Table.Rows.Add(output_row);
-        }
-    }
-        
-
 
 
 
@@ -1187,10 +1194,14 @@ if(multiform_field_list.Count > 0)
 
         mapping_document.Table.Rows.Add(mapping_row);
         }
-
-
-        kvp.Value.WriteHeadersToStream();
-        kvp.Value.WriteToStream();
+        if(is_excel_file_type)
+        {
+            kvp.Value.WriteToStream();
+        }
+        else
+        {
+            kvp.Value.FinishStream();
+        }
     }
 
     mapping_document.WriteHeadersToStream();
@@ -1357,8 +1368,8 @@ if(multiform_field_list.Count > 0)
     );
 
 
-    string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}export_queue/" + this.item_id, null, this.user_name, this.value_string);
-    export_queue_item export_queue_item = Newtonsoft.Json.JsonConvert.DeserializeObject<export_queue_item>(responseFromServer);
+    export_queue_item export_queue_item;
+    export_queue_item = await _exportQueueRepository.GetQueueDocumentAsync<export_queue_item>(this.item_id, db_config);
 
     export_queue_item.status = "Download";
 
@@ -1366,7 +1377,7 @@ if(multiform_field_list.Count > 0)
     Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings();
     settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
     string object_string = Newtonsoft.Json.JsonConvert.SerializeObject(export_queue_item, settings);
-    responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue/" + export_queue_item._id, object_string, this.user_name, this.value_string);
+    await _exportQueueRepository.SaveQueueDocumentAsync(export_queue_item._id, object_string, db_config);
 
 
     Console.WriteLine("{0} Export Finished", System.DateTime.Now);
@@ -1379,15 +1390,15 @@ if(multiform_field_list.Count > 0)
     catch (Exception ex)
     {
 
-    string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}export_queue/" + this.item_id, null, this.user_name, this.value_string);
-    export_queue_item export_queue_item = Newtonsoft.Json.JsonConvert.DeserializeObject<export_queue_item>(responseFromServer);
+    export_queue_item export_queue_item;
+    export_queue_item = await _exportQueueRepository.GetQueueDocumentAsync<export_queue_item>(this.item_id, db_config);
 
     export_queue_item.status = "Queue Failed:" + ex.ToString();
 
     Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings();
     settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
     string object_string = Newtonsoft.Json.JsonConvert.SerializeObject(export_queue_item, settings);
-    responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue/" + export_queue_item._id, object_string, this.user_name, this.value_string);
+    await _exportQueueRepository.SaveQueueDocumentAsync(export_queue_item._id, object_string, db_config);
 
 
     return false;
@@ -1723,6 +1734,8 @@ private void create_header_row
         column.ColumnName = $"{file_field_name}_{p_path_to_int_map[path].ToString()}";
         p_Table.Columns.Add(column);
     }
+
+    path_to_field_name_map[path] = column.ColumnName;
 
     }
 }
@@ -2225,11 +2238,11 @@ private void WriteQualitativeData
 
     if (this.qualitativeStreamCount[index] == 0)
     {
-        this.qualitativeStreamWriter[index].WriteLine($"{record_split}\nid={p_record_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}");
+        this.qualitativeStreamWriter[index].Write($"{record_split}\nid={p_record_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}\n");
     }
     else
     {
-        this.qualitativeStreamWriter[index].WriteLine($"\n{record_split}\nid={p_record_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}");
+        this.qualitativeStreamWriter[index].Write($"\n{record_split}\nid={p_record_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}\n");
     }
     this.qualitativeStreamCount[index] += 1;
 }
@@ -2265,11 +2278,11 @@ private void WriteClearTextData
 
     if (this.clearTextStreamCount[index] == 0)
     {
-        this.clearTextStreamWriter[index].WriteLine($"{record_split}\nid={p_record_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}");
+        this.clearTextStreamWriter[index].Write($"{record_split}\nid={p_record_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}\n");
     }
     else
     {
-        this.clearTextStreamWriter[index].WriteLine($"\n{record_split}\nid={p_record_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}");
+        this.clearTextStreamWriter[index].Write($"\n{record_split}\nid={p_record_id}\npath={p_mmria_path}\nrecord_index={p_index}\nparent_index={p_parent_index}{header_split}\n{p_data}\n");
     }
     this.clearTextStreamCount[index] += 1;
 }

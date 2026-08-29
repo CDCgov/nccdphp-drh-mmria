@@ -37,7 +37,12 @@ function render_offline_processing_item(caseDoc, i) {
     const currentCaseStatus = caseStatus == null ? '(blank)' : caseStatuses[caseStatus.toString()];
     const dateCreated = modifiedDocument.date_created ? new Date(modifiedDocument.date_created).toLocaleDateString('en-US') : '';
     const lastUpdatedDate = modifiedDocument.date_last_updated ? new Date(modifiedDocument.date_last_updated).toLocaleDateString('en-US') : '';
-    const isOfflineCreated = agencyCaseID && agencyCaseID.indexOf('-offline') !== -1;
+    // Story 29.6: recognize both the new placeholder pattern
+    // ({STATE}-OFFLINE-CASE-XX) and the legacy "-offline" suffix.
+    const isOfflineCreated = !!(recordID && (
+        /-OFFLINE-CASE-\d+$/i.test(recordID) ||
+        /-offline$/i.test(recordID)
+    ));
 
     let projectedReviewDate = modifiedDocument.home_record?.case_status?.projected_review_date ? new Date(modifiedDocument.home_record.case_status.projected_review_date).toLocaleDateString('en-US') : '';
     let actualReviewDate = modifiedDocument.home_record?.case_status?.committee_review_date ? new Date(modifiedDocument.home_record.case_status.committee_review_date).toLocaleDateString('en-US') : '';
@@ -97,7 +102,7 @@ function render_offline_processing_item(caseDoc, i) {
             const changeRecord = g_offline_changes.get(caseID);
             changeIndicator = `
                 <div style="margin-top: 4px;">
-                    <span class="badge badge-warning" title="Document has offline changes made at ${new Date(changeRecord.timestamp).toLocaleString()}">
+                    <span class="badge badge-warning" style="background-color: #FBAB18 !important; color: #333333 !important;" title="Document has offline changes made at ${new Date(changeRecord.timestamp).toLocaleString()}">
                         <i class="fa fa-edit"></i> Modified Offline
                     </span>
                 </div>
@@ -113,7 +118,7 @@ function render_offline_processing_item(caseDoc, i) {
     const abandon_button_class = !canAbandon ? 'offline-processing-disabled' : '';
 
     return `
-        <tr class="tr" path="${caseID}" ${hasChanges ? 'style="background-color: #fff3cd;"' : ''}>
+        <tr class="tr" path="${caseID}" ${hasChanges ? 'style="background-color: #FFF7E1;"' : ''}>
             <td class="td">
                 <a href="#/${i}/home_record">${hostState} ${jurisdictionID}: ${lastName}, ${firstName} ${recordIDDisplay} ${agencyCaseID ? ` ac_id: ${agencyCaseID}` : ''}</a>
                 ${changeIndicator}
@@ -184,7 +189,7 @@ function render_offline_only_document_item(item, i) {
     if (isNew) {
         isNewIndicator = `
             <div style="margin-top: 4px;">
-                <span class="badge badge-success" title="This is a new offline document that has not been uploaded yet">
+                <span class="badge badge-success" style="font-weight:normal !important; background-color: #497D0C !important; color: #FFFFFF !important;" title="This is a new offline document that has not been uploaded yet">
                     <i class="fa fa-plus"></i> New Offline Document
                 </span>
             </div>
@@ -196,7 +201,7 @@ function render_offline_only_document_item(item, i) {
             const changeRecord = g_offline_changes.get(caseID);
             changeIndicator = `
                 <div style="margin-top: 4px;">
-                    <span class="badge badge-warning" title="Document has offline changes made at ${new Date(changeRecord.timestamp).toLocaleString()}">
+                    <span class="badge badge-warning" style="font-weight:normal !important; background-color: #FBAB18 !important; color: #333333 !important;" title="Document has offline changes made at ${new Date(changeRecord.timestamp).toLocaleString()}">
                         <i class="fa fa-edit"></i> Modified Offline
                     </span>
                 </div>
@@ -207,7 +212,7 @@ function render_offline_only_document_item(item, i) {
     }
 
     return `
-        <tr class="tr" path="${caseID}" ${hasChanges ? 'style="background-color: #fff3cd;"' : ''}>
+        <tr class="tr" path="${caseID}" ${hasChanges ? 'style="background-color: #FFF7E1;"' : ''}>
             <td class="td">
                 <a href="#/${i}/home_record">${hostState} ${jurisdictionID}: ${lastName}, ${firstName} ${recordID} ${agencyCaseID ? ` ac_id: ${agencyCaseID}` : ''}</a>
                 ${changeIndicator} ${isNewIndicator}
@@ -271,7 +276,7 @@ function render_offline_document_item(item, i) {
             const changeRecord = g_offline_changes.get(caseID);
             changeIndicator = `
                 <div style="margin-top: 4px;">
-                    <span class="badge badge-warning" title="Document has offline changes made at ${new Date(changeRecord.timestamp).toLocaleString()}">
+                    <span class="badge badge-warning" style="background-color: #FBAB18 !important; color: #333333 !important;" title="Document has offline changes made at ${new Date(changeRecord.timestamp).toLocaleString()}">
                         <i class="fa fa-edit"></i> Modified Offline
                     </span>
                 </div>
@@ -282,7 +287,7 @@ function render_offline_document_item(item, i) {
     }
 
     return `
-        <tr class="tr" path="${caseID}" ${hasChanges ? 'style="background-color: #fff3cd;"' : ''}>
+        <tr class="tr" path="${caseID}" ${hasChanges ? 'style="background-color: #FFF7E1;"' : ''}>
             <td class="td">
                 <a href="#/${caseIndex}/home_record">${hostState} ${jurisdictionID}: ${lastName}, ${firstName} ${recordID} ${agencyCaseID ? ` ac_id: ${agencyCaseID}` : ''}</a>
                 ${changeIndicator}

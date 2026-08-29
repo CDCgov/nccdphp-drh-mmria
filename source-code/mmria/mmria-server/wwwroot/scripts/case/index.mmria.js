@@ -50,12 +50,10 @@ var g_ui = {
 
       const isOfflineMode = localStorage.getItem('is_offline') || 'false';
 
-      if (g_autosave_interval != null) 
+      if (typeof stop_edit_mode_auto_timers === 'function')
       {
-        window.clearInterval(g_autosave_interval);
+        stop_edit_mode_auto_timers();
       }
-  
-      g_autosave_interval = window.setInterval(autosave, 10000);
   
       var result = create_default_object(g_metadata, {});
   
@@ -87,7 +85,12 @@ var g_ui = {
       result.home_record.date_of_death.day = p_day_of_death;
   
       let reporting_state = sanitize_encodeHTML(window.location.host.split("-")[0]);
-  
+
+      // Story 29.5: hoisted so the save-then-retry loop below can regenerate
+      // a fresh 4-digit suffix if the server responds with record_id_conflict.
+      let generateRecordIdCandidate = null;
+      let hasGeneratedRecordId = false;
+
       if 
       (
           (
@@ -102,17 +105,30 @@ var g_ui = {
       ) 
       {
           
-          let new_record_id = reporting_state.trim() + '-' + result.home_record.date_of_death.year.trim() + '-' + $mmria.getRandomCryptoValue().toString().substring(2, 6);
-          while(g_record_id_list.has(new_record_id))
+          const yearPart = result.home_record.date_of_death.year.trim();
+          generateRecordIdCandidate = () => reporting_state.trim() + '-' + yearPart + '-' + $mmria.getRandomCryptoValue().toString().substring(2, 6);
+          let new_record_id;
+
+          // Story 29.5: online path is server-authoritative — no /api/record_id
+          // pre-flight. The single POST to /api/case below retries on
+          // record_id_conflict. Story 29.6: offline path writes a placeholder
+          // record ID; OfflineCaseManager.SyncOfflineCaseAsync replaces it with
+          // a real STATE-YEAR-NNNN via GenerateUniqueRecordIdAsync at sync time.
+          const isOfflineForUniqueness = window.OfflineStatus && window.OfflineStatus.isOffline() === true;
+
+          if (isOfflineForUniqueness)
           {
-              new_record_id = reporting_state.trim() + '-' + result.home_record.date_of_death.year.trim() + '-' + $mmria.getRandomCryptoValue().toString().substring(2, 6);
+              const state = reporting_state.trim();
+              const seq = window.OfflineSessionManager.getNextOfflineCaseSequence();
+              new_record_id = state + '-OFFLINE-CASE-' + seq;
           }
-  
-          // Append "-offline" suffix if in offline mode
-          if(isOfflineMode === 'true') {
-            new_record_id = window.OfflineCaseManager.generateOfflineRecordId(new_record_id);
-            }
+          else
+          {
+              new_record_id = generateRecordIdCandidate();
+          }
+
           result.home_record.record_id = new_record_id.toUpperCase();
+          hasGeneratedRecordId = true;
   
           g_record_id_list.add(new_record_id.toUpperCase());
       }
@@ -152,6 +168,11 @@ var g_ui = {
       g_ui.selected_record_id = result._id;
       g_ui.selected_record_index = g_ui.case_view_list.length - 1;
       
+      if (typeof sync_edit_mode_auto_timers === 'function')
+      {
+        sync_edit_mode_auto_timers();
+      }
+      
       // Update offline case index map if in offline mode
       if(isOfflineMode === 'true') {
         await window.OfflineCaseManager.handleNewCaseOfflineSetup(result, g_ui);
@@ -162,8 +183,62 @@ var g_ui = {
             g_data,
             async function () 
             {
-                await save_case(g_data, function () 
+                try
                 {
+                    // Story 29.5: online save-then-retry-on-collision.
+                    // Common case is a single POST. If the server responds with
+                    // error_code === "record_id_conflict", regenerate the 4-digit
+                    // suffix and re-POST, up to MAX_UNIQUE_RETRIES total attempts.
+                    // Non-collision errors surface immediately via the existing
+                    // save_case_and_wait failure path.
+                    const MAX_UNIQUE_RETRIES = 5;
+                    const canRetryOnCollision =
+                        hasGeneratedRecordId &&
+                        generateRecordIdCandidate != null &&
+                        isOfflineMode !== 'true' &&
+                        !(window.OfflineStatus && window.OfflineStatus.isOffline() === true);
+
+                    let retry_attempts = 0;
+                    while (true)
+                    {
+                        try
+                        {
+                            await save_case_and_wait(g_data, null, "add_new_case");
+                            break;
+                        }
+                        catch (save_ex)
+                        {
+                            if (!canRetryOnCollision ||
+                                !save_ex ||
+                                save_ex.error_code !== "record_id_conflict")
+                            {
+                                throw save_ex;
+                            }
+
+                            retry_attempts++;
+                            if (retry_attempts >= MAX_UNIQUE_RETRIES)
+                            {
+                                const errMsg = "Unable to generate a unique Record ID after multiple attempts. Please try again.";
+                                alert(errMsg);
+                                const err = new Error(errMsg);
+                                err.__handled = true;
+                                throw err;
+                            }
+
+                            const next_candidate = generateRecordIdCandidate().toUpperCase();
+                            g_data.home_record.record_id = next_candidate;
+                            result.home_record.record_id = next_candidate;
+
+                            const last_view = g_ui.case_view_list[g_ui.case_view_list.length - 1];
+                            if (last_view && last_view.value)
+                            {
+                                last_view.value.record_id = next_candidate;
+                            }
+
+                            g_record_id_list.add(next_candidate);
+                        }
+                    }
+
                     // Ensure offline case index map is updated before navigation
                     const isOffline = window.OfflineStatus.isOffline();
                     if (isOffline && typeof window.OfflineCaseManager.updateOfflineCaseIndexMap === 'function') {
@@ -187,11 +262,11 @@ var g_ui = {
                         window.location.hash = '#/' + g_ui.selected_record_index + '/home_record';
                         resolve(result);
                     }, 10);
-                }, "add_new_case");
-            },
-            function(error) {
-                console.error('Error in set_local_case:', error);
-                reject(error);
+                }
+                catch (ex)
+                {
+                    reject(ex);
+                }
             }
         );
       });
@@ -504,25 +579,26 @@ async function add_new_case_button_click(p_input)
             state.value = "init";
             new_validation_message_area.innerHTML = "generate confirmed";
 
-            await Get_Record_Id_List(
-
-            async function () {
-                try {
-                    console.log('🎯 Starting case creation...');
-                    await g_ui.add_new_case(
-                    new_first_name.value,
-                    new_middle_name.value,
-                    new_last_name.value,
-                    new_month_of_death.value,
-                    new_day_of_death.value,
-                    new_year_of_death.value,
-                    new_state_of_death.value);
-                    console.log('✅ Case creation completed successfully');
-                } catch (error) {
-                    console.error('❌ Error during case creation:', error);
+            // Story 29.2: Get_Record_Id_List no longer needed on the confirm path.
+            // add_new_case() now performs a per-candidate uniqueness check against
+            // GET /api/record_id (online) or a locally rebuilt Set (offline).
+            try {
+                console.log('🎯 Starting case creation...');
+                await g_ui.add_new_case(
+                new_first_name.value,
+                new_middle_name.value,
+                new_last_name.value,
+                new_month_of_death.value,
+                new_day_of_death.value,
+                new_year_of_death.value,
+                new_state_of_death.value);
+                console.log('✅ Case creation completed successfully');
+            } catch (error) {
+                console.error('❌ Error during case creation:', error);
+                if (!error || !error.__handled) {
                     alert('Error creating case. Please try again.');
                 }
-            });
+            }
 
         }
         else
@@ -2974,7 +3050,7 @@ function arc_pregnancy_interval()
     {
         var lb_date = new Date(lb_year, lb_month - 1, lb_day);
         var event_date = new Date(event_year, event_month - 1, event_day);
-        interval = Math.trunc($global.calc_days(lb_date, end_date) / 30.4375);
+        interval = Math.trunc($global.calc_days(lb_date, event_date) / 30.4375);
         g_data.birth_fetal_death_certificate_parent.pregnancy_history.pregnancy_interval = interval;
         $mmria.set_control_value("birth_fetal_death_certificate_parent/pregnancy_history/pregnancy_interval", interval);
     }

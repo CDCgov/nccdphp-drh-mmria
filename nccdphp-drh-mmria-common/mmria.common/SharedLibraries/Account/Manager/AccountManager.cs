@@ -19,11 +19,20 @@ namespace mmria.common.SharedLibraries.Account.Manager;
 /// </summary>
 public class AccountManager
 {
-    private readonly AccountDAL _dal;
+    // _users operations are accessed via the interface seam (SQL migration boundary).
+    private readonly mmria.common.SharedLibraries.Account.IUserRepository _dal;
+    // Session/authentication operations stay on AccountDAL (out of _users scope).
+    private readonly AccountDAL _accountDal;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
-    public AccountManager(AccountDAL dal)
+    public AccountManager(
+        mmria.common.SharedLibraries.Account.IUserRepository dal,
+        AccountDAL accountDal,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
         _dal = dal;
+        _accountDal = accountDal;
+        _couchDbHttpClient = couchDbHttpClient;
     }
 
     /// <summary>
@@ -47,9 +56,15 @@ public class AccountManager
             return LoginResult.Unauthorized("Username and password are required.");
         }
 
+        var canonicalUserName = NormalizeUserName(loginRequest.UserName);
+        if (string.IsNullOrWhiteSpace(canonicalUserName))
+        {
+            return LoginResult.Unauthorized("Username and password are required.");
+        }
+
         // Step 1: Check lockout status
         var lockoutStatus = await CheckLockoutStatusAsync(
-            loginRequest.UserName!,
+            canonicalUserName,
             dbConfig,
             configuration,
             hostPrefix);
@@ -61,7 +76,7 @@ public class AccountManager
 
         // Step 2: Authenticate with CouchDB
         var authResult = await AuthenticateUserAsync(
-            loginRequest.UserName!,
+            canonicalUserName,
             loginRequest.Password!,
             dbConfig,
             configuration,
@@ -79,7 +94,7 @@ public class AccountManager
 
         // Step 3: Create session
         var sessionInfo = await CreateSessionAsync(
-            loginRequest.UserName!,
+            authResult.UserName ?? canonicalUserName,
             authResult.UserRoles,
             dbConfig,
             sessionIdleTimeoutMinutes);
@@ -102,6 +117,12 @@ public class AccountManager
         OverridableConfiguration configuration,
         string hostPrefix)
     {
+        userName = NormalizeUserName(userName);
+        if (string.IsNullOrWhiteSpace(userName))
+        {
+            return LockoutStatus.NotLockedOut();
+        }
+
         // Load lockout policy from configuration
         int thresholdBeforeLockout = 5;
         var thresholdConfig = configuration.GetInteger("unsuccessful_login_attempts_number_before_lockout", hostPrefix);
@@ -125,7 +146,7 @@ public class AccountManager
         }
 
         // Get session events for this user
-        var events = await _dal.GetSessionEventsAsync(userName, dbConfig);
+        var events = await _accountDal.GetSessionEventsAsync(userName, dbConfig);
         if (events.Count == 0)
         {
             return LockoutStatus.NotLockedOut();
@@ -168,6 +189,12 @@ public class AccountManager
     {
         try
         {
+            userName = NormalizeUserName(userName);
+            if (string.IsNullOrWhiteSpace(userName))
+            {
+                return AuthorizationStatus.Failure("Username or password is incorrect.");
+            }
+
             // Step 1: Get user from CouchDB /_users to check app_prefix access
             var couchUser = await _dal.GetCouchDbUserAsync(userName, dbConfig);
             if (couchUser == null)
@@ -179,12 +206,18 @@ public class AccountManager
             bool isAppPrefixOk = ValidateAppPrefixAccess(couchUser.app_prefix_list, dbConfig.prefix);
 
             // Step 3: Authenticate against CouchDB session endpoint
-            var loginResponse = await _dal.AuthenticateWithSessionAsync(
+            var loginResponse = await _accountDal.AuthenticateWithSessionAsync(
                 userName,
                 password,
                 dbConfig.url);
 
             if (loginResponse == null || !loginResponse.ok || string.IsNullOrWhiteSpace(loginResponse.name))
+            {
+                return AuthorizationStatus.Failure("Username or password is incorrect.");
+            }
+
+            var canonicalUserName = NormalizeUserName(loginResponse.name);
+            if (string.IsNullOrWhiteSpace(canonicalUserName))
             {
                 return AuthorizationStatus.Failure("Username or password is incorrect.");
             }
@@ -217,7 +250,7 @@ public class AccountManager
             {
 #if !IS_PMSS_ENHANCED
                 var jurisdictionRoles = mmria.common.SharedLibraries.Other.authorization
-                    .get_current_user_role_jurisdiction_set_for(dbConfig, userName)
+                    .get_current_user_role_jurisdiction_set_for(dbConfig, canonicalUserName, _couchDbHttpClient)
                     .Select(jr => jr.role_name)
                     .Distinct()
                     .ToList();
@@ -225,7 +258,7 @@ public class AccountManager
 #endif
 #if IS_PMSS_ENHANCED
                 var jurisdictionRoles = mmria.pmss.server.utils.authorization
-                    .get_current_user_role_jurisdiction_set_for(dbConfig, userName)
+                    .get_current_user_role_jurisdiction_set_for(dbConfig, canonicalUserName, _couchDbHttpClient)
                     .Select(jr => jr.role_name)
                     .Distinct()
                     .ToList();
@@ -234,10 +267,10 @@ public class AccountManager
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Warning: Failed to load jurisdiction roles for {userName}: {ex.Message}");
+                Console.WriteLine($"Warning: Failed to load jurisdiction roles for {canonicalUserName}: {ex.Message}");
             }
 
-            return AuthorizationStatus.Success(userName, roleList, isAppPrefixOk);
+            return AuthorizationStatus.Success(canonicalUserName, roleList, isAppPrefixOk);
         }
         catch (Exception ex)
         {
@@ -259,6 +292,12 @@ public class AccountManager
     {
         try
         {
+            userName = NormalizeUserName(userName);
+            if (string.IsNullOrWhiteSpace(userName))
+            {
+                return SessionInfo.Failure("Session creation failed: Username is required.");
+            }
+
             // Generate session ID and event ID
             var sessionId = Guid.NewGuid().ToString();
             var sessionEventId = Guid.NewGuid().ToString();
@@ -283,7 +322,7 @@ public class AccountManager
                 data = new Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase)
             };
             var sessionJson = JsonConvert.SerializeObject(sessionDoc, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
-            await _dal.CreateSessionDocumentAsync(sessionJson, sessionId, dbConfig);
+            await _accountDal.CreateSessionDocumentAsync(sessionJson, sessionId, dbConfig);
 
             return SessionInfo.Success(sessionId, expirationDateTime, userName, sessionEventId, roles);
         }
@@ -311,5 +350,10 @@ public class AccountManager
 
         // Prefix configured - check if user has access to this specific prefix
         return appPrefixList != null && appPrefixList.ContainsKey(configPrefix) && appPrefixList[configPrefix];
+    }
+
+    private static string NormalizeUserName(string? userName)
+    {
+        return (userName ?? string.Empty).Trim().ToLowerInvariant();
     }
 }

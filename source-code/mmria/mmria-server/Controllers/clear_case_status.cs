@@ -5,53 +5,47 @@ using Microsoft.AspNetCore.Authorization;
 using System.Threading.Tasks;
 using System.Linq;
 using Microsoft.AspNetCore.Http;
-using  mmria.server.extension;
+using mmria.server.extension;
+using mmria.server.util;
+using mmria.common.SharedLibraries.CaseWorkflowAdmin.Manager;
 
 namespace mmria.server.Controllers;
 
-[Authorize(Roles  = "cdc_admin,jurisdiction_admin")]
+[Authorize(Roles = "cdc_admin,jurisdiction_admin")]
 public sealed class clear_case_statusController : Controller
 {
     private readonly IAuthorizationService _authorizationService;
     private readonly mmria.common.couchdb.ConfigurationSet _dbConfigSet;
 
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     mmria.common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly CaseWorkflowAdminManager _manager;
 
-    private System.Collections.Generic.Dictionary<string, string> CaseStatusToDisplay;
+    private readonly System.Collections.Generic.Dictionary<string, string> CaseStatusToDisplay;
     public clear_case_statusController
     (
-        mmria.common.couchdb.ConfigurationSet DbConfigurationSet,
-        IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        IHttpContextAccessor httpContextAccessor,
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        CaseWorkflowAdminManager manager
     )
     {
+        _dbConfigSet = tenantRuntime.RequireConfigurationSet();
+        _manager = manager;
 
-        _dbConfigSet = DbConfigurationSet;
-        _couchDbHttpClient = couchDbHttpClient;
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
 
-        configuration = _configuration;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        configuration = tenantRuntime.RequireConfiguration();
 
-        if(_dbConfigSet.detail_list.ContainsKey("vital_import"))
+        db_config = tenantRuntime.RequireDbConfig();
+        if (_dbConfigSet.detail_list.ContainsKey("vital_import"))
         {
             _dbConfigSet.detail_list.Remove("vital_import");
         }
 
         CaseStatusToDisplay = new System.Collections.Generic.Dictionary<string, string>();
         CaseStatusToDisplay["9999"] = "(blank)";
-        CaseStatusToDisplay["1"] = "Abstracting (Incomplete)";	
+        CaseStatusToDisplay["1"] = "Abstracting (Incomplete)";
         CaseStatusToDisplay["2"] = "Abstraction Complete";
         CaseStatusToDisplay["3"] = "Ready for Review";
         CaseStatusToDisplay["4"] = "Review Complete and Decision Entered";
@@ -64,34 +58,26 @@ public sealed class clear_case_statusController : Controller
         return View(_dbConfigSet);
     }
 
-
-    public async Task<IActionResult> FindRecord(mmria.server.model.casestatus.CaseStatusRequest Model)
+    [HttpPost]
+    public async Task<IActionResult> FindRecord(
+        [Bind(
+            nameof(mmria.server.model.casestatus.CaseStatusRequest.StateDatabase) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusRequest.RecordId))]
+        mmria.server.model.casestatus.CaseStatusRequest Model)
     {
+        Model ??= new mmria.server.model.casestatus.CaseStatusRequest();
         var model = new mmria.server.model.casestatus.CaseStatusRequestResponse();
         model.SearchText = Model.RecordId;
         TempData["SearchText"] = model.SearchText;
         try
         {
-            string responseFromServer = null;
+            var isCdcAdmin = AuthorizedWorkflowScopeHelper.IsCdcAdmin(User);
+            var effectiveRole = isCdcAdmin ? "cdc_admin" : "jurisdiction_admin";
+            var effectiveStateDatabase = AuthorizedWorkflowScopeHelper.ResolveAuthorizedStateDatabase(User, Model.StateDatabase, host_prefix, _dbConfigSet);
+            var effectiveDbConfig = AuthorizedWorkflowScopeHelper.ResolveAuthorizedDbConfig(User, Model.StateDatabase, host_prefix, db_config, _dbConfigSet);
+            model.is_cdc_admin = isCdcAdmin;
 
-            if (Model.Role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase))
-            {
-                model.is_cdc_admin = true;
-
-                var db_info = _dbConfigSet.detail_list[Model.StateDatabase];
-                string request_string = $"{db_info.url}/{db_info.prefix}mmrds/_design/sortable/_view/by_date_last_updated?skip=0&limit=25000&descending=true";
-                responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_info.user_name, db_info.user_value);
-
-            }
-            else
-            {
-
-                string request_string = $"{db_config.url}/{db_config.prefix}mmrds/_design/sortable/_view/by_date_last_updated?skip=0&limit=25000&descending=true";
-                responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
-            }
-
-
-            mmria.common.model.couchdb.case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(responseFromServer);
+            var case_view_response = await _manager.GetCasesByDateAsync(effectiveDbConfig);
 
             var Locked_status_list = new List<int>() { 4, 5, 6 };
             foreach (var item in case_view_response.rows)
@@ -106,13 +92,6 @@ public sealed class clear_case_statusController : Controller
                             item.value.record_id.IndexOf(Model.RecordId, System.StringComparison.OrdinalIgnoreCase) > -1 ||
                             Model.RecordId.IndexOf(item.value.record_id, System.StringComparison.OrdinalIgnoreCase) > -1
                         )
-                    /*
-                    &&
-                    (
-                        item.value.case_status.HasValue &&
-                        Locked_status_list.IndexOf(item.value.case_status.Value) > -1
-                    )*/
-
                     )
                     {
                         var x = new mmria.server.model.casestatus.CaseStatusDetail()
@@ -136,9 +115,9 @@ public sealed class clear_case_statusController : Controller
 
                             CaseStatusDisplay = (item.value.case_status != null && CaseStatusToDisplay.ContainsKey(item.value.case_status.ToString())) ? CaseStatusToDisplay[item.value.case_status.ToString()] : "(blank)",
 
-                            StateDatabase = Model.StateDatabase,
-
-                            Role = Model.Role
+                            StateDatabase = effectiveStateDatabase,
+                            is_cdc_admin = isCdcAdmin,
+                            Role = effectiveRole
                         };
 
                         model.CaseStatusDetail.Add(x);
@@ -159,18 +138,56 @@ public sealed class clear_case_statusController : Controller
 
         return View(model);
     }
-
-    public IActionResult ConfirmClearCaseStatusRequest(mmria.server.model.casestatus.CaseStatusDetail Model)
+    [HttpPost]
+    public IActionResult ConfirmClearCaseStatusRequest(
+        [Bind(
+            nameof(mmria.server.model.casestatus.CaseStatusDetail._id) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.RecordId) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.FirstName) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.LastName) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.MiddleName) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.DateOfDeath) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.StateOfDeath) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.LastUpdatedBy) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.DateLastUpdated) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.CaseStatus) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.CaseStatusDisplay) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.StateDatabase))]
+        mmria.server.model.casestatus.CaseStatusDetail Model)
     {
-        var model = Model;
+        var model = Model ?? new mmria.server.model.casestatus.CaseStatusDetail();
+        model.is_cdc_admin = AuthorizedWorkflowScopeHelper.IsCdcAdmin(User);
+        model.Role = model.is_cdc_admin ? "cdc_admin" : "jurisdiction_admin";
+        model.StateDatabase = AuthorizedWorkflowScopeHelper.ResolveAuthorizedStateDatabase(User, model.StateDatabase, host_prefix, _dbConfigSet);
 
         return View(model);
     }
 
-    
-    public async Task<IActionResult> ClearCaseStatus(mmria.server.model.casestatus.CaseStatusDetail Model)
+    [HttpPost]
+    public async Task<IActionResult> ClearCaseStatus(
+        [Bind(
+            nameof(mmria.server.model.casestatus.CaseStatusDetail._id) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.RecordId) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.FirstName) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.LastName) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.MiddleName) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.DateOfDeath) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.StateOfDeath) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.LastUpdatedBy) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.DateLastUpdated) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.CaseStatus) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.CaseStatusDisplay) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.StateDatabase))]
+        mmria.server.model.casestatus.CaseStatusDetail Model)
     {
-        var model = Model;
+        var model = Model ?? new mmria.server.model.casestatus.CaseStatusDetail();
+        var isCdcAdmin = AuthorizedWorkflowScopeHelper.IsCdcAdmin(User);
+        var effectiveRole = isCdcAdmin ? "cdc_admin" : "jurisdiction_admin";
+        var effectiveStateDatabase = AuthorizedWorkflowScopeHelper.ResolveAuthorizedStateDatabase(User, model.StateDatabase, host_prefix, _dbConfigSet);
+        var effectiveDbConfig = AuthorizedWorkflowScopeHelper.ResolveAuthorizedDbConfig(User, model.StateDatabase, host_prefix, db_config, _dbConfigSet);
+        model.is_cdc_admin = isCdcAdmin;
+        model.Role = effectiveRole;
+        model.StateDatabase = effectiveStateDatabase;
 
         try
         {
@@ -184,93 +201,17 @@ public sealed class clear_case_statusController : Controller
             }
 
 
-            string responseFromServer = null;
-            if(Model.Role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase))
+            var (ok, oldCaseStatus, errorMessage) = await _manager.ClearCaseStatusAsync(effectiveDbConfig, model._id, userName);
+
+            if (ok)
             {
-        
-                var db_info = _dbConfigSet.detail_list[Model.StateDatabase];
-                string request_string = $"{db_info.url}/{db_info.prefix}mmrds/{Model._id}";
-                responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_info.user_name, db_info.user_value);
+                model.CaseStatusDisplay = "(blank)";
+                model.LastUpdatedBy = userName;
+                model.DateLastUpdated = DateTime.Now;
             }
             else
             {
-                
-                string request_string = $"{db_config.url}/{db_config.prefix}mmrds/{Model._id}";
-                responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
-            }
-            var case_response = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(responseFromServer);
-
-            
-            var dictionary = case_response as IDictionary<string,object>;
-            if(dictionary != null)
-            {
-                var home_record = dictionary["home_record"] as IDictionary<string,object>;
-                if(home_record != null)
-                {
-                    var case_status = home_record["case_status"] as IDictionary<string,object>;
-                    if(case_status != null)
-                    {
-                        case_status["overall_case_status"] = 9999;
-                        case_status["case_locked_date"] = "";
-
-                        dictionary["last_updated_by"] = userName;
-                        dictionary["date_last_updated"] = DateTime.Now;
-
-                        Model.LastUpdatedBy = userName;
-                        Model.DateLastUpdated = (DateTime) dictionary["date_last_updated"];
-
-
-                        Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-                        settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-                        var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(case_response, settings);
-
-                        string put_request_string = "";
-
-                        if(Model.Role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase))
-                        {
-                            var db_info = _dbConfigSet.detail_list[Model.StateDatabase];
-                            put_request_string = $"{db_info.url}/{db_info.prefix}mmrds/{Model._id}";
-                        }
-                        else
-                        {
-                            put_request_string = $"{db_config.url}/{db_config.prefix}mmrds/{Model._id}";
-                        }
-
-                        var document_put_response = new mmria.common.model.couchdb.document_put_response();
-                        try
-                        {
-                            responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", put_request_string, object_string, 
-                                Model.Role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase) ? _dbConfigSet.detail_list[Model.StateDatabase].user_name : db_config.user_name,
-                                Model.Role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase) ? _dbConfigSet.detail_list[Model.StateDatabase].user_value : db_config.user_value);
-                            document_put_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
-                        }
-                        catch(Exception ex)
-                        {
-                            model.CaseStatusDisplay = $"Problem Setting Status to (blank)\n{ex}";
-                        }
-
-                        if(document_put_response.ok)
-                        {
-                            model.CaseStatusDisplay = "(blank)";
-                        }
-                        else
-                        {
-                            model.CaseStatusDisplay = "Problem Setting Status to (blank)";
-                        }
-                    }
-                    else
-                    {
-                        model.CaseStatusDisplay = "Problem Setting Status to (blank)";
-                    }   
-                }
-                else
-                {
-                    model.CaseStatusDisplay = "Problem Setting Status to (blank)";
-                }
-            }
-            else
-            {
-                model.CaseStatusDisplay = "Problem Setting Status to (blank)";
+                model.CaseStatusDisplay = errorMessage ?? "Problem Setting Status to (blank)";
             }
             
         }

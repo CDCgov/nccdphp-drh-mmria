@@ -6,8 +6,10 @@ using Serilog;
 using Serilog.Configuration;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
+using mmria.common.utils;
 
 using  mmria.server.extension; 
+using mmria.server.util;
 namespace mmria.server;
 
 [Authorize(Policy = "form_designer")]
@@ -15,27 +17,21 @@ namespace mmria.server;
 public sealed class ui_specificationController: ControllerBase 
 { 
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.SharedLibraries.MetadataVersion.Manager.MetadataVersionManager _metadataVersionManager;
     public ui_specificationController
     (
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.common.SharedLibraries.MetadataVersion.Manager.MetadataVersionManager metadataVersionManager
     )
     {
         _metadataVersionManager = metadataVersionManager;
-        configuration = _configuration;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
     }
 
 
@@ -86,11 +82,12 @@ public sealed class ui_specificationController: ControllerBase
     [HttpPost]
     public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post
     (
-        [FromBody] mmria.common.metadata.UI_Specification ui_specification
+        string id = null
     ) 
     { 
-        string ui_specification_json;
         mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response ();
+        var ui_specification = await JsonRequestBodyReader.ReadAsync<mmria.common.metadata.UI_Specification>(Request);
+        var sanitizedUiSpecification = DocumentPayloadCloneHelper.CloneUiSpecification(ui_specification, GetCurrentUserName());
 
         try
         {
@@ -98,17 +95,27 @@ public sealed class ui_specificationController: ControllerBase
 
             if
             (
-                ui_specification.data_type == null ||
-                ui_specification.data_type != "ui-specification" || 
-                ui_specification._id == "2016-06-12T13:49:24.759Z" ||
-                ui_specification._id == "de-identified-list"
+                sanitizedUiSpecification == null ||
+                sanitizedUiSpecification.data_type == null ||
+                sanitizedUiSpecification.data_type != "ui-specification" || 
+                sanitizedUiSpecification._id == "2016-06-12T13:49:24.759Z" ||
+                sanitizedUiSpecification._id == "de-identified-list"
 
             )
             {
                 return null;
             }
 
-            result = await _metadataVersionManager.SaveUiSpecificationAsync(ui_specification, db_config);
+            result = await _metadataVersionManager.SaveUiSpecificationAsync(sanitizedUiSpecification, db_config);
+            if (result == null || !result.ok)
+            {
+                var revisionHandling = CouchDbRevisionHelper.DescribeRevisionHandling(ui_specification?._rev, null);
+                Log.Information(
+                    "ui_specification save failed for {DocumentId}. rev={RevisionHandling}; response={Response}",
+                    sanitizedUiSpecification._id,
+                    revisionHandling,
+                    result?.error_description);
+            }
 
 
             if (!result.ok) 
@@ -124,6 +131,20 @@ public sealed class ui_specificationController: ControllerBase
             
         return result;
     } 
+
+    private string GetCurrentUserName()
+    {
+        if (User?.Identities?.Any(u => u.IsAuthenticated) == true)
+        {
+            return User.Identities.First(
+                u => u.IsAuthenticated &&
+                u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name))
+                .FindFirst(System.Security.Claims.ClaimTypes.Name)
+                .Value;
+        }
+
+        return null;
+    }
 
 
     [Route("{_id?}")]

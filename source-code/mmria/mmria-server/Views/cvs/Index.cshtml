@@ -1,6 +1,8 @@
 @model mmria.server.Controllers.CvsController.CVS_View_Model
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @using System.Security.Claims;
 @{
+    var antiforgeryTokens = Antiforgery.GetAndStoreTokens(Context);
 
 
     var lat = Model.lat == null || Model.lat == "null" ? "": Model.lat;
@@ -16,11 +18,15 @@
         u => u.IsAuthenticated && 
         u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
   }
+
+  var cvs_max_attempts = TempData["CVS_MAX_ATTEMPTS"] ?? 10;
+  var cvs_retry_delay_seconds = TempData["CVS_RETRY_DELAY_SECONDS"] ?? 60;
 }
 
 <html lang="en">
     <head>
     <link rel="stylesheet" href="../styles/cdc.app.css" />
+    <meta name="request-verification-token" content="@antiforgeryTokens.RequestToken">
     <!-- link href="../styles/d3/c3/0.7.20/c3.min.css" type="text/css" rel="stylesheet"-->
 
     <script src="/TemplatePackage/4.0/assets/vendor/js/jquery.min.js"></script>
@@ -36,6 +42,10 @@
 
     <script src="../scripts/mmria.js" type="text/javascript"></script>
 
+    <script>
+        window.CVS_MAX_ATTEMPTS = @cvs_max_attempts;
+        window.CVS_RETRY_DELAY_SECONDS = @cvs_retry_delay_seconds;
+    </script>
     <script src="../scripts/cvs/index.js" type="text/javascript"></script>
 
 </head>

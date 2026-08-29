@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
+using mmria.common.utils;
 
 using  mmria.server.extension;
 namespace mmria.server;
@@ -18,27 +19,21 @@ public sealed class sessionController: ControllerBase
 {
 
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.SharedLibraries.Session.Manager.SessionManager _sessionManager;
     public sessionController
     (
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.common.SharedLibraries.Session.Manager.SessionManager sessionManager
     )
     {
         _sessionManager = sessionManager;
-        configuration = _configuration;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
     }
 
     [Route("list")]
@@ -84,21 +79,109 @@ public sealed class sessionController: ControllerBase
 
     [HttpPut]
     [HttpPost]
-    public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post
-    (
-        [FromBody] session Post_Request
+    public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post()
+    {
+        var postRequest = await mmria.server.util.JsonRequestBodyReader.ReadAsync<session>(Request);
 
-    ) 
-    { 
+        var sanitizedSession = await CreateSanitizedSessionAsync(postRequest);
+        if (sanitizedSession == null)
+        {
+            return null;
+        }
 
         try
         {
-            await _sessionManager.PostSessionDocumentAsync(Post_Request, User, db_config);
+            var result = await _sessionManager.PostSessionDocumentAsync(sanitizedSession, User, db_config);
+            if (result == null || !result.ok)
+            {
+                var revisionHandling = CouchDbRevisionHelper.DescribeRevisionHandling(postRequest?._rev, sanitizedSession._rev);
+                Console.WriteLine(
+                    $"Session save failed for {sanitizedSession._id}: rev={revisionHandling}; response={result?.error_description}");
+            }
         }
         catch(Exception ex)
         {
             Console.WriteLine (ex);
         } 
+
+        return null;
+    }
+
+    private async System.Threading.Tasks.Task<session> CreateSanitizedSessionAsync(session request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request._id))
+        {
+            return null;
+        }
+
+        var sessionId = request._id.Trim();
+        session existingSession = null;
+
+        try
+        {
+            existingSession = await _sessionManager.GetSessionDocumentAsync(sessionId, db_config);
+        }
+        catch
+        {
+            // Missing sessions are treated as creates.
+        }
+
+        var userName = GetCurrentUserName();
+        var remoteIp = HttpContext?.Connection?.RemoteIpAddress?.ToString();
+
+        var sanitizedSession = existingSession ?? new session();
+        sanitizedSession._id = sessionId;
+        sanitizedSession._rev = CouchDbRevisionHelper.ResolveServerOwnedRevision(request._rev, existingSession?._rev);
+        sanitizedSession.data_type = "session";
+        sanitizedSession.date_created =
+            existingSession?.date_created ??
+            (request.date_created == default ? DateTime.UtcNow : request.date_created);
+        sanitizedSession.date_last_updated = DateTime.UtcNow;
+        sanitizedSession.date_expired = request.date_expired;
+        sanitizedSession.is_active = request.is_active;
+        sanitizedSession.user_id = !string.IsNullOrWhiteSpace(existingSession?.user_id) ? existingSession.user_id : userName;
+        sanitizedSession.ip = !string.IsNullOrWhiteSpace(remoteIp) ? remoteIp : existingSession?.ip;
+        sanitizedSession.session_event_id = !string.IsNullOrWhiteSpace(existingSession?.session_event_id)
+            ? existingSession.session_event_id
+            : request.session_event_id;
+        sanitizedSession.data = CloneSessionData(request.data, existingSession?.data);
+
+        return sanitizedSession;
+    }
+
+    private static Dictionary<string, string> CloneSessionData(
+        Dictionary<string, string> requestData,
+        Dictionary<string, string> existingData)
+    {
+        var source = requestData ?? existingData;
+        var result = new Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase);
+
+        if (source == null)
+        {
+            return result;
+        }
+
+        foreach (var kvp in source)
+        {
+            if (!string.IsNullOrWhiteSpace(kvp.Key))
+            {
+                result[kvp.Key] = kvp.Value;
+            }
+        }
+
+        return result;
+    }
+
+    private string GetCurrentUserName()
+    {
+        if (User?.Identities?.Any(u => u.IsAuthenticated) == true)
+        {
+            return User.Identities.First(
+                u => u.IsAuthenticated &&
+                u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name))
+                .FindFirst(System.Security.Claims.ClaimTypes.Name)
+                .Value;
+        }
 
         return null;
     }

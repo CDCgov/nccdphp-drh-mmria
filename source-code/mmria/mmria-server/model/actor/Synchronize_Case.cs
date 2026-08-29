@@ -5,6 +5,8 @@ using System.Collections.Generic;
 using System.Linq;
 using Akka.Actor;
 using mmria.server.model.actor;
+using mmria.common.SharedLibraries.DeIdentified;
+using mmria.common.SharedLibraries.Report;
 
 namespace mmria.server.model.actor;
 public sealed class Sync_Document_Message
@@ -54,19 +56,25 @@ public sealed class Synchronize_Case : UntypedActor
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly mmria.common.couchdb.OverridableConfiguration _configuration;
     private readonly string _host_prefix;
+    private readonly IDeIdentifiedRepository _deIdentifiedRepository;
+    private readonly IReportRepository _reportRepository;
 
     public Synchronize_Case
     (
         mmria.common.couchdb.DBConfigurationDetail _db_config,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
         mmria.common.couchdb.OverridableConfiguration configuration = null,
-        string host_prefix = null
+        string host_prefix = null,
+        IDeIdentifiedRepository deIdentifiedRepository = null,
+        IReportRepository reportRepository = null
     )
     {
         db_config = _db_config;
         _couchDbHttpClient = couchDbHttpClient;
         _configuration = configuration;
         _host_prefix = host_prefix;
+        _deIdentifiedRepository = deIdentifiedRepository;
+        _reportRepository = reportRepository;
     }
     protected override void OnReceive(object message)
     {
@@ -84,8 +92,10 @@ public sealed class Synchronize_Case : UntypedActor
                 sync_document_message.metadata_version,
                 db_config,
                 _couchDbHttpClient,
-                _configuration,
-                _host_prefix
+                deIdentifiedRepository: _deIdentifiedRepository,
+                reportRepository: _reportRepository,
+                configuration: _configuration,
+                host_prefix: _host_prefix
             );
 
             try
@@ -100,20 +110,36 @@ public sealed class Synchronize_Case : UntypedActor
             break;
 
             case Sync_All_Documents_Message sync_all_documents_message:
+                if(_configuration == null || string.IsNullOrWhiteSpace(_host_prefix))
+                {
+                    Console.WriteLine("Synchronize_Case received Sync_All_Documents_Message without rebuild service configuration. Skipping local full rebuild.");
+                    break;
+                }
 
-                mmria.server.utils.c_document_sync_all sync_all = new mmria.server.utils.c_document_sync_all 
-                (
-                    db_config.url,
-                    db_config.user_name,
-                    db_config.user_value,
-                    sync_all_documents_message.metadata_version,
-                    db_config,
+                string rebuildServiceUrl = mmria.common.SharedLibraries.MMRIARebuild.Manager.MMRIARebuildManager.BuildServiceUrl(
+                    _configuration.GetString("vitals_url", _host_prefix));
+                string vitalServiceKey = _configuration.GetString("vital_service_key", _host_prefix);
+
+                if(string.IsNullOrWhiteSpace(rebuildServiceUrl) || string.IsNullOrWhiteSpace(vitalServiceKey))
+                {
+                    Console.WriteLine($"Synchronize_Case could not resolve rebuild service configuration for tenant '{_host_prefix}'.");
+                    break;
+                }
+
+                var rebuildManager = new mmria.common.SharedLibraries.MMRIARebuild.Manager.MMRIARebuildManager(
+                    new mmria.common.SharedLibraries.MMRIARebuild.DAL.MMRIARebuildDAL(_couchDbHttpClient),
                     _couchDbHttpClient,
-                    _configuration,
-                    _host_prefix
-                );
+                    mmria.server.Program.configuration,
+                    new System.Collections.Generic.List<mmria.common.couchdb.ConfigurationSet>());
 
-                _ = sync_all.executeAsync ();
+                _ = rebuildManager.QueueRebuildOnServiceAsync(
+                    new mmria.common.SharedLibraries.MMRIARebuild.Model.MMRIARebuildRequest
+                    {
+                        tenant = _host_prefix,
+                        source = "manual"
+                    },
+                    rebuildServiceUrl,
+                    vitalServiceKey);
 
             break;
         }

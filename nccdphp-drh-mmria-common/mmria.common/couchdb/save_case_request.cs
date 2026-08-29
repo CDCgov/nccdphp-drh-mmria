@@ -61,6 +61,9 @@ public sealed class Change_Stack
 
     public string note {get;set;}
 
+    public string old_value {get;set;}
+    public string new_value {get;set;}
+
     public string metadata_version {get;set;}
 
     public DateTime? date_created {get;set;}

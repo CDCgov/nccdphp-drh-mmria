@@ -1,6 +1,9 @@
 #if IS_PMSS_ENHANCED
 using System;
 using System.Collections.Generic;
+using mmria.common.SharedLibraries.DeIdentified;
+using mmria.common.SharedLibraries.Report;
+using Newtonsoft.Json.Linq;
 
 
 namespace mmria.pmss.server.utils;
@@ -16,6 +19,8 @@ public sealed class c_sync_document
 
     mmria.common.couchdb.DBConfigurationDetail db_config = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IDeIdentifiedRepository _deIdentifiedRepository;
+    private readonly IReportRepository _reportRepository;
 
     public c_sync_document 
     (
@@ -24,7 +29,9 @@ public sealed class c_sync_document
         string p_method,
         string p_metadata_version,
         mmria.common.couchdb.DBConfigurationDetail _db_config,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        IDeIdentifiedRepository deIdentifiedRepository,
+        IReportRepository reportRepository
     )
     {
         this.document_json = p_document_json;
@@ -32,6 +39,8 @@ public sealed class c_sync_document
         metadata_version = p_metadata_version;
         db_config = _db_config;
         _couchDbHttpClient = couchDbHttpClient;
+        _deIdentifiedRepository = deIdentifiedRepository;
+        _reportRepository = reportRepository;
 
         switch (p_method.ToUpperInvariant ())
         {
@@ -101,19 +110,11 @@ public sealed class c_sync_document
     public async System.Threading.Tasks.Task executeAsync()
     {
 
-        string de_identified_revision = await get_revision (db_config.url + $"/{db_config.prefix}de_id/" + this.document_id);
-        System.Text.StringBuilder de_identfied_url = new System.Text.StringBuilder();
+        string de_identified_revision = await _deIdentifiedRepository.GetRevisionAsync(this.document_id, db_config);
         string de_identified_json = null;
-
-        de_identfied_url.Append(db_config.url);
-        de_identfied_url.Append($"/{db_config.prefix}de_id/");
-        de_identfied_url.Append(this.document_id);
 
         if(this.method == "DELETE")
         {
-            de_identfied_url.Append("?rev=");
-            de_identfied_url.Append(de_identified_revision);	
-
         }
         else
         {
@@ -174,10 +175,14 @@ public sealed class c_sync_document
 
         try
         {
-            string de_id_result = await _couchDbHttpClient.ExecuteAsync(this.method, de_identfied_url.ToString(), de_identified_json, db_config.user_name, db_config.user_value);
-            System.Console.WriteLine("sync de_id");
-            System.Console.WriteLine(de_id_result);
-
+            if(this.method == "DELETE")
+            {
+                await _deIdentifiedRepository.DeleteDocumentAsync(this.document_id, de_identified_revision, db_config);
+            }
+            else if(!string.IsNullOrEmpty(de_identified_json))
+            {
+                await _deIdentifiedRepository.UpsertDocumentAsync(this.document_id, JObject.Parse(de_identified_json), db_config);
+            }
         }
         catch (Exception)
         {
@@ -193,15 +198,13 @@ public sealed class c_sync_document
             if(!string.IsNullOrWhiteSpace(freq_detail_report_json))
             {
                 var freq_id = "freq-" + this.document_id;
-                string current_detail_revision = await get_revision (db_config.url + $"/{db_config.prefix}report/" + freq_id);
+                string current_detail_revision = await _reportRepository.GetRevisionAsync(freq_id, db_config);
 
 
                 var dqr_report_expando_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (freq_detail_report_json);
                 var byName = (IDictionary<string,object>)dqr_report_expando_object;
                 byName["_id"] = freq_id;
                 freq_detail_report_json =  Newtonsoft.Json.JsonConvert.SerializeObject(dqr_report_expando_object);
-                
-                System.Text.StringBuilder freq_detail_url = new System.Text.StringBuilder();
 
                 if(!string.IsNullOrEmpty(current_detail_revision))
                 {
@@ -213,20 +216,14 @@ public sealed class c_sync_document
                     freq_detail_report_json =  Newtonsoft.Json.JsonConvert.SerializeObject(dqr_report_expando_object);
                 }
 
-
-                freq_detail_url.Append(db_config.url);
-                freq_detail_url.Append($"/{db_config.prefix}report/");
-                freq_detail_url.Append(freq_id);
-    
                 if(this.method == "DELETE")
                 {
-                    freq_detail_url.Append("?rev=");
-                    freq_detail_url.Append(current_detail_revision);	
+                    await _reportRepository.DeleteDocumentAsync(freq_id, current_detail_revision, db_config);
                 }
-
-                string freq_detail_result = await _couchDbHttpClient.ExecuteAsync(this.method, freq_detail_url.ToString(), freq_detail_report_json, db_config.user_name, db_config.user_value);
-                System.Console.WriteLine("c_sync_document freq detail");
-                System.Console.WriteLine(freq_detail_result);
+                else
+                {
+                    await _reportRepository.UpsertDocumentAsync(freq_id, JObject.Parse(freq_detail_report_json), db_config);
+                }
             }
 
         }
@@ -262,9 +259,7 @@ public sealed class c_sync_document
                 aggregate_url.Append(aggregate_revision);	
             }
 
-            string aggregate_result = await _couchDbHttpClient.ExecuteAsync(this.method, aggregate_url.ToString(), aggregate_json, db_config.user_name, db_config.user_value);
-            System.Console.WriteLine("c_sync_document aggregate_id");
-            System.Console.WriteLine(aggregate_result);
+            await _couchDbHttpClient.ExecuteAsync(this.method, aggregate_url.ToString(), aggregate_json, db_config.user_name, db_config.user_value);
 
         }
         catch (Exception)
@@ -308,10 +303,7 @@ public sealed class c_sync_document
                     opioid_aggregate_url.Append(aggregate_revision);	
                 }
 
-                string aggregate_result = await _couchDbHttpClient.ExecuteAsync(this.method, opioid_aggregate_url.ToString(), opioid_report_json, db_config.user_name, db_config.user_value);
-
-                System.Console.WriteLine("c_sync_document aggregate_id");
-                System.Console.WriteLine(aggregate_result);
+                await _couchDbHttpClient.ExecuteAsync(this.method, opioid_aggregate_url.ToString(), opioid_report_json, db_config.user_name, db_config.user_value);
             }
 
         }
@@ -354,10 +346,7 @@ public sealed class c_sync_document
                     opioid_aggregate_url.Append(aggregate_revision);	
                 }
 
-                string aggregate_result = await _couchDbHttpClient.ExecuteAsync(this.method, opioid_aggregate_url.ToString(), opioid_report_json, db_config.user_name, db_config.user_value);
-
-                System.Console.WriteLine("c_sync_document aggregate_id");
-                System.Console.WriteLine(aggregate_result);
+                await _couchDbHttpClient.ExecuteAsync(this.method, opioid_aggregate_url.ToString(), opioid_report_json, db_config.user_name, db_config.user_value);
             }
 
         }
@@ -406,9 +395,7 @@ public sealed class c_sync_document
                     dqr_detail_url.Append(current_detail_revision);	
                 }
 
-                string dqr_detail_result = await _couchDbHttpClient.ExecuteAsync(this.method, dqr_detail_url.ToString(), dqr_detail_report_json, db_config.user_name, db_config.user_value);
-                System.Console.WriteLine("c_sync_document dqr detail");
-                System.Console.WriteLine(dqr_detail_result);
+                await _couchDbHttpClient.ExecuteAsync(this.method, dqr_detail_url.ToString(), dqr_detail_report_json, db_config.user_name, db_config.user_value);
             }
 
         }

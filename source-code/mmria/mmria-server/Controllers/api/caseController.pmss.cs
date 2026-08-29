@@ -23,11 +23,10 @@ public sealed class caseController: ControllerBase
     ActorSystem _actorSystem;	
 
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.Audit.IAuditRepository _auditRepository;
 
     private readonly IAuthorizationService _authorizationService;
     //private readonly IDocumentRepository _documentRepository;
@@ -35,24 +34,23 @@ public sealed class caseController: ControllerBase
     public caseController
     ( 
         IHttpContextAccessor httpContextAccessor,
-        mmria.common.couchdb.OverridableConfiguration p_configuration, 
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
         ActorSystem actorSystem, 
         IAuthorizationService authorizationService,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.Audit.IAuditRepository auditRepository
     )
     {
         _actorSystem = actorSystem;
         _authorizationService = authorizationService;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
         _couchDbHttpClient = couchDbHttpClient;
+        _auditRepository = auditRepository;
 
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
 
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, p_configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, p_configuration, host_prefix);
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
     }
     
     [Authorize(Roles  = "abstractor, data_analyst, committee_member, vro")]
@@ -90,7 +88,7 @@ public sealed class caseController: ControllerBase
                 
                 
 
-                if(mmria.pmss.server.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.pmss.server.utils.ResourceRightEnum.ReadCase, result))
+                if(mmria.pmss.server.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.pmss.server.utils.ResourceRightEnum.ReadCase, result, _couchDbHttpClient))
                 {
                     return result;
                 }
@@ -188,7 +186,7 @@ public sealed class caseController: ControllerBase
             pmssno = case_post_request.tracking.admin_info.pmssno;
             
 
-            if(!mmria.pmss.server.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.pmss.server.utils.ResourceRightEnum.WriteCase, case_post_request.tracking.admin_info.case_folder))
+            if(!mmria.pmss.server.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.pmss.server.utils.ResourceRightEnum.WriteCase, case_post_request.tracking.admin_info.case_folder, _couchDbHttpClient))
             {
                 result.error_description = $"unauthorized PUT {case_post_request.tracking.admin_info.jurisdiction}: {case_post_request._id}";
                 Console.Write($"unauthorized PUT {case_post_request.tracking.admin_info.jurisdiction}: {case_post_request._id}");
@@ -210,7 +208,7 @@ public sealed class caseController: ControllerBase
 
                 if
                 (
-                    !mmria.pmss.server.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.pmss.server.utils.ResourceRightEnum.WriteCase, case_object)
+                    !mmria.pmss.server.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.pmss.server.utils.ResourceRightEnum.WriteCase, case_object, _couchDbHttpClient)
                 )
                 {
                     result.error_description = $"unauthorized PUT: {case_object._id}";
@@ -261,24 +259,13 @@ public sealed class caseController: ControllerBase
             audit_data.record_id = pmssno;
             audit_data.metadata_version = configuration.GetString("metadata_version", host_prefix);
 
-            var audit_string = Newtonsoft.Json.JsonConvert.SerializeObject(audit_data, settings);
-
-            string audit_url = db_config.Get_Prefix_DB_Url($"audit/{audit_data._id}");
             try
             {
-                string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                    "PUT",
-                    audit_url,
-                    audit_string,
-                    db_config.user_name,
-                    db_config.user_value
-                );
-                var audit_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
+                await _auditRepository.WriteAuditEntryAsync(audit_data, db_config);
             }
             catch(Exception ex)
             {
                 Console.Write("problem saving audit\n{0}", ex);
-
             }
 
             var Sync_Document_Message = new mmria.pmss.server.model.actor.Sync_Document_Message
@@ -292,7 +279,6 @@ public sealed class caseController: ControllerBase
             _actorSystem.ActorOf(Props.Create<mmria.pmss.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient)).Tell(Sync_Document_Message);
     
             /*
-                    List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
                     mmria.common.getset.CouchDbHttpClient couchDbHttpClient
             case_sync_actor.Tell(Sync_Document_Message);
             */
@@ -355,7 +341,7 @@ public sealed class caseController: ControllerBase
                 
                 if
                 (
-                    !mmria.pmss.server.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.pmss.server.utils.ResourceRightEnum.WriteCase, mmria_case)
+                    !mmria.pmss.server.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.pmss.server.utils.ResourceRightEnum.WriteCase, mmria_case, _couchDbHttpClient)
                 )
                 {
                     Console.Write($"unauthorized DELETE {mmria_case.tracking.admin_info.jurisdiction}: {mmria_case._id}");
@@ -413,31 +399,14 @@ public sealed class caseController: ControllerBase
                 date_created = DateTime.UtcNow,
             };
 
-            Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-            settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
- 
-
-            var audit_string = Newtonsoft.Json.JsonConvert.SerializeObject(audit_data, settings);
-
             try
             {
-                string audit_url = db_config.Get_Prefix_DB_Url($"audit/{audit_data._id}");
-                string save_delete_audit_response = await _couchDbHttpClient.ExecuteAsync(
-                    "PUT",
-                    audit_url,
-                    audit_string,
-                    db_config.user_name,
-                    db_config.user_value
-                );
-                var audit_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(save_delete_audit_response);
+                await _auditRepository.WriteAuditEntryAsync(audit_data, db_config);
             }
             catch(Exception ex)
             {
                 Console.Write("problem saving audit\n{0}", ex);
-
             }
-
-
 
             if(! string.IsNullOrWhiteSpace(document_json))
             {

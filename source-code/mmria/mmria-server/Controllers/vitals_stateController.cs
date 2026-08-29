@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 
 using Microsoft.AspNetCore.Authorization;
 using mmria.server.model;
@@ -13,15 +14,23 @@ namespace VitalsImport_FileUpload.Controllers;
 public sealed class vitals_stateController : Controller
 {
     private readonly ILogger<vitalsController> _logger;
+    private readonly IConfiguration _appConfiguration;
 
-    public vitals_stateController(ILogger<vitalsController> logger)
+    public vitals_stateController(ILogger<vitalsController> logger, IConfiguration appConfiguration)
     {
         _logger = logger;
+        _appConfiguration = appConfiguration;
+    }
+
+    private void PopulateVitalsUploadViewData()
+    {
+        TempData["vitals_import_additional_tenants"] = _appConfiguration["mmria_settings:vitals_import_additional_tenants"] ?? string.Empty;
     }
 
     
     public IActionResult Index()
     {
+        PopulateVitalsUploadViewData();
         var model = new FileUploadModel();
         return View(model);
     }
@@ -29,6 +38,7 @@ public sealed class vitals_stateController : Controller
     [HttpGet]
     public IActionResult FileUpload()
     {
+        PopulateVitalsUploadViewData();
         var model = new FileUploadModel();
         return View(model);
     }

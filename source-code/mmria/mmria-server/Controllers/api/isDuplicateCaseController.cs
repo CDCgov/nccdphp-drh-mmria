@@ -34,8 +34,6 @@ public sealed class isDuplicateCaseController: ControllerBase
 { 
     ActorSystem _actorSystem;
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
@@ -43,26 +41,28 @@ public sealed class isDuplicateCaseController: ControllerBase
     (
         ActorSystem actorSystem, 
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         _actorSystem = actorSystem;
-        configuration = _configuration;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
         _couchDbHttpClient = couchDbHttpClient;
     }
     
     
     [HttpPost]
-    public async Task<bool> Post([FromBody] IsDuplicateCaseRequest DuplicateCaseRequest) 
-    { 
+    public async Task<bool> Post()
+    {
+        var DuplicateCaseRequest = await mmria.server.util.JsonRequestBodyReader.ReadAsync<IsDuplicateCaseRequest>(Request);
+        var safeRequest = CreateSanitizedDuplicateCaseRequest(DuplicateCaseRequest);
+        if (safeRequest == null)
+        {
+            return false;
+        }
 
         var caseViewManager = new mmria.common.SharedLibraries.CaseView.CaseViewManager(
             db_config,
@@ -73,14 +73,37 @@ public sealed class isDuplicateCaseController: ControllerBase
         );
 
         return await caseViewManager.IsDuplicateCaseAsync(
-            DuplicateCaseRequest.FirstName,
-            DuplicateCaseRequest.LastName,
-            DuplicateCaseRequest.MonthOfDeath,
-            DuplicateCaseRequest.DayOfDeath,
-            DuplicateCaseRequest.YearOfDeath,
-            DuplicateCaseRequest.StateOfDeath
+            safeRequest.FirstName,
+            safeRequest.LastName,
+            safeRequest.MonthOfDeath,
+            safeRequest.DayOfDeath,
+            safeRequest.YearOfDeath,
+            safeRequest.StateOfDeath
         );
     } 
+
+    private static IsDuplicateCaseRequest CreateSanitizedDuplicateCaseRequest(IsDuplicateCaseRequest request)
+    {
+        if (request == null)
+        {
+            return null;
+        }
+
+        return new IsDuplicateCaseRequest
+        {
+            FirstName = NormalizeOptionalString(request.FirstName),
+            LastName = NormalizeOptionalString(request.LastName),
+            MonthOfDeath = request.MonthOfDeath,
+            DayOfDeath = request.DayOfDeath,
+            YearOfDeath = request.YearOfDeath,
+            StateOfDeath = NormalizeOptionalString(request.StateOfDeath)
+        };
+    }
+
+    private static string NormalizeOptionalString(string value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
 } 
 
 

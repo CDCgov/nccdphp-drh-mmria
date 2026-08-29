@@ -49,6 +49,8 @@ public sealed class CaseViewSearch
     bool is_include_pinned_cases = false;
     mmria.pmss.server.utils.ResourceRightEnum ResourceRight;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.Jurisdiction.IJurisdictionRepository _jurisdictionRepository;
+    private readonly mmria.common.SharedLibraries.Case.ICaseRepository _caseRepository;
 
     public CaseViewSearch
     (
@@ -56,7 +58,9 @@ public sealed class CaseViewSearch
         System.Security.Claims.ClaimsPrincipal p_user, 
         bool p_is_case_identified_data = false,
         bool p_include_pinned_cases = false,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient = null
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient = null,
+        mmria.common.SharedLibraries.Jurisdiction.IJurisdictionRepository jurisdictionRepository = null,
+        mmria.common.SharedLibraries.Case.ICaseRepository caseRepository = null
     )
     {
         db_config = p_configuration;
@@ -65,6 +69,8 @@ public sealed class CaseViewSearch
         is_case_identified_data = p_is_case_identified_data;
         is_include_pinned_cases = p_include_pinned_cases;
         _couchDbHttpClient = couchDbHttpClient;
+        _jurisdictionRepository = jurisdictionRepository;
+        _caseRepository = caseRepository;
 
         if(is_case_identified_data)
         {
@@ -1824,7 +1830,7 @@ last_checked_out_by
 
     is_valid_predicate create_predicate_by_vro_role(HashSet<(string jurisdiction, mmria.pmss.server.utils.ResourceRightEnum ResourceRight)> ctx)
     {
-        var jurisdiction_hashset = mmria.pmss.server.utils.authorization.get_current_user_role_jurisdiction_set_for(db_config, User.Identity.Name);
+        var jurisdiction_hashset = mmria.pmss.server.utils.authorization.get_current_user_role_jurisdiction_set_for(db_config, User.Identity.Name, _couchDbHttpClient);
 
         var status_set = new HashSet<string>()
         {
@@ -1935,7 +1941,7 @@ STEVE: Pending VRO Investigation, Linkage Review Requested by CDC
     ) 
     {
 
-        var jurisdiction_hashset = mmria.pmss.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, User);
+        var jurisdiction_hashset = mmria.pmss.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, User, _couchDbHttpClient);
 
         string sort_view = sort.ToLower ();
 
@@ -1992,7 +1998,7 @@ STEVE: Pending VRO Investigation, Linkage Review Requested by CDC
             }
 
             string request_string = request_builder.ToString();
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value, "application/json");
+            string responseFromServer = await _caseRepository.GetCasesByCustomViewAsync(request_string, db_config);
 
             create_predicates
             (
@@ -2290,9 +2296,7 @@ STEVE: Pending VRO Investigation, Linkage Review Requested by CDC
 
         try
         {
-            string request_string = $"{db_config.url}/jurisdiction/pinned-case-set";
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value, "application/json");
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.pinned_case_set>(responseFromServer);
+            result = await _jurisdictionRepository.GetPinnedCaseSetAsync(db_config);
         }
         catch (Exception ex)
         {

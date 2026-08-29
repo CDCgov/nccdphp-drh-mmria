@@ -15,6 +15,8 @@ var highest_folder = null;
 const mor_max_length = 5001;
 const nat_max_length = 4001;
 const fet_max_length = 6001;
+const g_vitals_import_additional_tenants = parse_additional_tenant_csv(window.vitals_import_additional_tenants);
+const g_vitals_import_additional_tenant_set = new Set(g_vitals_import_additional_tenants);
 
 /*
 
@@ -39,6 +41,54 @@ var openFile = function (event)
     };
     reader.readAsText(input.files[0]);
 };
+
+function parse_additional_tenant_csv(value)
+{
+    const result = [];
+    const seen = new Set();
+    const csv = typeof value === "string" ? value : "";
+    const items = csv.split(",");
+
+    for (let i = 0; i < items.length; i++) 
+    {
+        const normalizedValue = items[i].trim().toLowerCase();
+
+        if (normalizedValue.length === 0 || seen.has(normalizedValue))
+        {
+            continue;
+        }
+
+        seen.add(normalizedValue);
+        result.push(normalizedValue);
+    }
+
+    return result;
+}
+
+function escape_regexp(value)
+{
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function get_file_name_suffix(file_name)
+{
+    const last_dot_index = file_name.lastIndexOf(".");
+    const file_name_without_extension = last_dot_index > -1 ? file_name.substring(0, last_dot_index) : file_name;
+    const split_on_underscore = file_name_without_extension.split("_");
+
+    return split_on_underscore[split_on_underscore.length - 1].toLowerCase();
+}
+
+function build_additional_tenant_mor_regex(additional_tenants)
+{
+    if (!additional_tenants || additional_tenants.length === 0)
+    {
+        return null;
+    }
+
+    const additional_tenant_pattern = additional_tenants.map(escape_regexp).join("|");
+    return new RegExp(`^[0-9]{4}_20[0-9]{2}_[0-2][0-9]_[0-3][0-9]_(([A-Z,a-z]{2,9})|(${additional_tenant_pattern}))\\.[mM][oO][rR]$`);
+}
 
 function readmultifiles(event, files) 
 {
@@ -137,28 +187,14 @@ async function setup_file_list()
                 is_mor = true;
                 temp[0] = item;
                 temp_contents[0] = g_content_list[i];
+                const additional_tenant_mor_regex = build_additional_tenant_mor_regex(g_vitals_import_additional_tenants);
+                const mor_file_name_suffix = get_file_name_suffix(item.name);
 
-
-                const test_tenants = ["tenant1","tenant2","tenant3","tenant4","tenant5"];
-                const qa_tenants = ["tenant1qa","tenant2qa","tenant3qa","tenant4qa","tenant5qa"];
-
-                if(test_tenants.some(t => item.name.toLowerCase().includes(t))){
-                    var patt = new RegExp("^[0-9]{4}_20[0-9]{2}_[0-2][0-9]_[0-3][0-9]_(([A-Z,a-z]{2,9})|(tenant[1-5]))\\.[mM][oO][rR]$");
-
-                    if (!patt.test(item.name.toLowerCase())) 
+                if(g_vitals_import_additional_tenant_set.has(mor_file_name_suffix) && additional_tenant_mor_regex){
+                    if (!additional_tenant_mor_regex.test(item.name.toLowerCase())) 
                     {
-                        g_validation_errors.add(`mor file name format incorrect. File name must be in ####_20##_Year_Month_Day_StateCode[2-9] or ####_20##_Year_Month_Day_TENANT[1-5] format.\n(e.g. 2021_01_01_KS.mor or 2026_2026_01_18_TENANT2.MOR)\nfound ${item.name}`);
+                        g_validation_errors.add(`mor file name format incorrect. File name must be in ####_20##_Year_Month_Day_StateCode[2-9] format or use a suffix configured in vitals_import_additional_tenants.\n(e.g. 2021_01_01_KS.mor or 2026_2026_01_18_TENANT2.MOR)\nfound ${item.name}`);
                     }
-
-                }
-                else if(qa_tenants.some(t => item.name.toLowerCase().includes(t))){
-                    var patt = new RegExp("^[0-9]{4}_20[0-9]{2}_[0-2][0-9]_[0-3][0-9]_(([A-Z,a-z]{2,9})|(tenant[1-5]qa))\\.[mM][oO][rR]$");
-
-                    if (!patt.test(item.name.toLowerCase())) 
-                    {
-                        g_validation_errors.add(`mor file name format incorrect. File name must be in ####_20##_Year_Month_Day_StateCode[2-9] or ####_20##_Year_Month_Day_TENANT[1-5] format.\n(e.g. 2021_01_01_KS.mor or 2026_2026_01_18_TENANT2.MOR)\nfound ${item.name}`);
-                    }
-
                 }                
                 else{
                     var patt = new RegExp("^[0-9]{4}_20[0-9]{2}_[0-2][0-9]_[0-3][0-9]_[A-Z,a-z]{2,9}.[mM][oO][rR]$");

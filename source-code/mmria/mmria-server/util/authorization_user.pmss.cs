@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
-
+using mmria.common.SharedLibraries.Jurisdiction.DAL;
 
 using mmria.server.utils;
 namespace mmria.pmss.server.utils;
@@ -27,50 +27,21 @@ public sealed class authorization_user
 
         var jurisdiction_hashset = mmria.pmss.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, p_claims_principal, couchDbHttpClient);
 
+        var reader = new JurisdictionAuthorizationDAL(couchDbHttpClient);
+        var userEntries = reader.GetRolesByUserIdAsync(p_user.name, db_config).GetAwaiter().GetResult();
 
-        string jurisdicion_view_url = $"{db_config.url}/{db_config.prefix}jurisdiction/_design/sortable/_view/by_user_id?{p_user.name}";
-        string jurisdicion_result_string = null;
-        try
+        foreach (var entry in userEntries)
         {
-            jurisdicion_result_string = couchDbHttpClient.ExecuteAsync("GET", jurisdicion_view_url, null, db_config.user_name, db_config.user_value, "application/json").Result;
-        }
-        catch(Exception ex)
-        {
-            System.Console.WriteLine(ex);
-            return result;
-        }
-
-        var user_role_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.user_role_jurisdiction>>(jurisdicion_result_string);
-
-        foreach(mmria.common.model.couchdb.get_sortable_view_response_item<mmria.common.model.couchdb.user_role_jurisdiction> cvi in user_role_response.rows)
-        {
-
-            //bool is_jurisdiction_ok = false;
-            foreach((string, ResourceRightEnum) jurisdiction_item in jurisdiction_hashset)
+            foreach ((string, ResourceRightEnum) jurisdiction_item in jurisdiction_hashset)
             {
                 var regex = new System.Text.RegularExpressions.Regex("^" + @jurisdiction_item.Item1);
-                if(cvi.value.jurisdiction_id == null)
-                {
-                    cvi.value.jurisdiction_id = "/";
-                }
+                string jurisdictionId = string.IsNullOrEmpty(entry.jurisdiction_id) ? "/" : entry.jurisdiction_id;
 
-                if(regex.IsMatch(cvi.value.jurisdiction_id))
+                if (regex.IsMatch(jurisdictionId))
                 {
                     return true;
                 }
             }
-
-/*
-            foreach(string jurisdiction_id in  jurisdiction_hashset)
-            {
-                var regex = new System.Text.RegularExpressions.Regex("^" + jurisdiction_id);
-                if(p_user._role_jurisdiction.jurisdiction_id != null && regex.IsMatch(p_user_role_jurisdiction.jurisdiction_id))
-                {
-                    result = true;
-                    break;
-                }
-            }
-*/
         }
 
 
@@ -85,10 +56,30 @@ public sealed class authorization_user
         mmria.common.model.couchdb.user_role_jurisdiction p_user_role_jurisdiction
     )
     {
+        return is_authorized_to_handle_jurisdiction_id(
+            db_config,
+            p_claims_principal,
+            p_resource_action,
+            p_user_role_jurisdiction,
+            CreateCompatibilityCouchDbHttpClient());
+    }
+
+    public static bool is_authorized_to_handle_jurisdiction_id
+    (
+        mmria.common.couchdb.DBConfigurationDetail db_config,
+        System.Security.Claims.ClaimsPrincipal p_claims_principal,
+        ResourceRightEnum p_resource_action, 
+        mmria.common.model.couchdb.user_role_jurisdiction p_user_role_jurisdiction,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+    )
+    {
 
         bool result = false;
 
-        var jurisdiction_hashset = mmria.pmss.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, p_claims_principal);
+        var jurisdiction_hashset = mmria.pmss.server.utils.authorization.get_current_jurisdiction_id_set_for(
+            db_config,
+            p_claims_principal,
+            couchDbHttpClient);
             
         foreach(var jurisdiction_item in  jurisdiction_hashset)
         {
@@ -107,6 +98,11 @@ public sealed class authorization_user
 
 
         return result;
+    }
+
+    private static mmria.common.getset.CouchDbHttpClient CreateCompatibilityCouchDbHttpClient()
+    {
+        return new mmria.common.getset.CouchDbHttpClient(new mmria.common.SimpleHttpClientFactory());
     }
 
 
@@ -132,60 +128,30 @@ public sealed class authorization_user
             result.Add("/");
         }
 
-        var user_name = p_claims_principal.Claims.Where(c => c.Type == ClaimTypes.Name).FirstOrDefault().Value; 
+        var user_name = p_claims_principal.Claims.Where(c => c.Type == ClaimTypes.Name).FirstOrDefault().Value;
 
-        string jurisdicion_view_url = $"{db_config.url}/{db_config.prefix}jurisdiction/_design/sortable/_view/by_user_id?{user_name}";
-        string jurisdicion_result_string = null;
-        try
-        {
-            jurisdicion_result_string = couchDbHttpClient.ExecuteAsync("GET", jurisdicion_view_url, null, db_config.user_name, db_config.user_value, "application/json").Result;
-        }
-        catch(Exception ex)
-        {
-            System.Console.WriteLine(ex);
-            return result;
-        }
-        
-        var jurisdiction_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.user_role_jurisdiction>>(jurisdicion_result_string);
-        
+        var reader = new JurisdictionAuthorizationDAL(couchDbHttpClient);
+        var rawEntries = reader.GetRolesByUserIdAsync(user_name, db_config).GetAwaiter().GetResult();
+
         var now = DateTime.Now;
-        foreach(mmria.common.model.couchdb.get_sortable_view_response_item<mmria.common.model.couchdb.user_role_jurisdiction> jvi in jurisdiction_view_response.rows)
+        foreach (var entry in rawEntries)
         {
-            if(jvi.key!=null && jvi.key == user_name)
-            {
-                if(jvi.value.is_active != null && jvi.value.is_active.HasValue && jvi.value.is_active.Value)
-                {
+            if (entry?.user_id != user_name)
+                continue;
 
-                    bool add_item = true;
-                    
-                    if(jvi.value.effective_start_date != null && jvi.value.effective_start_date.HasValue)
-                    {
-                        if(jvi.value.effective_start_date > now)
-                        {
-                            add_item = false;
-                        }
-                        
-                    }
+            if (entry.is_active == null || !entry.is_active.HasValue || !entry.is_active.Value)
+                continue;
 
-                    if(jvi.value.effective_end_date != null && jvi.value.effective_end_date.HasValue)
-                    {
-                        
-                        if(jvi.value.effective_end_date.Value < now)
-                        {
-                            add_item = false;
-                        }
-                        
-                    }
+            bool add_item = true;
 
-                    if(add_item)
-                    {
-                        result.Add(jvi.value.jurisdiction_id);
-                    }
-                    
+            if (entry.effective_start_date.HasValue && entry.effective_start_date.Value > now)
+                add_item = false;
 
-                }
-            }
-            
+            if (entry.effective_end_date.HasValue && entry.effective_end_date.Value < now)
+                add_item = false;
+
+            if (add_item)
+                result.Add(entry.jurisdiction_id!);
         }
 
         return result;

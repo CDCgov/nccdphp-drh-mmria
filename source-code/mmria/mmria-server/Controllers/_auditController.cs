@@ -6,8 +6,10 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Configuration;
 using System.Linq;
 using mmria.common.functional;
+using mmria.common.utils;
 using mmria.server;
 using Microsoft.AspNetCore.Http;
+using mmria.server.util;
 
 using  mmria.server.extension; 
 namespace mmria.server.Controllers;
@@ -49,26 +51,8 @@ public sealed class Audit_Detail_View
 public sealed class _auditController : Controller
 {
 
-    public struct Change_Stack_Result_Struct
-    {
-        public mmria.common.model.couchdb.Change_Stack[] docs;
-    }
-
-    struct Selector_Struc
-    {
-        //public System.Dynamic.ExpandoObject selector;
-        public System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, string>> selector;
-        public string[] fields;
-
-        public string use_index;
-
-        public int limit;
-    }
-
 
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     private readonly mmria.common.SharedLibraries.AuditRecovery.Manager.AuditRecoveryManager _auditRecoveryManager;
     string host_prefix = null;
@@ -76,35 +60,16 @@ public sealed class _auditController : Controller
     public _auditController
     (
         IHttpContextAccessor httpContextAccessor,
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.common.SharedLibraries.AuditRecovery.Manager.AuditRecoveryManager auditRecoveryManager
     )
     {
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
         _auditRecoveryManager = auditRecoveryManager;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
-    }
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
 
-    (string url, string post) get_find_url(string p_id)
-    {
-        var selector_struc = new Selector_Struc();
-        selector_struc.selector = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
-        selector_struc.limit = 1_000_000;
-        selector_struc.selector.Add("case_id", new System.Collections.Generic.Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
-        selector_struc.selector["case_id"].Add("$eq", p_id);
-        selector_struc.use_index = "case-id-date-last-updated-index";
+        configuration = tenantRuntime.RequireConfiguration();
 
-        Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings();
-        settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-        string selector_struc_string = Newtonsoft.Json.JsonConvert.SerializeObject(selector_struc, settings);
-
-        string result = $"{db_config.url}/{db_config.prefix}audit/_find";
-        return (result, selector_struc_string);
+        db_config = tenantRuntime.RequireDbConfig();
     }
 
     [Route("_audit/{p_id}/{page?}")]
@@ -427,7 +392,7 @@ public sealed class _auditController : Controller
             var subitem = value.items[subitem_index];
 
 
-            if (subitem.metadata_type.ToUpper() == "DATETIME")
+            if (string.Equals(subitem.metadata_type, "DATETIME", StringComparison.OrdinalIgnoreCase))
             {
                 if (subitem.dictionary_path == found_path)
                 {
@@ -481,32 +446,33 @@ public sealed class _auditController : Controller
 
     [HttpPost]
     [Route("api/_audit/audit-manage-user")]
-    public async Task<IActionResult> PostAuditHistory([FromBody] mmria.common.model.couchdb.audit.Audit_Manage_User master_audit_document)
+    public async Task<IActionResult> PostAuditHistory()
     {
+        var master_audit_document = await JsonRequestBodyReader.ReadAsync<mmria.common.model.couchdb.audit.Audit_Manage_User>(Request);
         if (master_audit_document == null || master_audit_document.items == null || !master_audit_document.items.Any())
         {
             return BadRequest("No audit items provided");
         }
         try
         {
-            // Save the updated master document to CouchDB
-            var db_save_result = await SaveAuditDocument(master_audit_document);
+            var existingAuditDocument = await _auditRecoveryManager.GetAuditDocumentAsync(db_config);
+            var revisionHandling = CouchDbRevisionHelper.DescribeRevisionHandling(master_audit_document?._rev, existingAuditDocument?._rev);
+            var sanitizedAuditDocument = DocumentPayloadCloneHelper.CloneAuditManageUser(master_audit_document, existingAuditDocument);
+            if (sanitizedAuditDocument == null)
+            {
+                return BadRequest("Invalid audit payload");
+            }
 
-            if (db_save_result.ok)
+            // Save the updated master document to CouchDB
+            await SaveAuditDocument(sanitizedAuditDocument);
+
+            // Return success response
+            var response = new
             {
-                // Return success response
-                var response = new
-                {
-                    ok = true,
-                    _id = master_audit_document._id,
-                    _rev = db_save_result.rev
-                };
-                return Ok(response);
-            }
-            else
-            {
-                return StatusCode(500, "Failed to save audit history to database");
-            }
+                ok = true,
+                _id = sanitizedAuditDocument._id
+            };
+            return Ok(response);
         }
         catch (Exception ex)
         {
@@ -530,18 +496,9 @@ public sealed class _auditController : Controller
         }
     }
 
-    private async Task<mmria.common.model.couchdb.document_put_response> SaveAuditDocument(mmria.common.model.couchdb.audit.Audit_Manage_User auditDocument)
+    private async Task SaveAuditDocument(mmria.common.model.couchdb.audit.Audit_Manage_User auditDocument)
     {
-        try
-        {
-            return await _auditRecoveryManager.SaveAuditDocumentAsync(auditDocument, db_config);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error in SaveAuditDocument: {ex.Message}");
-            Console.WriteLine($"Stack Trace: {ex.StackTrace}");
-            return new mmria.common.model.couchdb.document_put_response { ok = false };
-        }
+        await _auditRecoveryManager.SaveAuditDocumentAsync(auditDocument, db_config);
     }
 
 }

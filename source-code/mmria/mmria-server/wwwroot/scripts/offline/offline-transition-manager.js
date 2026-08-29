@@ -12,6 +12,153 @@ const MAX_OFFLINE_TRANSITION_RETRIES = 3;
 
 // Persistent keep-alive interval for service worker (prevents SW termination during offline mode)
 let g_service_worker_keep_alive_interval = null;
+const OTM_MODAL_FOCUSABLE_SELECTOR = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+const g_offline_transition_modal_state = new Map();
+
+function otm_hide_background_from_screen_readers(modal, backdrop) {
+    const hiddenElements = [];
+    Array.from(document.body.children).forEach((element) => {
+        if (
+            element === modal ||
+            element === backdrop ||
+            element.tagName === 'SCRIPT' ||
+            element.tagName === 'STYLE'
+        ) {
+            return;
+        }
+
+        hiddenElements.push({
+            element,
+            previousAriaHidden: element.getAttribute('aria-hidden')
+        });
+        element.setAttribute('aria-hidden', 'true');
+    });
+
+    return hiddenElements;
+}
+
+function otm_restore_background_for_screen_readers(hiddenElements) {
+    (hiddenElements || []).forEach(({ element, previousAriaHidden }) => {
+        if (!element) {
+            return;
+        }
+
+        if (previousAriaHidden === null || typeof previousAriaHidden === 'undefined') {
+            element.removeAttribute('aria-hidden');
+        } else {
+            element.setAttribute('aria-hidden', previousAriaHidden);
+        }
+    });
+}
+
+function otm_get_focusable_elements(modal) {
+    return Array.from(modal.querySelectorAll(OTM_MODAL_FOCUSABLE_SELECTOR))
+        .filter((element) => {
+            if (!element) {
+                return false;
+            }
+
+            if (element.hasAttribute('hidden') || element.getAttribute('aria-hidden') === 'true') {
+                return false;
+            }
+
+            return element.offsetParent !== null || element === document.activeElement;
+        });
+}
+
+function otm_activate_modal_accessibility(modalId, backdropId, options = {}) {
+    const modal = document.getElementById(modalId);
+    const backdrop = document.getElementById(backdropId);
+
+    if (!modal || !backdrop) {
+        return;
+    }
+
+    const restoreFocusElement = options.restoreFocusElement || document.activeElement;
+    const hiddenElements = otm_hide_background_from_screen_readers(modal, backdrop);
+    const closeOnEscape = options.closeOnEscape !== false;
+    const closeHandler = options.closeHandler;
+    const requestedInitialFocus = options.initialFocusSelector
+        ? modal.querySelector(options.initialFocusSelector)
+        : null;
+
+    const keydownHandler = (event) => {
+        if (event.key === 'Escape' && closeOnEscape && typeof closeHandler === 'function') {
+            event.preventDefault();
+            closeHandler();
+            return;
+        }
+
+        if (event.key !== 'Tab') {
+            return;
+        }
+
+        const focusableElements = otm_get_focusable_elements(modal);
+        if (focusableElements.length === 0) {
+            event.preventDefault();
+            modal.focus();
+            return;
+        }
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (event.shiftKey) {
+            if (document.activeElement === firstElement || document.activeElement === modal) {
+                event.preventDefault();
+                lastElement.focus();
+            }
+        } else if (document.activeElement === lastElement) {
+            event.preventDefault();
+            firstElement.focus();
+        }
+    };
+
+    g_offline_transition_modal_state.set(modalId, {
+        restoreFocusElement,
+        hiddenElements,
+        keydownHandler
+    });
+
+    modal.addEventListener('keydown', keydownHandler);
+    modal.setAttribute('aria-hidden', 'false');
+    backdrop.setAttribute('aria-hidden', 'true');
+
+    const focusTarget = requestedInitialFocus || otm_get_focusable_elements(modal)[0] || modal;
+    window.setTimeout(() => {
+        if (focusTarget && typeof focusTarget.focus === 'function') {
+            focusTarget.focus();
+        } else {
+            modal.focus();
+        }
+    }, 0);
+}
+
+function otm_deactivate_modal_accessibility(modalId) {
+    const state = g_offline_transition_modal_state.get(modalId);
+    const modal = document.getElementById(modalId);
+
+    if (modal && state && state.keydownHandler) {
+        modal.removeEventListener('keydown', state.keydownHandler);
+    }
+
+    if (state) {
+        otm_restore_background_for_screen_readers(state.hiddenElements);
+
+        const restoreFocusElement = state.restoreFocusElement;
+        window.setTimeout(() => {
+            if (
+                restoreFocusElement &&
+                typeof restoreFocusElement.focus === 'function' &&
+                document.contains(restoreFocusElement)
+            ) {
+                restoreFocusElement.focus();
+            }
+        }, 0);
+    }
+
+    g_offline_transition_modal_state.delete(modalId);
+}
 
 // Function for Go Offline button click handler
 function go_offline_button_clicked(event) {
@@ -47,6 +194,198 @@ async function sync_log_data() {
     }
 }
 
+function set_go_online_button_state(isBusy) {
+    const goOnlineButton = document.getElementById('go-online-btn');
+    if (!goOnlineButton) {
+        return;
+    }
+
+    goOnlineButton.disabled = !!isBusy;
+    goOnlineButton.style.opacity = isBusy ? '0.6' : '1';
+
+    const buttonText = goOnlineButton.querySelector('.button-text');
+    if (buttonText) {
+        if (isBusy) {
+            buttonText.textContent = 'Going Online...';
+        } else {
+            buttonText.innerHTML = buttonText.dataset.idleLabel || 'Go Online & Sync Changes';
+        }
+    }
+}
+
+async function handle_go_online_failure(error, options = {}) {
+    const reason = options.reason || 'Offline session recovery required';
+
+    offlineLog.error('OfflineTransitionManager', reason, error);
+    close_moving_to_online_modal();
+    set_go_online_button_state(false);
+
+    await sync_log_data();
+
+    if (window.OfflineModals && typeof window.OfflineModals.showGoOnlineFailure === 'function') {
+        window.OfflineModals.showGoOnlineFailure();
+    }
+
+    if (window.OfflineIntegrityValidator && window.OfflineStatus && window.OfflineStatus.isOffline()) {
+        window.OfflineIntegrityValidator.startMonitoring();
+    }
+
+    return false;
+}
+
+async function get_current_recovery_tab_id() {
+    try {
+        if (typeof window.mmria_get_unique_tab_id === 'function') {
+            await window.mmria_get_unique_tab_id();
+        }
+        if (typeof get_mmria_tab_id === 'function') {
+            return get_mmria_tab_id();
+        }
+    } catch (_tabError) {
+        return null;
+    }
+
+    return null;
+}
+
+function has_narrow_offline_server_session() {
+    return !!(
+        window.OfflineStatus &&
+        window.OfflineStatus.isOfflineModeServerSession &&
+        window.OfflineStatus.isOfflineModeServerSession()
+    );
+}
+
+async function get_active_offline_session_for_recovery() {
+    if (has_narrow_offline_server_session()) {
+        offlineLog.warn('OfflineTransitionManager', 'Skipping active offline session lookup because the current browser session is limited to SaveOfflineCases.');
+        return null;
+    }
+
+    try {
+        const activeSessionResponse = await fetch('/api/OfflineCase/active-user-session');
+        if (!activeSessionResponse.ok) {
+            offlineLog.warn('OfflineTransitionManager', `Failed to load active offline session for recovery: ${activeSessionResponse.status} ${activeSessionResponse.statusText}`);
+            return null;
+        }
+
+        const activeSessionData = await activeSessionResponse.json();
+        if (!activeSessionData || activeSessionData.error === 'no active sessions' || !activeSessionData._id) {
+            return null;
+        }
+
+        return activeSessionData;
+    } catch (activeSessionError) {
+        offlineLog.warn('OfflineTransitionManager', 'Unable to load active offline session for recovery:', activeSessionError);
+        return null;
+    }
+}
+
+async function recover_session_cases_as_softlocks(offlineSessionId, caseIds) {
+    if (has_narrow_offline_server_session()) {
+        offlineLog.warn('OfflineTransitionManager', 'Skipping soft lock recovery because the current browser session is limited to SaveOfflineCases.');
+        return false;
+    }
+
+    const normalizedCaseIds = Array.isArray(caseIds)
+        ? caseIds.map(id => (id || '').toString().trim()).filter(id => id.length > 0)
+        : [];
+
+    if (!offlineSessionId || normalizedCaseIds.length === 0) {
+        offlineLog.warn('OfflineTransitionManager', 'Soft lock recovery skipped because session id or case ids were not available.', {
+            offlineSessionId: offlineSessionId || null,
+            caseCount: normalizedCaseIds.length
+        });
+        return false;
+    }
+
+    const currentTabId = await get_current_recovery_tab_id();
+    if (!currentTabId) {
+        throw new Error('Unable to determine tab id for soft lock recovery.');
+    }
+
+    offlineLog.log('OfflineTransitionManager', 'Recovering session cases as soft locks before cleanup', {
+        offlineSessionId: offlineSessionId,
+        caseCount: normalizedCaseIds.length
+    });
+
+    const recoverResponse = await fetch('/api/OfflineCase/recover-softlocks', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            offlineSessionId: offlineSessionId,
+            caseIds: normalizedCaseIds,
+            tab_id: currentTabId
+        })
+    });
+
+    if (!recoverResponse.ok) {
+        let recoverError = `Failed to preserve session soft locks: ${recoverResponse.status} ${recoverResponse.statusText}`;
+        try {
+            const recoverResult = await recoverResponse.json();
+            if (recoverResult && recoverResult.error_description) {
+                recoverError = recoverResult.error_description;
+            } else if (recoverResult && recoverResult.error) {
+                recoverError = recoverResult.error;
+            }
+        } catch (_recoverParseError) {
+            // ignore
+        }
+
+        throw new Error(recoverError);
+    }
+
+    offlineLog.log('OfflineTransitionManager', 'Session cases were successfully converted back to soft locks', {
+        offlineSessionId: offlineSessionId,
+        caseCount: normalizedCaseIds.length
+    });
+
+    return true;
+}
+
+async function confirm_go_online_failure_recovery() {
+    try {
+        offlineLog.log('OfflineTransitionManager', 'User acknowledged offline session recovery modal - starting offline session cleanup');
+        const offlineSessionId = localStorage.getItem('offline_session_id');
+
+        if (window.OfflineModals && typeof window.OfflineModals.closeGoOnlineFailure === 'function') {
+            window.OfflineModals.closeGoOnlineFailure();
+        }
+
+        if (window.OfflineModals && typeof window.OfflineModals.showLoadingSpinner === 'function') {
+            window.OfflineModals.showLoadingSpinner();
+        }
+
+        if (window.OfflineIntegrityValidator) {
+            window.OfflineIntegrityValidator.stopMonitoring();
+        }
+
+        await sync_log_data();
+
+        localStorage.setItem('abandon_offline_session', 'true');
+        localStorage.setItem('abandon_offline_session_suppressed', 'true');
+
+        await unregister_service_worker();
+        await clear_all_cached_data();
+
+        localStorage.setItem('abandon_offline_session', 'true');
+        localStorage.setItem('abandon_offline_session_suppressed', 'true');
+        if (offlineSessionId) {
+            localStorage.setItem('offline_session_id', offlineSessionId);
+        }
+
+        document.body.classList.remove('mmria-offline-mode');
+
+        offlineLog.log('OfflineTransitionManager', 'Offline session recovery complete - redirecting to login');
+        window.location.href = '/Account/AutoLogin';
+    } catch (error) {
+        offlineLog.error('OfflineTransitionManager', 'Error during offline session recovery:', error);
+        window.location.href = '/Account/AutoLogin';
+    }
+}
+
 // Function for Go Online button
 async function go_online_clicked(event) {
     // Prevent any default behavior and stop event propagation
@@ -70,15 +409,7 @@ async function go_online_clicked(event) {
   
       
     // Disable the button to prevent multiple clicks
-    const goOnlineButton = document.getElementById('go-online-btn');
-    if (goOnlineButton) {
-        goOnlineButton.disabled = true;
-        goOnlineButton.style.opacity = '0.6';
-        const buttonText = goOnlineButton.querySelector('.button-text');
-        if (buttonText) {
-            buttonText.textContent = 'Going Online...';
-        }
-    }
+    set_go_online_button_state(true);
     
     // Add a delay to ensure we can see the console logs
     await new Promise(resolve => setTimeout(resolve, 100));
@@ -86,6 +417,10 @@ async function go_online_clicked(event) {
     try {
         //add modal while going online
         show_moving_to_online_modal();
+
+        if (window.OfflineIntegrityValidator) {
+            window.OfflineIntegrityValidator.stopMonitoring();
+        }
 
         // DIAGNOSTIC LOGGING: Capture state at moment of "Go Online" click
         // This helps diagnose post-restart issues
@@ -147,6 +482,13 @@ async function go_online_clicked(event) {
         
         offlineLog.log('OfflineTransitionManager', '=== End Diagnostic Info ===');
 
+        if (window.OfflineIntegrityValidator) {
+            await window.OfflineIntegrityValidator.validateOrThrow({
+                checkPoint: 'go_online_preflight',
+                throwOnFailure: true
+            });
+        }
+
         
  
         offlineLog.log('OfflineTransitionManager', 'Saving cached cases to database...');
@@ -155,12 +497,10 @@ async function go_online_clicked(event) {
         const saveResult = await window.OfflineSyncManager.saveCasesToDatabase();
         
         if (!saveResult.shouldSetProcessOffline) {
-            await sync_log_data();
-            close_moving_to_online_modal();
-            offlineLog.error('OfflineTransitionManager','Failed to save cached cases to database - saveCasesToDatabase returned false');
-            alert(`Error transitioning to online mode: Please try again.`);
-            window.location.reload();           
-            return;           
+            return await handle_go_online_failure(
+                new Error('saveCasesToDatabase returned shouldSetProcessOffline=false'),
+                { reason: 'Failed to save cached cases to database during Go Online' }
+            );
         }
         else {     
       
@@ -184,6 +524,11 @@ async function go_online_clicked(event) {
             // IMPORTANT: Clear offline status FIRST so service worker allows API calls through
             localStorage.removeItem('is_offline');
             localStorage.removeItem('has_active_offline_session');
+            localStorage.removeItem('mmria_offline_last_activity_at');
+
+            if (window.OfflineInactivityManager) {
+                window.OfflineInactivityManager.stop();
+            }
 
             // Give service worker a moment to process the status change
             await new Promise(resolve => setTimeout(resolve, 200)); // Increased slightly for safety
@@ -209,9 +554,9 @@ async function go_online_clicked(event) {
             await clear_all_cached_data();
             
             // Clear remaining offline session data
-            localStorage.removeItem('mmria_offline_session');
-            localStorage.removeItem('mmria_cached_cases');
-            localStorage.removeItem('mmria_offline_changes');
+        localStorage.removeItem('mmria_offline_session');
+        localStorage.removeItem('mmria_cached_cases');
+        localStorage.removeItem('mmria_offline_changes');
             
             // Remove offline mode indicator from body
             document.body.classList.remove('mmria-offline-mode');
@@ -226,38 +571,22 @@ async function go_online_clicked(event) {
         
           }
     } catch (error) {
-        offlineLog.error('OfflineTransitionManager', 'Error transitioning to online mode:', error);
-        alert(`Error transitioning to online mode: Please try again.`);
-        window.location.reload();
-        close_moving_to_online_modal();
-
-         await sync_log_data();
-
-        // Re-enable the button if there was an error
-        const goOnlineButton = document.getElementById('go-online-btn');
-        if (goOnlineButton) {
-            goOnlineButton.disabled = false;
-            goOnlineButton.style.opacity = '1';
-            const buttonText = goOnlineButton.querySelector('.button-text');
-            if (buttonText) {
-                buttonText.textContent = 'Go Online';
-            }
-        }
-        
-        // Don't reload the page if there was an error - this allows debugging
-        return false;
+        return await handle_go_online_failure(error, {
+            reason: 'Error transitioning to online mode'
+        });
     }
 }
 
 // Function to show the Go Offline modal
 function show_go_offline_modal() {
+    const triggerElement = document.activeElement;
     const modalHtml = `
-        <div id="go-offline-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+        <div id="go-offline-modal" class="modal fade" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="go-offline-modal-title" style="z-index: 1050;">
             <div class="modal-dialog modal-lg" role="document">
                 <div class="modal-content">
                     <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
-                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Go Offline</h4>
-                        <button type="button" class="close" onclick="window.OfflineTransitionManager.closeGoOfflineModal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                        <h2 id="go-offline-modal-title" class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Go Offline</h2>
+                        <button type="button" class="close" aria-label="Close" onclick="window.OfflineTransitionManager.closeGoOfflineModal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
                             <span aria-hidden="true">&times;</span>
                         </button>
                     </div>
@@ -299,6 +628,11 @@ function show_go_offline_modal() {
             modal.classList.add('show');
             modal.style.display = 'block';
             backdrop.classList.add('show');
+            otm_activate_modal_accessibility('go-offline-modal', 'go-offline-backdrop', {
+                restoreFocusElement: triggerElement,
+                initialFocusSelector: '.close, .btn-light, .btn-primary',
+                closeHandler: close_go_offline_modal
+            });
         }
     }, 10);
 }
@@ -309,6 +643,7 @@ function close_go_offline_modal() {
     const backdrop = document.getElementById('go-offline-backdrop');
     
     if (modal && backdrop) {
+        otm_deactivate_modal_accessibility('go-offline-modal');
         modal.classList.remove('show');
         backdrop.classList.remove('show');
         
@@ -333,21 +668,26 @@ function continue_to_set_key() {
 
 // Function to show the Set Offline Key modal
 function show_set_offline_key_modal() {
+    const triggerElement = document.activeElement;
     const modalHtml = `
-        <div id="set-offline-key-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+        <div id="set-offline-key-modal" class="modal fade" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="set-offline-key-modal-title" style="z-index: 1050;">
             <div class="modal-dialog modal-lg" role="document">
                 <div class="modal-content">
                     <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
-                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Set Offline Key</h4>
-                        <button type="button" class="close" onclick="window.OfflineTransitionManager.closeSetKeyModal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                        <h2 id="set-offline-key-modal-title" class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Set Offline Key</h2>
+                        <button type="button" class="close" aria-label="Close" onclick="window.OfflineTransitionManager.closeSetKeyModal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
                             <span aria-hidden="true">&times;</span>
                         </button>
                     </div>
                     <div class="modal-body" style="padding: 30px;">
                         <p style="font-size: 16px; margin-bottom: 20px; color: #333;">Set a key to log in while in offline mode:</p>
                         
-                        <input type="text" id="offline-key-input" class="form-control" style="margin-bottom: 10px; padding: 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px;" placeholder="Enter your offline key" oninput="window.OfflineTransitionManager.handleKeyInput()" autocomplete="off" tabindex="1" value="sssDDDkkk@@@2">
+                        <input type="text" id="offline-key-input" class="form-control" style="margin-bottom: 16px; padding: 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px;" placeholder="Enter your offline key" oninput="window.OfflineTransitionManager.handleKeyInput()" autocomplete="off">
                         
+                        <label for="offline-key-confirm-input" style="font-size: 16px; margin-bottom: 10px; color: #333; display: block;">Please re-enter key:</label>
+                        <input type="text" id="offline-key-confirm-input" class="form-control" style="margin-bottom: 10px; padding: 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px;" oninput="window.OfflineTransitionManager.handleKeyInput()" autocomplete="off">
+                        
+                        <div id="key-match-status" style="display: none; font-size: 14px; margin-bottom: 20px; line-height: 1.4;" aria-live="polite"></div>
                         <div id="key-validation-error" style="display: none; color: #dc3545; font-size: 14px; margin-bottom: 20px; line-height: 1.4;">
                             The provided key does not fulfill one or more of the requirements below. Please update the key and try again.
                         </div>
@@ -376,7 +716,7 @@ function show_set_offline_key_modal() {
                             Cancel
                         </button>
                         <button type="button" id="go-offline-btn" class="btn btn-primary" onclick="window.OfflineTransitionManager.goOfflineFinal()" style="background-color: #7b2d8e; border-color: #7b2d8e; color: white; padding: 8px 20px; opacity: 0.6;" disabled>
-                            <img src="../img/offline-go.svg" style="width: 14px; height: 14px; margin-right: 5px; vertical-align: middle;" alt="Go Offline">Go Offline
+                            <img src="../img/offline-go.svg" style="width: 14px; height: 14px; margin-right: 5px; vertical-align: middle;" alt="" aria-hidden="true">Go Offline
                         </button>
                     </div>
                 </div>
@@ -394,12 +734,16 @@ function show_set_offline_key_modal() {
             modal.classList.add('show');
             modal.style.display = 'block';
             backdrop.classList.add('show');
+            otm_activate_modal_accessibility('set-offline-key-modal', 'set-offline-key-backdrop', {
+                restoreFocusElement: triggerElement,
+                initialFocusSelector: '#offline-key-input',
+                closeHandler: close_set_offline_key_modal
+            });
         }
         const input = document.getElementById('offline-key-input');
         if (input) {
             input.disabled = false;
             input.focus();
-            input.select();
         }
     }, 10);
 }
@@ -410,6 +754,7 @@ function close_set_offline_key_modal() {
     const backdrop = document.getElementById('set-offline-key-backdrop');
     
     if (modal && backdrop) {
+        otm_deactivate_modal_accessibility('set-offline-key-modal');
         modal.classList.remove('show');
         backdrop.classList.remove('show');
         
@@ -438,21 +783,23 @@ function handle_key_input() {
 // Function to validate key in real-time
 function validate_key_realtime() {
     const keyInput = document.getElementById('offline-key-input');
+    const keyConfirmInput = document.getElementById('offline-key-confirm-input');
     const key = keyInput ? keyInput.value : '';
+    const confirmKey = keyConfirmInput ? keyConfirmInput.value : '';
     const errorDiv = document.getElementById('key-validation-error');
+    const matchStatusDiv = document.getElementById('key-match-status');
     const goOfflineBtn = document.getElementById('go-offline-btn');
     
     const isValid = window.OfflineSessionValidator.validateKey(key);
-    
+    const keysMatch = key === confirmKey;
+    const hasConfirmKey = confirmKey.length > 0;
+    const canGoOffline = isValid && hasConfirmKey && keysMatch;
+
     if (key.length === 0) {
         if (errorDiv) errorDiv.style.display = 'none';
         if (keyInput) {
             keyInput.disabled = false;
             keyInput.style.borderColor = '#ccc';
-        }
-        if (goOfflineBtn) {
-            goOfflineBtn.disabled = true;
-            goOfflineBtn.style.opacity = '0.6';
         }
     } else if (!isValid) {
         if (errorDiv) errorDiv.style.display = 'block';
@@ -460,20 +807,49 @@ function validate_key_realtime() {
             keyInput.disabled = false;
             keyInput.style.borderColor = '#dc3545';
         }
-        if (goOfflineBtn) {
-            goOfflineBtn.disabled = true;
-            goOfflineBtn.style.opacity = '0.6';
-        }
     } else {
         if (errorDiv) errorDiv.style.display = 'none';
         if (keyInput) {
             keyInput.disabled = false;
             keyInput.style.borderColor = '#ccc';
         }
-        if (goOfflineBtn) {
-            goOfflineBtn.disabled = false;
-            goOfflineBtn.style.opacity = '1';
+    }
+
+    if (keyConfirmInput) {
+        keyConfirmInput.disabled = false;
+    }
+
+    if (!hasConfirmKey) {
+        if (matchStatusDiv) {
+            matchStatusDiv.style.display = 'none';
+            matchStatusDiv.innerHTML = '';
         }
+        if (keyConfirmInput) {
+            keyConfirmInput.style.borderColor = '#ccc';
+        }
+    } else if (!keysMatch) {
+        if (matchStatusDiv) {
+            matchStatusDiv.style.display = 'block';
+            matchStatusDiv.style.color = '#dc3545';
+            matchStatusDiv.innerHTML = '<span class="cdc-icon-times-circle-solid" aria-hidden="true" style="margin-right: 6px;"></span>Keys do not match';
+        }
+        if (keyConfirmInput) {
+            keyConfirmInput.style.borderColor = '#dc3545';
+        }
+    } else {
+        if (matchStatusDiv) {
+            matchStatusDiv.style.display = 'block';
+            matchStatusDiv.style.color = '#2e7d32';
+            matchStatusDiv.innerHTML = '<span class="cdc-icon-check-circle-solid" aria-hidden="true" style="margin-right: 6px;"></span>Keys match';
+        }
+        if (keyConfirmInput) {
+            keyConfirmInput.style.borderColor = '#ccc';
+        }
+    }
+
+    if (goOfflineBtn) {
+        goOfflineBtn.disabled = !canGoOffline;
+        goOfflineBtn.style.opacity = canGoOffline ? '1' : '0.6';
     }
 }
 
@@ -608,7 +984,13 @@ async function cancel_offline_transition() {
         localStorage.removeItem('is_offline');
         localStorage.removeItem('mmria_offline_session');
         localStorage.removeItem('has_active_offline_session');
+        localStorage.removeItem('mmria_offline_last_activity_at');
         localStorage.removeItem('mmria_cached_cases');
+
+        if (window.OfflineInactivityManager) {
+            window.OfflineInactivityManager.stop();
+        }
+
         offlineLog.log('OfflineTransitionManager', 'Offline session data cleared');
         
         setTimeout(() => {
@@ -632,61 +1014,44 @@ async function cancel_offline_transition() {
     }
 }
 
-// Function to show the Moving to Online Mode modal
 function show_moving_to_online_modal() {
-    const modalHtml = `
-        <div id="moving-to-online-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
-            <div class="modal-dialog modal-lg" role="document">
-                <div class="modal-content">
-                    <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
-                        <h4 class="modal-title" style="margin: 0; font-weight: bold; font-size:17px;">Moving to Online Mode</h4>
-                    </div>
-                    <div class="modal-body" style="padding-top: 10px;padding-bottom: 10px;">                        
-                        <p style="font-size:17px; color: #333;">Now switching to online mode - this process may take several minutes.</p>                  
-                        <span class="spinner-container spinner-content spinner-active" style="margin-top: 15px;margin-bottom: 15px;width:100%; align-items: center; justify-content: center; display: inline-flex;">
-                            <span class="spinner-body text-primary">
-                                <span class="spinner"></span>
-                                <span class="spinner-info">Loading...</span>
-                            </span>
-                        </span>                        
-                        <p style="font-size:17px; color: #666;">This screen will refresh when the system is back online.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div id="moving-to-online-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
-    `;
-    
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    
-    setTimeout(() => {
-        const modal = document.getElementById('moving-to-online-modal');
-        const backdrop = document.getElementById('moving-to-online-backdrop');
-        if (modal && backdrop) {
-            modal.classList.add('show');
-            modal.style.display = 'block';
-            backdrop.classList.add('show');
-        }
-    }, 10);
-}
-
-// Function to close the Moving to Online Mode modal
-function close_moving_to_online_modal() {
-    const modal = document.getElementById('moving-to-online-modal');
-    const backdrop = document.getElementById('moving-to-online-backdrop');
-    
-    if (modal && backdrop) {
-        modal.classList.remove('show');
-        backdrop.classList.remove('show');
-        
-        setTimeout(() => {
-            if (modal.parentNode) modal.parentNode.removeChild(modal);
-            if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
-        }, 150);
+    if (window.OfflineModals && typeof window.OfflineModals.showMovingToOnline === 'function') {
+        window.OfflineModals.showMovingToOnline();
     }
 }
 
-function EnableGoOfflineErrorState(){
+function close_moving_to_online_modal() {
+    if (window.OfflineModals && typeof window.OfflineModals.closeMovingToOnline === 'function') {
+        window.OfflineModals.closeMovingToOnline();
+    }
+}
+
+function persist_go_offline_softlock_restore(caseIds) {
+    try {
+        if (!Array.isArray(caseIds) || caseIds.length === 0) {
+            return;
+        }
+
+        const normalizedIds = caseIds
+            .map(id => (id || '').toString().trim())
+            .filter(id => id.length > 0);
+
+        if (normalizedIds.length === 0) {
+            return;
+        }
+
+        const uniqueIds = Array.from(new Set(normalizedIds));
+        localStorage.setItem('pending_go_offline_softlock_restore', JSON.stringify(uniqueIds));
+        offlineLog.log('OfflineTransitionManager', 'Stored pending go offline soft lock restore list', uniqueIds);
+    } catch (error) {
+        offlineLog.error('OfflineTransitionManager', 'Unable to persist go offline soft lock restore list:', error);
+    }
+}
+
+function EnableGoOfflineErrorState(caseIds){
+    if (Array.isArray(caseIds) && caseIds.length > 0) {
+        persist_go_offline_softlock_restore(caseIds);
+    }
     localStorage.setItem('is_go_offline_error', 'true');    
     if (window.OfflineTransitionManager && window.OfflineTransitionManager.confirmInvalidOfflineStateRecovery) {
         window.OfflineTransitionManager.confirmInvalidOfflineStateRecovery();
@@ -697,12 +1062,20 @@ function EnableGoOfflineErrorState(){
 async function go_offline_final() {
     let result = null;
     const keyInput = document.getElementById('offline-key-input');
+    const keyConfirmInput = document.getElementById('offline-key-confirm-input');
     const key = keyInput ? keyInput.value : '';
+    const confirmKey = keyConfirmInput ? keyConfirmInput.value : '';
     
     if (!window.OfflineSessionValidator.validateKey(key)) {
         offlineLog.log('OfflineTransitionManager', 'Key validation failed on final check');
         return;
-    }    
+    }
+
+    if (key !== confirmKey || confirmKey.length === 0) {
+        offlineLog.log('OfflineTransitionManager', 'Key confirmation validation failed on final check');
+        validate_key_realtime();
+        return;
+    }
 
     localStorage.setItem('offline_bypass_unlock_case_beacon', 'true');
 
@@ -715,10 +1088,24 @@ async function go_offline_final() {
     close_set_offline_key_modal();
     show_moving_to_offline_modal();
 
+    try {
+        let currentTabId = null;
+        try {
+            if (typeof window.mmria_get_unique_tab_id === 'function') {
+                await window.mmria_get_unique_tab_id();
+            }
+            if (typeof get_mmria_tab_id === 'function') {
+                currentTabId = get_mmria_tab_id();
+            }
+        } catch (_ex) {
+            currentTabId = null;
+        }
+
         const requestData = {
             offline_ids: offlineIds,
-            offline_key: key,               
-        };        
+            offline_key: key,
+            tab_id: currentTabId
+        };
         offlineLog.log('OfflineTransitionManager', 'Creating offline session');
         const response = await fetch('/api/OfflineCase', {
             method: 'POST',
@@ -754,8 +1141,25 @@ async function go_offline_final() {
             offlineLog.error('OfflineTransitionManager', 'Error response:', responseText.substring(0, 500));
             throw new Error(`Server error: ${response.status} ${response.statusText}`);
         }
+    } catch (error) {
+        offlineLog.error('OfflineTransitionManager', 'Error creating offline session:', error);
+        close_moving_to_offline_modal();
+        localStorage.removeItem('offline_bypass_unlock_case_beacon');
 
+        const message = error && error.message ? String(error.message) : '';
+        if (message.toLowerCase().indexOf('another browser tab') > -1 || message.toLowerCase().indexOf('another tab') > -1) {
+            try {
+                if (typeof show_go_offline_tab_conflict_modal === 'function') {
+                    show_go_offline_tab_conflict_modal();
+                }
+            } catch (_ex) {
+                // best-effort
+            }
+            return;
+        }
 
+        throw error;
+    }
 }
 
 async function sync_log_data() {
@@ -928,7 +1332,8 @@ async function attempt_offline_transition(key, offlineIds, result) {
             derivedKeyHash: derivedKeyHash,
             offlineIds: offlineIds,
             dateCreated: new Date().toISOString(),
-            user_id: g_user_name || 'unknown_user'
+            user_id: g_user_name || 'unknown_user',
+            blockAndAlertOnError: true
         };
         
         localStorage.setItem('mmria_offline_session', JSON.stringify(offlineSessionData));
@@ -973,15 +1378,42 @@ async function attempt_offline_transition(key, offlineIds, result) {
         await ServiceWorkerManager.prefetchCases(offlineIds);
         await ServiceWorkerManager.precachePages();
         await ServiceWorkerManager.cacheMetadata();
+        await ServiceWorkerManager.waitForCacheReadiness(offlineIds, {
+            timeoutMs: 30000,
+            pollMs: 500
+        });
+
+        if (window.OfflineIntegrityValidator) {
+            await window.OfflineIntegrityValidator.validateOrThrow({
+                checkPoint: 'go_offline_pre_auth',
+                expectedOfflineIds: offlineIds,
+                throwOnFailure: true
+            });
+        }
+
         await setup_offline_session_auth();
         offlineLog.log('OfflineTransitionManager', 'Offline resources cached and authentication ready');
 
+        if (window.OfflineIntegrityValidator) {
+            await window.OfflineIntegrityValidator.validateOrThrow({
+                checkPoint: 'go_offline_precomplete',
+                expectedOfflineIds: offlineIds,
+                throwOnFailure: true
+            });
+        }
+
         localStorage.setItem('is_offline', 'true');
         localStorage.setItem('has_active_offline_session', 'true');
+        localStorage.setItem('mmria_offline_last_activity_at', String(Date.now()));
 
         if (window.ServiceWorkerManager) {
             window.ServiceWorkerManager.notifyOfflineStatusChange();
             window.ServiceWorkerManager.notifyActiveOfflineSessionChange();
+        }
+
+        if (window.OfflineInactivityManager) {
+            window.OfflineInactivityManager.refreshActivity();
+            window.OfflineInactivityManager.initialize();
         }
         
         offlineLog.log('OfflineTransitionManager', 'Offline mode transition complete - refreshing interface');               
@@ -1005,8 +1437,10 @@ async function attempt_offline_transition(key, offlineIds, result) {
         if (window.updateOfflineModeIndicator) {
             window.updateOfflineModeIndicator();
         }
-        
-      
+
+        if (window.OfflineIntegrityValidator) {
+            window.OfflineIntegrityValidator.startMonitoring();
+        }
 
         if (typeof get_case_set === 'function') {
             get_case_set();
@@ -1025,11 +1459,11 @@ async function attempt_offline_transition(key, offlineIds, result) {
             
             await new Promise(resolve => setTimeout(resolve, 3000));
             
-            return attempt_offline_transition(key, offlineIds);
+            return attempt_offline_transition(key, offlineIds, result);
         } else {
             offlineLog.error('OfflineTransitionManager', `Failed after ${MAX_OFFLINE_TRANSITION_RETRIES} attempts: ${error.message}. Click Cancel to exit offline mode setup.`);
             
-            return EnableGoOfflineErrorState();
+            return EnableGoOfflineErrorState(offlineIds);
         }
     }
 }
@@ -1132,17 +1566,27 @@ async function clear_all_cached_data() {
         
         const localStorageKeys = [
             'has_active_offline_session',
+            'mmria_offline_last_activity_at',
             'mmria_offline_session',
             'is_offline',
             'mmria_cached_cases',
             'mmria_offline_changes',
             'mmria_offline_case_documents',
             'process_offline_cases',
-            'offline_session_id'
+            'offline_session_id',
+            'abandon_offline_session',
+            'abandon_offline_session_suppressed',
+            'offline_bypass_unlock_case_beacon',
+            'offline_mode_invalid_state_detected',
+            'cases_to_update_geo'
         ];
         
         for (const key of localStorageKeys) {
             localStorage.removeItem(key);
+        }
+
+        if (window.OfflineInactivityManager) {
+            window.OfflineInactivityManager.stop();
         }
         
         for (let i = 0; i < localStorage.length; i++) {
@@ -1165,12 +1609,28 @@ async function clear_all_cached_data() {
 async function confirm_invalid_offline_state_recovery() {
     try {
         offlineLog.log('OfflineTransitionManager', 'User confirmed invalid offline state recovery, cleaning up...');
+        const canUseServerRecoveryApis = !has_narrow_offline_server_session();
+        const pendingRestoreRaw = localStorage.getItem('pending_go_offline_softlock_restore');
+        let pendingRestoreCaseIds = [];
+
+        if (pendingRestoreRaw) {
+            try {
+                const parsedPending = JSON.parse(pendingRestoreRaw);
+                if (Array.isArray(parsedPending)) {
+                    pendingRestoreCaseIds = parsedPending
+                        .map(id => (id || '').toString().trim())
+                        .filter(id => id.length > 0);
+                }
+            } catch (_parseError) {
+                pendingRestoreCaseIds = [];
+            }
+        }
       
         // Check if there's an offline session that needs to be abandoned
         let offlineSessionId = localStorage.getItem('offline_session_id');
         
         // If no offline_session_id in localStorage, check the database for an active session
-        if (!offlineSessionId || offlineSessionId === '') {
+        if ((!offlineSessionId || offlineSessionId === '') && canUseServerRecoveryApis) {
             offlineLog.log('OfflineTransitionManager', 'No offline_session_id in localStorage, checking database for active session...');
             
             try {
@@ -1194,24 +1654,33 @@ async function confirm_invalid_offline_state_recovery() {
             } catch (error) {
                 offlineLog.warn('OfflineTransitionManager', 'Error checking for active offline session:', error);
             }
+        } else if ((!offlineSessionId || offlineSessionId === '') && !canUseServerRecoveryApis) {
+            offlineLog.log('OfflineTransitionManager', 'Skipping active-session recovery lookup because the current browser session is limited to SaveOfflineCases.');
         }
-   
+
         
-        if (offlineSessionId) {
-            offlineLog.log('OfflineTransitionManager', 'Found offline session, abandoning before cleanup:', offlineSessionId);
-            
-            // Call the abandon offline session function from OfflineSyncManager
-            if (window.OfflineSyncManager && window.OfflineSyncManager.abandonOfflineSession) {
-                try {
-                    await window.OfflineSyncManager.abandonOfflineSession(false); // Don't reload yet
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                } catch (error) {
-                    offlineLog.error('OfflineTransitionManager', 'Error abandoning offline session:', error);
-                    offlineLog.log('OfflineTransitionManager', 'Proceeding with standard cleanup...');
-                }
+        if (pendingRestoreCaseIds.length > 0 && canUseServerRecoveryApis) {
+            await recover_session_cases_as_softlocks(offlineSessionId || '', pendingRestoreCaseIds);
+            localStorage.removeItem('pending_go_offline_softlock_restore');
+        }
+        else if (pendingRestoreCaseIds.length > 0) {
+            offlineLog.warn('OfflineTransitionManager', 'Leaving pending soft lock restore list intact until normal login is restored.');
+        }
+        else if (offlineSessionId && canUseServerRecoveryApis) {
+            offlineLog.log('OfflineTransitionManager', 'Found offline session during invalid-state recovery; preserving session cases as soft locks before cleanup:', offlineSessionId);
+            const activeSessionData = await get_active_offline_session_for_recovery();
+            const sessionCaseIds = activeSessionData && Array.isArray(activeSessionData.offline_ids)
+                ? activeSessionData.offline_ids
+                : [];
+
+            if (sessionCaseIds.length > 0) {
+                await recover_session_cases_as_softlocks(offlineSessionId, sessionCaseIds);
             } else {
-                offlineLog.warn('OfflineTransitionManager', 'OfflineSyncManager.abandonOfflineSession not available, proceeding with standard cleanup');
+                offlineLog.warn('OfflineTransitionManager', 'Active offline session found, but no session offline_ids were available for soft lock recovery. Proceeding with standard cleanup only.');
             }
+        }
+        else if (offlineSessionId) {
+            offlineLog.warn('OfflineTransitionManager', 'Skipping offline-session recovery APIs because the current browser session is limited to SaveOfflineCases. Proceeding with local cleanup only.');
         }
         else {
             // Only try to release case locks if both OfflineSyncManager and g_ui are available
@@ -1219,10 +1688,13 @@ async function confirm_invalid_offline_state_recovery() {
             if (typeof window.OfflineSyncManager !== 'undefined' && 
                 window.OfflineSyncManager && 
                 typeof g_ui !== 'undefined' && 
-                g_ui) {
+                g_ui &&
+                canUseServerRecoveryApis) {
                 offlineLog.log('OfflineTransitionManager', 'Attempting to release case locks...');
                 await new Promise(resolve => setTimeout(resolve, 500));
                 await window.OfflineSyncManager.releaseCaseLocks();
+            } else if (!canUseServerRecoveryApis) {
+                offlineLog.log('OfflineTransitionManager', 'Skipping case-lock release during invalid state cleanup because the current browser session is limited to SaveOfflineCases.');
             } else {
                 offlineLog.log('OfflineTransitionManager', 'OfflineSyncManager or g_ui not available yet - skipping case lock release during invalid state cleanup');
             }
@@ -1265,9 +1737,17 @@ window.OfflineTransitionManager = {
     closeSetKeyModal: close_set_offline_key_modal,
     handleKeyInput: handle_key_input,
     goOfflineFinal: go_offline_final,
+    confirmGoOnlineFailureRecovery: confirm_go_online_failure_recovery,
     cancelTransition: cancel_offline_transition,
     clear_all_cached_data: clear_all_cached_data,
+    clearAllCachedData: clear_all_cached_data,
+    sync_log_data: sync_log_data,
+    syncLogData: sync_log_data,
+    unregister_service_worker: unregister_service_worker,
+    unregisterServiceWorker: unregister_service_worker,
     confirmInvalidOfflineStateRecovery: confirm_invalid_offline_state_recovery,
+    getActiveOfflineSessionForRecovery: get_active_offline_session_for_recovery,
+    recoverSessionCasesAsSoftlocks: recover_session_cases_as_softlocks,
     // Expose keep-alive interval for external access and cleanup
     g_service_worker_keep_alive_interval: g_service_worker_keep_alive_interval
 };

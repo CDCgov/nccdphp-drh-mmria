@@ -6,13 +6,17 @@
 // Conditionally hide login partial based on offline mode status
 document.addEventListener('DOMContentLoaded', function() {
   function updateLoginPartialVisibility() {
+    const isOfflineLoginPage = /^\/Account\/OfflineLogin\/?$/i.test(window.location.pathname);
     const isOffline = localStorage.getItem('is_offline') === 'true';
     const hasActiveSession = localStorage.getItem('has_active_offline_session') === 'true';
     const loginContainer = document.getElementById('login-partial-container');
     
     if (loginContainer) {
+      // Always hide the login partial on the offline login page.
+      if (isOfflineLoginPage) {
+        loginContainer.style.display = 'none';
       // Hide if: offline mode is true AND has no active offline session
-      if (isOffline && !hasActiveSession) {
+      } else if (isOffline && !hasActiveSession) {
         loginContainer.style.display = 'none';   
       } else {
         loginContainer.style.display = '';     

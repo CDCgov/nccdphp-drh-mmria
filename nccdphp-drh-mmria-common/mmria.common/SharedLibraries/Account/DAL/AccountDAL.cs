@@ -2,15 +2,18 @@
 
 using System;
 using System.Collections.Generic;
+using System.Dynamic;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using mmria.common.getset;
 using mmria.common.couchdb;
 using mmria.common.model.couchdb;
+using mmria.common.SharedLibraries.Session;
 
 namespace mmria.common.SharedLibraries.Account.DAL;
 
@@ -19,13 +22,20 @@ namespace mmria.common.SharedLibraries.Account.DAL;
 /// Contains ALL CouchDB calls for authentication, session events, and session management.
 /// No business logic - only data operations.
 /// </summary>
-public class AccountDAL
+public class AccountDAL : mmria.common.SharedLibraries.Account.IUserRepository
 {
-    private readonly CouchDbHttpClient _httpClient;
+    private static readonly System.Text.Json.JsonSerializerOptions SensitiveJsonPayloadOptions = new()
+    {
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
 
-    public AccountDAL(CouchDbHttpClient httpClient)
+    private readonly CouchDbHttpClient _httpClient;
+    private readonly ISessionRepository _sessionRepository;
+
+    public AccountDAL(CouchDbHttpClient httpClient, ISessionRepository sessionRepository)
     {
         _httpClient = httpClient;
+        _sessionRepository = sessionRepository;
     }
 
     /// <summary>
@@ -37,7 +47,13 @@ public class AccountDAL
     {
         try
         {
-            var userDocId = $"org.couchdb.user:{userName.ToLower()}";
+            userName = NormalizeUserName(userName);
+            if (string.IsNullOrWhiteSpace(userName))
+            {
+                return null;
+            }
+
+            var userDocId = $"org.couchdb.user:{userName}";
             var url = $"{dbConfig.url}/_users/{System.Web.HttpUtility.HtmlEncode(userDocId)}";
 
             var response = await _httpClient.ExecuteAsync(
@@ -58,7 +74,7 @@ public class AccountDAL
     }
 
     /// <summary>
-    /// Authenticate with CouchDB session endpoint - validates username and password.
+    /// Authenticate with the CouchDB session endpoint using the supplied credentials.
     /// Uses CouchDbHttpClient with x-www-form-urlencoded payload.
     /// </summary>
     public async Task<login_response?> AuthenticateWithSessionAsync(
@@ -69,7 +85,7 @@ public class AccountDAL
         byte[]? payloadBytes = null;
         try
         {
-            userName = (userName ?? string.Empty).Trim();
+            userName = NormalizeUserName(userName);
             var requestUrl = couchDbUrl.TrimEnd('/') + "/_session";
 
             payloadBytes = BuildSessionAuthFormPayload(userName, password);
@@ -117,15 +133,19 @@ public class AccountDAL
         {
             userBytes = Encoding.UTF8.GetBytes(userName);
             passwordBytes = Encoding.UTF8.GetBytes(password ?? string.Empty);
+            var payloadBytes = GC.AllocateUninitializedArray<byte>(
+                "name=".Length +
+                GetFormUrlEncodedLength(userBytes) +
+                "&password=".Length +
+                GetFormUrlEncodedLength(passwordBytes));
 
-            using var stream = new MemoryStream(userBytes.Length + passwordBytes.Length + 32);
+            var offset = 0;
+            WriteAscii(payloadBytes, ref offset, "name=");
+            WriteFormUrlEncoded(payloadBytes, userBytes, ref offset);
+            WriteAscii(payloadBytes, ref offset, "&password=");
+            WriteFormUrlEncoded(payloadBytes, passwordBytes, ref offset);
 
-            WriteAscii(stream, "name=");
-            WriteFormUrlEncoded(stream, userBytes!);
-            WriteAscii(stream, "&password=");
-            WriteFormUrlEncoded(stream, passwordBytes!);
-
-            return stream.ToArray();
+            return payloadBytes;
         }
         finally
         {
@@ -141,33 +161,41 @@ public class AccountDAL
         }
     }
 
-    private static void WriteAscii(Stream stream, string text)
+    private static int GetFormUrlEncodedLength(ReadOnlySpan<byte> bytes)
     {
-        var bytes = Encoding.ASCII.GetBytes(text);
-        stream.Write(bytes, 0, bytes.Length);
+        var length = 0;
+        foreach (var b in bytes)
+        {
+            length += IsUnreservedFormByte(b) || b == (byte)' ' ? 1 : 3;
+        }
+
+        return length;
     }
 
-    private static void WriteFormUrlEncoded(Stream stream, byte[] bytes)
+    private static void WriteAscii(Span<byte> destination, ref int offset, string text)
+    {
+        offset += Encoding.ASCII.GetBytes(text, destination.Slice(offset));
+    }
+
+    private static void WriteFormUrlEncoded(Span<byte> destination, ReadOnlySpan<byte> bytes, ref int offset)
     {
         foreach (var b in bytes)
         {
             if (IsUnreservedFormByte(b))
             {
-                stream.WriteByte(b);
+                destination[offset++] = b;
             }
             else if (b == (byte)' ')
             {
-                stream.WriteByte((byte)'+');
+                destination[offset++] = (byte)'+';
             }
             else
             {
-                stream.WriteByte((byte)'%');
-                stream.WriteByte(ToUpperHexByte((b >> 4) & 0xF));
-                stream.WriteByte(ToUpperHexByte(b & 0xF));
+                destination[offset++] = (byte)'%';
+                destination[offset++] = ToUpperHexByte((b >> 4) & 0xF);
+                destination[offset++] = ToUpperHexByte(b & 0xF);
             }
         }
-        // Zero sensitive data immediately after use
-        CryptographicOperations.ZeroMemory(bytes);
     }
 
     private static bool IsUnreservedFormByte(byte b)
@@ -187,6 +215,104 @@ public class AccountDAL
         return (byte)(value < 10 ? value + '0' : value - 10 + 'A');
     }
 
+    private static string NormalizeUserName(string? userName)
+    {
+        return (userName ?? string.Empty).Trim().ToLowerInvariant();
+    }
+
+    // -----------------------------------------------------------------------
+    // IUserRepository — canonical _users CRUD methods
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// Get a CouchDB user document by full user_id (e.g. "org.couchdb.user:someone").
+    /// </summary>
+    public async Task<user> GetUserAsync(
+        string userId,
+        DBConfigurationDetail dbConfig)
+    {
+        string requestUrl = $"{dbConfig.url}/_users/{userId}";
+        string responseFromServer = await _httpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value);
+        return JsonConvert.DeserializeObject<user>(responseFromServer);
+    }
+
+    /// <summary>
+    /// Check if a CouchDB user document exists by full user_id.
+    /// Returns an empty user object if not found or on error — never returns null.
+    /// </summary>
+    public async Task<user> CheckUserAsync(
+        string userId,
+        DBConfigurationDetail dbConfig)
+    {
+        try
+        {
+            string requestUrl = $"{dbConfig.url}/_users/{userId}";
+            string responseFromServer = await _httpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value);
+
+            if (string.IsNullOrWhiteSpace(responseFromServer))
+            {
+                return new user();
+            }
+
+            if (responseFromServer.Contains("\"error\"") && responseFromServer.Contains("not_found"))
+            {
+                return new user();
+            }
+
+            return JsonConvert.DeserializeObject<user>(responseFromServer) ?? new user();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+            return new user();
+        }
+    }
+
+    /// <summary>
+    /// Create or update a CouchDB user document via PUT.
+    /// </summary>
+    public async Task<document_put_response> PutUserAsync(
+        user user,
+        DBConfigurationDetail dbConfig)
+    {
+        string userDbUrl = $"{dbConfig.url}/_users/{user._id}";
+        string responseFromServer = await _httpClient.ExecuteJsonAsync(
+            "PUT",
+            userDbUrl,
+            user,
+            SensitiveJsonPayloadOptions,
+            dbConfig.user_name,
+            dbConfig.user_value,
+            "application/json");
+        return JsonConvert.DeserializeObject<document_put_response>(responseFromServer);
+    }
+
+    /// <summary>
+    /// Delete a CouchDB user document via DELETE.
+    /// </summary>
+    public async Task<System.Dynamic.ExpandoObject> DeleteUserAsync(
+        string userId,
+        string rev,
+        DBConfigurationDetail dbConfig)
+    {
+        string requestUrl = $"{dbConfig.url}/_users/{userId}?rev={rev}";
+        string responseFromServer = await _httpClient.ExecuteAsync("DELETE", requestUrl, null, dbConfig.user_name, dbConfig.user_value);
+        return JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(responseFromServer);
+    }
+
+    /// <summary>
+    /// Get all users from _all_docs with pagination.
+    /// </summary>
+    public async Task<get_response_header<user>> GetAllUsersAsync(
+        int skip,
+        int take,
+        DBConfigurationDetail dbConfig)
+    {
+        string requestUrl = $"{dbConfig.url}/_users/_all_docs?include_docs=true&skip={skip}&limit={take}";
+        string responseFromServer = await _httpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value);
+        return JsonConvert.DeserializeObject<get_response_header<user>>(responseFromServer);
+    }
+
     /// <summary>
     /// Get session events for a user within a time range to check for failed login attempts
     /// </summary>
@@ -196,18 +322,7 @@ public class AccountDAL
     {
         try
         {
-            var url = dbConfig.Get_Prefix_DB_Url(
-                $"session/_design/session_event_sortable/_view/by_user_id?startkey=\"{userName}\"&endkey=\"{userName}\"");
-
-            var response = await _httpClient.ExecuteAsync(
-                "GET",
-                url,
-                null,
-                dbConfig.user_name,
-                dbConfig.user_value);
-
-            var viewResponse = JsonConvert.DeserializeObject<
-                get_sortable_view_reponse_header<session_event>>(response);
+            var viewResponse = await _sessionRepository.GetSessionEventsByUserIdAsync(userName, dbConfig);
 
             if (viewResponse?.rows != null)
             {
@@ -247,18 +362,8 @@ public class AccountDAL
                 ip = ipAddress
             };
 
-            var json = JsonConvert.SerializeObject(sessionEvent);
-            var url = dbConfig.Get_Prefix_DB_Url($"session/{sessionEventId}");
-
-            var response = await _httpClient.ExecuteAsync(
-                "PUT",
-                url,
-                json,
-                dbConfig.user_name,
-                dbConfig.user_value);
-
-            var result = JsonConvert.DeserializeObject<document_put_response>(response);
-            return result?.ok ?? false;
+            await _sessionRepository.SaveSessionEventAsync(sessionEvent, dbConfig);
+            return true;
         }
         catch (Exception ex)
         {
@@ -277,17 +382,7 @@ public class AccountDAL
     {
         try
         {
-            var url = dbConfig.Get_Prefix_DB_Url($"session/{sessionId}");
-
-            var response = await _httpClient.ExecuteAsync(
-                "PUT",
-                url,
-                sessionJson,
-                dbConfig.user_name,
-                dbConfig.user_value);
-
-            var result = JsonConvert.DeserializeObject<document_put_response>(response);
-            return result;
+            return await _sessionRepository.SaveSessionRawAsync(sessionId, sessionJson, dbConfig);
         }
         catch (Exception ex)
         {
@@ -305,16 +400,7 @@ public class AccountDAL
     {
         try
         {
-            var url = dbConfig.Get_Prefix_DB_Url($"session/{sessionId}");
-
-            var response = await _httpClient.ExecuteAsync(
-                "GET",
-                url,
-                null,
-                dbConfig.user_name,
-                dbConfig.user_value);
-
-            return response;
+            return await _sessionRepository.GetSessionDocumentRawAsync(sessionId, dbConfig);
         }
         catch (Exception ex)
         {

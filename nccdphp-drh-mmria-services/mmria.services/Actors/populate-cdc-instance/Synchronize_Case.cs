@@ -83,9 +83,9 @@ public sealed class Synchronize_Case : ReceiveActor
                 message.connection,
                 message.metadata_release_version_name,
                 _couchDbHttpClient,
-                message.method,
-                _configuration,
-                _host_prefix
+                p_method: message.method,
+                configuration: _configuration,
+                host_prefix: _host_prefix
             );
 
             try

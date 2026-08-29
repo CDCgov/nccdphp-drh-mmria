@@ -140,7 +140,7 @@ var g_ui = {
     page :1,
     skip : 0,
     take : 100,
-    sort : "date_last_updated",
+    sort : "by_date_created",
     search_key : null,
     descending : true,
     case_status: "3",
@@ -930,15 +930,7 @@ function print_case_onchange()
 
   if(section_id && section_id.length > 0)
   {
-    if(section_id == "core-summary")
-    {
-      open_core_summary("all");
-    }
-    else
-    {
-      open_print_version(section_id);
-    }
-    
+    open_print_version(section_id);
   }
 }
 
@@ -1128,18 +1120,6 @@ function pdf_case_onclick(event, type_output)
 
   if (section_name) 
   {
-    if (section_name == 'core-summary') 
-    {
-
-        window.setTimeout(function()
-        {
-            openTab('./pdf-version', unique_tab_name, section_name, type_output);
-        }, 1000);	
-
-      
-    } 
-    else 
-    {
       // data-record of selected option, set default in case it comes from the summary case list
 	  // If selected from detail list
 	  const selectedOption = dropdown.options[dropdown.options.selectedIndex];
@@ -1149,8 +1129,6 @@ function pdf_case_onclick(event, type_output)
       {
           openTab('./pdf-version', unique_tab_name, section_name, type_output, record_number);
       }, 1000);	
-      
-    }
   }
 
 }
@@ -1192,18 +1170,6 @@ function print_case_onclick(event)
  
 	if (section_name) 
 	{
-	  if (section_name == 'core-summary') 
-	  {
-  
-		  window.setTimeout(function()
-		  {
-			  openTab('./core-elements', unique_tab_name, 'all');
-		  }, 1000);	
-  
-		
-	  } 
-	  else 
-	  {
 		// data-record of selected option
 		const selectedOption = dropdown.options[dropdown.options.selectedIndex];
 		const record_number = selectedOption.dataset.record;
@@ -1213,8 +1179,6 @@ function print_case_onclick(event)
 		{
 			openTab('./print-version', unique_tab_name, section_name, record_number);
 		}, 1000);	
-		
-	  }
 	}
   
 }

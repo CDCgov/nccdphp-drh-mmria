@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -9,6 +10,8 @@ using mmria.server.model;
 using Microsoft.AspNetCore.Http;
 
 using  mmria.server.extension;
+using mmria.server.util;
+using mmria.common.SharedLibraries.Jurisdiction;
 
 
 namespace VitalsImport_FileUpload.Controllers;
@@ -17,36 +20,45 @@ namespace VitalsImport_FileUpload.Controllers;
 public sealed class vitalsController : Controller
 {
     private readonly ILogger<vitalsController> _logger;
+    private readonly IConfiguration _appConfiguration;
 
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     mmria.common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.server.util.TenantCatalog _tenantCatalog;
+    private readonly IJurisdictionRepository _jurisdictionRepository;
 
     public vitalsController
     (
         ILogger<vitalsController> logger,
+        IConfiguration appConfiguration,
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        mmria.server.util.TenantCatalog tenantCatalog,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        IJurisdictionRepository jurisdictionRepository
     )
     {
         _logger = logger;
+        _appConfiguration = appConfiguration;
         _couchDbHttpClient = couchDbHttpClient;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        _tenantCatalog = tenantCatalog;
+        _jurisdictionRepository = jurisdictionRepository;
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+        configuration = tenantRuntime.RequireConfiguration();
+        db_config = tenantRuntime.RequireDbConfig();
+    }
+
+    private void PopulateVitalsUploadViewData()
+    {
+        TempData["vitals_import_additional_tenants"] = _appConfiguration["mmria_settings:vitals_import_additional_tenants"] ?? string.Empty;
     }
 
     
     public IActionResult Index()
     {
+        PopulateVitalsUploadViewData();
         var model = new FileUploadModel();
         return View(model);
     }
@@ -54,6 +66,7 @@ public sealed class vitalsController : Controller
     [HttpGet]
     public IActionResult FileUpload()
     {
+        PopulateVitalsUploadViewData();
         var model = new FileUploadModel();
         return View(model);
     }
@@ -90,34 +103,27 @@ public sealed class vitalsController : Controller
     }*/
 
     [HttpGet]
-    public async Task<JsonResult> GetJurisdictionTree(string j)
+    public async Task<IActionResult> GetJurisdictionTree(string j)
     {
 
         mmria.common.model.couchdb.jurisdiction_tree result = null;
 
         try{
-            var detail = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, null, j.ToLower());
-            string jurisdiction_tree_url = $"{detail.url}/jurisdiction/jurisdiction_tree";
-            if(!string.IsNullOrWhiteSpace(detail.prefix))
+            var detail = _tenantCatalog.TryResolveDbConfig(j?.ToLower());
+            if (detail == null)
             {
-                jurisdiction_tree_url = $"{detail.url}/{detail.prefix}jurisdiction/jurisdiction_tree";
+                return EscapedJsonResultFactory.Create(result);
             }
 
-            string response_from_server = await _couchDbHttpClient.ExecuteAsync("GET", jurisdiction_tree_url, null, detail.user_name, detail.user_value);
-
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.jurisdiction_tree>(response_from_server);
-
+            result = await _jurisdictionRepository.GetJurisdictionTreeAsync(detail);
         }
         catch(Exception ex) 
         {
-            var message = $"{ex}";
-             
-             
             System.Console.WriteLine($"{ex}");
         }
 
 
-        return Json(result);
+        return EscapedJsonResultFactory.Create(result);
     }
 
 }

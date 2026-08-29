@@ -3,6 +3,384 @@
  * Manages offline case operations and status
  */
 
+function redirect_to_offline_login_for_reauth() {
+    const offlineLoginUrl = window.OfflineStatus && typeof window.OfflineStatus.getOfflineLoginUrl === 'function'
+        ? window.OfflineStatus.getOfflineLoginUrl()
+        : '/Account/OfflineLogin';
+
+    window.location.href = offlineLoginUrl;
+}
+
+function get_current_offline_session_id() {
+    const sessionId =
+        (window.OfflineStatus && typeof window.OfflineStatus.getOfflineSessionId === 'function'
+            ? window.OfflineStatus.getOfflineSessionId()
+            : null) ||
+        localStorage.getItem('offline_session_id');
+
+    if (!sessionId || sessionId === 'null' || sessionId === 'undefined') {
+        return null;
+    }
+
+    return sessionId;
+}
+
+function create_empty_offline_removed_case_state(sessionId) {
+    return {
+        sessionId: sessionId || null,
+        pendingRemovals: [],
+        hiddenExistingCaseIds: [],
+        deletedNewCaseIds: [],
+        updatedAt: new Date().toISOString()
+    };
+}
+
+function normalize_removed_case_ids(caseIds) {
+    if (!Array.isArray(caseIds)) {
+        return [];
+    }
+
+    return Array.from(new Set(
+        caseIds
+            .filter(caseId => typeof caseId === 'string')
+            .map(caseId => caseId.trim())
+            .filter(caseId => caseId.length > 0)
+    ));
+}
+
+function normalize_offline_removed_case_kind(kind) {
+    return kind === 'new' ? 'new' : 'existing';
+}
+
+function normalize_pending_offline_case_removals(entries) {
+    if (!Array.isArray(entries)) {
+        return [];
+    }
+
+    const seenEntries = new Set();
+    const normalizedEntries = [];
+
+    entries.forEach(entry => {
+        if (!entry) {
+            return;
+        }
+
+        let caseId = null;
+        let kind = 'existing';
+
+        if (typeof entry === 'string') {
+            caseId = entry.trim();
+        } else if (typeof entry === 'object') {
+            if (typeof entry.caseId === 'string') {
+                caseId = entry.caseId.trim();
+            }
+
+            kind = normalize_offline_removed_case_kind(entry.kind);
+        }
+
+        if (!caseId) {
+            return;
+        }
+
+        const dedupeKey = `${kind}:${caseId}`;
+        if (seenEntries.has(dedupeKey)) {
+            return;
+        }
+
+        seenEntries.add(dedupeKey);
+        normalizedEntries.push({
+            caseId: caseId,
+            kind: kind
+        });
+    });
+
+    return normalizedEntries;
+}
+
+function normalize_offline_removed_case_state(state, sessionId) {
+    const effectiveSessionId =
+        sessionId ||
+        (state && typeof state.sessionId === 'string' ? state.sessionId : null);
+    const normalized = create_empty_offline_removed_case_state(effectiveSessionId);
+
+    const legacyPendingRemovalCaseIds = normalize_removed_case_ids(state && state.pendingRemovalCaseIds);
+    const legacyRemovedCaseIds = normalize_removed_case_ids(state && state.removedCaseIds);
+
+    normalized.pendingRemovals = normalize_pending_offline_case_removals(
+        (state && state.pendingRemovals) || legacyPendingRemovalCaseIds
+    );
+    normalized.hiddenExistingCaseIds = normalize_removed_case_ids(
+        (state && state.hiddenExistingCaseIds) || legacyRemovedCaseIds
+    );
+    normalized.deletedNewCaseIds = normalize_removed_case_ids(state && state.deletedNewCaseIds);
+    normalized.updatedAt =
+        state && typeof state.updatedAt === 'string' && state.updatedAt.length > 0
+            ? state.updatedAt
+            : new Date().toISOString();
+
+    return normalized;
+}
+
+async function load_offline_removed_case_state(sessionId) {
+    const effectiveSessionId = sessionId || get_current_offline_session_id();
+    const fallbackState = create_empty_offline_removed_case_state(effectiveSessionId);
+
+    if (!effectiveSessionId) {
+        return fallbackState;
+    }
+
+    if (!window.ServiceWorkerManager || typeof window.ServiceWorkerManager.getOfflineRemovedCasesState !== 'function') {
+        return fallbackState;
+    }
+
+    try {
+        const state = await window.ServiceWorkerManager.getOfflineRemovedCasesState(effectiveSessionId);
+        return normalize_offline_removed_case_state(state, effectiveSessionId);
+    } catch (error) {
+        offlineLog.warn('OfflineCaseManager', 'Unable to load offline removed case state. Continuing without marker state.', error);
+        return fallbackState;
+    }
+}
+
+async function save_offline_removed_case_state(state) {
+    const normalizedState = normalize_offline_removed_case_state(state, state && state.sessionId);
+
+    if (!normalizedState.sessionId) {
+        return normalizedState;
+    }
+
+    if (!window.ServiceWorkerManager || typeof window.ServiceWorkerManager.setOfflineRemovedCasesState !== 'function') {
+        return normalizedState;
+    }
+
+    try {
+        const savedState = await window.ServiceWorkerManager.setOfflineRemovedCasesState(normalizedState);
+        return normalize_offline_removed_case_state(savedState, normalizedState.sessionId);
+    } catch (error) {
+        offlineLog.warn('OfflineCaseManager', 'Unable to save offline removed case state. Continuing with in-memory intent only.', error);
+        return normalizedState;
+    }
+}
+
+async function add_pending_offline_case_removal(caseId, kind = 'existing') {
+    const state = await load_offline_removed_case_state();
+
+    if (!state.sessionId) {
+        return state;
+    }
+
+    const normalizedKind = normalize_offline_removed_case_kind(kind);
+
+    state.pendingRemovals = state.pendingRemovals.filter(entry => entry.caseId !== caseId);
+    state.pendingRemovals.push({
+        caseId: caseId,
+        kind: normalizedKind
+    });
+    state.hiddenExistingCaseIds = state.hiddenExistingCaseIds.filter(hiddenCaseId => hiddenCaseId !== caseId);
+    state.deletedNewCaseIds = state.deletedNewCaseIds.filter(deletedCaseId => deletedCaseId !== caseId);
+    return save_offline_removed_case_state(state);
+}
+
+async function mark_offline_case_removed(caseId, kind = 'existing') {
+    const state = await load_offline_removed_case_state();
+
+    if (!state.sessionId) {
+        return state;
+    }
+
+    const normalizedKind = normalize_offline_removed_case_kind(kind);
+    state.pendingRemovals = state.pendingRemovals.filter(entry => entry.caseId !== caseId);
+
+    if (normalizedKind === 'new') {
+        state.hiddenExistingCaseIds = state.hiddenExistingCaseIds.filter(hiddenCaseId => hiddenCaseId !== caseId);
+        if (!state.deletedNewCaseIds.includes(caseId)) {
+            state.deletedNewCaseIds.push(caseId);
+        }
+    } else {
+        state.deletedNewCaseIds = state.deletedNewCaseIds.filter(deletedCaseId => deletedCaseId !== caseId);
+        if (!state.hiddenExistingCaseIds.includes(caseId)) {
+            state.hiddenExistingCaseIds.push(caseId);
+        }
+    }
+
+    return save_offline_removed_case_state(state);
+}
+
+async function rollback_pending_offline_case_removal(caseId) {
+    const state = await load_offline_removed_case_state();
+
+    if (!state.sessionId) {
+        return state;
+    }
+
+    state.pendingRemovals = state.pendingRemovals.filter(entry => entry.caseId !== caseId);
+    return save_offline_removed_case_state(state);
+}
+
+function get_existing_case_release_candidates_from_state(state) {
+    const normalizedState = normalize_offline_removed_case_state(state);
+    const releaseCandidateIds = [
+        ...normalizedState.hiddenExistingCaseIds,
+        ...normalizedState.pendingRemovals
+            .filter(entry => entry.kind === 'existing')
+            .map(entry => entry.caseId)
+    ];
+
+    return normalize_removed_case_ids(releaseCandidateIds);
+}
+
+function get_offline_session_snapshot() {
+    try {
+        const rawValue = localStorage.getItem('mmria_offline_session');
+        if (!rawValue) {
+            return null;
+        }
+
+        return JSON.parse(rawValue);
+    } catch (error) {
+        offlineLog.warn('OfflineCaseManager', 'Unable to parse mmria_offline_session while pruning removed case state.', error);
+        return null;
+    }
+}
+
+function prune_case_from_offline_session_data(sessionData, caseId) {
+    if (!sessionData || typeof sessionData !== 'object') {
+        return sessionData;
+    }
+
+    const pruned = JSON.parse(JSON.stringify(sessionData));
+
+    if (Array.isArray(pruned.offlineIds)) {
+        pruned.offlineIds = pruned.offlineIds.filter(id => id !== caseId);
+    }
+
+    if (Array.isArray(pruned.offline_ids)) {
+        pruned.offline_ids = pruned.offline_ids.filter(id => id !== caseId);
+    }
+
+    if (Array.isArray(pruned.caseDocuments)) {
+        pruned.caseDocuments = pruned.caseDocuments.filter(document =>
+            (document && (document.documentId || document.id)) !== caseId
+        );
+    }
+
+    if (Array.isArray(pruned.case_documents)) {
+        pruned.case_documents = pruned.case_documents.filter(document =>
+            (document && (document.documentId || document.id)) !== caseId
+        );
+    }
+
+    return pruned;
+}
+
+async function persist_offline_session_snapshot(sessionData) {
+    if (!sessionData) {
+        return;
+    }
+
+    localStorage.setItem('mmria_offline_session', JSON.stringify(sessionData));
+    window.mmria_offline_session_data = sessionData;
+
+    if (window.g_ui && window.g_ui.offline_session_data) {
+        window.g_ui.offline_session_data = sessionData;
+    }
+
+    if (
+        window.g_ui &&
+        window.g_ui.process_offline_case_view_list_by_user &&
+        typeof window.g_ui.process_offline_case_view_list_by_user === 'object' &&
+        window.g_ui.process_offline_case_view_list_by_user._id === sessionData.offlineSessionId
+    ) {
+        window.g_ui.process_offline_case_view_list_by_user = sessionData;
+    }
+
+    if (window.ServiceWorkerManager && typeof window.ServiceWorkerManager.cacheOfflineSessionData === 'function') {
+        try {
+            await window.ServiceWorkerManager.cacheOfflineSessionData(sessionData);
+        } catch (error) {
+            offlineLog.warn('OfflineCaseManager', 'Unable to refresh cached offline session payload after case removal.', error);
+        }
+    }
+}
+
+async function prune_case_from_offline_session_snapshot(caseId) {
+    const sessionData = get_offline_session_snapshot();
+
+    if (!sessionData) {
+        return null;
+    }
+
+    const prunedSessionData = prune_case_from_offline_session_data(sessionData, caseId);
+    await persist_offline_session_snapshot(prunedSessionData);
+    return prunedSessionData;
+}
+
+async function reconcile_offline_removed_case_state(activeCaseIds) {
+    const state = await load_offline_removed_case_state();
+
+    if (!state.sessionId) {
+        return state;
+    }
+
+    const activeCaseIdSet = new Set(Array.isArray(activeCaseIds) ? activeCaseIds : []);
+    const nextHiddenExistingCaseIds = new Set(state.hiddenExistingCaseIds);
+    const nextDeletedNewCaseIds = new Set(state.deletedNewCaseIds);
+    let didChange = false;
+
+    const nextPendingRemovals = [];
+    for (const entry of state.pendingRemovals) {
+        if (!entry || !entry.caseId) {
+            didChange = true;
+            continue;
+        }
+
+        if (activeCaseIdSet.has(entry.caseId)) {
+            nextHiddenExistingCaseIds.delete(entry.caseId);
+            nextDeletedNewCaseIds.delete(entry.caseId);
+            didChange = true;
+            continue;
+        }
+
+        if (entry.kind === 'new') {
+            if (!nextDeletedNewCaseIds.has(entry.caseId)) {
+                nextDeletedNewCaseIds.add(entry.caseId);
+                didChange = true;
+            }
+        } else if (!nextHiddenExistingCaseIds.has(entry.caseId)) {
+            nextHiddenExistingCaseIds.add(entry.caseId);
+            didChange = true;
+        }
+    }
+
+    for (const caseId of state.hiddenExistingCaseIds) {
+        if (activeCaseIdSet.has(caseId)) {
+            nextHiddenExistingCaseIds.delete(caseId);
+            didChange = true;
+        }
+    }
+
+    for (const caseId of state.deletedNewCaseIds) {
+        if (activeCaseIdSet.has(caseId)) {
+            nextDeletedNewCaseIds.delete(caseId);
+            didChange = true;
+        }
+    }
+
+    const nextState = normalize_offline_removed_case_state({
+        sessionId: state.sessionId,
+        pendingRemovals: nextPendingRemovals,
+        hiddenExistingCaseIds: Array.from(nextHiddenExistingCaseIds),
+        deletedNewCaseIds: Array.from(nextDeletedNewCaseIds),
+        updatedAt: state.updatedAt
+    }, state.sessionId);
+
+    if (didChange) {
+        return save_offline_removed_case_state(nextState);
+    }
+
+    return nextState;
+}
+
 // Helper function to disable all offline-related buttons
 function disable_all_offline_buttons() {
     // Disable all "Add to Offline List" buttons
@@ -13,7 +391,7 @@ function disable_all_offline_buttons() {
     });
     
     // Disable all "Remove from List" buttons
-    const removeButtons = document.querySelectorAll('button[onclick*="remove_offline_mode_softlock"]');
+    const removeButtons = document.querySelectorAll('button[onclick*="remove_offline_mode_softlock"], button[onclick*="offline_mode_abandon_offline_changes"]');
     removeButtons.forEach(button => {
         button.disabled = true;
         button.classList.add('offline-processing-disabled');
@@ -118,6 +496,119 @@ async function refresh_offline_documents_list() {
     }
 }
 
+async function restore_pending_go_offline_softlocks() {
+    const storageKey = 'pending_go_offline_softlock_restore';
+
+    try {
+        const rawValue = localStorage.getItem(storageKey);
+        if (!rawValue) {
+            return { attempted: 0, restored: 0, failed: 0, didRestore: false };
+        }
+
+        let pendingIds = [];
+        try {
+            const parsed = JSON.parse(rawValue);
+            if (Array.isArray(parsed)) {
+                pendingIds = parsed;
+            }
+        } catch (_parseError) {
+            pendingIds = [];
+        }
+
+        const normalizedIds = Array.from(new Set(
+            pendingIds
+                .map(id => (id || '').toString().trim())
+                .filter(id => id.length > 0)
+        ));
+
+        if (normalizedIds.length === 0) {
+            localStorage.removeItem(storageKey);
+            return { attempted: 0, restored: 0, failed: 0, didRestore: false };
+        }
+
+        let tab_id = null;
+        try {
+            if (typeof window.mmria_get_unique_tab_id === 'function') {
+                await window.mmria_get_unique_tab_id();
+            }
+            if (typeof get_mmria_tab_id === 'function') {
+                tab_id = get_mmria_tab_id();
+            }
+        } catch (_ex) {
+            tab_id = null;
+        }
+
+        const alreadyOfflineIds = new Set(
+            (g_ui && Array.isArray(g_ui.offline_case_view_list_by_user) ? g_ui.offline_case_view_list_by_user : [])
+                .map(doc => doc && doc.id ? doc.id : null)
+                .filter(id => id)
+        );
+
+        let attempted = 0;
+        let restored = 0;
+        let failed = 0;
+
+        for (const caseId of normalizedIds) {
+            if (alreadyOfflineIds.has(caseId)) {
+                restored++;
+                continue;
+            }
+
+            attempted++;
+
+            let url = '/api/case/toggle-offline/' + caseId;
+            if (tab_id) {
+                url += '?tab_id=' + encodeURIComponent(tab_id);
+            }
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ direction: 'add' })
+                });
+
+                let result = {};
+                try {
+                    result = await response.json();
+                } catch (_jsonError) {
+                    result = {};
+                }
+
+                if ((response.ok && result.success) || result.already_in_state) {
+                    restored++;
+                } else {
+                    failed++;
+                    offlineLog.warn('OfflineCaseManager', `Failed to restore pending go offline soft lock for case ${caseId}`, result);
+                }
+            } catch (error) {
+                failed++;
+                offlineLog.error('OfflineCaseManager', `Error restoring pending go offline soft lock for case ${caseId}:`, error);
+            }
+        }
+
+        localStorage.removeItem(storageKey);
+        offlineLog.log('OfflineCaseManager', 'Completed pending go offline soft lock restore', {
+            attempted,
+            restored,
+            failed
+        });
+
+        return {
+            attempted,
+            restored,
+            failed,
+            didRestore: attempted > 0 || restored > 0
+        };
+    } catch (error) {
+        offlineLog.error('OfflineCaseManager', 'Error restoring pending go offline soft locks:', error);
+        localStorage.removeItem(storageKey);
+        return { attempted: 0, restored: 0, failed: 0, didRestore: false };
+    }
+}
+
 // Make functions globally available
 window.disable_all_offline_buttons = disable_all_offline_buttons;
 window.disable_all_processing_buttons = disable_all_processing_buttons;
@@ -125,6 +616,7 @@ window.enable_all_processing_buttons = enable_all_processing_buttons;
 window.handle_abandon_changes_click = handle_abandon_changes_click;
 window.handle_delete_changes_click = handle_delete_changes_click;
 window.refresh_offline_documents_list = refresh_offline_documents_list;
+window.restore_pending_go_offline_softlocks = restore_pending_go_offline_softlocks;
 
 // Global function for offline status toggle
 async function add_offline_mode_softlock(caseId, caseIndex) {
@@ -170,7 +662,12 @@ async function add_offline_mode_softlock(caseId, caseIndex) {
             body: JSON.stringify({ direction: 'add' })
         });
 
-        var result = await response.json();
+        let result = {};
+        try {
+            result = await response.json();
+        } catch (_ex) {
+            result = {};
+        }
         
         if (response.ok && result.success) {
             // Success - case added to offline mode
@@ -198,20 +695,58 @@ async function add_offline_mode_softlock(caseId, caseIndex) {
         } else {
             // If the server reports a lock-style conflict, show the same modal UX as the case editor.
             const message = (result && result.message) ? String(result.message) : '';
+            const normalizedMessage = message.toLowerCase();
+            const extractLockedUserName = (text, prefix) => {
+                if (!text || !prefix) {
+                    return '';
+                }
+
+                if (text.indexOf(prefix) !== 0) {
+                    return '';
+                }
+
+                return text.substring(prefix.length).replace(/\.$/, '').trim();
+            };
             if (
-                response.status === 409 ||
-                (message && message.toLowerCase().indexOf('another tab') > -1)
+                normalizedMessage.indexOf('case is offline locked by another tab for this user.') > -1 ||
+                normalizedMessage.indexOf('case is locked by another tab for this user.') > -1 ||
+                normalizedMessage.indexOf('please close the other tab, or wait for the lock to expire.') > -1
             )
             {
+                g_offline_operation_in_progress = false;
+                window.OfflineModals.closeLoadingSpinner();
                 try {
-                    if (typeof show_locked_case_modal === 'function') {
-                        show_locked_case_modal(caseId);
+                    if (typeof show_add_offline_softlock_tab_conflict_modal === 'function') {
+                        window.setTimeout(() => {
+                            show_add_offline_softlock_tab_conflict_modal(caseId);
+                        }, 175);
                     }
                 } catch (_ex) {
                     // best-effort
                 }
+                return;
+            }
+
+            if (
+                normalizedMessage.indexOf('case is locked by ') === 0 ||
+                normalizedMessage.indexOf('case is offline locked by ') === 0
+            )
+            {
+                const lockedBy =
+                    extractLockedUserName(message, 'Case is locked by ') ||
+                    extractLockedUserName(message, 'Case is offline locked by ');
+
                 g_offline_operation_in_progress = false;
                 window.OfflineModals.closeLoadingSpinner();
+                try {
+                    if (typeof show_case_locked_by_another_user_modal === 'function') {
+                        window.setTimeout(() => {
+                            show_case_locked_by_another_user_modal(caseId, lockedBy);
+                        }, 175);
+                    }
+                } catch (_ex) {
+                    // best-effort
+                }
                 return;
             }
 
@@ -234,7 +769,6 @@ async function remove_offline_mode_softlock(caseId) {
     try {
         // Set global flag to disable all offline buttons
         g_offline_operation_in_progress = true;
-        
 
         window.OfflineModals.showLoadingSpinner();        
 
@@ -297,14 +831,48 @@ async function remove_offline_mode_softlock(caseId) {
         } else {
             // If the server reports a lock-style conflict, show the same modal UX as the case editor.
             const message = (result && result.message) ? String(result.message) : '';
+            const normalizedMessage = message.toLowerCase();
+            const extractLockedUserName = (text, prefix) => {
+                if (!text || !prefix) {
+                    return '';
+                }
+
+                if (text.indexOf(prefix) !== 0) {
+                    return '';
+                }
+
+                return text.substring(prefix.length).replace(/\.$/, '').trim();
+            };
             if (
-                response.status === 409 ||
-                (message && message.toLowerCase().indexOf('another tab') > -1)
+                normalizedMessage.indexOf('case is offline locked by another tab for this user.') > -1 ||
+                normalizedMessage.indexOf('case is locked by another tab for this user.') > -1 ||
+                normalizedMessage.indexOf('please close the other tab, or wait for the lock to expire.') > -1
             )
             {
                 try {
-                    if (typeof show_locked_case_modal === 'function') {
-                        show_locked_case_modal(caseId);
+                    if (typeof show_remove_offline_softlock_tab_conflict_modal === 'function') {
+                        show_remove_offline_softlock_tab_conflict_modal(caseId);
+                    }
+                } catch (_ex) {
+                    // best-effort
+                }
+                g_offline_operation_in_progress = false;
+                window.OfflineModals.closeLoadingSpinner();
+                return;
+            }
+
+            if (
+                normalizedMessage.indexOf('case is offline locked by ') === 0 ||
+                normalizedMessage.indexOf('case is locked by ') === 0
+            )
+            {
+                const lockedBy =
+                    extractLockedUserName(message, 'Case is offline locked by ') ||
+                    extractLockedUserName(message, 'Case is locked by ');
+
+                try {
+                    if (typeof show_case_locked_by_another_user_modal === 'function') {
+                        show_case_locked_by_another_user_modal(caseId, lockedBy);
                     }
                 } catch (_ex) {
                     // best-effort
@@ -326,6 +894,12 @@ async function remove_offline_mode_softlock(caseId) {
 async function get_offline_documents() {
     try {
         offlineLog.log('OfflineCaseManager', 'Fetching offline documents...');
+        if (window.OfflineIntegrityValidator) {
+            await window.OfflineIntegrityValidator.validateCurrentState({
+                checkPoint: 'case_list_load'
+            });
+        }
+
         const response = await fetch('/api/case_view/offline-documents', {
             method: 'GET',
             headers: {
@@ -337,9 +911,24 @@ async function get_offline_documents() {
         
         if (response.ok) {
             const result = await response.json();
-            offlineLog.log('OfflineCaseManager', 'Offline documents loaded successfully');
+            offlineLog.info('OfflineCaseManager', 'Offline documents loaded successfully', {
+                loadedCaseCount: Array.isArray(result.rows) ? result.rows.length : 0
+            });
             return result.rows || [];
         } else {
+            if (response.status === 401) {
+                try {
+                    const errorData = await response.json();
+                    if (errorData && errorData.error === 'offline_key_required') {
+                        offlineLog.warn('OfflineCaseManager', 'Offline key re-entry required before loading cached case list');
+                        redirect_to_offline_login_for_reauth();
+                        return [];
+                    }
+                } catch (parseError) {
+                    offlineLog.warn('OfflineCaseManager', 'Could not parse offline documents 401 response:', parseError);
+                }
+            }
+
             offlineLog.error('OfflineCaseManager', 'Failed to fetch offline documents:', response.status, response.statusText);
             return [];
         }
@@ -534,6 +1123,13 @@ async function get_offline_case(p_id)
 {
   offlineLog.log('OfflineCaseManager', 'Loading offline case:', p_id);
 
+  if (window.OfflineIntegrityValidator) {
+    await window.OfflineIntegrityValidator.validateCurrentState({
+      checkPoint: 'case_detail_load',
+      expectedOfflineIds: [p_id]
+    });
+  }
+
   try
   {
     // Use fetch to get case data - service worker will intercept and handle decryption
@@ -603,8 +1199,7 @@ async function get_offline_case(p_id)
           const errorData = await response.json();
           if (errorData.error === 'offline_key_required') {
             offlineLog.error('OfflineCaseManager', 'Offline encryption key required - redirecting to offline login');
-            //alert('Your offline session has expired. Please log in again with your offline password.');
-            window.location.href = '/Account/Offlinelogin';
+            redirect_to_offline_login_for_reauth();
             return;
           }
         } catch (err) {
@@ -624,6 +1219,13 @@ async function get_offline_case(p_id)
 
 async function get_case_for_processing(p_id) 
 {
+  if (window.OfflineIntegrityValidator) {
+    await window.OfflineIntegrityValidator.validateCurrentState({
+      checkPoint: 'case_detail_load',
+      expectedOfflineIds: [p_id]
+    });
+  }
+
   try
   {
     // Use fetch to get case data - service worker will intercept and handle decryption
@@ -665,6 +1267,20 @@ async function get_case_for_processing(p_id)
  */
 async function process_offline_save(p_data, save_case_request, p_note, p_call_back) {
     offlineLog.log('OfflineCaseManager', 'Offline mode detected - tracking document changes instead of saving to server');
+    offlineLog.info('OfflineCaseManager', 'Processing offline save request', {
+        caseId: p_data && p_data._id,
+        note: p_note || '',
+        changeCount: save_case_request && save_case_request.Change_Stack && Array.isArray(save_case_request.Change_Stack.items)
+            ? save_case_request.Change_Stack.items.length
+            : 0
+    });
+
+    if (window.OfflineIntegrityValidator) {
+        await window.OfflineIntegrityValidator.validateCurrentState({
+            checkPoint: 'case_save',
+            expectedOfflineIds: p_data && p_data._id ? [p_data._id] : []
+        });
+    }
     
     let case_response;
     
@@ -675,21 +1291,18 @@ async function process_offline_save(p_data, save_case_request, p_note, p_call_ba
         
         // Track the document change for offline sync with field-level changes
         if (typeof track_offline_document_change === 'function') {
-            track_offline_document_change(
+            await track_offline_document_change(
                 p_data._id, 
                 p_data, 
                 p_note || 'Document modified while offline',
                 changeStackCopy  // Pass the complete change stack
             );
         } else {
-            offlineLog.warn('OfflineCaseManager', 'track_offline_document_change function not available');
+            throw new Error('Offline change tracker is not available');
         }
-        
-        // Update local storage with the modified document
-        if (typeof set_local_case === 'function') {
-            set_local_case(p_data, p_call_back);
-        } else {
-            offlineLog.warn('OfflineCaseManager', 'set_local_case function not available');
+
+        if (typeof p_call_back === 'function') {
+            p_call_back();
         }
         
         // Simulate successful save response for offline mode
@@ -714,19 +1327,6 @@ async function process_offline_save(p_data, save_case_request, p_note, p_call_ba
 }
 
 /**
- * Generate offline record ID by appending "-offline" suffix if in offline mode
- * @param {string} baseRecordId - The base record ID
- * @returns {string} Record ID with "-offline" suffix if in offline mode
- */
-function generateOfflineRecordId(baseRecordId) {
-    const isOffline = window.OfflineStatus.isOffline();
-    if (isOffline) {
-        return baseRecordId + '-offline';
-    }
-    return baseRecordId;
-}
-
-/**
  * Handle offline setup for newly created case
  * @param {Object} result - The newly created case data
  * @param {Object} g_ui - Global UI object
@@ -737,28 +1337,21 @@ async function handleNewCaseOfflineSetup(result, g_ui) {
     if (isOffline && window.g_offline_case_index_map) {
         window.g_offline_case_index_map = g_ui.case_view_list.map(c => c.id);
         
-        // Cache the new case in service worker for offline access
         try {
-            const cacheUrl = `/api/case?case_id=${result._id}`;
-            const cacheResponse = new Response(JSON.stringify(result), {
-                headers: { 'Content-Type': 'application/json' }
-            });
-            
-            // Use the global cache name function (gets version from server endpoint)
-            // This ensures consistency with service worker cache naming
-            const apiCacheName = await window.getActualApiCacheName();
-            
-            // Cache the case data
-            const cache = await caches.open(apiCacheName);
-            await cache.put(cacheUrl, cacheResponse);
-            
-            // Track as new offline document
+            if (typeof g_original_offline_documents !== 'undefined' &&
+                g_original_offline_documents != null &&
+                typeof g_original_offline_documents.set === 'function') {
+                g_original_offline_documents.set(result._id, JSON.parse(JSON.stringify(result)));
+            }
+
             if (typeof track_offline_document_change === 'function') {
-                track_offline_document_change(
+                await track_offline_document_change(
                     result._id, 
                     result, 
                     'New case created while offline'
                 );
+            } else {
+                throw new Error('Offline change tracker is not available');
             }
             
             // Add new case to offline_mode_case_view_list so it displays in offline mode
@@ -809,6 +1402,12 @@ async function handleNewCaseOfflineSetup(result, g_ui) {
 window.OfflineCaseManager = {
     addOfflineModeSoftlock: add_offline_mode_softlock,
     removeOfflineModeSoftlock: remove_offline_mode_softlock,
+    addPendingOfflineCaseRemoval: add_pending_offline_case_removal,
+    markOfflineCaseRemoved: mark_offline_case_removed,
+    rollbackPendingOfflineCaseRemoval: rollback_pending_offline_case_removal,
+    getExistingCaseReleaseCandidates: get_existing_case_release_candidates_from_state,
+    pruneCaseFromOfflineSessionSnapshot: prune_case_from_offline_session_snapshot,
+    reconcileOfflineRemovedCaseState: reconcile_offline_removed_case_state,
     getDocuments: get_offline_documents,
     getCasesBySession: get_offline_cases_by_session,
     updateOfflineCaseIndexMap: update_offline_case_index_map,
@@ -816,7 +1415,6 @@ window.OfflineCaseManager = {
     ensureOfflineInitialization: ensure_offline_initialization,
     getOfflineCase: get_offline_case,
     processOfflineSave: process_offline_save,
-    generateOfflineRecordId: generateOfflineRecordId,
     handleNewCaseOfflineSetup: handleNewCaseOfflineSetup,
     get_case_for_processing: get_case_for_processing
 };

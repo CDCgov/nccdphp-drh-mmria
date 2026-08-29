@@ -1,5 +1,10 @@
 # Controller -> SharedLibraries Migration Matrix
 
+- Status: Active
+- Scope: Current controller migration status, target SharedLibraries features, and safe extraction boundaries.
+- When to use: Read this before refactoring controllers or moving controller logic into `mmria.common/SharedLibraries`.
+- Last verified: 2026-04-14
+- Related docs: [AI Context Index](./AI_CONTEXT.md)
 This document captures the current migration plan for moving server-side controller logic into `mmria.common/SharedLibraries` using the feature-based `Model/Manager/DAL` pattern required by [AI_CONTEXT.md](./AI_CONTEXT.md).
 
 Use this document before refactoring controller code in:
@@ -10,10 +15,12 @@ Use this document before refactoring controller code in:
 
 Current inventory from the controller analysis:
 
-- `53` non-API controllers under `Controllers/`
+- `54` non-API controllers under `Controllers/`
 - `52` API controllers under `Controllers/api/`
-- `38/53` non-API controllers have no direct `CouchDbHttpClient.ExecuteAsync` usage and are mostly route/view shells
-- `40/52` API controllers still make direct CouchDB calls from controller code
+- `43/54` non-API controllers do not call `CouchDbHttpClient.ExecuteAsync(...)` directly and are mostly route/view shells
+- `19/52` API controllers still call `CouchDbHttpClient.ExecuteAsync(...)` directly from controller code
+
+Those `ExecuteAsync(...)` counts understate the remaining migration surface. Several controllers now avoid direct `ExecuteAsync(...)` calls but still own document sanitization, request-body parsing, revision handling, tenant-aware orchestration, or legacy HTTP helpers that still belong in feature `Manager`/`DAL` code.
 
 The migration target is not "all controllers". The target is the subset still mixing:
 - route handling
@@ -31,7 +38,7 @@ These rules are derived from [AI_CONTEXT.md](./AI_CONTEXT.md) and the current se
 - Move business logic into `mmria.common/SharedLibraries/<Feature>/Manager`.
 - Move CouchDB calls into `mmria.common/SharedLibraries/<Feature>/DAL`.
 - Keep `HttpContext`, `User`, `View()`, `Json()`, `File()`, cookies, headers, and actor dispatch in controllers on the first pass.
-- Keep tenant resolution in controllers on the first pass. Resolve `host_prefix`, `configuration`, and `db_config` in the controller, then pass them into managers.
+- Keep tenant resolution in controllers on the first pass. Resolve `host_prefix`, `configuration`, `db_config`, and when needed `ConfigurationSet` from `RequestTenantRuntime`, and use `TenantCatalog` only for explicit cross-tenant lookups.
 - Do not move Akka actor creation or `ActorSystem` dependencies into `mmria.common` on the first pass.
 - Do not do namespace cleanup or architectural cleanup that is not required for the mechanical move.
 - When extracting code, do not add outer `try/catch` blocks in Manager or DAL methods.
@@ -41,9 +48,10 @@ These rules are derived from [AI_CONTEXT.md](./AI_CONTEXT.md) and the current se
 - The common project already has SharedLibraries for `Account`, `AggregateReport`, `Case`, `CaseView`, `InteractiveReport`, `ManageUsers`, `MMRIAServices`, `OfflineCase`, and `Session`.
 - Existing adoption is partial. Several controllers still bypass those libraries and call CouchDB directly.
 - `manage_usersController` currently constructs other controllers directly to assemble initial page data. This is a good early target for an orchestration manager because it is high-friction and low-risk.
-- Tenant resolution currently depends on server-side helpers:
+- Tenant resolution currently depends on request-scoped runtime services:
   - `mmria.server.extension.GetPrefix()`
-  - `mmria.server.util.MultiTenantConfigHelper`
+  - `mmria.server.util.RequestTenantRuntime`
+  - `mmria.server.util.TenantCatalog` for explicit cross-tenant request paths
   These should stay in the controller for the first migration pass.
 - Actor-driven side effects are still server-owned. Controllers such as case save/import/export endpoints should keep actor dispatch in `mmria-server` until an explicit abstraction is introduced.
 - Several common libraries already use older namespaces such as `mmria.common.Manager` and `mmria.common.Model.*`. Do not stop the migration to normalize those unless explicitly requested.
@@ -56,6 +64,9 @@ These rules are derived from [AI_CONTEXT.md](./AI_CONTEXT.md) and the current se
 - Round 3 implementation completed for the metadata/version wave using a new `MetadataVersion` feature in `mmria.common/SharedLibraries`.
 - Round 3 moved metadata document CRUD, attachment reads/writes, revision lookup, version save gating, UI specification CRUD, and validator/check-code attachment orchestration into `MetadataVersion/Manager` and `MetadataVersion/DAL`.
 - Round 3 intentionally left the `versionController` `export-names` action using the existing server-side utility because that path depends on server-only code and moving it would broaden the refactor beyond the “move as-is” goal.
+- The biggest remaining documentation gap is the backlog of document-centric controllers that still own metadata/config/session/report CRUD or recovery workflows but are not yet represented in this matrix.
+- The most important missing API follow-up targets are `passwordChangeController`, `ije_messageController`, `jurisdiction_treeController`, `data_summary_viewController`, `caseRevisionListController`, and `de_identified_listController`.
+- The most important missing MVC follow-up targets are `broadcast_messageController`, `clear_case_statusController`, `recover_deleted_caseController`, and `loggerController`.
 
 ## Spreadsheet-Style Matrix
 
@@ -112,6 +123,17 @@ Suggested status values:
 | 7 | `largely aligned` | `Controllers/api/attachmentController.cs` | `Attachment` | Round 7 extracted attachment validation and PMSS lookup orchestration into `Attachment` | file-name validation, central upload PMSS resolution, reusable upload validation | PMSS case-view lookup needed for central upload resolution | file system paths, file writes/deletes, `FileResult`, and request-body handling | Medium | Completed in Round 7; removed controller-to-controller `case_viewController` usage while keeping local file operations in the controller |
 | 7 | `largely aligned` | `Controllers/api/cvsAPIController.cs` | `CVS` | Round 7 extracted CVS request/data orchestration into `CVS` | request-building, response normalization, year/address fallback rules, dashboard orchestration | external CVS API calls and backing case/case-view lookups | file download responses, local file cache management, and role extraction | High | Completed in Round 7; controller still owns cached PDF writes and download responses by design |
 | 7 | `largely aligned` | `Controllers/backup_managerController.cs` | `BackupAdmin` | Round 7 extracted backup service orchestration into `BackupAdmin` | backup admin orchestration and service-call wrapping | remote backup service calls | file download/temp file handling and MVC responses | Medium | Completed in Round 7; `GetFile` and `GetSubFolderFile` intentionally remain controller-owned because they stream files |
+| 8 | `partially migrated` | `Controllers/api/passwordChangeController.cs` | `Session` | Controller already uses `SessionManager` for password-change session events, but still performs direct `_users` and `session_event` access | password-expiration lookup, password-change orchestration, and request validation | `_users` document GET/PUT plus `session/_design/session_event_sortable/_view/by_user_id` query | route/actions, current-user extraction, and final auth/session response behavior | Medium | Follow-on to Round 2; fold this into `Session` instead of creating another password-specific data path |
+| 8 | `planned` | `Controllers/api/ije_messageController.cs` | `VitalImport` | Still owns vital-import document listing and IJE set submission orchestration directly in the controller | request validation, batch serialization, vital-import list/load workflow, and submit/delete orchestration | `vital_import/_all_docs`, `vitals_url` PUT, and `VitalNotification` DELETE flows | route/actions, request-body reads, Excel file generation, and final response shaping | Medium | Missing from Round 6 even though it is part of the same vital-import surface |
+| 8 | `planned` | `Controllers/api/jurisdiction_treeController.cs` | `JurisdictionTree` | Controller still owns tree sanitization, revision resolution, and document CRUD for the jurisdiction metadata tree | tree validation/sanitization, revision handling, and save orchestration | `jurisdiction/jurisdiction_tree` GET/PUT | route/actions, auth attributes, and final response shaping | Medium | A dedicated feature keeps the first-pass move mechanical even if this is later grouped with broader admin/jurisdiction work |
+| 8 | `planned` | `Controllers/api/data_summary_viewController.cs` | `DataSummary` | Controller still builds report-view URLs, executes report queries, and applies auth-aware result filtering | report query orchestration and result filtering | `report/_design/data_summary_view_report/_view/year_of_death` access | route/actions and pagination/result response shape | Medium | This is the API half of the data-summary feature and should not remain as ad hoc controller logic |
+| 8 | `planned` | `Controllers/api/caseRevisionListController.cs` | `AuditRecovery` | Distinct from `caseRevisionList_case_viewController`; still performs cross-tenant revision fetches directly in the controller | revision lookup orchestration and tenant-aware recovery workflow | `mmrds/{case_id}?revs=true&open_revs=all` fetches | route/actions and cross-tenant request validation | Medium | Keep this separate from the Round 5 `case_view` revision list entry because it serves a different admin/recovery use case |
+| 8 | `planned` | `Controllers/api/de_identified_listController.cs` | `DeIdentifiedList` | Controller still owns metadata list selection, cookie-aware reads, and document PUT handling | list selection and save orchestration | `metadata/de-identified-list` and `metadata/de-identified-export-list` GET/PUT | route/actions, request cookie access, and final result shaping | Low | Small and mechanical, but still a document CRUD controller that should be tracked explicitly |
+| 9 | `planned` | `Controllers/broadcast_messageController.cs` | `BroadcastMessage` | Controller still owns metadata document load/save/publish orchestration plus replication handoff to the vitals service | broadcast message sanitization, publish/unpublish workflow, and replication orchestration | `metadata/broadcast-message-list` GET/PUT and vitals replication POST | MVC view routing, request-body reads, and final responses | Medium | Good candidate for a compact feature because the data contract is one metadata document plus an external replication side effect |
+| 9 | `planned` | `Controllers/clear_case_status.cs` | `CaseWorkflowAdmin` | Controller still owns case lookup, state filtering, and case-status reset document writes | search/filter workflow and case-status reset orchestration | `mmrds` view query plus case document GET/PUT | MVC view flow, authorized state resolution, and final view models | High | High-risk because it mutates case workflow state across tenant-selected databases; keep request-scoped authorization in the controller on pass 1 |
+| 9 | `planned` | `Controllers/recover_deleted_case.cs` | `AuditRecovery` | Controller still owns deleted-case lookup, audit lookup, revision selection, and recovery writes | deleted-case recovery orchestration and tombstone handling | audit lookup, deleted revision fetches, case restore PUT, and audit cleanup DELETE | MVC view flow, authorized state resolution, and final user-facing recovery results | High | Natural follow-on to Round 4 because the workflow is audit-driven and recovery-oriented |
+| 9 | `planned` | `Controllers/loggerController.cs` | `LoggingDiagnostics` | Controller still owns logging metadata assembly, multi-source log queries, and offline-session correlation logic | metadata/query orchestration and filter normalization | logging DB and `offline_cases` view/document reads plus log write paths | MVC `View()` action, query-string binding, and final JSON response shapes | Medium | Keep the server UI surface in `mmria-server`; only move query/data assembly into shared code |
+| 10 | `defer` | `Controllers/_config.cs` | `SystemConfig` | Controller is document-centric, but tightly coupled to installation/admin runtime configuration and environment-owned values | configuration document sanitization and save orchestration only if this area becomes an active refactor target | `configuration/{shared_config_id}` GET/PUT | MVC view rendering, environment/appsettings reads, and applied-config assembly | Medium | Track it so the target shape is explicit, but defer until installation/runtime configuration becomes an active refactor target |
 
 ## Controllers Already Largely Aligned
 
@@ -147,6 +169,9 @@ Suggested status for this group: `defer`
 5. `CaseView` follow-up
 6. `VitalImport` and `ExportQueue`
 7. `Attachment`, `CVS`, `BackupAdmin`
+8. `Session` and document-API follow-up: `passwordChange`, `ije_message`, `jurisdiction_tree`, `data_summary_view`, `caseRevisionList`, `de_identified_list`
+9. `BroadcastMessage`, `AuditRecovery` recovery follow-up, `CaseWorkflowAdmin`, and `LoggingDiagnostics`
+10. `SystemConfig` only if installation/runtime configuration becomes an explicit refactor target
 
 ## Round 1 Update
 
@@ -212,7 +237,7 @@ Round 4 was implemented with the following outcomes:
 Round 4 implementation notes:
 
 - `_auditController` still owns Razor view rendering; only CouchDB/data orchestration moved to `AuditRecovery`
-- `AuditRecoverUtilController` still resolves `configuration.GetDBConfig(jurisdiction_id)` in the controller to preserve current tenant/jurisdiction behavior
+- `AuditRecoverUtilController` now resolves cross-tenant DB config through `TenantCatalog` while preserving the controller-owned HTTP surface
 - `caseRevisionController` POST remains intentionally stubbed; only the active GET revision retrieval path was extracted
 
 ## Round 5 Update
@@ -290,3 +315,6 @@ When work starts on a controller listed above, update this document with:
 - any route or response-shape sensitivity discovered during implementation
 
 This document is intended to be the working index for controller-to-SharedLibraries migration planning across the repo.
+
+
+

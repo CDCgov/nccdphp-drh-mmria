@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Dynamic;
 
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
 
-using  mmria.server.extension; 
+using  mmria.server.extension;
+using mmria.common.SharedLibraries.Queue;
 
 namespace mmria.server;
 
@@ -13,61 +15,70 @@ namespace mmria.server;
 public sealed class queueController: ControllerBase
 {
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IQueueRepository _queueRepository;
     public queueController 
     (
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        IQueueRepository queueRepository
     )
     {
-        configuration = _configuration;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
         _couchDbHttpClient = couchDbHttpClient;
+        _queueRepository = queueRepository;
     }
 
     [HttpPost]
-    public async System.Threading.Tasks.Task<mmria.common.data.api.Set_Queue_Response> Post(mmria.common.data.api.Set_Queue_Request set_queue_request)
+    public async System.Threading.Tasks.Task<mmria.common.data.api.Set_Queue_Response> Post()
     { 
+        var set_queue_request = await mmria.server.util.JsonRequestBodyReader.ReadAsync<mmria.common.data.api.Set_Queue_Request>(Request);
         mmria.common.data.api.Set_Queue_Response result = new mmria.common.data.api.Set_Queue_Response();
+        var safeRequest = CreateSanitizedQueueRequest(set_queue_request);
+
+        if (safeRequest == null)
+        {
+            result.Ok = false;
+            result.message = "Invalid queue request.";
+            return result;
+        }
 
         mmria.common.data.api.Queue_Item queue_item = new mmria.common.data.api.Queue_Item ();
         queue_item.queue_id = System.Guid.NewGuid ().ToString ();
-        queue_item.case_list = set_queue_request.case_list;
+        queue_item.action = safeRequest.action;
+        queue_item.case_list = safeRequest.case_list;
 
-        string queue_url = db_config.url + "/queue/"  + queue_item.queue_id;
-
-        string object_string = Newtonsoft.Json.JsonConvert.SerializeObject(queue_item);
-
-        var customHeaders = new Dictionary<string, string>();
-        if(!string.IsNullOrWhiteSpace(set_queue_request.security_token))
+        var requestOptions = new mmria.common.getset.CouchDbRequestOptions();
+        if(!string.IsNullOrWhiteSpace(safeRequest.security_token))
         {
-            customHeaders.Add("Cookie", "AuthSession=" + set_queue_request.security_token);
-            customHeaders.Add("X-CouchDB-WWW-Authenticate", set_queue_request.security_token);
+            requestOptions = new mmria.common.getset.CouchDbRequestOptions
+            {
+                AuthSessionValue = safeRequest.security_token
+            };
         }
         else if (!string.IsNullOrWhiteSpace(this.Request.Cookies["AuthSession"]))
         {
-            string auth_session_value = this.Request.Cookies["AuthSession"];
-            customHeaders.Add("Cookie", "AuthSession=" + auth_session_value);
-            customHeaders.Add("X-CouchDB-WWW-Authenticate", auth_session_value);
+            requestOptions = new mmria.common.getset.CouchDbRequestOptions
+            {
+                AuthSessionValue = this.Request.Cookies["AuthSession"]
+            };
         }
 
         mmria.common.model.couchdb.document_put_response put_response = null;
 
         try
         {
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", queue_url, object_string, null, null, "application/json", customHeaders);
-            put_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
+            put_response = await _queueRepository.SaveQueueItemAsync(queue_item, db_config, requestOptions);
+            result.Ok = put_response?.ok == true;
+            result.Queue_Id = queue_item.queue_id;
+            result.message = put_response?.error_description;
         }
         catch(Exception ex)
         {
@@ -80,6 +91,50 @@ public sealed class queueController: ControllerBase
 
 
         return result;
+    }
+
+    private static mmria.common.data.api.Set_Queue_Request CreateSanitizedQueueRequest(mmria.common.data.api.Set_Queue_Request request)
+    {
+        if (request == null)
+        {
+            return null;
+        }
+
+        return new mmria.common.data.api.Set_Queue_Request
+        {
+            security_token = string.IsNullOrWhiteSpace(request.security_token) ? null : request.security_token.Trim(),
+            action = string.IsNullOrWhiteSpace(request.action) ? null : request.action.Trim(),
+            case_list = CloneCaseList(request.case_list)
+        };
+    }
+
+    private static ExpandoObject[] CloneCaseList(ExpandoObject[] requestCaseList)
+    {
+        if (requestCaseList == null)
+        {
+            return Array.Empty<ExpandoObject>();
+        }
+
+        return requestCaseList
+            .Where(item => item != null)
+            .Select(CloneExpandoObject)
+            .ToArray();
+    }
+
+    private static ExpandoObject CloneExpandoObject(ExpandoObject source)
+    {
+        var clone = new ExpandoObject();
+        var cloneDictionary = (IDictionary<string, object>)clone;
+
+        if (source is IDictionary<string, object> sourceDictionary)
+        {
+            foreach (var kvp in sourceDictionary)
+            {
+                cloneDictionary[kvp.Key] = kvp.Value;
+            }
+        }
+
+        return clone;
     }
 }
 

@@ -3,6 +3,7 @@ using System.Data;
 using System.IO;
 using System.Text;
 using System.Collections.Generic;
+using mmria.server.util;
 
 namespace mmria.server.utils;
 
@@ -20,16 +21,17 @@ public sealed class WriteCSV
     DataTable table;
     public WriteCSV(string p_file_name, string p_folder_name, string p_export_directory, bool p_is_excel)
     {
-        this.folder_name = System.IO.Path.Combine(p_export_directory, p_folder_name);
-        this.file_name = p_file_name;
+        this.folder_name = ContainedPathHelper.ResolveContainedDirectoryPath(p_export_directory, p_folder_name);
+        this.file_name = ContainedPathHelper.ValidateContainedName(p_file_name, nameof(p_file_name));
 
         this.is_excel = p_is_excel;
 
         table = new DataTable("temp_table");
+        Directory.CreateDirectory(this.folder_name);
 
         if(! is_excel)
         {
-            writer = new StreamWriter(folder_name + "/" + this.file_name);
+            writer = new StreamWriter(ContainedPathHelper.OpenContainedWriteStream(folder_name, this.file_name), Encoding.UTF8);
         }
     }
 

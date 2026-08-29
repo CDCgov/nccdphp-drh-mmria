@@ -18,31 +18,24 @@ public sealed class populate_cdc_instanceController : ControllerBase
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
-    mmria.common.couchdb.ConfigurationSet ConfigDB;
     private readonly mmria.common.SharedLibraries.MMRIAServices.Manager.MMRIAServicesManager _mmriaServicesManager;
 
     public populate_cdc_instanceController
     (
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
         mmria.common.SharedLibraries.MMRIAServices.Manager.MMRIAServicesManager mmriaServicesManager
     )
     {
         _couchDbHttpClient = couchDbHttpClient;
         _mmriaServicesManager = mmriaServicesManager;
-        configuration = _configuration;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
     }
 
     [Authorize(Roles = "cdc_admin")]
@@ -80,18 +73,17 @@ public sealed class populate_cdc_instanceController : ControllerBase
 
         try
         {
-        System.IO.Stream dataStream0 = this.Request.Body;
-        //dataStream0.Seek(0, System.IO.SeekOrigin.Begin);
-        System.IO.StreamReader reader0 = new System.IO.StreamReader(dataStream0);
+        mmria.common.metadata.Populate_CDC_Instance populate_cdc_instance =
+            await mmria.server.util.JsonRequestBodyReader.ReadAsync<mmria.common.metadata.Populate_CDC_Instance>(Request);
+        var sanitizedDocument = CreateSanitizedPopulateCdcInstance(populate_cdc_instance);
 
-        document_content = await reader0.ReadToEndAsync();
-
-        mmria.common.metadata.Populate_CDC_Instance populate_cdc_instance = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.Populate_CDC_Instance>(document_content);
-
-        if(populate_cdc_instance._id == "populate-cdc-instance")
+        if(sanitizedDocument?._id == "populate-cdc-instance")
         {
             try
             {
+            var settings = new Newtonsoft.Json.JsonSerializerSettings();
+            settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
+            document_content = Newtonsoft.Json.JsonConvert.SerializeObject(sanitizedDocument, settings);
             result = await _mmriaServicesManager.SavePopulateCDCInstanceDocumentAsync(document_content, db_config);
 
             }
@@ -117,14 +109,21 @@ public sealed class populate_cdc_instanceController : ControllerBase
 
     [Authorize(Roles  = "cdc_admin")]
     [HttpPut]
-    public async System.Threading.Tasks.Task<mmria.common.metadata.Populate_CDC_Instance> Post([FromBody] mmria.common.metadata.Populate_CDC_Instance request_message) 
-    { 
+    public async System.Threading.Tasks.Task<mmria.common.metadata.Populate_CDC_Instance> Put()
+    {
+        var request_message = await mmria.server.util.JsonRequestBodyReader.ReadAsync<mmria.common.metadata.Populate_CDC_Instance>(Request);
         mmria.common.metadata.Populate_CDC_Instance result = new ();
+        var safeRequest = CreateSanitizedPopulateCdcInstance(request_message);
+
+        if (safeRequest == null)
+        {
+            return result;
+        }
 
         try
         {
             result = await _mmriaServicesManager.PutPopulateCDCInstanceToServiceAsync(
-                request_message,
+                safeRequest,
                 configuration.GetString("vitals_url", host_prefix).Replace("Message/IJESet", "PopulateCDCInstance"),
                 configuration.GetString("vital_service_key", host_prefix)
             );
@@ -145,6 +144,29 @@ public sealed class populate_cdc_instanceController : ControllerBase
     {
         var base64EncodedBytes = System.Convert.FromBase64String(base64EncodedData);
         return System.Text.Encoding.UTF8.GetString(base64EncodedBytes);
+    }
+
+    private static mmria.common.metadata.Populate_CDC_Instance CreateSanitizedPopulateCdcInstance(mmria.common.metadata.Populate_CDC_Instance request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request._id))
+        {
+            return null;
+        }
+
+        return new mmria.common.metadata.Populate_CDC_Instance
+        {
+            _id = request._id.Trim(),
+            _rev = string.IsNullOrWhiteSpace(request._rev) ? null : request._rev.Trim(),
+            state_list = request.state_list?
+                .Where(item => item != null)
+                .Select(item => new mmria.common.metadata.State_List_Item
+                {
+                    is_included = item.is_included,
+                    prefix = string.IsNullOrWhiteSpace(item.prefix) ? null : item.prefix.Trim(),
+                    name = string.IsNullOrWhiteSpace(item.name) ? null : item.name.Trim()
+                })
+                .ToList() ?? new List<mmria.common.metadata.State_List_Item>()
+        };
     }
 
 }

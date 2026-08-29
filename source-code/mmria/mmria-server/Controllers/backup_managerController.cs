@@ -7,7 +7,6 @@ using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
@@ -15,6 +14,7 @@ using Newtonsoft.Json;
 using Microsoft.AspNetCore.Authorization;
 
 using  mmria.server.extension; 
+using mmria.server.util;
 namespace mmria.server.Controllers;
 
 [Authorize(Roles = "installation_admin")]
@@ -23,8 +23,6 @@ public sealed class backupManagerController : Controller
 {
 
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
 
@@ -40,26 +38,107 @@ public sealed class backupManagerController : Controller
     public backupManagerController
     (
         ILogger<backupManagerController> logger, 
-        mmria.common.couchdb.ConfigurationSet p_config_db,
-        IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
         mmria.common.SharedLibraries.BackupAdmin.Manager.BackupAdminManager backupAdminManager
     )
 	{
         _logger = logger;
-        ConfigDB = p_config_db;
+        ConfigDB = tenantRuntime.RequireConfigurationSet();
         _couchDbHttpClient = couchDbHttpClient;
         _backupAdminManager = backupAdminManager;
 
-        configuration = _configuration;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        configuration = tenantRuntime.RequireConfiguration();
+        db_config = tenantRuntime.RequireDbConfig();
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+    }
+
+    private static string BuildBackupServiceUrl(string configUrl, params string[] pathSegments)
+    {
+        var encodedSegments = string.Join("/", pathSegments.Select(Uri.EscapeDataString));
+        return new Uri(new Uri(configUrl.TrimEnd('/') + "/"), $"api/backup/{encodedSegments}").AbsoluteUri;
+    }
+
+    private string GetBackupServiceBaseUrl()
+    {
+        var configUrl = configuration.GetString("vitals_url", host_prefix);
+        if (string.IsNullOrWhiteSpace(configUrl))
+        {
+            throw new InvalidOperationException("The current tenant is missing vitals_url configuration.");
+        }
+
+        var backupBaseUrl = configUrl.Replace("/api/Message/IJESet", string.Empty);
+        if (!Uri.TryCreate(backupBaseUrl, UriKind.Absolute, out var validatedBaseUri))
+        {
+            throw new InvalidOperationException("The current tenant vitals_url is not a valid absolute URI.");
+        }
+
+        if (validatedBaseUri.Scheme != Uri.UriSchemeHttp && validatedBaseUri.Scheme != Uri.UriSchemeHttps)
+        {
+            throw new InvalidOperationException("The current tenant vitals_url must use HTTP or HTTPS.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(validatedBaseUri.UserInfo) || !string.IsNullOrWhiteSpace(validatedBaseUri.Fragment))
+        {
+            throw new InvalidOperationException("The current tenant vitals_url must not contain user info or fragments.");
+        }
+
+        return new UriBuilder(validatedBaseUri)
+        {
+            Query = string.Empty,
+            Fragment = string.Empty
+        }.Uri.AbsoluteUri.TrimEnd('/');
+    }
+
+    private string GetVitalServiceKey()
+    {
+        var configuredValue = ConfigDB.name_value["vital_service_key"];
+        return OutboundRequestSecurityHelper.ValidateHeaderValue(configuredValue, "vital_service_key");
+    }
+
+    private Uri BuildBackupServiceUri(params string[] pathSegments)
+    {
+        return new Uri(BuildBackupServiceUrl(GetBackupServiceBaseUrl(), pathSegments));
+    }
+
+    private HttpRequestMessage CreateBackupServiceRequest(Uri requestUri)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, ValidateTrustedBackupRequestUri(requestUri));
+        request.Headers.Add("vital-service-key", GetVitalServiceKey());
+        return request;
+    }
+
+    private Uri ValidateTrustedBackupRequestUri(Uri requestUri)
+    {
+        if (requestUri == null || !requestUri.IsAbsoluteUri)
+        {
+            throw new ArgumentException("Backup service request URI must be absolute.", nameof(requestUri));
+        }
+
+        if (!string.IsNullOrWhiteSpace(requestUri.UserInfo) || !string.IsNullOrWhiteSpace(requestUri.Fragment))
+        {
+            throw new ArgumentException("Backup service request URI must not contain user info or fragments.", nameof(requestUri));
+        }
+
+        var trustedBaseUri = new Uri(GetBackupServiceBaseUrl().TrimEnd('/') + "/");
+        var trustedApiBaseUri = new Uri(trustedBaseUri, "api/backup/");
+
+        if (!Uri.Compare(
+                trustedApiBaseUri,
+                requestUri,
+                UriComponents.SchemeAndServer,
+                UriFormat.SafeUnescaped,
+                StringComparison.OrdinalIgnoreCase).Equals(0))
+        {
+            throw new ArgumentException("Backup service request URI escaped the configured host.", nameof(requestUri));
+        }
+
+        if (!requestUri.AbsolutePath.StartsWith(trustedApiBaseUri.AbsolutePath, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException("Backup service request URI escaped the configured backup API path.", nameof(requestUri));
+        }
+
+        return requestUri;
     }
 
    
@@ -67,8 +146,7 @@ public sealed class backupManagerController : Controller
     public async Task<IActionResult> Index()
     {
 
-        var config_url = configuration.GetString("vitals_url", host_prefix).Replace("/api/Message/IJESet","");
-        List<string> file_list = await _backupAdminManager.GetFileListAsync(config_url, ConfigDB.name_value["vital_service_key"]);
+        List<string> file_list = await _backupAdminManager.GetFileListAsync(GetBackupServiceBaseUrl(), GetVitalServiceKey());
 
         return View(file_list);
     }
@@ -79,8 +157,7 @@ public sealed class backupManagerController : Controller
     public async Task<IActionResult> RemoveFileList(int over_number_of_days)
     {
 
-        var config_url = configuration.GetString("vitals_url", host_prefix).Replace("/api/Message/IJESet","");
-        List<string> file_list = await _backupAdminManager.GetRemoveFileListAsync(config_url, ConfigDB.name_value["vital_service_key"], over_number_of_days);
+        List<string> file_list = await _backupAdminManager.GetRemoveFileListAsync(GetBackupServiceBaseUrl(), GetVitalServiceKey(), over_number_of_days);
 
         return View(new RemovalListResult(file_list, over_number_of_days));
     }
@@ -89,8 +166,7 @@ public sealed class backupManagerController : Controller
     public async Task<IActionResult> PerformFileRemoval(int over_number_of_days)
     {
 
-        var config_url = configuration.GetString("vitals_url", host_prefix).Replace("/api/Message/IJESet","");
-        List<string> file_list = await _backupAdminManager.PerformFileRemovalAsync(config_url, ConfigDB.name_value["vital_service_key"], over_number_of_days);
+        List<string> file_list = await _backupAdminManager.PerformFileRemovalAsync(GetBackupServiceBaseUrl(), GetVitalServiceKey(), over_number_of_days);
 
         return View(new RemovalListResult(file_list, over_number_of_days));
     }
@@ -98,18 +174,17 @@ public sealed class backupManagerController : Controller
     [Route("backupManager/SubFolderFileList/{id}")]
     public async Task<IActionResult> SubFolderFileList(string id)
     {
+        var safeFolderName = ContainedPathHelper.ValidateContainedName(id, nameof(id));
 
-        var config_url = configuration.GetString("vitals_url", host_prefix).Replace("/api/Message/IJESet","");
-        List<string> file_list = await _backupAdminManager.GetSubFolderFileListAsync(config_url, ConfigDB.name_value["vital_service_key"], id);
+        List<string> file_list = await _backupAdminManager.GetSubFolderFileListAsync(GetBackupServiceBaseUrl(), GetVitalServiceKey(), safeFolderName);
 
-        return View((id, file_list));
+        return View((safeFolderName, file_list));
     }
 
     //[Route("backup-manager/PerformHotBackup")]
     public async Task<IActionResult>  PerformHotBackup()
     {
-        var config_url = configuration.GetString("vitals_url", host_prefix).Replace("/api/Message/IJESet","");
-        var responseContent = await _backupAdminManager.PerformHotBackupAsync(config_url, ConfigDB.name_value["vital_service_key"]);
+        var responseContent = await _backupAdminManager.PerformHotBackupAsync(GetBackupServiceBaseUrl(), GetVitalServiceKey());
         //System.Console.WriteLine(responseContent);
 
         return Ok(responseContent);
@@ -119,8 +194,7 @@ public sealed class backupManagerController : Controller
     public async Task<IActionResult>  PerformColdBackup()
     {
 
-        var config_url = configuration.GetString("vitals_url", host_prefix).Replace("/api/Message/IJESet","");
-        var responseContent = await _backupAdminManager.PerformColdBackupAsync(config_url, ConfigDB.name_value["vital_service_key"]);
+        var responseContent = await _backupAdminManager.PerformColdBackupAsync(GetBackupServiceBaseUrl(), GetVitalServiceKey());
         //System.Console.WriteLine(responseContent);
 
         return Ok(responseContent);
@@ -129,8 +203,7 @@ public sealed class backupManagerController : Controller
     public async Task<IActionResult>  PerformCompression()
     {
 
-        var config_url = configuration.GetString("vitals_url", host_prefix).Replace("/api/Message/IJESet","");
-        var responseContent = await _backupAdminManager.PerformCompressionAsync(config_url, ConfigDB.name_value["vital_service_key"]);
+        var responseContent = await _backupAdminManager.PerformCompressionAsync(GetBackupServiceBaseUrl(), GetVitalServiceKey());
         //System.Console.WriteLine(responseContent);
 
         return Ok(responseContent);
@@ -140,31 +213,43 @@ public sealed class backupManagerController : Controller
     public async Task<IActionResult>  GetFile(string id)
     {
 
-        var config_url = configuration.GetString("vitals_url", host_prefix).Replace("/api/Message/IJESet","");
-        var base_url = $"{config_url}/api/backup/GetFile/{id}";
+        var export_directory = configuration.GetString("export_directory", host_prefix);
+        var safeFileName = ContainedPathHelper.ValidateContainedName(id, nameof(id));
+        var requestUri = BuildBackupServiceUri("GetFile", safeFileName);
 
-        using (var client = new HttpClient())
+        using (var client = OutboundRequestSecurityHelper.CreateNoRedirectClient())
         {
-            client.DefaultRequestHeaders.Add("vital-service-key",  ConfigDB.name_value["vital_service_key"]);
-            using (var response = await client.GetAsync(base_url))
+            using (var request = CreateBackupServiceRequest(requestUri))
+            using (var response = await client.SendAsync(request))
             {
+                if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    return NotFound();
+                }
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    return StatusCode((int)response.StatusCode);
+                }
+
                 using (var content = response.Content)
                 {
-                    var file_path = System.IO.Path.Combine(configuration.GetString("export_directory", host_prefix), id);
-
-                    using (var fs = new FileStream(file_path, FileMode.Create, FileAccess.Write, FileShare.None))
+                    await using (System.IO.Stream contentStream = await response.Content.ReadAsStreamAsync())
+                    await using (var fs = ContainedPathHelper.OpenContainedWriteStream(export_directory, safeFileName))
                     {
-                        await response.Content.CopyToAsync(fs);
-                        //await fs.FlushAsync();
-                        
+                        await contentStream.CopyToAsync(fs);
                     }
                             
-                    if(System.IO.File.Exists(file_path))
+                    if (ContainedPathHelper.ContainedFileExists(export_directory, safeFileName))
                     {
-                        byte[] fileBytes = await ReadFile(file_path);
+                        byte[] fileBytes = await ContainedPathHelper.ReadContainedFileAsync(export_directory, safeFileName);
 
-                        System.IO.File.Delete(file_path);
-                        return File(fileBytes, System.Net.Mime.MediaTypeNames.Application.Octet, id);
+                        ContainedPathHelper.DeleteContainedFile(export_directory, safeFileName);
+                        return SafeFileDownloadResultFactory.Create(
+                            fileBytes,
+                            System.Net.Mime.MediaTypeNames.Application.Octet,
+                            safeFileName,
+                            "backup-download.bin");
                     }
                     else
                     {
@@ -181,23 +266,33 @@ public sealed class backupManagerController : Controller
     [Route("backupManager/GetSubFolderFile/{folder}/{file_name}")]
     public async Task<IActionResult> GetSubFolderFile(string folder, string file_name)
     {
-        var config_url = configuration.GetString("vitals_url", host_prefix).Replace("/api/Message/IJESet","");
-        var base_url = $"{config_url}/api/backup/GetSubFolderFile/{folder}/{file_name}";
+        var export_directory = configuration.GetString("export_directory", host_prefix);
+        var safeFolderName = ContainedPathHelper.ValidateContainedName(folder, nameof(folder));
+        var safeFileName = ContainedPathHelper.ValidateContainedName(file_name, nameof(file_name));
+        var requestUri = BuildBackupServiceUri("GetSubFolderFile", safeFolderName, safeFileName);
 
-        using (var client = new HttpClient())
+        using (var client = OutboundRequestSecurityHelper.CreateNoRedirectClient())
         {
-            client.DefaultRequestHeaders.Add("vital-service-key",  ConfigDB.name_value["vital_service_key"]);
-            using (var response = await client.GetAsync(base_url))
+            using (var request = CreateBackupServiceRequest(requestUri))
+            using (var response = await client.SendAsync(request))
             {
+                if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    return NotFound();
+                }
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    return StatusCode((int)response.StatusCode);
+                }
+
                 using (var content = response.Content)
                 {
-                    var directory_path = System.IO.Path.Combine(configuration.GetString("export_directory", host_prefix), folder);
-                    var file_path = System.IO.Path.Combine(configuration.GetString("export_directory", host_prefix), folder, file_name);
-
-                    System.IO.Directory.CreateDirectory(directory_path);
+                    var directory_path = ContainedPathHelper.EnsureContainedDirectoryExists(export_directory, safeFolderName);
 
 
-                    using (System.IO.Stream contentStream = await response.Content.ReadAsStreamAsync(), fileStream = new System.IO.FileStream(file_path, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.None, 8192, true))
+                    await using (System.IO.Stream contentStream = await response.Content.ReadAsStreamAsync())
+                    await using (var fileStream = ContainedPathHelper.OpenContainedWriteStream(directory_path, safeFileName))
                     {
                         const int number_of_bytes = 8192;
 
@@ -219,16 +314,16 @@ public sealed class backupManagerController : Controller
                         while (isMoreToRead);
                     }
                             
-                    if(System.IO.File.Exists(file_path))
+                    if (ContainedPathHelper.ContainedFileExists(directory_path, safeFileName))
                     {
-                        return new PhysicalFileResult
-                        (
-                            file_path, 
-                            "application/octet-stream"
-                        ) 
-                        { 
-                            FileDownloadName = file_name 
-                        };
+                        byte[] fileBytes = await ContainedPathHelper.ReadContainedFileAsync(directory_path, safeFileName);
+                        ContainedPathHelper.DeleteContainedFile(directory_path, safeFileName);
+                        ContainedPathHelper.DeleteContainedDirectoryIfEmpty(export_directory, safeFolderName);
+                        return SafeFileDownloadResultFactory.Create(
+                            fileBytes,
+                            "application/octet-stream",
+                            safeFileName,
+                            "backup-download.bin");
                     }
                     else
                     {
@@ -239,23 +334,6 @@ public sealed class backupManagerController : Controller
             }
         }
 
-    }
-
-    async Task<byte[]> ReadFile(string s)
-    {
-        byte[] data;
-        int br;
-        int fs_length;
-
-        using(FileStream fs = new FileStream (s, FileMode.Open, FileAccess.Read))
-        {
-            fs_length = (int) fs.Length;
-            data = new byte[fs.Length];
-            br = await fs.ReadAsync(data, 0, data.Length);
-        }
-        if (br != (int) fs_length)
-            throw new System.IO.IOException(s);
-        return data;
     }
 
 }

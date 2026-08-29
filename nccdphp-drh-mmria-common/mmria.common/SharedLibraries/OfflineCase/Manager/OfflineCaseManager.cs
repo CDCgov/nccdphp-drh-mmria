@@ -3,42 +3,44 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
-using mmria.case_version.v260120;
+using mmria.case_version.v260615;
 using mmria.common.couchdb;
 using mmria.common.model.couchdb;
 using mmria.common.SharedLibraries.Session.Model;
 using mmria.common.SharedLibraries.Session.Manager;
 using mmria.common.SharedLibraries.OfflineCase.DAL;
-using mmria.common.SharedLibraries.Case.DAL;
+using mmria.common.SharedLibraries.Case;
 using mmria.common.SharedLibraries.Session.DAL;
 using mmria.common.SharedLibraries.OfflineCase.Model;
+using mmria.common.utils;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace mmria.common.SharedLibraries.OfflineCase.Manager;
 
 public class OfflineCaseManager : IOfflineCaseManager
 {
     private readonly OfflineCaseDAL _offlineCaseDal;
-    private readonly CaseDAL _caseDal;
+    private readonly ICaseRepository _caseRepository;
     private readonly SessionDAL _sessionDal;
     private readonly SessionManager _sessionManager;
-    private readonly OverridableConfiguration _configuration;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.Audit.IAuditRepository _auditRepository;
 
     public OfflineCaseManager(
         OfflineCaseDAL offlineCaseDal,
-        CaseDAL caseDal,
+        ICaseRepository caseRepository,
         SessionDAL sessionDal,
         SessionManager sessionManager,
-        OverridableConfiguration configuration,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.Audit.IAuditRepository auditRepository)
     {
         _offlineCaseDal = offlineCaseDal;
-        _caseDal = caseDal;
+        _caseRepository = caseRepository;
         _sessionDal = sessionDal;
         _sessionManager = sessionManager;
-        _configuration = configuration;
         _couchDbHttpClient = couchDbHttpClient;
+        _auditRepository = auditRepository;
     }
 
     public Task<CacheVersionResponse> GetCacheVersionAsync()
@@ -62,6 +64,28 @@ public class OfflineCaseManager : IOfflineCaseManager
 
     public async Task<document_put_response> CreateOfflineCaseAsync(OfflineCaseRequest request, string userName, DBConfigurationDetail dbConfig)
     {
+        if (request == null)
+        {
+            return new document_put_response { ok = false, error_description = "Offline session request is required." };
+        }
+
+        if (string.IsNullOrWhiteSpace(request.tab_id))
+        {
+            return new document_put_response { ok = false, error_description = "tab_id is required to enter offline mode." };
+        }
+
+        var conflictingSoftLockCaseId = await _caseRepository.GetSoftLockedCaseIdForUserInAnotherTabAsync(userName, request.tab_id, dbConfig);
+        if (!string.IsNullOrWhiteSpace(conflictingSoftLockCaseId))
+        {
+            return new document_put_response { ok = false, error_description = "Cannot go into offline mode with cases added in another browser tab. Please try this tab from the original tab." };
+        }
+
+        var conflictingSessionId = await _offlineCaseDal.GetActiveSessionIdForUserInAnotherTabAsync(userName, request.tab_id, dbConfig);
+        if (!string.IsNullOrWhiteSpace(conflictingSessionId))
+        {
+            return new document_put_response { ok = false, error_description = "Cannot go into offline mode with cases added in another browser tab. Please try this tab from the original tab." };
+        }
+
         var result = await _offlineCaseDal.CreateOfflineCaseAsync(request, userName, dbConfig);
         
         // Upgrade all cases in offline_ids from soft lock (type 1) to hard lock (type 2)
@@ -80,8 +104,7 @@ public class OfflineCaseManager : IOfflineCaseManager
             try
             {
                 // Fetch the case document
-                var caseUrl = $"{dbConfig.url}/{dbConfig.prefix}mmrds/{caseId}";
-                var caseResponse = await _couchDbHttpClient.ExecuteAsync("GET", caseUrl, null, dbConfig.user_name, dbConfig.user_value);
+                var caseResponse = await _caseRepository.GetCaseDocumentJsonAsync(caseId, dbConfig);
                 
                 if (string.IsNullOrEmpty(caseResponse)) continue;
                 
@@ -95,7 +118,7 @@ public class OfflineCaseManager : IOfflineCaseManager
                     caseDocument["date_last_updated"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
                     
                     var json_string = Newtonsoft.Json.JsonConvert.SerializeObject(caseDocument);
-                    await _couchDbHttpClient.ExecuteAsync("PUT", caseUrl, json_string, dbConfig.user_name, dbConfig.user_value);
+                    await _caseRepository.PutCaseDocumentJsonAsync(caseId, json_string, dbConfig);
                 }
             }
             catch (Exception ex)
@@ -118,10 +141,10 @@ public class OfflineCaseManager : IOfflineCaseManager
 
     public async Task<OfflineSessionStatus> GetActiveUserSessionAsync(string userId, DBConfigurationDetail dbConfig)
     {
-        var cases = await _offlineCaseDal.GetUserOfflineCasesAsync(userId, dbConfig);
+        var cases = await _offlineCaseDal.TryGetUserOfflineCasesAsync(userId, dbConfig);
         
         // Filter for active states (0 or 1)
-        var activeSessions = cases.rows.Where(r => 
+        var activeSessions = (cases?.rows ?? Enumerable.Empty<OfflineCaseItem>()).Where(r => 
             r?.value != null && r.key == userId &&
             (r.value.offline_state == 0 || r.value.offline_state == 1)
         ).ToList();
@@ -220,10 +243,499 @@ public class OfflineCaseManager : IOfflineCaseManager
         return await _offlineCaseDal.UpdateOfflineCaseAsync(request.OfflineSessionId, session, dbConfig);
     }
 
+    public async Task<document_put_response> ReleaseOfflineCaseLocksAsync(ReleaseOfflineCaseLocksRequest request, string userName, DBConfigurationDetail dbConfig)
+    {
+        if (request == null)
+        {
+            return new document_put_response { ok = false, error_description = "Release offline case locks request is required." };
+        }
+
+        if (string.IsNullOrWhiteSpace(request.OfflineSessionId))
+        {
+            return new document_put_response { ok = false, error_description = "OfflineSessionId is required." };
+        }
+
+        if (string.IsNullOrWhiteSpace(userName))
+        {
+            return new document_put_response { ok = false, error_description = "Unable to determine user." };
+        }
+
+        var caseIds = request.CaseIds?
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(System.StringComparer.OrdinalIgnoreCase)
+            .ToList() ?? new List<string>();
+
+        if (caseIds.Count == 0)
+        {
+            return new document_put_response { ok = true };
+        }
+
+        var session = await _offlineCaseDal.GetOfflineCaseAsync(request.OfflineSessionId, dbConfig);
+        if (session == null || string.IsNullOrWhiteSpace(session._id))
+        {
+            return new document_put_response { ok = false, error_description = "Offline session not found." };
+        }
+
+        if (!string.Equals(session.created_by, userName, System.StringComparison.OrdinalIgnoreCase))
+        {
+            return new document_put_response { ok = false, error_description = "Offline session belongs to another user." };
+        }
+
+        if (session.offline_ids == null)
+        {
+            return new document_put_response { ok = false, error_description = "Offline session does not contain case ids." };
+        }
+
+        var sessionCaseIds = new HashSet<string>(session.offline_ids.Where(x => !string.IsNullOrWhiteSpace(x)), System.StringComparer.OrdinalIgnoreCase);
+        var missingCaseId = caseIds.FirstOrDefault(caseId => !sessionCaseIds.Contains(caseId));
+        if (!string.IsNullOrWhiteSpace(missingCaseId))
+        {
+            return new document_put_response { ok = false, error_description = $"Case {missingCaseId} is not part of the offline session." };
+        }
+
+        document_put_response lastResponse = new document_put_response { ok = true };
+
+        foreach (var caseId in caseIds)
+        {
+            var caseJson = await _caseRepository.GetCaseDocumentJsonAsync(caseId, dbConfig);
+            var caseDocument = JObject.Parse(caseJson);
+
+            var isOffline = caseDocument.Value<bool?>("is_offline") == true ||
+                string.Equals(caseDocument["is_offline"]?.ToString(), "true", System.StringComparison.OrdinalIgnoreCase);
+            if (!isOffline)
+            {
+                continue;
+            }
+
+            var offlineBy = caseDocument.Value<string>("offline_by");
+            if (!string.IsNullOrWhiteSpace(offlineBy) &&
+                !string.Equals(offlineBy, userName, System.StringComparison.OrdinalIgnoreCase))
+            {
+                return new document_put_response { ok = false, error_description = $"Case {caseId} is offline locked by {offlineBy}." };
+            }
+
+            caseDocument["is_offline"] = false;
+            caseDocument.Remove("offline_date");
+            caseDocument.Remove("offline_by");
+            caseDocument.Remove("offline_lock_type");
+            caseDocument.Remove("offline_by_tab_id");
+            caseDocument["date_last_updated"] = System.DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+            caseDocument["last_updated_by"] = userName;
+
+            var saveResponse = await _caseRepository.PutCaseDocumentJsonAsync(
+                caseId,
+                caseDocument.ToString(Formatting.None),
+                dbConfig);
+
+            lastResponse = JsonConvert.DeserializeObject<document_put_response>(saveResponse) ?? new document_put_response { ok = false, error_description = "Failed to update case." };
+            if (!lastResponse.ok)
+            {
+                return lastResponse;
+            }
+        }
+
+        return lastResponse;
+    }
+
+    public async Task<document_put_response> RecoverSoftLocksAsync(RecoverSoftLocksRequest request, string userName, DBConfigurationDetail dbConfig)
+    {
+        if (request == null)
+        {
+            return new document_put_response { ok = false, error_description = "Recover soft locks request is required." };
+        }
+
+        if (string.IsNullOrWhiteSpace(userName))
+        {
+            return new document_put_response { ok = false, error_description = "Unable to determine user." };
+        }
+
+        if (string.IsNullOrWhiteSpace(request.tab_id))
+        {
+            return new document_put_response { ok = false, error_description = "tab_id is required." };
+        }
+
+        var caseIds = request.CaseIds?
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x.Trim())
+            .Distinct(System.StringComparer.OrdinalIgnoreCase)
+            .ToList() ?? new List<string>();
+
+        if (caseIds.Count == 0)
+        {
+            return new document_put_response { ok = false, error_description = "At least one case id is required." };
+        }
+
+        OfflineCaseResponse session = null;
+        if (!string.IsNullOrWhiteSpace(request.OfflineSessionId))
+        {
+            session = await _offlineCaseDal.GetOfflineCaseAsync(request.OfflineSessionId, dbConfig);
+            if (session == null || string.IsNullOrWhiteSpace(session._id))
+            {
+                return new document_put_response { ok = false, error_description = "Offline session not found." };
+            }
+
+            if (!string.Equals(session.created_by, userName, StringComparison.OrdinalIgnoreCase))
+            {
+                return new document_put_response { ok = false, error_description = "Offline session belongs to another user." };
+            }
+
+            var sessionCaseIds = new HashSet<string>(
+                session.offline_ids?.Where(x => !string.IsNullOrWhiteSpace(x)) ?? Enumerable.Empty<string>(),
+                StringComparer.OrdinalIgnoreCase);
+
+            var missingCaseId = caseIds.FirstOrDefault(caseId => !sessionCaseIds.Contains(caseId));
+            if (!string.IsNullOrWhiteSpace(missingCaseId))
+            {
+                return new document_put_response { ok = false, error_description = $"Case {missingCaseId} is not part of the offline session." };
+            }
+        }
+
+        document_put_response lastResponse = new document_put_response { ok = true };
+
+        foreach (var caseId in caseIds)
+        {
+            var caseJson = await _caseRepository.GetCaseDocumentJsonAsync(caseId, dbConfig);
+
+            if (string.IsNullOrWhiteSpace(caseJson))
+            {
+                return new document_put_response { ok = false, error_description = $"Unable to load case {caseId}." };
+            }
+
+            var caseDocument = JObject.Parse(caseJson);
+            if (caseDocument["error"] != null)
+            {
+                return new document_put_response { ok = false, error_description = $"Unable to load case {caseId}." };
+            }
+
+            var offlineBy = caseDocument.Value<string>("offline_by");
+            if (!string.IsNullOrWhiteSpace(offlineBy) &&
+                !string.Equals(offlineBy, userName, StringComparison.OrdinalIgnoreCase))
+            {
+                return new document_put_response { ok = false, error_description = $"Case {caseId} is offline locked by {offlineBy}." };
+            }
+
+            caseDocument["is_offline"] = true;
+            caseDocument["offline_date"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+            caseDocument["offline_by"] = userName;
+            caseDocument["offline_lock_type"] = 1;
+            caseDocument["offline_by_tab_id"] = request.tab_id;
+            caseDocument["date_last_updated"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+            caseDocument["last_updated_by"] = userName;
+
+            var saveResponse = await _caseRepository.PutCaseDocumentJsonAsync(
+                caseId,
+                caseDocument.ToString(Formatting.None),
+                dbConfig);
+
+            lastResponse = JsonConvert.DeserializeObject<document_put_response>(saveResponse) ??
+                new document_put_response { ok = false, error_description = $"Failed to update case {caseId}." };
+
+            if (!lastResponse.ok)
+            {
+                return lastResponse;
+            }
+        }
+
+        if (session != null)
+        {
+            session.offline_state = 3;
+            session.last_updated_by = userName;
+            session.date_last_updated = DateTime.UtcNow;
+
+            lastResponse = await _offlineCaseDal.UpdateOfflineCaseAsync(session._id, session, dbConfig);
+            if (!lastResponse.ok)
+            {
+                return lastResponse;
+            }
+        }
+
+        return lastResponse;
+    }
+
+    public async Task<mmria.common.SharedLibraries.Case.Manager.SaveCaseResult> SyncOfflineCaseAsync(SyncOfflineCaseRequest request, string userName, ClaimsPrincipal user, DBConfigurationDetail dbConfig, OverridableConfiguration configuration, string hostPrefix)
+    {
+        if (request == null)
+        {
+            return new mmria.common.SharedLibraries.Case.Manager.SaveCaseResult
+            {
+                Response = new document_put_response { ok = false, error_description = "Sync offline case request is required." }
+            };
+        }
+
+        if (string.IsNullOrWhiteSpace(request.OfflineSessionId))
+        {
+            return new mmria.common.SharedLibraries.Case.Manager.SaveCaseResult
+            {
+                Response = new document_put_response { ok = false, error_description = "OfflineSessionId is required." }
+            };
+        }
+
+        if (string.IsNullOrWhiteSpace(request.CaseId))
+        {
+            return new mmria.common.SharedLibraries.Case.Manager.SaveCaseResult
+            {
+                Response = new document_put_response { ok = false, error_description = "CaseId is required." }
+            };
+        }
+
+        if (string.IsNullOrWhiteSpace(userName))
+        {
+            return new mmria.common.SharedLibraries.Case.Manager.SaveCaseResult
+            {
+                Response = new document_put_response { ok = false, error_description = "Unable to determine user." }
+            };
+        }
+
+        var offlineCase = await _offlineCaseDal.GetOfflineCaseAsync(request.OfflineSessionId, dbConfig);
+        if (offlineCase == null || string.IsNullOrWhiteSpace(offlineCase._id))
+        {
+            return new mmria.common.SharedLibraries.Case.Manager.SaveCaseResult
+            {
+                Response = new document_put_response { ok = false, error_description = "Offline session not found." }
+            };
+        }
+
+        if (!string.Equals(offlineCase.created_by, userName, StringComparison.OrdinalIgnoreCase))
+        {
+            return new mmria.common.SharedLibraries.Case.Manager.SaveCaseResult
+            {
+                Response = new document_put_response { ok = false, error_description = "Offline session belongs to another user." }
+            };
+        }
+
+        var docChange = offlineCase.case_documents?.FirstOrDefault(d =>
+            string.Equals(d.DocumentId, request.CaseId, StringComparison.OrdinalIgnoreCase));
+        if (docChange?.ModifiedDocument == null)
+        {
+            return new mmria.common.SharedLibraries.Case.Manager.SaveCaseResult
+            {
+                Response = new document_put_response { ok = false, error_description = $"No modified document found for case {request.CaseId}." }
+            };
+        }
+
+        var modifiedDocument = docChange.ModifiedDocument;
+        var sessionCaseIds = new HashSet<string>(
+            offlineCase.offline_ids?.Where(x => !string.IsNullOrWhiteSpace(x)) ?? Enumerable.Empty<string>(),
+            StringComparer.OrdinalIgnoreCase);
+
+        JObject currentCaseDocument = null;
+        string currentCaseJson = null;
+        bool caseExistsInDatabase = false;
+
+        try
+        {
+            currentCaseJson = await _caseRepository.GetCaseDocumentJsonAsync(request.CaseId, dbConfig);
+            currentCaseDocument = JObject.Parse(currentCaseJson);
+            caseExistsInDatabase = currentCaseDocument["error"] == null;
+        }
+        catch
+        {
+            caseExistsInDatabase = false;
+            currentCaseDocument = null;
+            currentCaseJson = null;
+        }
+
+        var isExistingCaseInSession = sessionCaseIds.Contains(request.CaseId);
+        if (!isExistingCaseInSession)
+        {
+            if (caseExistsInDatabase)
+            {
+                return new mmria.common.SharedLibraries.Case.Manager.SaveCaseResult
+                {
+                    Response = new document_put_response { ok = false, error_description = $"Case {request.CaseId} is not part of the offline session." }
+                };
+            }
+
+            if (!mmria.common.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(
+                    dbConfig,
+                    user,
+                    mmria.common.SharedLibraries.Other.ResourceRightEnum.WriteCase,
+                    modifiedDocument.home_record?.jurisdiction_id,
+                    _couchDbHttpClient))
+            {
+                return new mmria.common.SharedLibraries.Case.Manager.SaveCaseResult
+                {
+                    Response = new document_put_response { ok = false, error_description = $"Unauthorized to save case {request.CaseId} in jurisdiction {modifiedDocument.home_record?.jurisdiction_id}" }
+                };
+            }
+        }
+        else
+        {
+            var currentOfflineBy = currentCaseDocument.Value<string>("offline_by");
+            var currentIsOffline = currentCaseDocument.Value<bool?>("is_offline") == true ||
+                string.Equals(currentCaseDocument["is_offline"]?.ToString(), "true", StringComparison.OrdinalIgnoreCase);
+
+            if (!currentIsOffline)
+            {
+                return new mmria.common.SharedLibraries.Case.Manager.SaveCaseResult
+                {
+                    Response = new document_put_response { ok = false, error_description = "Case is not currently in offline mode." }
+                };
+            }
+
+            if (!string.Equals(currentOfflineBy, userName, StringComparison.OrdinalIgnoreCase))
+            {
+                return new mmria.common.SharedLibraries.Case.Manager.SaveCaseResult
+                {
+                    Response = new document_put_response { ok = false, error_description = $"Case {request.CaseId} is offline locked by {currentOfflineBy}." }
+                };
+            }
+
+            var currentCase = CaseJsonSerialization.DeserializeMmriaCase(currentCaseJson);
+            var caseJurisdiction = currentCase?.home_record?.jurisdiction_id;
+            if (!mmria.common.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(
+                    dbConfig,
+                    user,
+                    mmria.common.SharedLibraries.Other.ResourceRightEnum.WriteCase,
+                    caseJurisdiction,
+                    _couchDbHttpClient))
+            {
+                return new mmria.common.SharedLibraries.Case.Manager.SaveCaseResult
+                {
+                    Response = new document_put_response { ok = false, error_description = $"Unauthorized to save case {request.CaseId} in jurisdiction {caseJurisdiction}" }
+                };
+            }
+
+            var currentRevision = currentCaseDocument.Value<string>("_rev");
+            if (!string.Equals(modifiedDocument._rev, currentRevision, StringComparison.Ordinal))
+            {
+                return new mmria.common.SharedLibraries.Case.Manager.SaveCaseResult
+                {
+                    Response = new document_put_response { ok = false, error_description = "(409) Conflict: Case revision has changed while offline processing." }
+                };
+            }
+        }
+
+        modifiedDocument.is_offline = "false";
+        modifiedDocument.offline_date = null;
+        modifiedDocument.offline_by = null;
+        modifiedDocument.offline_lock_type = null;
+        modifiedDocument.last_updated_by = userName;
+        modifiedDocument.date_last_updated = DateTime.UtcNow;
+
+        var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient, _caseRepository, _auditRepository);
+
+        // Story 29.6: sync-side detection converts the offline placeholder
+        // record_id ({STATE}-OFFLINE-CASE-XX) into a real jurisdiction-scoped
+        // STATE-YEAR-NNNN via CaseManager.GenerateUniqueRecordIdAsync before
+        // SaveCaseAsync runs, so the Story 29.1 format guard never sees the
+        // placeholder. The legacy "-offline" suffix strip below (AC #5) remains
+        // functional for pre-29.6 offline caches.
+        var recordId = modifiedDocument.home_record?.record_id;
+        if (!string.IsNullOrWhiteSpace(recordId))
+        {
+            var placeholderMatch = System.Text.RegularExpressions.Regex.Match(
+                recordId,
+                @"^([A-Z0-9]+)-OFFLINE-CASE-\d+$",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            if (placeholderMatch.Success)
+            {
+                var statePrefix = placeholderMatch.Groups[1].Value.ToUpperInvariant();
+                string year;
+                var yearValue = modifiedDocument.home_record?.date_of_death?.year;
+                if (yearValue.HasValue && yearValue.Value >= 1900 && yearValue.Value <= 2100)
+                {
+                    year = ((int)yearValue.Value).ToString();
+                }
+                else
+                {
+                    year = DateTime.UtcNow.Year.ToString();
+                    Console.WriteLine($"OfflineCaseManager sync record_id_format=placeholder year_source=utc_fallback placeholder={recordId} case_id={modifiedDocument._id}");
+                }
+
+                var newRecordId = await caseManager.GenerateUniqueRecordIdAsync(statePrefix, year, dbConfig);
+                Console.WriteLine($"OfflineCaseManager sync record_id_format=placeholder placeholder={recordId} new_record_id={newRecordId} case_id={modifiedDocument._id}");
+                modifiedDocument.home_record.record_id = newRecordId;
+            }
+            else if (recordId.EndsWith("-offline", StringComparison.OrdinalIgnoreCase))
+            {
+                var stripped = recordId[..^"-offline".Length];
+                Console.WriteLine($"OfflineCaseManager sync record_id_format=legacy_offline_suffix original={recordId} new_record_id={stripped} case_id={modifiedDocument._id}");
+                modifiedDocument.home_record.record_id = stripped;
+            }
+        }
+
+        List<mmria.common.model.couchdb.Change_Stack_Item> changeStackItems;
+        if (docChange.ChangeStackItems != null && docChange.ChangeStackItems.Count > 0)
+        {
+            changeStackItems = docChange.ChangeStackItems;
+        }
+        else
+        {
+            changeStackItems = new List<mmria.common.model.couchdb.Change_Stack_Item>
+            {
+                new()
+                {
+                    _id = modifiedDocument._id,
+                    _rev = modifiedDocument._rev,
+                    object_path = "offline_document_sync",
+                    metadata_path = "/offline_sync",
+                    old_value = "offline_changes",
+                    new_value = "synced_to_server",
+                    dictionary_path = "/offline_sync",
+                    metadata_type = "offline_sync",
+                    prompt = "Offline Document Sync",
+                    date_created = DateTime.UtcNow,
+                    user_name = userName
+                }
+            };
+        }
+
+        var changeStack = new Change_Stack
+        {
+            _id = Guid.NewGuid().ToString(),
+            case_id = modifiedDocument._id,
+            case_rev = modifiedDocument._rev,
+            date_created = DateTime.UtcNow,
+            user_name = userName,
+            items = changeStackItems,
+            note = $"Offline sync: Document modified offline and synced from session {request.OfflineSessionId}"
+        };
+
+        var saveResult = await caseManager.SaveCaseAsync(
+            modifiedDocument,
+            changeStack,
+            dbConfig,
+            user,
+            configuration,
+            hostPrefix,
+            bypassOfflineTabOwnershipCheck: true);
+
+        if (!saveResult.Response.ok)
+        {
+            return saveResult;
+        }
+
+        if (currentCaseDocument != null &&
+            !string.IsNullOrWhiteSpace(currentCaseDocument.Value<string>("offline_by_tab_id")))
+        {
+            var savedCaseJson = await _caseRepository.GetCaseDocumentJsonAsync(request.CaseId, dbConfig);
+            var savedCaseDocument = JObject.Parse(savedCaseJson);
+            savedCaseDocument.Remove("offline_by_tab_id");
+
+            var cleanupResponseJson = await _caseRepository.PutCaseDocumentJsonAsync(
+                request.CaseId,
+                savedCaseDocument.ToString(Formatting.None),
+                dbConfig);
+
+            var cleanupResponse = JsonConvert.DeserializeObject<document_put_response>(cleanupResponseJson) ??
+                new document_put_response { ok = false, error_description = "Failed to clear offline_by_tab_id." };
+
+            saveResult.Response = cleanupResponse;
+            if (!cleanupResponse.ok)
+            {
+                return saveResult;
+            }
+
+            saveResult.SerializedCase = savedCaseDocument.ToString(Formatting.None);
+        }
+
+        return saveResult;
+    }
+
     public async Task<string> CreateOfflineAuthTokenAsync(string userName, DBConfigurationDetail dbConfig)
     {
-        int expireMinutes = 24 * 7 * 60; // 7 days
-
         // Create role list with ONLY offline_mode
         var roleList = new List<string> { "offline_mode" };
 
@@ -241,7 +753,7 @@ public class OfflineCaseManager : IOfflineCaseManager
         // Create new session with offline_mode role
         var sessionId = Guid.NewGuid().ToString();
         var sessionData = new Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase);
-        var sessionExpirationDateTime = DateTime.Now.AddMinutes(expireMinutes);
+        var sessionExpirationDateTime = OfflineAuthSessionDefaults.GetExpirationDateTime(DateTime.Now);
 
         var sessionMessage = new Session_Message(
             sessionId,
@@ -284,7 +796,7 @@ public class OfflineCaseManager : IOfflineCaseManager
                 var caseId = docChange.DocumentId;
                 if (string.IsNullOrWhiteSpace(caseId)) continue;
 
-                var currentDoc = await _caseDal.GetCaseAsync(caseId, dbConfig);
+                var currentDoc = await _caseRepository.GetCaseAsync(caseId, dbConfig);
                 if (currentDoc == null)
                 {
                     validationErrors.Add($"Could not retrieve current document for case ID: {caseId}");
@@ -305,13 +817,13 @@ public class OfflineCaseManager : IOfflineCaseManager
 
                 // Validate jurisdiction
                 var caseJurisdiction = currentDoc.home_record?.jurisdiction_id;
-                if (!mmria.common.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(dbConfig, user, mmria.common.SharedLibraries.Other.ResourceRightEnum.WriteCase, caseJurisdiction))
+                if (!mmria.common.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(dbConfig, user, mmria.common.SharedLibraries.Other.ResourceRightEnum.WriteCase, caseJurisdiction, _couchDbHttpClient))
                 {
                     validationErrors.Add($"Unauthorized to save case {caseId} in jurisdiction {caseJurisdiction}");
                     continue;
                 }
 
-                var saveResult = await _caseDal.UpdateCaseAsync(caseId, updatedDoc, dbConfig);
+                var saveResult = await _caseRepository.UpdateCaseAsync(caseId, updatedDoc, dbConfig);
                 if (saveResult.ok)
                 {
                     enhancedChanges.Add(new { 

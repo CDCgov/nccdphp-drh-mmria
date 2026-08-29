@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using mmria.common.SharedLibraries.MetadataVersion;
+using mmria.common.SharedLibraries.MetadataVersion.DAL;
 
 namespace mmria.server.utils;
 
@@ -14,6 +16,7 @@ public sealed class c_cdc_de_identifier
     common.couchdb.DBConfigurationDetail connection;
     string metadata_release_version_name;
     mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IMetadataRepository _metadataRepository;
 
     public c_cdc_de_identifier (string p_case_item_json, string p_prefix, common.couchdb.DBConfigurationDetail p_connection, string p_metadata_release_version_name, mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
@@ -22,13 +25,13 @@ public sealed class c_cdc_de_identifier
         this.connection = p_connection;
         metadata_release_version_name = p_metadata_release_version_name;
         _couchDbHttpClient = couchDbHttpClient;
+        _metadataRepository = new MetadataVersionDAL(couchDbHttpClient);
     }
     public async Task<string> executeAsync()
     {
         string result = null;
 
-        var de_identified_list_response = await _couchDbHttpClient.ExecuteAsync("GET", connection.url + "/metadata/de-identified-export-list", null, connection.user_name, connection.user_value);
-        System.Dynamic.ExpandoObject de_identified_ExpandoObject = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(de_identified_list_response);
+        System.Dynamic.ExpandoObject de_identified_ExpandoObject = await _metadataRepository.GetDeIdentifiedExportListAsync(connection);
         IDictionary<string, object> idictionary = de_identified_ExpandoObject as IDictionary<string, object>;
         if(idictionary != null)
         {
@@ -90,13 +93,9 @@ public sealed class c_cdc_de_identifier
 
                 string de_identified_json;
 
-                string current_directory = AppContext.BaseDirectory;
-                if(!System.IO.Directory.Exists(System.IO.Path.Combine(current_directory, "database-scripts")))
-                {
-                    current_directory = System.IO.Directory.GetCurrentDirectory();
-                }
+                var case_template_path = mmria.common.SharedLibraries.MMRIAServices.Helper.MMRIAServicesHelper.ResolveDatabaseScriptPath($"case-version-{metadata_release_version_name}.json");
 
-                using (var  sr = new System.IO.StreamReader(System.IO.Path.Combine( current_directory,  $"database-scripts/case-version-{metadata_release_version_name}.json")))
+                using (var  sr = new System.IO.StreamReader(case_template_path))
                 {
                     de_identified_json = sr.ReadToEnd();
                 }

@@ -11,10 +11,10 @@ public sealed class recover_caseController : Controller
 
     public recover_caseController
     (
-        mmria.common.couchdb.ConfigurationSet p_config_db
+        mmria.server.util.RequestTenantRuntime tenantRuntime
     )
     {
-        ConfigDB = p_config_db;
+        ConfigDB = tenantRuntime.RequireConfigurationSet();
     }
     public IActionResult Index()
     {

@@ -2,6 +2,7 @@
 @{ 
     Layout = "_LayoutBase"; 
     var userName = "";
+    var omb_expiration_date = TempData["omb_expiration_date"] ?? "05/31/2026";
     bool enable_case_status_dropdown = false;
 
     ViewBag.BreadCrumbs = true;
@@ -40,6 +41,7 @@
 {
     <script>
         const case_status_enabled = @enable_case_status_dropdown.ToString().ToLower();
+        window.mmria_omb_expiration_date = "@omb_expiration_date";
     </script>
   <link href="./styles/jquery/jquery.timepicker.css" type="text/css" rel="stylesheet" />
   <link href="./styles/jquery/jquery.datetimepicker.css" type="text/css" rel="stylesheet" />

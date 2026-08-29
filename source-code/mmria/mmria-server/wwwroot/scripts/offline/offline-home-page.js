@@ -32,11 +32,23 @@ document.addEventListener('DOMContentLoaded', async function() {
   // First check if user is already in offline mode or processing offline cases
   const isOffline = localStorage.getItem('is_offline') === 'true';
   const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') === 'true';
-  
+  const hasPendingExitOfflineCleanup = !!localStorage.getItem('mmria_exit_offline_cleanup_pending');
+  const isOfflineModeServerSession =
+    window.OfflineStatus &&
+    window.OfflineStatus.isOfflineModeServerSession &&
+    window.OfflineStatus.isOfflineModeServerSession();
+
+  if (!isOffline && isOfflineModeServerSession) {
+    offlineLog.log('OfflineHomePage', 'Detected offline SaveOfflineCases token outside active offline mode. Redirecting to AutoLogin before checking server state.');
+    window.OfflineStatus.redirectToAutoLogin('/Case#/summary');
+    return;
+  }
 
 
   // If not in offline mode, check for active sessions on server
-  if (!isOffline && !isProcessingOfflineCases) {
+  if (hasPendingExitOfflineCleanup) {
+    offlineLog.log('OfflineHomePage', 'Pending exit-offline cleanup detected. Skipping active offline session redirect check.');
+  } else if (!isOffline && !isProcessingOfflineCases) {
     fetch('/api/OfflineCase/lightweight-status-only')
       .then(response => response.json())
       .then(data => {

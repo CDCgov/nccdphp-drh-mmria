@@ -23,8 +23,6 @@ public sealed class export_queueController: ControllerBase
 { 
     ActorSystem _actorSystem;
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     mmria.common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
@@ -34,20 +32,16 @@ public sealed class export_queueController: ControllerBase
     (
         ActorSystem actorSystem, 
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
         mmria.common.SharedLibraries.ExportQueue.Manager.ExportQueueManager exportQueueManager
     )
     {
         _actorSystem = actorSystem;
-        configuration = _configuration;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
         _couchDbHttpClient = couchDbHttpClient;
         _exportQueueManager = exportQueueManager;
     }
@@ -56,6 +50,8 @@ public sealed class export_queueController: ControllerBase
     [HttpGet]
     public async System.Threading.Tasks.Task<IEnumerable<export_queue_item>> Get() 
     { 
+        Response.Headers["Cache-Control"] = "no-store, no-cache";
+
         var userName = "";
         if (User.Identities.Any(u => u.IsAuthenticated))
         {
@@ -80,11 +76,13 @@ public sealed class export_queueController: ControllerBase
 
 
     // POST api/values 
+    [ValidateAntiForgeryToken]
     [HttpPost]
-    public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post([FromBody] export_queue_item queue_item) 
-    { 
+    public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post()
+    {
         //bool valid_login = false;
         //mmria.common.data.api.Set_Queue_Request queue_request = null;
+        var queue_item = await mmria.server.util.JsonRequestBodyReader.ReadAsync<export_queue_item>(Request);
 
         mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response ();
         
@@ -96,9 +94,17 @@ public sealed class export_queueController: ControllerBase
                 u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
         }
 
+        var safeQueueItem = await CreateSanitizedQueueItemAsync(queue_item, userName);
+        if (safeQueueItem == null)
+        {
+            return result;
+        }
+
+        System.Console.WriteLine($"[EXPORT-QUEUE] request received host_prefix='{host_prefix}' id='{safeQueueItem._id}' export_type='{safeQueueItem.export_type}'");
+
         var is_match = System.Text.RegularExpressions.Regex.IsMatch
         (
-            queue_item._id, 
+            safeQueueItem._id, 
             @"^\d\d\d\d-\d\d-\d\dT\d\d-\d\d-\d\d.\d\d\dZ.zip$"
         );
 
@@ -106,26 +112,17 @@ public sealed class export_queueController: ControllerBase
 
         if(
             ! is_match  ||
-            queue_item == null
+            safeQueueItem == null
         )
         {
 
             return result;
         }
 
-
-        if(string.IsNullOrWhiteSpace(queue_item.created_by))
-        {
-            queue_item.created_by = userName;
-        } 
-
-        
-        queue_item.last_updated_by = userName;
-
         //if(queue_request.case_list.Length == 1)
         try
         {
-            var sharedItem = MapToSharedModel(queue_item);
+            var sharedItem = MapToSharedModel(safeQueueItem);
             result = await _exportQueueManager.SaveQueueItemAsync(sharedItem, userName, db_config);
         
             if(_exportQueueManager.ShouldTriggerService(sharedItem, result))
@@ -142,11 +139,11 @@ public sealed class export_queueController: ControllerBase
                         configuration.GetString("vitals_url", host_prefix),
                         configuration.GetString("vital_service_key", host_prefix)
                     );
-                    System.Console.WriteLine($"Export queue processing delegated to mmria.services: {queue_item._id}");
+                    System.Console.WriteLine($"[EXPORT-QUEUE] delegated to mmria.services host_prefix='{host_prefix}' id='{safeQueueItem._id}'");
                 }
                 catch (Exception ex)
                 {
-                    System.Console.WriteLine($"Error calling mmria.services for export queue: {ex.Message}");
+                    System.Console.WriteLine($"[EXPORT-QUEUE] delegate failed host_prefix='{host_prefix}' id='{safeQueueItem._id}' error='{ex.Message}'");
                     // Don't fail the request - export will remain in queue and can be retried
                 }
             }
@@ -165,6 +162,74 @@ public sealed class export_queueController: ControllerBase
         return result;
 
     } 
+
+    private async System.Threading.Tasks.Task<export_queue_item> CreateSanitizedQueueItemAsync(export_queue_item request, string userName)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request._id))
+        {
+            return null;
+        }
+
+        mmria.common.SharedLibraries.ExportQueue.Model.ExportQueueItem existingItem = null;
+        try
+        {
+            existingItem = await _exportQueueManager.GetQueueItemAsync(request._id.Trim(), db_config);
+        }
+        catch
+        {
+            // Missing queue items are treated as creates.
+        }
+
+        var safeQueueItem = existingItem != null ? MapToServerModel(existingItem) : new export_queue_item();
+        safeQueueItem._id = request._id.Trim();
+        safeQueueItem._rev = !string.IsNullOrWhiteSpace(request._rev) ? request._rev : existingItem?._rev;
+        safeQueueItem.data_type = "export";
+        safeQueueItem._deleted = request._deleted;
+        safeQueueItem.date_created = existingItem?.date_created ?? DateTime.UtcNow;
+        safeQueueItem.created_by = !string.IsNullOrWhiteSpace(existingItem?.created_by) ? existingItem.created_by : userName;
+        safeQueueItem.date_last_updated = DateTime.UtcNow;
+        safeQueueItem.last_updated_by = userName;
+        safeQueueItem.file_name = NormalizeOptionalString(request.file_name) ?? safeQueueItem.file_name ?? safeQueueItem._id;
+        safeQueueItem.export_type = NormalizeOptionalString(request.export_type) ?? safeQueueItem.export_type;
+        safeQueueItem.status = NormalizeOptionalString(request.status) ?? safeQueueItem.status;
+        safeQueueItem.all_or_core = NormalizeOptionalString(request.all_or_core);
+        safeQueueItem.grantee_name = NormalizeOptionalString(request.grantee_name);
+        safeQueueItem.is_encrypted = NormalizeOptionalString(request.is_encrypted);
+        safeQueueItem.zip_key = NormalizeOptionalString(request.zip_key);
+        safeQueueItem.de_identified_selection_type = NormalizeOptionalString(request.de_identified_selection_type);
+        safeQueueItem.de_identified_field_set = request.de_identified_field_set != null
+            ? CloneTrimmedStringArray(request.de_identified_field_set)
+            : safeQueueItem.de_identified_field_set;
+        safeQueueItem.case_filter_type = NormalizeOptionalString(request.case_filter_type);
+        safeQueueItem.case_file_type = NormalizeOptionalString(request.case_file_type);
+        safeQueueItem.case_set = request.case_set != null ? CloneTrimmedStringArray(request.case_set) : safeQueueItem.case_set;
+        safeQueueItem.ExportType = request.ExportType;
+        safeQueueItem.field_set = request.field_set != null ? CloneTrimmedStringArray(request.field_set) : safeQueueItem.field_set;
+        safeQueueItem.pregnancy_relatedness = request.pregnancy_relatedness != null
+            ? (int[])request.pregnancy_relatedness.Clone()
+            : safeQueueItem.pregnancy_relatedness;
+        safeQueueItem.include_blank_date_of_reviews = request.include_blank_date_of_reviews;
+        safeQueueItem.include_blank_date_of_deaths = request.include_blank_date_of_deaths;
+        safeQueueItem.date_of_review_begin = request.date_of_review_begin;
+        safeQueueItem.date_of_review_end = request.date_of_review_end;
+        safeQueueItem.date_of_death_begin = request.date_of_death_begin;
+        safeQueueItem.date_of_death_end = request.date_of_death_end;
+
+        return safeQueueItem;
+    }
+
+    private static string NormalizeOptionalString(string value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static string[] CloneTrimmedStringArray(string[] source)
+    {
+        return source?
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Select(item => item.Trim())
+            .ToArray();
+    }
 
     private static mmria.common.SharedLibraries.ExportQueue.Model.ExportQueueItem MapToSharedModel(export_queue_item item)
     {

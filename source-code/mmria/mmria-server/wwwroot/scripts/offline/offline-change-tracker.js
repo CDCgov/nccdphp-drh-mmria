@@ -48,9 +48,7 @@ async function track_offline_document_change(documentId, updatedDocument, change
     // If still not found, fetch from cache and store it
     if (!originalDoc) {
         offlineLog.log('OfflineChangeTracker', 'Original document not found in memory, fetching from cache for:', documentId);
-        // We'll fetch it asynchronously and store it for future use
-        fetchAndStoreOriginalDocument(documentId, updatedDocument, changeDescription);
-        return;
+        return await fetchAndStoreOriginalDocument(documentId, updatedDocument, changeDescription, changeStack);
     }
     
     // Get session ID from localStorage
@@ -112,21 +110,28 @@ async function track_offline_document_change(documentId, updatedDocument, change
     
     // Store the change
     g_offline_changes.set(documentId, changeRecord);
+
+    offlineLog.info('OfflineChangeTracker', 'Tracked offline document change', {
+        documentId: documentId,
+        changeDescription: changeDescription,
+        changeCount: accumulatedChangeStack.length,
+        changedFields: accumulatedChangeStack.map(item => item.metadata_path).filter(Boolean)
+    });
     
     // Persist changes to localStorage
     save_offline_changes_to_storage();
     
     // Update the cached case document with the changes
-    try {
-        await update_cached_case_document(documentId, updatedDocument);
-    } catch (error) {
-        offlineLog.error('OfflineChangeTracker', 'Error updating cache:', error);
+    const cacheUpdated = await update_cached_case_document(documentId, updatedDocument);
+    if (cacheUpdated !== true) {
+        throw new Error(`Failed to update cached case document for ${documentId}`);
     }   
-
+    
+    return true;
 }
 
 // Helper function to fetch and store original document from cache
-async function fetchAndStoreOriginalDocument(documentId, updatedDocument, changeDescription) {
+async function fetchAndStoreOriginalDocument(documentId, updatedDocument, changeDescription, changeStack = []) {
     try {
         
         // Get case data from service worker cache
@@ -155,7 +160,7 @@ async function fetchAndStoreOriginalDocument(documentId, updatedDocument, change
             g_original_offline_documents.set(documentId, JSON.parse(JSON.stringify(originalCaseData)));
             
             // Now track the change with the original document
-            track_offline_document_change(documentId, updatedDocument, changeDescription);
+            return await track_offline_document_change(documentId, updatedDocument, changeDescription, changeStack);
         } else {
             offlineLog.warn('OfflineChangeTracker', 'Could not find original document in cache for:', documentId);
             // Still track the change but without original document for comparison
@@ -166,12 +171,18 @@ async function fetchAndStoreOriginalDocument(documentId, updatedDocument, change
                 timestamp: new Date().toISOString(),
                 changeDescription: changeDescription + ' (original document not available)',
                 userId: g_user_name || 'unknown_user',
-                sessionId: getSessionId()
+                sessionId: getSessionId(),
+                changeStackItems: Array.isArray(changeStack) ? changeStack : []
             };
             
             g_offline_changes.set(documentId, changeRecord);
             save_offline_changes_to_storage();
+            const cacheUpdated = await update_cached_case_document(documentId, updatedDocument);
+            if (cacheUpdated !== true) {
+                throw new Error(`Failed to update cached case document for ${documentId}`);
+            }
             offlineLog.log('OfflineChangeTracker', 'Change tracked without original document:', documentId);
+            return true;
         }
     } catch (error) {
         offlineLog.error('OfflineChangeTracker', 'Error fetching original document:', error);
@@ -183,12 +194,18 @@ async function fetchAndStoreOriginalDocument(documentId, updatedDocument, change
             timestamp: new Date().toISOString(),
             changeDescription: changeDescription + ' (fetch error)',
             userId: g_user_name || 'unknown_user',
-            sessionId: getSessionId()
+            sessionId: getSessionId(),
+            changeStackItems: Array.isArray(changeStack) ? changeStack : []
         };
         
         g_offline_changes.set(documentId, changeRecord);
         save_offline_changes_to_storage();
+        const cacheUpdated = await update_cached_case_document(documentId, updatedDocument);
+        if (cacheUpdated !== true) {
+            throw new Error(`Failed to update cached case document for ${documentId}`);
+        }
         offlineLog.log('OfflineChangeTracker', 'Change tracked with error fallback:', documentId);
+        return true;
     }
 }
 

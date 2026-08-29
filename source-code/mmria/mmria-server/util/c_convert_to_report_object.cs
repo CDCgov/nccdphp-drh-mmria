@@ -14,6 +14,9 @@ public sealed partial class c_convert_to_report_object
     mmria.common.couchdb.DBConfigurationDetail db_config = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly bool _isShowSyncDocumentStatus;
+    private readonly System.Dynamic.ExpandoObject _source_object;
+    private readonly mmria.common.metadata.app _metadata;
+    private readonly mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository _metadataRepository;
 
     private System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, string>> List_Look_Up;
 
@@ -111,8 +114,11 @@ public sealed partial class c_convert_to_report_object
         string p_metadata_version,
         mmria.common.couchdb.DBConfigurationDetail _db_config,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.MetadataVersion.IMetadataRepository metadataRepository,
         mmria.common.couchdb.OverridableConfiguration configuration = null,
-        string host_prefix = null
+        string host_prefix = null,
+        System.Dynamic.ExpandoObject p_source_object = null,
+        mmria.common.metadata.app p_metadata = null
     )
     {
 
@@ -121,6 +127,9 @@ public sealed partial class c_convert_to_report_object
         db_config = _db_config;
         _couchDbHttpClient = couchDbHttpClient;
         _isShowSyncDocumentStatus = configuration?.GetBoolean("is_show_sync_document_status", host_prefix ?? "shared") ?? true;
+        _source_object = p_source_object;
+        _metadata = p_metadata;
+        _metadataRepository = metadataRepository;
     }
 
 
@@ -130,9 +139,7 @@ public sealed partial class c_convert_to_report_object
         string result = null;
         //Get_Value_Result value_result = null;
 
-        string metadata_url = db_config.url + $"/metadata/version_specification-{metadata_version}/metadata";
-        string metadata_response = await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, db_config.user_name, db_config.user_value);
-        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_response);
+        var metadata = _metadata ?? await _metadataRepository.GetAppDocumentAsync(metadata_version, db_config);
 
 
         List_Look_Up = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
@@ -146,7 +153,7 @@ public sealed partial class c_convert_to_report_object
 
         c_report_object report_object;
 
-        System.Dynamic.ExpandoObject source_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (source_json);
+        System.Dynamic.ExpandoObject source_object = _source_object ?? Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (source_json);
         //dynamic source_object = Newtonsoft.Json.Linq.JObject.Parse(source_json);
 
         report_object = new c_report_object ();
@@ -409,10 +416,6 @@ public sealed partial class c_convert_to_report_object
                 }
                 else if (index != null)
                 {
-                    if (_isShowSyncDocumentStatus)
-                    {
-                        System.Console.WriteLine(index.GetType());
-                    }
                     /*
                     else if (index != null && index[path[i]].GetType() == typeof(IList<object>))
                     {
@@ -969,6 +972,62 @@ death_certificate/Race/race = Other
     }
 
 
+    private static bool try_get_safe_int_value(object value, out int result)
+    {
+        switch(value)
+        {
+            case int int_value:
+                result = int_value;
+                return true;
+            case long long_value when long_value >= int.MinValue && long_value <= int.MaxValue:
+                result = (int)long_value;
+                return true;
+            case short short_value:
+                result = short_value;
+                return true;
+            case byte byte_value:
+                result = byte_value;
+                return true;
+            case sbyte sbyte_value:
+                result = sbyte_value;
+                return true;
+            case ushort ushort_value:
+                result = ushort_value;
+                return true;
+            case uint uint_value when uint_value <= int.MaxValue:
+                result = (int)uint_value;
+                return true;
+            case ulong ulong_value when ulong_value <= int.MaxValue:
+                result = (int)ulong_value;
+                return true;
+            case decimal decimal_value when decimal.Truncate(decimal_value) == decimal_value &&
+                                            decimal_value >= int.MinValue &&
+                                            decimal_value <= int.MaxValue:
+                result = (int)decimal_value;
+                return true;
+            case double double_value when !double.IsNaN(double_value) &&
+                                          !double.IsInfinity(double_value) &&
+                                          Math.Truncate(double_value) == double_value &&
+                                          double_value >= int.MinValue &&
+                                          double_value <= int.MaxValue:
+                result = (int)double_value;
+                return true;
+            case float float_value when !float.IsNaN(float_value) &&
+                                        !float.IsInfinity(float_value) &&
+                                        MathF.Truncate(float_value) == float_value &&
+                                        float_value >= int.MinValue &&
+                                        float_value <= int.MaxValue:
+                result = (int)float_value;
+                return true;
+            case string string_value:
+                return int.TryParse(string_value, out result);
+            default:
+                result = -1;
+                return false;
+        }
+    }
+
+
     private void popluate_pregnancy_deaths_by_pregnant_at_time_of_death(ref c_report_object p_report_object, System.Dynamic.ExpandoObject p_source_object)
     {
 
@@ -1027,18 +1086,10 @@ pregnancy_status <- list field
             length_between_child_birth_and_death_of_mother_dynamic = get_value_result.result;
         }
         
-        int length_between_child_birth_and_death_of_mother =  -1;
-        if(length_between_child_birth_and_death_of_mother_dynamic is string)
+        int length_between_child_birth_and_death_of_mother = -1;
+        if(!try_get_safe_int_value(length_between_child_birth_and_death_of_mother_dynamic, out length_between_child_birth_and_death_of_mother))
         {
-            string length_between_child_birth_and_death_of_mother_string = length_between_child_birth_and_death_of_mother_dynamic as string;
-            if(!int.TryParse(length_between_child_birth_and_death_of_mother_string, out length_between_child_birth_and_death_of_mother))
-            {
-                length_between_child_birth_and_death_of_mother = -1;
-            }
-        }
-        else if(length_between_child_birth_and_death_of_mother_dynamic is Int64)
-        {
-            length_between_child_birth_and_death_of_mother = (int) length_between_child_birth_and_death_of_mother_dynamic;
+            length_between_child_birth_and_death_of_mother = -1;
         }
 
         

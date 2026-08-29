@@ -15,27 +15,24 @@ namespace mmria.server;
 public sealed class syncController: ControllerBase 
 { 
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.MMRIARebuild.Manager.MMRIARebuildManager _mmriaRebuildManager;
     string host_prefix = null;
     public syncController
     (
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.MMRIARebuild.Manager.MMRIARebuildManager mmriaRebuildManager
     )
     {
-        configuration = _configuration;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
         _couchDbHttpClient = couchDbHttpClient;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        _mmriaRebuildManager = mmriaRebuildManager;
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
     }
 
     [HttpGet]
@@ -43,34 +40,27 @@ public sealed class syncController: ControllerBase
     {
         string result = null;
 
-        System.Threading.Tasks.Task.Run
-        (
-            new Action (() =>
+        System.Threading.Tasks.Task.Run(async () =>
+        {
+            try 
             {
+                string rebuildServiceUrl = mmria.common.SharedLibraries.MMRIARebuild.Manager.MMRIARebuildManager.BuildServiceUrl(
+                    configuration.GetString("vitals_url", host_prefix));
 
-                try 
-                {
-                    
-                    mmria.server.utils.c_document_sync_all sync_all = new mmria.server.utils.c_document_sync_all 
-                    (
-                        db_config.url,
-                        db_config.user_name,
-                        db_config.user_value,
-                        configuration.GetString("metadata_version", host_prefix),
-                        db_config,
-                        _couchDbHttpClient,
-                        configuration,
-                        host_prefix
-                    );
-
-                    sync_all.executeAsync (); 
-                }
-                catch (Exception ex) 
-                {
-                    System.Console.WriteLine ($"syncController. error sync_all.execute\n{ex}");
-                }
-            })
-        );
+                await _mmriaRebuildManager.QueueRebuildOnServiceAsync(
+                    new mmria.common.SharedLibraries.MMRIARebuild.Model.MMRIARebuildRequest
+                    {
+                        tenant = host_prefix,
+                        source = "manual"
+                    },
+                    rebuildServiceUrl,
+                    configuration.GetString("vital_service_key", host_prefix));
+            }
+            catch (Exception ex) 
+            {
+                System.Console.WriteLine ($"syncController. error sync_all.execute\n{ex}");
+            }
+        });
         
 
         return result;

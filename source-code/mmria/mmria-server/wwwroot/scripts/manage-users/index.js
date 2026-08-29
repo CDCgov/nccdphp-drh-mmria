@@ -369,17 +369,31 @@ function add_new_user_click()
 async function export_user_list_click()
 {
     console.log("export user list clicked");
-    const excel_user_lists = g_user_role_jurisdiction
+
+    // Rows for filtered users who have at least one role-jurisdiction assignment.
+    const role_rows = g_user_role_jurisdiction
         .filter(item => item.user_id !== null && item.user_id !== "")
-        .filter(item => g_ui.user_summary_list.find(user => user.name === item.user_id))
+        .filter(item => g_filtered_user_list.find(user => user.name === item.user_id)); // depends on g_filtered_user_list initialized by summary_renderer.js
+
+    // Sentinel rows for filtered users with no role assignments — they appear in
+    // the table but are absent from g_user_role_jurisdiction.  Include them so
+    // the export matches exactly what the admin sees in the filtered table.
+    const role_user_ids = new Set(role_rows.map(item => item.user_id));
+    const no_role_rows = g_filtered_user_list
+        .filter(user => !role_user_ids.has(user.name))
+        .map(user => ({ user_id: user.name, role_name: "", jurisdiction_id: "", is_active: null }));
+
+    const excel_user_lists = [...role_rows, ...no_role_rows]
         .sort((a, b) => a.user_id.localeCompare(b.user_id));
-    
+
     // Prepare data for export
     const exportData = {
         title: "User Management Export",
         users: excel_user_lists.map(item => ({
             user_id: item.user_id,
-            role_name: `${format_role_label(item.role_name)} (${item.is_active ? "Active" : "Inactive"})`,
+            role_name: item.role_name
+                ? `${format_role_label(item.role_name)} (${item.is_active ? "Active" : "Inactive"})`
+                : "",
             jurisdiction_id: item.jurisdiction_id === "/" ? "Top Folder" : item.jurisdiction_id,
         }))
     };

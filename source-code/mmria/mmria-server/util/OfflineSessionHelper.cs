@@ -1,7 +1,9 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using mmria.common.SharedLibraries.OfflineCase;
 using mmria.common.SharedLibraries.OfflineCase.Model;
+using mmria.common.utils;
 
 namespace mmria.server.util
 {
@@ -22,7 +24,7 @@ namespace mmria.server.util
         public static async Task<OfflineSessionStatus> CheckActiveOfflineSession(
             mmria.common.couchdb.DBConfigurationDetail db_config,
             string userName,
-            mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+            IOfflineCaseRepository offlineCaseRepository)
         {
             try
             {
@@ -37,11 +39,7 @@ namespace mmria.server.util
                 }
 
                 // Query the offline_cases view for all documents
-                string request_string = db_config.Get_Prefix_DB_Url("offline_cases/_design/sortable/_view/by-created-by");
-                string responseFromServer = await couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value, "application/json");
-
-                // Deserialize to strongly typed response
-                var offline_case_documents = Newtonsoft.Json.JsonConvert.DeserializeObject<OfflineCaseListResponse>(responseFromServer);
+                var offline_case_documents = await offlineCaseRepository.GetAllActiveSessionsAsync(db_config);
 
                 // Filter for current user and active states (0 or 1)
                 var active_sessions = offline_case_documents.rows.Where(row =>
@@ -91,7 +89,7 @@ namespace mmria.server.util
         public static async Task<OfflineSessionStatusLight> CheckActiveOfflineSessionLight(
             mmria.common.couchdb.DBConfigurationDetail db_config,
             string userName,
-            mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+            IOfflineCaseRepository offlineCaseRepository)
         {
             try
             {
@@ -106,11 +104,7 @@ namespace mmria.server.util
                 }
 
                 // Query the offline_cases view for all documents
-                string request_string = db_config.Get_Prefix_DB_Url("offline_cases/_design/sortable/_view/lightweight-status-only");
-                string responseFromServer = await couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value, "application/json");
-
-                // Deserialize to strongly typed response
-                var offline_case_documents = Newtonsoft.Json.JsonConvert.DeserializeObject<LightweightOfflineCaseListResponse>(responseFromServer);
+                var offline_case_documents = await offlineCaseRepository.GetAllLightweightOfflineCasesAsync(db_config);
 
                 // Filter for current user and active states (0 or 1)
                 var active_sessions = offline_case_documents.rows.Where(row =>

@@ -1,37 +1,15 @@
-FROM idefault-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-80@sha256:d815f801d82d35b69919d2cd234068bea36fefaaa0f2b84832d8fedcc19d9abe
+# S2I builder-image customization for MMRIA
+# Base: dotnet-100 SDK on RHEL 9.8 (UBI 9)
+# https://catalog.redhat.com/en/software/containers/ubi9/dotnet-100/672bc9015e6e9c0c6f7d2ff7
+FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-100:9.8-1784594615@sha256:c71106c2ad6009ee6238dc383f8bf4afe8539df2e4868ca0e1d9e1a724fe1d02
 
-RUN apt update
-RUN apt install -y clang zlib1g-dev
+USER root
 
-RUN mkdir /home/net_core_user
-RUN mkdir /home/net_core_user/app
+# Update OS packages to pull in latest security fixes:
+#   libacl: CVE-2026-54369 (symlink traversal privilege escalation; fixed in libacl-2.4.0-1.el9_8)
+#   curl-minimal / libcurl-minimal: CVE-2026-11352, CVE-2026-11586, CVE-2026-8286,
+#     CVE-2026-8925, CVE-2026-9547 (DoS / TLS-reuse / double-free; no upstream fix
+#     released yet — update ensures fix is applied automatically when available)
+RUN dnf update -y libacl curl-minimal libcurl-minimal && dnf clean all
 
-RUN dotnet restore "/source-code/mmria/mmria-server/mmria-server.csproj"
-RUN dotnet build "/source-code/mmria/mmria-server/mmria-server.csproj" -c Release -o /home/net_core_user/app/mmria-server
-
-
-
-
-#COPY /source-code/mmria/mmria-server/bin/Release/.net8.0/rhel.7-x64/publish /home/net_core_user/app/
-#COPY appsettings.json /home/net_core_user/app/
-
-#COPY ./app/mmria/mmria-server/database-scripts/metadata_design_auth.json /home/net_core_user/app/database-scripts/metadata_design_auth.json
-#COPY ./app/mmria/mmria-server/database-scripts/metadata.json /home/net_core_user/app/database-scripts/metadata.json
-#COPY ./app/mmria/mmria-server/database-scripts/MMRIA_calculations.js /home/net_core_user/app/database-scripts/MMRIA_calculations.js
-#COPY ./app/mmria/mmria-server/database-scripts/mmria-check-code.js /home/net_core_user/app/database-scripts/mmria-check-code.js
-#COPY ./app/mmria/mmria-server/database-scripts/case_design_sortable.json /home/net_core_user/app/database-scripts/case_design_sortable.json
-#COPY ./app/mmria/mmria-server/database-scripts/case_store_design_auth.json /home/net_core_user/app/database-scripts/case_store_design_auth.json
-#COPY ./app/mmria/mmria-server/database-scripts/de-identified-list.json /home/net_core_user/app/database-scripts/de-identified-list.json
-#COPY ./app/mmria/mmria-server/database-scripts/jurisdiction_design_auth.json /home/net_core_user/app/database-scripts/jurisdiction_design_auth.json
-#COPY ./app/mmria/mmria-server/database-scripts/jurisdiction_sortable.json /home/net_core_user/app/database-scripts/jurisdiction_sortable.json
-
-
-RUN mkdir /home/net_core_user/app/workdir
-
-ENV HOME /home/net_core_user/app
-WORKDIR /home/net_core_user/app
-
-# Expose port 8080 for the application.
-EXPOSE 8080
 USER 1001
-ENTRYPOINT ["/home/net_core_user/app/mmria-server"]
