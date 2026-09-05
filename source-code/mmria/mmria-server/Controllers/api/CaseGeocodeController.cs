@@ -94,7 +94,7 @@ public sealed class CaseGeocodeController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "case-geocode: failed to parse request body for case {CaseId}", safeCaseId);
+            _logger.LogWarning(ex, "case-geocode: failed to parse request body.");
             return BadRequest(new { error = "Invalid request body." });
         }
 
@@ -116,7 +116,7 @@ public sealed class CaseGeocodeController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "case-geocode: failed to load case {CaseId}", safeCaseId);
+            _logger.LogError(ex, "case-geocode: failed to load case document.");
             return StatusCode(500, new { error = "Failed to load case document." });
         }
 
@@ -132,7 +132,7 @@ public sealed class CaseGeocodeController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "case-geocode: failed to parse case {CaseId}", safeCaseId);
+            _logger.LogError(ex, "case-geocode: failed to parse case document.");
             return StatusCode(500, new { error = "Failed to parse case document." });
         }
 
@@ -163,7 +163,7 @@ public sealed class CaseGeocodeController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "case-geocode: geocode call failed for case {CaseId}", safeCaseId);
+            _logger.LogError(ex, "case-geocode: geocode call failed.");
             return StatusCode(500, new { error = "Geocode lookup failed." });
         }
 
@@ -186,7 +186,7 @@ public sealed class CaseGeocodeController : ControllerBase
             catch (Exception ex)
             {
                 // CVS failures are non-fatal — the geocode has already been applied.
-                _logger.LogWarning(ex, "case-geocode: CVS lookup failed for case {CaseId} — continuing", safeCaseId);
+                _logger.LogWarning(ex, "case-geocode: CVS lookup failed — continuing.");
             }
         }
 
@@ -202,7 +202,7 @@ public sealed class CaseGeocodeController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "case-geocode: failed to save case {CaseId}", safeCaseId);
+            _logger.LogError(ex, "case-geocode: failed to save case document.");
             return StatusCode(500, new { error = "Failed to save case document." });
         }
 
